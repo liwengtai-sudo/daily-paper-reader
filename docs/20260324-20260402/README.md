@@ -1,20 +1,108 @@
 # 日报 · 2026-03-24 ~ 2026-04-02
 
-- 生成时间：2026-04-02 04:52:31 UTC
-- 当次推荐总数：0
-- 精读区：0
-- 速读区：0
+- 生成时间：2026-04-02 06:34:15 UTC
+- 当次推荐总数：90
+- 精读区：78
+- 速读区：12
 
 ## 今日简报（AI）
-> 今日无新推荐，系统未产出可展示论文。
-
-> 本次触发没有产出可推荐论文。
+本期精选 90 篇前沿成果，深度解析医疗 AI 在病灶追踪与病理图像理解领域的满分突破。
+重点关注 PSMA 诊疗自动化分割及多模态大模型对全切片图像的分层解析，标志着精准医疗迈向新阶段。
+推荐探索因果推理与专家眼动轨迹在医学视觉模型中的应用，以掌握提升诊断可信度的前沿路径。
 
 ## 精读区
-- 本次无精读推荐。
+1. [Towards Routine AI-Based PET/CT and SPECT/CT Lesion Segmentation and Tracking in PSMA Theranostics](/20260324-20260402/2603.22666v1-towards-routine-ai-based-petct-and-spectct-lesion-segmentation-and-tracking-in-psma-theranostics) （10.0/10）
+2. [MLLM-HWSI: A Multimodal Large Language Model for Hierarchical Whole Slide Image Understanding](/20260324-20260402/2603.23067v2-mllm-hwsi-a-multimodal-large-language-model-for-hierarchical-whole-slide-image-understanding) （10.0/10）
+3. [An Explainable AI-Driven Framework for Automated Brain Tumor Segmentation Using an Attention-Enhanced U-Net](/20260324-20260402/2603.23344v1-an-explainable-ai-driven-framework-for-automated-brain-tumor-segmentation-using-an-attention-enhanced-u-net) （10.0/10）
+4. [Central Dogma Transformer III: Interpretable AI Across DNA, RNA, and Protein](/20260324-20260402/2603.23361v2-central-dogma-transformer-iii-interpretable-ai-across-dna-rna-and-protein) （10.0/10）
+5. [Detection and Classification of (Pre)Cancerous Cells in Pap Smears: An Ensemble Strategy for the RIVA Cervical Cytology Challenge](/20260324-20260402/2603.23742v1-detection-and-classification-of-precancerous-cells-in-pap-smears-an-ensemble-strategy-for-the-riva-cervical-cytology-challenge) （10.0/10）
+6. [3D-LLDM: Label-Guided 3D Latent Diffusion Model for Improving High-Resolution Synthetic MR Imaging in Hepatic Structure Segmentation](/20260324-20260402/2603.23845v1-3d-lldm-label-guided-3d-latent-diffusion-model-for-improving-high-resolution-synthetic-mr-imaging-in-hepatic-structure-segmentation) （10.0/10）
+7. [DeepDTF: Dual-Branch Transformer Fusion for Multi-Omics Anticancer Drug Response Prediction](/20260324-20260402/2603.24265v1-deepdtf-dual-branch-transformer-fusion-for-multi-omics-anticancer-drug-response-prediction) （10.0/10）
+8. [Robust Multicenter CT Radiogenomics for Dual EGFR and KRAS Prediction in Lung Cancer with Stability-Aware Modeling and SHAP Interpretation](/20260324-20260402/2603.24922v1-robust-multicenter-ct-radiogenomics-for-dual-egfr-and-kras-prediction-in-lung-cancer-with-stability-aware-modeling-and-shap-interpretation) （10.0/10）
+9. [DeepFAN, a transformer-based deep learning model for human-artificial intelligence collaborative assessment of incidental pulmonary nodules in CT scans: a multi-reader, multi-case trial](/20260324-20260402/2603.25607v1-deepfan-a-transformer-based-deep-learning-model-for-human-artificial-intelligence-collaborative-assessment-of-incidental-pulmonary-nodules-in-ct-scans-a-multi-reader-multi-case-trial) （10.0/10）
+10. [LEMON: a foundation model for nuclear morphology in Computational Pathology](/20260324-20260402/2603.25802v1-lemon-a-foundation-model-for-nuclear-morphology-in-computational-pathology) （10.0/10）
+11. [MUST: Modality-Specific Representation-Aware Transformer for Diffusion-Enhanced Survival Prediction with Missing Modality](/20260324-20260402/2603.26071v1-must-modality-specific-representation-aware-transformer-for-diffusion-enhanced-survival-prediction-with-missing-modality) （10.0/10）
+12. [DPD-Cancer: Explainable Graph-based Deep Learning for Small Molecule Anti-Cancer Activity Prediction](/20260324-20260402/2603.26114v1-dpd-cancer-explainable-graph-based-deep-learning-for-small-molecule-anti-cancer-activity-prediction) （10.0/10）
+13. [Dictionary-based Pathology Mining with Hard-instance-assisted Classifier Debiasing for Genetic Biomarker Prediction from WSIs](/20260324-20260402/2603.26809v1-dictionary-based-pathology-mining-with-hard-instance-assisted-classifier-debiasing-for-genetic-biomarker-prediction-from-wsis) （10.0/10）
+14. [Central-to-Local Adaptive Generative Diffusion Framework for Improving Gene Expression Prediction in Data-Limited Spatial Transcriptomics](/20260324-20260402/2603.26827v1-central-to-local-adaptive-generative-diffusion-framework-for-improving-gene-expression-prediction-in-data-limited-spatial-transcriptomics) （10.0/10）
+15. [Statistical modeling of breast cancer radiomic features and hazard using image registration-aided longitudinal CT data](/20260324-20260402/2603.26888v1-statistical-modeling-of-breast-cancer-radiomic-features-and-hazard-using-image-registration-aided-longitudinal-ct-data) （10.0/10）
+16. [MOOZY: A Patient-First Foundation Model for Computational Pathology](/20260324-20260402/2603.27048v1-moozy-a-patient-first-foundation-model-for-computational-pathology) （10.0/10）
+17. [Pan-Cancer Mapping of the Tumor Immune Landscape through Metagene Clustering and Predictive Modeling](/20260324-20260402/2603.27145v1-pan-cancer-mapping-of-the-tumor-immune-landscape-through-metagene-clustering-and-predictive-modeling) （10.0/10）
+18. [Adapting SAM to Nuclei Instance Segmentation and Classification via Cooperative Fine-Grained Refinement](/20260324-20260402/2603.28027v1-adapting-sam-to-nuclei-instance-segmentation-and-classification-via-cooperative-fine-grained-refinement) （10.0/10）
+19. [Physics-Embedded Feature Learning for AI in Medical Imaging](/20260324-20260402/2603.28057v1-physics-embedded-feature-learning-for-ai-in-medical-imaging) （10.0/10）
+20. [Optimized Weighted Voting System for Brain Tumor Classification Using MRI Images](/20260324-20260402/2603.28357v1-optimized-weighted-voting-system-for-brain-tumor-classification-using-mri-images) （10.0/10）
+21. [ChemCLIP: Bridging Organic and Inorganic Anticancer Compounds Through Contrastive Learning](/20260324-20260402/2603.28575v1-chemclip-bridging-organic-and-inorganic-anticancer-compounds-through-contrastive-learning) （10.0/10）
+22. [NeoNet: An End-to-End 3D MRI-Based Deep Learning Framework for Non-Invasive Prediction of Perineural Invasion via Generation-Driven Classification](/20260324-20260402/2603.29449v1-neonet-an-end-to-end-3d-mri-based-deep-learning-framework-for-non-invasive-prediction-of-perineural-invasion-via-generation-driven-classification) （10.0/10）
+23. [Exploring the Impact of Skin Color on Skin Lesion Segmentation](/20260324-20260402/2603.29694v1-exploring-the-impact-of-skin-color-on-skin-lesion-segmentation) （10.0/10）
+24. [Multimodal Machine Learning for Early Prediction of Metastasis in a Swedish Multi-Cancer Cohort](/20260324-20260402/2603.29793v1-multimodal-machine-learning-for-early-prediction-of-metastasis-in-a-swedish-multi-cancer-cohort) （10.0/10）
+25. [Trimodal Deep Learning for Glioma Survival Prediction: A Feasibility Study Integrating Histopathology, Gene Expression, and MRI](/20260324-20260402/2603.29968v1-trimodal-deep-learning-for-glioma-survival-prediction-a-feasibility-study-integrating-histopathology-gene-expression-and-mri) （10.0/10）
+26. [Quantifying Cross-Modal Interactions in Multimodal Glioma Survival Prediction via InterSHAP: Evidence for Additive Signal Integration](/20260324-20260402/2603.29977v1-quantifying-cross-modal-interactions-in-multimodal-glioma-survival-prediction-via-intershap-evidence-for-additive-signal-integration) （10.0/10）
+27. [Genetic algorithms for multi-omic feature selection: a comparative study in cancer survival analysis](/20260324-20260402/2604.00065v1-genetic-algorithms-for-multi-omic-feature-selection-a-comparative-study-in-cancer-survival-analysis) （10.0/10）
+28. [Improving Generalization of Deep Learning for Brain Metastases Segmentation Across Institutions](/20260324-20260402/2604.00397v1-improving-generalization-of-deep-learning-for-brain-metastases-segmentation-across-institutions) （10.0/10）
+29. [BioCOMPASS: Integrating Biomarkers into Transformer-Based Immunotherapy Response Prediction](/20260324-20260402/2604.00739v1-biocompass-integrating-biomarkers-into-transformer-based-immunotherapy-response-prediction) （10.0/10）
+30. [Understanding Transformers and Attention Mechanisms: An Introduction for Applied Mathematicians](/20260324-20260402/2604.00965v1-understanding-transformers-and-attention-mechanisms-an-introduction-for-applied-mathematicians) （10.0/10）
+31. [Maximizing T2-Only Prostate Cancer Localization from Expected Diffusion Weighted Imaging](/20260324-20260402/2604.00985v1-maximizing-t2-only-prostate-cancer-localization-from-expected-diffusion-weighted-imaging) （10.0/10）
+32. [Vision-based Deep Learning Analysis of Unordered Biomedical Tabular Datasets via Optimal Spatial Cartography](/20260324-20260402/2603.22675v1-vision-based-deep-learning-analysis-of-unordered-biomedical-tabular-datasets-via-optimal-spatial-cartography) （9.0/10）
+33. [A Clinically Anchored Radiomics Dictionary for Explainable TI-RADS-Based Thyroid Nodule Classification in Ultrasound; Dictionary Version TU1.0](/20260324-20260402/2603.22692v1-a-clinically-anchored-radiomics-dictionary-for-explainable-ti-rads-based-thyroid-nodule-classification-in-ultrasound-dictionary-version-tu10) （9.0/10）
+34. [Cross-Slice Knowledge Transfer via Masked Multi-Modal Heterogeneous Graph Contrastive Learning for Spatial Gene Expression Inference](/20260324-20260402/2603.22821v1-cross-slice-knowledge-transfer-via-masked-multi-modal-heterogeneous-graph-contrastive-learning-for-spatial-gene-expression-inference) （9.0/10）
+35. [HUydra: Full-Range Lung CT Synthesis via Multiple HU Interval Generative Modelling](/20260324-20260402/2603.23041v1-huydra-full-range-lung-ct-synthesis-via-multiple-hu-interval-generative-modelling) （9.0/10）
+36. [MLLM-HWSI: A Multimodal Large Language Model for Hierarchical Whole Slide Image Understanding](/20260324-20260402/2603.23067v1-mllm-hwsi-a-multimodal-large-language-model-for-hierarchical-whole-slide-image-understanding) （9.0/10）
+37. [Sparser, Faster, Lighter Transformer Language Models](/20260324-20260402/2603.23198v1-sparser-faster-lighter-transformer-language-models) （9.0/10）
+38. [Mamba-driven MRI-to-CT Synthesis for MRI-only Radiotherapy Planning](/20260324-20260402/2603.23295v1-mamba-driven-mri-to-ct-synthesis-for-mri-only-radiotherapy-planning) （9.0/10）
+39. [Curriculum-Driven 3D CT Report Generation via Language-Free Visual Grafting and Zone-Constrained Compression](/20260324-20260402/2603.23308v1-curriculum-driven-3d-ct-report-generation-via-language-free-visual-grafting-and-zone-constrained-compression) （9.0/10）
+40. [Central Dogma Transformer III: Interpretable AI Across DNA, RNA, and Protein](/20260324-20260402/2603.23361v1-central-dogma-transformer-iii-interpretable-ai-across-dna-rna-and-protein) （9.0/10）
+41. [Harnessing Lightweight Transformer with Contextual Synergic Enhancement for Efficient 3D Medical Image Segmentation](/20260324-20260402/2603.23390v1-harnessing-lightweight-transformer-with-contextual-synergic-enhancement-for-efficient-3d-medical-image-segmentation) （9.0/10）
+42. [A Large-Scale Comparative Analysis of Imputation Methods for Single-Cell RNA Sequencing Data](/20260324-20260402/2603.24626v1-a-large-scale-comparative-analysis-of-imputation-methods-for-single-cell-rna-sequencing-data) （9.0/10）
+43. [BCMDA: Bidirectional Correlation Maps Domain Adaptation for Mixed Domain Semi-Supervised Medical Image Segmentation](/20260324-20260402/2603.24691v1-bcmda-bidirectional-correlation-maps-domain-adaptation-for-mixed-domain-semi-supervised-medical-image-segmentation) （9.0/10）
+44. [NeuroVLM-Bench: Evaluation of Vision-Enabled Large Language Models for Clinical Reasoning in Neurological Disorders](/20260324-20260402/2603.24846v1-neurovlm-bench-evaluation-of-vision-enabled-large-language-models-for-clinical-reasoning-in-neurological-disorders) （9.0/10）
+45. [SurgPhase: Time efficient pituitary tumor surgery phase recognition via an interactive web platform](/20260324-20260402/2603.24897v1-surgphase-time-efficient-pituitary-tumor-surgery-phase-recognition-via-an-interactive-web-platform) （9.0/10）
+46. [Improving Infinitely Deep Bayesian Neural Networks with Nesterov's Accelerated Gradient Method](/20260324-20260402/2603.25024v1-improving-infinitely-deep-bayesian-neural-networks-with-nesterovs-accelerated-gradient-method) （9.0/10）
+47. [Lingshu-Cell: A generative cellular world model for transcriptome modeling toward virtual cells](/20260324-20260402/2603.25240v1-lingshu-cell-a-generative-cellular-world-model-for-transcriptome-modeling-toward-virtual-cells) （9.0/10）
+48. [FEAST: Fully Connected Expressive Attention for Spatial Transcriptomics](/20260324-20260402/2603.25247v1-feast-fully-connected-expressive-attention-for-spatial-transcriptomics) （9.0/10）
+49. [Physics-informed structured learning of a class of recurrent neural networks with guaranteed properties](/20260324-20260402/2603.25574v1-physics-informed-structured-learning-of-a-class-of-recurrent-neural-networks-with-guaranteed-properties) （9.0/10）
+50. [Colon-Bench: An Agentic Workflow for Scalable Dense Lesion Annotation in Full-Procedure Colonoscopy Videos](/20260324-20260402/2603.25645v1-colon-bench-an-agentic-workflow-for-scalable-dense-lesion-annotation-in-full-procedure-colonoscopy-videos) （9.0/10）
+51. [QHap: Quantum-Inspired Haplotype Phasing](/20260324-20260402/2603.25762v1-qhap-quantum-inspired-haplotype-phasing) （9.0/10）
+52. [Focus-to-Perceive Representation Learning: A Cognition-Inspired Hierarchical Framework for Endoscopic Video Analysis](/20260324-20260402/2603.25778v1-focus-to-perceive-representation-learning-a-cognition-inspired-hierarchical-framework-for-endoscopic-video-analysis) （9.0/10）
+53. [Adapting Segment Anything Model 3 for Concept-Driven Lesion Segmentation in Medical Images: An Experimental Study](/20260324-20260402/2603.25945v1-adapting-segment-anything-model-3-for-concept-driven-lesion-segmentation-in-medical-images-an-experimental-study) （9.0/10）
+54. [Switch Attention: Towards Dynamic and Fine-grained Hybrid Transformers](/20260324-20260402/2603.26380v1-switch-attention-towards-dynamic-and-fine-grained-hybrid-transformers) （9.0/10）
+55. [Clinical named entity recognition in the Portuguese language: a benchmark of modern BERT models and LLMs](/20260324-20260402/2603.26510v1-clinical-named-entity-recognition-in-the-portuguese-language-a-benchmark-of-modern-bert-models-and-llms) （9.0/10）
+56. [Beyond Benchmarks: A Framework for Post Deployment Validation of CT Lung Nodule Detection AI](/20260324-20260402/2603.26785v1-beyond-benchmarks-a-framework-for-post-deployment-validation-of-ct-lung-nodule-detection-ai) （9.0/10）
+57. [PhyDCM: A Reproducible Open-Source Framework for AI-Assisted Brain Tumor Classification from Multi-Sequence MRI](/20260324-20260402/2603.26794v1-phydcm-a-reproducible-open-source-framework-for-ai-assisted-brain-tumor-classification-from-multi-sequence-mri) （9.0/10）
+58. [A Hierarchical Sheaf Spectral Embedding Framework for Single-Cell RNA-seq Analysis](/20260324-20260402/2603.26858v1-a-hierarchical-sheaf-spectral-embedding-framework-for-single-cell-rna-seq-analysis) （9.0/10）
+59. [ImmSET: Sequence-Based Predictor of TCR-pMHC Specificity at Scale](/20260324-20260402/2603.26994v1-immset-sequence-based-predictor-of-tcr-pmhc-specificity-at-scale) （9.0/10）
+60. [MOOZY: A Patient-First Foundation Model for Computational Pathology](/20260324-20260402/2603.27048v2-moozy-a-patient-first-foundation-model-for-computational-pathology) （9.0/10）
+61. [Model-free Feature Screening via Revised Chatterjee's Rank Correlation for Ultra-high Dimensional Censored Data](/20260324-20260402/2603.27085v1-model-free-feature-screening-via-revised-chatterjees-rank-correlation-for-ultra-high-dimensional-censored-data) （9.0/10）
+62. [Preconditioned Attention: Enhancing Efficiency in Transformers](/20260324-20260402/2603.27153v1-preconditioned-attention-enhancing-efficiency-in-transformers) （9.0/10）
+63. [DeepBayesFlow: A Bayesian Structured Variational Framework for Generalizable Prostate Segmentation via Expressive Posteriors and SDE-Girsanov Uncertainty Modeling](/20260324-20260402/2603.27263v1-deepbayesflow-a-bayesian-structured-variational-framework-for-generalizable-prostate-segmentation-via-expressive-posteriors-and-sde-girsanov-uncertainty-modeling) （9.0/10）
+64. [Clore: Interactive Pathology Image Segmentation with Click-based Local Refinement](/20260324-20260402/2603.27625v1-clore-interactive-pathology-image-segmentation-with-click-based-local-refinement) （9.0/10）
+65. [Object Detection Based on Distributed Convolutional Neural Networks](/20260324-20260402/2603.28050v1-object-detection-based-on-distributed-convolutional-neural-networks) （9.0/10）
+66. [Prototype-Enhanced Multi-View Learning for Thyroid Nodule Ultrasound Classification](/20260324-20260402/2603.28315v1-prototype-enhanced-multi-view-learning-for-thyroid-nodule-ultrasound-classification) （9.0/10）
+67. [Building evidence-based knowledge graphs from full-text literature for disease-specific biomedical reasoning](/20260324-20260402/2603.28325v1-building-evidence-based-knowledge-graphs-from-full-text-literature-for-disease-specific-biomedical-reasoning) （9.0/10）
+68. [Building evidence-based knowledge graphs from full-text literature for disease-specific biomedical reasoning](/20260324-20260402/2603.28325v2-building-evidence-based-knowledge-graphs-from-full-text-literature-for-disease-specific-biomedical-reasoning) （9.0/10）
+69. [Key-Embedded Privacy for Decentralized AI in Biomedical Omics](/20260324-20260402/2603.28334v1-key-embedded-privacy-for-decentralized-ai-in-biomedical-omics) （9.0/10）
+70. [KGroups: A Versatile Univariate Max-Relevance Min-Redundancy Feature Selection Algorithm for High-dimensional Biological Data](/20260324-20260402/2603.28417v1-kgroups-a-versatile-univariate-max-relevance-min-redundancy-feature-selection-algorithm-for-high-dimensional-biological-data) （9.0/10）
+71. [Rich-U-Net: A medical image segmentation model for fusing spatial depth features and capturing minute structural details](/20260324-20260402/2603.29404v1-rich-u-net-a-medical-image-segmentation-model-for-fusing-spatial-depth-features-and-capturing-minute-structural-details) （9.0/10）
+72. [Survival In-Context: Prior-fitted In-context Learning Tabular Foundation Model for Survival Analysis](/20260324-20260402/2603.29475v1-survival-in-context-prior-fitted-in-context-learning-tabular-foundation-model-for-survival-analysis) （9.0/10）
+73. [Brain MR Image Synthesis with Multi-contrast Self-attention GAN](/20260324-20260402/2604.00070v1-brain-mr-image-synthesis-with-multi-contrast-self-attention-gan) （9.0/10）
+74. [Large Language Models for Variant-Centric Functional Evidence Mining](/20260324-20260402/2604.00075v1-large-language-models-for-variant-centric-functional-evidence-mining) （9.0/10）
+75. [QUEST: A robust attention formulation using query-modulated spherical attention](/20260324-20260402/2604.00199v1-quest-a-robust-attention-formulation-using-query-modulated-spherical-attention) （9.0/10）
+76. [TP-Seg: Task-Prototype Framework for Unified Medical Lesion Segmentation](/20260324-20260402/2604.00684v1-tp-seg-task-prototype-framework-for-unified-medical-lesion-segmentation) （9.0/10）
+77. [Stochastic Attention: Connectome-Inspired Randomized Routing for Expressive Linear-Time Attention](/20260324-20260402/2604.00754v1-stochastic-attention-connectome-inspired-randomized-routing-for-expressive-linear-time-attention) （9.0/10）
+78. [Foundation Model-guided Iteratively Prompting and Pseudo-Labeling for Partially Labeled Medical Image Segmentation](/20260324-20260402/2604.01038v1-foundation-model-guided-iteratively-prompting-and-pseudo-labeling-for-partially-labeled-medical-image-segmentation) （9.0/10）
 
 ## 速读区
-- 本次无速读推荐。
+1. [Transformers Trained via Gradient Descent Can Provably Learn a Class of Teacher Models](/20260324-20260402/2603.22801v1-transformers-trained-via-gradient-descent-can-provably-learn-a-class-of-teacher-models) （8.0/10）
+2. [FixationFormer: Direct Utilization of Expert Gaze Trajectories for Chest X-Ray Classification](/20260324-20260402/2603.22939v1-fixationformer-direct-utilization-of-expert-gaze-trajectories-for-chest-x-ray-classification) （8.0/10）
+3. [MedCausalX: Adaptive Causal Reasoning with Self-Reflection for Trustworthy Medical Vision-Language Models](/20260324-20260402/2603.23085v1-medcausalx-adaptive-causal-reasoning-with-self-reflection-for-trustworthy-medical-vision-language-models) （8.0/10）
+4. [VoDaSuRe: A Large-Scale Dataset Revealing Domain Shift in Volumetric Super-Resolution](/20260324-20260402/2603.23153v1-vodasure-a-large-scale-dataset-revealing-domain-shift-in-volumetric-super-resolution) （8.0/10）
+5. [From Arithmetic to Logic: The Resilience of Logic and Lookup-Based Neural Networks Under Parameter Bit-Flips](/20260324-20260402/2603.22770v1-from-arithmetic-to-logic-the-resilience-of-logic-and-lookup-based-neural-networks-under-parameter-bit-flips) （7.0/10）
+6. [Towards The Implicit Bias on Multiclass Separable Data Under Norm Constraints](/20260324-20260402/2603.22824v1-towards-the-implicit-bias-on-multiclass-separable-data-under-norm-constraints) （7.0/10）
+7. [The Coordinate System Problem in Persistent Structural Memory for Neural Architectures](/20260324-20260402/2603.22858v1-the-coordinate-system-problem-in-persistent-structural-memory-for-neural-architectures) （7.0/10）
+8. [Designing to Forget: Deep Semi-parametric Models for Unlearning](/20260324-20260402/2603.22870v1-designing-to-forget-deep-semi-parametric-models-for-unlearning) （7.0/10）
+9. [REALITrees: Rashomon Ensemble Active Learning for Interpretable Trees](/20260324-20260402/2603.22750v1-realitrees-rashomon-ensemble-active-learning-for-interpretable-trees) （6.0/10）
+10. [KARMA: Knowledge-Action Regularized Multimodal Alignment for Personalized Search at Taobao](/20260324-20260402/2603.22779v2-karma-knowledge-action-regularized-multimodal-alignment-for-personalized-search-at-taobao) （6.0/10）
+11. [Universal and efficient graph neural networks with dynamic attention for machine learning interatomic potentials](/20260324-20260402/2603.22810v1-universal-and-efficient-graph-neural-networks-with-dynamic-attention-for-machine-learning-interatomic-potentials) （6.0/10）
+12. [EchoKV: Efficient KV Cache Compression via Similarity-Based Reconstruction](/20260324-20260402/2603.22910v1-echokv-efficient-kv-cache-compression-via-similarity-based-reconstruction) （6.0/10）
 
 ---
 使用键盘方向键可在日报/论文之间快速切换。

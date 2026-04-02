@@ -6,346 +6,292 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-03-04 ~ 2026-04-02
-- 运行时间：2026-04-02 05:27:33 UTC
+- 最新运行日期：2026-03-24 ~ 2026-04-02
+- 运行时间：2026-04-02 06:34:15 UTC
 - 运行状态：成功
-- 本次总论文数：108
-- 精读区：97
-- 速读区：11
+- 本次总论文数：90
+- 精读区：78
+- 速读区：12
 
 ### 今日简报（AI）
-今日深度研读 108 篇前沿文献，重点聚焦脑胶质瘤影像分析与世界模型构建。
-脑胶质瘤世界模型（Brain-WM）与深度学习评估展现了精准医疗新高度，隐式神经表示则为病理切片分割带来突破。
-建议关注 AI 在复杂脑肿瘤建模及病理可解释性方面的进展，探索多组学数据交互的临床潜力。
-- 详情：[/20260304-20260402/README](/20260304-20260402/README)
+本期精选 90 篇前沿成果，深度聚焦 PSMA 诊疗一体化中的病灶自动化追踪与病理全切片图像的分层理解。
+重点推荐满分论文中关于 AI 辅助 PET/CT 分割及多模态大模型对 WSI 图像的解析，同时关注专家眼动轨迹与因果推理对医疗模型可信度的提升。
+建议读者优先研读多模态大模型在复杂医学影像中的层级化应用，探索 AI 如何通过模拟专家逻辑实现精准诊疗。
+- 详情：[/20260324-20260402/README](/20260324-20260402/README)
 
 ### 精读区论文标签
-1. [Comparative Evaluation of Traditional Methods and Deep Learning for Brain Glioma Imaging. Review Paper](/20260304-20260402/2603.04796v1-comparative-evaluation-of-traditional-methods-and-deep-learning-for-brain-glioma-imaging-review-paper)  
+1. [Towards Routine AI-Based PET/CT and SPECT/CT Lesion Segmentation and Tracking in PSMA Theranostics](/20260324-20260402/2603.22666v1-towards-routine-ai-based-petct-and-spectct-lesion-segmentation-and-tracking-in-psma-theranostics)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：用于脑胶质瘤影像分割与分类的深度学习
-2. [Brain-WM: Brain Glioblastoma World Model](/20260304-20260402/2603.07562v1-brain-wm-brain-glioblastoma-world-model)  
+   evidence：前列腺癌诊疗中的AI病灶分割与追踪
+2. [MLLM-HWSI: A Multimodal Large Language Model for Hierarchical Whole Slide Image Understanding](/20260324-20260402/2603.23067v2-mllm-hwsi-a-multimodal-large-language-model-for-hierarchical-whole-slide-image-understanding)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：胶质母细胞瘤预后建模和治疗反应模拟的世界模型
-3. [A Lightweight Multi-Cancer Tumor Localization Framework for Deployable Digital Pathology](/20260304-20260402/2603.08844v1-a-lightweight-multi-cancer-tumor-localization-framework-for-deployable-digital-pathology)  
+   evidence：用于计算病理学和癌症诊断的分层全切片图像理解
+3. [An Explainable AI-Driven Framework for Automated Brain Tumor Segmentation Using an Attention-Enhanced U-Net](/20260324-20260402/2603.23344v1-an-explainable-ai-driven-framework-for-automated-brain-tumor-segmentation-using-an-attention-enhanced-u-net)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：基于深度学习的多癌症数字病理肿瘤定位框架
-4. [Trajectory-informed graph-based clustering for longitudinal cancer subtyping](/20260304-20260402/2603.10089v1-trajectory-informed-graph-based-clustering-for-longitudinal-cancer-subtyping)  
+   evidence：用于脑肿瘤分割的注意力增强型 U-Net
+4. [Central Dogma Transformer III: Interpretable AI Across DNA, RNA, and Protein](/20260324-20260402/2603.23361v2-central-dogma-transformer-iii-interpretable-ai-across-dna-rna-and-protein)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：基于图的聚类用于纵向癌症分型和个性化治疗
-5. [DeepHistoViT: An Interpretable Vision Transformer Framework for Histopathological Cancer Classification](/20260304-20260402/2603.11403v1-deephistovit-an-interpretable-vision-transformer-framework-for-histopathological-cancer-classification)  
+   evidence：跨 DNA、RNA 和蛋白质的可解释人工智能生物建模
+5. [Detection and Classification of (Pre)Cancerous Cells in Pap Smears: An Ensemble Strategy for the RIVA Cervical Cytology Challenge](/20260324-20260402/2603.23742v1-detection-and-classification-of-precancerous-cells-in-pap-smears-an-ensemble-strategy-for-the-riva-cervical-cytology-challenge)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：用于组织病理学癌症分类的视觉Transformer
-6. [Automated Detection of Malignant Lesions in the Ovary Using Deep Learning Models and XAI](/20260304-20260402/2603.11818v1-automated-detection-of-malignant-lesions-in-the-ovary-using-deep-learning-models-and-xai)  
+   evidence：用于宫颈癌细胞检测的深度学习集成策略
+6. [3D-LLDM: Label-Guided 3D Latent Diffusion Model for Improving High-Resolution Synthetic MR Imaging in Hepatic Structure Segmentation](/20260324-20260402/2603.23845v1-3d-lldm-label-guided-3d-latent-diffusion-model-for-improving-high-resolution-synthetic-mr-imaging-in-hepatic-structure-segmentation)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：用于自动检测卵巢恶性病变的深度学习模型
-7. [TheraAgent: Multi-Agent Framework with Self-Evolving Memory and Evidence-Calibrated Reasoning for PET Theranostics](/20260304-20260402/2603.13676v1-theraagent-multi-agent-framework-with-self-evolving-memory-and-evidence-calibrated-reasoning-for-pet-theranostics)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：用于前列腺癌PET诊疗一体化结果预测的多智能体框架
-8. [Advancing Cancer Prognosis with Hierarchical Fusion of Genomic, Proteomic and Pathology Imaging Data from a Systems Biology Perspective](/20260304-20260402/2603.13787v1-advancing-cancer-prognosis-with-hierarchical-fusion-of-genomic-proteomic-and-pathology-imaging-data-from-a-systems-biology-perspective)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：基因组、蛋白质组和病理影像的层次化融合用于癌症预后
-9. [Deep Learning From Routine Histology Improves Risk Stratification for Biochemical Recurrence in Prostate Cancer](/20260304-20260402/2603.14187v1-deep-learning-from-routine-histology-improves-risk-stratification-for-biochemical-recurrence-in-prostate-cancer)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：深度学习预测前列腺癌的生化复发
-10. [Learning from Limited and Incomplete Data: A Multimodal Framework for Predicting Pathological Response in NSCLC](/20260304-20260402/2603.15100v1-learning-from-limited-and-incomplete-data-a-multimodal-framework-for-predicting-pathological-response-in-nsclc)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：多模态深度学习预测肺癌病理反应
-11. [Nodule-Aligned Latent Space Learning with LLM-Driven Multimodal Diffusion for Lung Nodule Progression Prediction](/20260304-20260402/2603.15932v1-nodule-aligned-latent-space-learning-with-llm-driven-multimodal-diffusion-for-lung-nodule-progression-prediction)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：结合影像和电子健康档案的多模态扩散模型预测肺癌进展
-12. [An Interpretable Machine Learning Framework for Non-Small Cell Lung Cancer Drug Response Analysis](/20260304-20260402/2603.16330v1-an-interpretable-machine-learning-framework-for-non-small-cell-lung-cancer-drug-response-analysis)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：人工智能驱动的肺癌个性化治疗药物反应分析
-13. [HGP-Mamba: Integrating Histology and Generated Protein Features for Mamba-based Multimodal Survival Risk Prediction](/20260304-20260402/2603.16421v1-hgp-mamba-integrating-histology-and-generated-protein-features-for-mamba-based-multimodal-survival-risk-prediction)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：结合组织学和蛋白质特征的多模态生存风险预测
-14. [HGP-Mamba: Integrating Histology and Generated Protein Features for Mamba-based Multimodal Survival Risk Prediction](/20260304-20260402/2603.16421v2-hgp-mamba-integrating-histology-and-generated-protein-features-for-mamba-based-multimodal-survival-risk-prediction)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：整合组织学和蛋白质特征的多模态生存风险预测
-15. [HistoAtlas: A Pan-Cancer Morphology Atlas Linking Histomics to Molecular Programs and Clinical Outcomes](/20260304-20260402/2603.16587v1-histoatlas-a-pan-cancer-morphology-atlas-linking-histomics-to-molecular-programs-and-clinical-outcomes)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：将组织学特征与分子程序及临床结果联系起来的泛癌图谱
-16. [Interpretable Prostate Cancer Detection using a Small Cohort of MRI Images](/20260304-20260402/2603.18460v1-interpretable-prostate-cancer-detection-using-a-small-cohort-of-mri-images)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：利用MRI图像和迁移学习进行自动前列腺癌检测
-17. [Efficient AI-Driven Multi-Section Whole Slide Image Analysis for Biochemical Recurrence Prediction in Prostate Cancer](/20260304-20260402/2603.20273v1-efficient-ai-driven-multi-section-whole-slide-image-analysis-for-biochemical-recurrence-prediction-in-prostate-cancer)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：利用病理切片预测前列腺癌生化复发的AI框架
-18. [Interpretable Multiple Myeloma Prognosis with Observational Medical Outcomes Partnership Data](/20260304-20260402/2603.20341v1-interpretable-multiple-myeloma-prognosis-with-observational-medical-outcomes-partnership-data)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：多发性骨髓瘤患者的可解释生存预测
-19. [GOLDMARK: Governed Outcome-Linked Diagnostic Model Assessment Reference Kit](/20260304-20260402/2603.20848v1-goldmark-governed-outcome-linked-diagnostic-model-assessment-reference-kit)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：利用 AI 提取组织病理学标志物以预测癌症预后
-20. [SynLeaF: A Dual-Stage Multimodal Fusion Framework for Synthetic Lethality Prediction Across Pan- and Single-Cancer Contexts](/20260304-20260402/2603.22369v1-synleaf-a-dual-stage-multimodal-fusion-framework-for-synthetic-lethality-prediction-across-pan--and-single-cancer-contexts)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：用于癌症治疗中合成致死预测的多模态融合
-21. [Towards Routine AI-Based PET/CT and SPECT/CT Lesion Segmentation and Tracking in PSMA Theranostics](/20260304-20260402/2603.22666v1-towards-routine-ai-based-petct-and-spectct-lesion-segmentation-and-tracking-in-psma-theranostics)  
-   标签：评分：10.0/10、query:ai-pm
-   evidence：基于AI的病灶分割与追踪，用于前列腺癌精准医疗
-22. [DeepDTF: Dual-Branch Transformer Fusion for Multi-Omics Anticancer Drug Response Prediction](/20260304-20260402/2603.24265v1-deepdtf-dual-branch-transformer-fusion-for-multi-omics-anticancer-drug-response-prediction)  
+   evidence：用于肝细胞癌分割的3D潜扩散模型
+7. [DeepDTF: Dual-Branch Transformer Fusion for Multi-Omics Anticancer Drug Response Prediction](/20260324-20260402/2603.24265v1-deepdtf-dual-branch-transformer-fusion-for-multi-omics-anticancer-drug-response-prediction)  
    标签：评分：10.0/10、query:ai-pm
    evidence：用于精准肿瘤学的多组学抗癌药物反应预测
-23. [Robust Multicenter CT Radiogenomics for Dual EGFR and KRAS Prediction in Lung Cancer with Stability-Aware Modeling and SHAP Interpretation](/20260304-20260402/2603.24922v1-robust-multicenter-ct-radiogenomics-for-dual-egfr-and-kras-prediction-in-lung-cancer-with-stability-aware-modeling-and-shap-interpretation)  
+8. [Robust Multicenter CT Radiogenomics for Dual EGFR and KRAS Prediction in Lung Cancer with Stability-Aware Modeling and SHAP Interpretation](/20260324-20260402/2603.24922v1-robust-multicenter-ct-radiogenomics-for-dual-egfr-and-kras-prediction-in-lung-cancer-with-stability-aware-modeling-and-shap-interpretation)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：用于肺癌精准治疗突变预测的影像基因组学
-24. [DPD-Cancer: Explainable Graph-based Deep Learning for Small Molecule Anti-Cancer Activity Prediction](/20260304-20260402/2603.26114v1-dpd-cancer-explainable-graph-based-deep-learning-for-small-molecule-anti-cancer-activity-prediction)  
+   evidence：用于肺癌EGFR和KRAS突变预测的CT放射基因组学
+9. [DeepFAN, a transformer-based deep learning model for human-artificial intelligence collaborative assessment of incidental pulmonary nodules in CT scans: a multi-reader, multi-case trial](/20260324-20260402/2603.25607v1-deepfan-a-transformer-based-deep-learning-model-for-human-artificial-intelligence-collaborative-assessment-of-incidental-pulmonary-nodules-in-ct-scans-a-multi-reader-multi-case-trial)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：基于图的深度学习用于小分子抗癌活性预测
-25. [Pan-Cancer Mapping of the Tumor Immune Landscape through Metagene Clustering and Predictive Modeling](/20260304-20260402/2603.27145v1-pan-cancer-mapping-of-the-tumor-immune-landscape-through-metagene-clustering-and-predictive-modeling)  
+   evidence：基于Transformer的CT扫描肺结节分类模型
+10. [LEMON: a foundation model for nuclear morphology in Computational Pathology](/20260324-20260402/2603.25802v1-lemon-a-foundation-model-for-nuclear-morphology-in-computational-pathology)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：利用RNA测序和聚类进行泛癌肿瘤免疫图谱绘制
-26. [Adapting SAM to Nuclei Instance Segmentation and Classification via Cooperative Fine-Grained Refinement](/20260304-20260402/2603.28027v1-adapting-sam-to-nuclei-instance-segmentation-and-classification-via-cooperative-fine-grained-refinement)  
+   evidence：用于病理学癌症研究和精准医疗的基础模型
+11. [MUST: Modality-Specific Representation-Aware Transformer for Diffusion-Enhanced Survival Prediction with Missing Modality](/20260324-20260402/2603.26071v1-must-modality-specific-representation-aware-transformer-for-diffusion-enhanced-survival-prediction-with-missing-modality)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：将SAM应用于计算病理学中的细胞核实例分割
-27. [Multimodal Machine Learning for Early Prediction of Metastasis in a Swedish Multi-Cancer Cohort](/20260304-20260402/2603.29793v1-multimodal-machine-learning-for-early-prediction-of-metastasis-in-a-swedish-multi-cancer-cohort)  
+   evidence：精准肿瘤学的生存预测
+12. [DPD-Cancer: Explainable Graph-based Deep Learning for Small Molecule Anti-Cancer Activity Prediction](/20260324-20260402/2603.26114v1-dpd-cancer-explainable-graph-based-deep-learning-for-small-molecule-anti-cancer-activity-prediction)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：多模态机器学习用于转移早期预测
-28. [Quantifying Cross-Modal Interactions in Multimodal Glioma Survival Prediction via InterSHAP: Evidence for Additive Signal Integration](/20260304-20260402/2603.29977v1-quantifying-cross-modal-interactions-in-multimodal-glioma-survival-prediction-via-intershap-evidence-for-additive-signal-integration)  
+   evidence：用于抗癌活性预测和细胞系特异性反应的深度学习
+13. [Dictionary-based Pathology Mining with Hard-instance-assisted Classifier Debiasing for Genetic Biomarker Prediction from WSIs](/20260324-20260402/2603.26809v1-dictionary-based-pathology-mining-with-hard-instance-assisted-classifier-debiasing-for-genetic-biomarker-prediction-from-wsis)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：从结直肠癌全扫描切片图像中预测遗传生物标志物
+14. [Central-to-Local Adaptive Generative Diffusion Framework for Improving Gene Expression Prediction in Data-Limited Spatial Transcriptomics](/20260324-20260402/2603.26827v1-central-to-local-adaptive-generative-diffusion-framework-for-improving-gene-expression-prediction-in-data-limited-spatial-transcriptomics)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：空间转录组学中基因表达的扩散框架
+15. [Statistical modeling of breast cancer radiomic features and hazard using image registration-aided longitudinal CT data](/20260324-20260402/2603.26888v1-statistical-modeling-of-breast-cancer-radiomic-features-and-hazard-using-image-registration-aided-longitudinal-ct-data)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：乳腺癌影像组学特征统计建模与生存分析
+16. [MOOZY: A Patient-First Foundation Model for Computational Pathology](/20260324-20260402/2603.27048v1-moozy-a-patient-first-foundation-model-for-computational-pathology)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：计算病理学基础模型与患者级表征
+17. [Pan-Cancer Mapping of the Tumor Immune Landscape through Metagene Clustering and Predictive Modeling](/20260324-20260402/2603.27145v1-pan-cancer-mapping-of-the-tumor-immune-landscape-through-metagene-clustering-and-predictive-modeling)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：泛癌免疫图谱绘制与预测建模
+18. [Adapting SAM to Nuclei Instance Segmentation and Classification via Cooperative Fine-Grained Refinement](/20260324-20260402/2603.28027v1-adapting-sam-to-nuclei-instance-segmentation-and-classification-via-cooperative-fine-grained-refinement)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：用于癌症诊断的细胞核实例分割
+19. [Physics-Embedded Feature Learning for AI in Medical Imaging](/20260324-20260402/2603.28057v1-physics-embedded-feature-learning-for-ai-in-medical-imaging)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：整合肿瘤生长动力学的物理嵌入深度学习框架用于分类
+20. [Optimized Weighted Voting System for Brain Tumor Classification Using MRI Images](/20260324-20260402/2603.28357v1-optimized-weighted-voting-system-for-brain-tumor-classification-using-mri-images)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：使用MRI扫描进行脑肿瘤分类的集成学习
+21. [ChemCLIP: Bridging Organic and Inorganic Anticancer Compounds Through Contrastive Learning](/20260324-20260402/2603.28575v1-chemclip-bridging-organic-and-inorganic-anticancer-compounds-through-contrastive-learning)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：用于抗癌化合物发现和表征的对比学习
+22. [NeoNet: An End-to-End 3D MRI-Based Deep Learning Framework for Non-Invasive Prediction of Perineural Invasion via Generation-Driven Classification](/20260324-20260402/2603.29449v1-neonet-an-end-to-end-3d-mri-based-deep-learning-framework-for-non-invasive-prediction-of-perineural-invasion-via-generation-driven-classification)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：基于3D MRI的深度学习用于癌症神经周围浸润预测
+23. [Exploring the Impact of Skin Color on Skin Lesion Segmentation](/20260324-20260402/2603.29694v1-exploring-the-impact-of-skin-color-on-skin-lesion-segmentation)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：深度学习用于癌症检测中的皮肤病变分割
+24. [Multimodal Machine Learning for Early Prediction of Metastasis in a Swedish Multi-Cancer Cohort](/20260324-20260402/2603.29793v1-multimodal-machine-learning-for-early-prediction-of-metastasis-in-a-swedish-multi-cancer-cohort)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：利用电子健康档案数据进行多癌症队列转移早期预测的多模态机器学习
+25. [Trimodal Deep Learning for Glioma Survival Prediction: A Feasibility Study Integrating Histopathology, Gene Expression, and MRI](/20260324-20260402/2603.29968v1-trimodal-deep-learning-for-glioma-survival-prediction-a-feasibility-study-integrating-histopathology-gene-expression-and-mri)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：整合MRI和基因组学的多模态深度学习用于胶质瘤生存预测
+26. [Quantifying Cross-Modal Interactions in Multimodal Glioma Survival Prediction via InterSHAP: Evidence for Additive Signal Integration](/20260324-20260402/2603.29977v1-quantifying-cross-modal-interactions-in-multimodal-glioma-survival-prediction-via-intershap-evidence-for-additive-signal-integration)  
    标签：评分：10.0/10、query:ai-pm
    evidence：用于胶质瘤生存预测的多模态深度学习
-29. [Genetic algorithms for multi-omic feature selection: a comparative study in cancer survival analysis](/20260304-20260402/2604.00065v1-genetic-algorithms-for-multi-omic-feature-selection-a-comparative-study-in-cancer-survival-analysis)  
+27. [Genetic algorithms for multi-omic feature selection: a comparative study in cancer survival analysis](/20260324-20260402/2604.00065v1-genetic-algorithms-for-multi-omic-feature-selection-a-comparative-study-in-cancer-survival-analysis)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：癌症生存分析中多组学特征选择的遗传算法
-30. [BioCOMPASS: Integrating Biomarkers into Transformer-Based Immunotherapy Response Prediction](/20260304-20260402/2604.00739v1-biocompass-integrating-biomarkers-into-transformer-based-immunotherapy-response-prediction)  
+   evidence：癌症生存分析中的多组学特征选择
+28. [Improving Generalization of Deep Learning for Brain Metastases Segmentation Across Institutions](/20260324-20260402/2604.00397v1-improving-generalization-of-deep-learning-for-brain-metastases-segmentation-across-institutions)  
    标签：评分：10.0/10、query:ai-pm
-   evidence：将生物标志物整合到基于Transformer的免疫治疗反应预测中
-31. [CoRe-BT: A Multimodal Radiology-Pathology-Text Benchmark for Robust Brain Tumor Typing](/20260304-20260402/2603.03618v1-core-bt-a-multimodal-radiology-pathology-text-benchmark-for-robust-brain-tumor-typing)  
+   evidence：跨机构脑转移瘤分割的深度学习研究
+29. [BioCOMPASS: Integrating Biomarkers into Transformer-Based Immunotherapy Response Prediction](/20260324-20260402/2604.00739v1-biocompass-integrating-biomarkers-into-transformer-based-immunotherapy-response-prediction)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：利用生物标志物进行免疫治疗反应预测
+30. [Understanding Transformers and Attention Mechanisms: An Introduction for Applied Mathematicians](/20260324-20260402/2604.00965v1-understanding-transformers-and-attention-mechanisms-an-introduction-for-applied-mathematicians)  
+   标签：评分：10.0/10、query:dl
+   evidence：Transformer架构与注意力机制介绍
+31. [Maximizing T2-Only Prostate Cancer Localization from Expected Diffusion Weighted Imaging](/20260324-20260402/2604.00985v1-maximizing-t2-only-prostate-cancer-localization-from-expected-diffusion-weighted-imaging)  
+   标签：评分：10.0/10、query:ai-pm
+   evidence：利用T2加权MRI进行前列腺癌定位的深度学习
+32. [Vision-based Deep Learning Analysis of Unordered Biomedical Tabular Datasets via Optimal Spatial Cartography](/20260324-20260402/2603.22675v1-vision-based-deep-learning-analysis-of-unordered-biomedical-tabular-datasets-via-optimal-spatial-cartography)  
+   标签：评分：9.0/10、query:ai-pm
+   evidence：用于转录组学和液体活检等生物医学表格数据的深度学习
+33. [A Clinically Anchored Radiomics Dictionary for Explainable TI-RADS-Based Thyroid Nodule Classification in Ultrasound; Dictionary Version TU1.0](/20260324-20260402/2603.22692v1-a-clinically-anchored-radiomics-dictionary-for-explainable-ti-rads-based-thyroid-nodule-classification-in-ultrasound-dictionary-version-tu10)  
+   标签：评分：9.0/10、query:ai-pm
+   evidence：用于甲状腺结节分类的影像组学
+34. [Cross-Slice Knowledge Transfer via Masked Multi-Modal Heterogeneous Graph Contrastive Learning for Spatial Gene Expression Inference](/20260324-20260402/2603.22821v1-cross-slice-knowledge-transfer-via-masked-multi-modal-heterogeneous-graph-contrastive-learning-for-spatial-gene-expression-inference)  
+   标签：评分：9.0/10、query:ai-pm
+   evidence：利用多模态图从病理图像推断空间基因表达
+35. [HUydra: Full-Range Lung CT Synthesis via Multiple HU Interval Generative Modelling](/20260324-20260402/2603.23041v1-huydra-full-range-lung-ct-synthesis-via-multiple-hu-interval-generative-modelling)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：脑肿瘤分型与诊断的多模态基准
-32. [ProFound: A moderate-sized vision foundation model for multi-task prostate imaging](/20260304-20260402/2603.03961v1-profound-a-moderate-sized-vision-foundation-model-for-multi-task-prostate-imaging)  
+   evidence：用于计算机辅助诊断的肺癌CT合成
+36. [MLLM-HWSI: A Multimodal Large Language Model for Hierarchical Whole Slide Image Understanding](/20260324-20260402/2603.23067v1-mllm-hwsi-a-multimodal-large-language-model-for-hierarchical-whole-slide-image-understanding)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于多任务前列腺癌成像的视觉基础模型
-33. [Revisiting the Role of Foundation Models in Cell-Level Histopathological Image Analysis under Small-Patch Constraints -- Effects of Training Data Scale and Blur Perturbations on CNNs and Vision Transformers](/20260304-20260402/2603.04081v1-revisiting-the-role-of-foundation-models-in-cell-level-histopathological-image-analysis-under-small-patch-constraints----effects-of-training-data-scale-and-blur-perturbations-on-cnns-and-vision-transformers)  
+   evidence：用于病理全切片图像分层理解的多模态大语言模型
+37. [Sparser, Faster, Lighter Transformer Language Models](/20260324-20260402/2603.23198v1-sparser-faster-lighter-transformer-language-models)  
+   标签：评分：9.0/10、query:dl
+   evidence：Transformer语言模型中的稀疏性
+38. [Mamba-driven MRI-to-CT Synthesis for MRI-only Radiotherapy Planning](/20260324-20260402/2603.23295v1-mamba-driven-mri-to-ct-synthesis-for-mri-only-radiotherapy-planning)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：深度学习用于结直肠癌细胞级组织病理图像分析
-34. [Meta-D: Metadata-Aware Architectures for Brain Tumor Analysis and Missing-Modality Segmentation](/20260304-20260402/2603.04811v1-meta-d-metadata-aware-architectures-for-brain-tumor-analysis-and-missing-modality-segmentation)  
+   evidence：基于Mamba的MRI到CT合成用于放疗规划
+39. [Curriculum-Driven 3D CT Report Generation via Language-Free Visual Grafting and Zone-Constrained Compression](/20260324-20260402/2603.23308v1-curriculum-driven-3d-ct-report-generation-via-language-free-visual-grafting-and-zone-constrained-compression)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于脑肿瘤检测和分割的元数据感知深度学习
-35. [Federated Modality-specific Encoders and Partially Personalized Fusion Decoder for Multimodal Brain Tumor Segmentation](/20260304-20260402/2603.04887v1-federated-modality-specific-encoders-and-partially-personalized-fusion-decoder-for-multimodal-brain-tumor-segmentation)  
+   evidence：深度学习用于3D CT放射报告生成
+40. [Central Dogma Transformer III: Interpretable AI Across DNA, RNA, and Protein](/20260324-20260402/2603.23361v1-central-dogma-transformer-iii-interpretable-ai-across-dna-rna-and-protein)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于多模态脑肿瘤分割的联邦学习
-36. [Adaptive Prototype-based Interpretable Grading of Prostate Cancer](/20260304-20260402/2603.04947v1-adaptive-prototype-based-interpretable-grading-of-prostate-cancer)  
+   evidence：用于生物细胞DNA、RNA和蛋白质分析的可解释AI
+41. [Harnessing Lightweight Transformer with Contextual Synergic Enhancement for Efficient 3D Medical Image Segmentation](/20260324-20260402/2603.23390v1-harnessing-lightweight-transformer-with-contextual-synergic-enhancement-for-efficient-3d-medical-image-segmentation)  
+   标签：评分：9.0/10、query:dl
+   evidence：用于3D医学图像分割的轻量级Transformer
+42. [A Large-Scale Comparative Analysis of Imputation Methods for Single-Cell RNA Sequencing Data](/20260324-20260402/2603.24626v1-a-large-scale-comparative-analysis-of-imputation-methods-for-single-cell-rna-sequencing-data)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：组织病理学图像的前列腺癌可解释分级
-37. [Identifying genes associated with phenotypes using machine and deep learning](/20260304-20260402/2603.06804v1-identifying-genes-associated-with-phenotypes-using-machine-and-deep-learning)  
+   evidence：单细胞RNA测序的生物信息学分析
+43. [BCMDA: Bidirectional Correlation Maps Domain Adaptation for Mixed Domain Semi-Supervised Medical Image Segmentation](/20260324-20260402/2603.24691v1-bcmda-bidirectional-correlation-maps-domain-adaptation-for-mixed-domain-semi-supervised-medical-image-segmentation)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：利用机器学习和深度学习识别疾病相关基因以实现精准医疗
-38. [Extracting and analyzing 3D histomorphometric features related to perineural and lymphovascular invasion in prostate cancer](/20260304-20260402/2603.06936v1-extracting-and-analyzing-3d-histomorphometric-features-related-to-perineural-and-lymphovascular-invasion-in-prostate-cancer)  
+   evidence：领域偏移下的半监督医学图像分割
+44. [NeuroVLM-Bench: Evaluation of Vision-Enabled Large Language Models for Clinical Reasoning in Neurological Disorders](/20260324-20260402/2603.24846v1-neurovlm-bench-evaluation-of-vision-enabled-large-language-models-for-clinical-reasoning-in-neurological-disorders)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于前列腺癌风险评估和预后的3D组织形态学特征
-39. [Class Visualizations and Activation Atlases for Enhancing Interpretability in Deep Learning-Based Computational Pathology](/20260304-20260402/2603.07170v2-class-visualizations-and-activation-atlases-for-enhancing-interpretability-in-deep-learning-based-computational-pathology)  
+   evidence：评估用于神经影像（包括脑肿瘤）的视觉大语言模型
+45. [SurgPhase: Time efficient pituitary tumor surgery phase recognition via an interactive web platform](/20260324-20260402/2603.24897v1-surgphase-time-efficient-pituitary-tumor-surgery-phase-recognition-via-an-interactive-web-platform)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：癌症计算病理学中深度学习的可解释性
-40. [LF2L: Loss Fusion Horizontal Federated Learning Across Heterogeneous Feature Spaces Using External Datasets Effectively: A Case Study in Second Primary Cancer Prediction](/20260304-20260402/2603.07249v1-lf2l-loss-fusion-horizontal-federated-learning-across-heterogeneous-feature-spaces-using-external-datasets-effectively-a-case-study-in-second-primary-cancer-prediction)  
+   evidence：基于深度学习的垂体瘤手术阶段识别
+46. [Improving Infinitely Deep Bayesian Neural Networks with Nesterov's Accelerated Gradient Method](/20260324-20260402/2603.25024v1-improving-infinitely-deep-bayesian-neural-networks-with-nesterovs-accelerated-gradient-method)  
+   标签：评分：9.0/10、query:dl
+   evidence：深度学习收敛的优化算法
+47. [Lingshu-Cell: A generative cellular world model for transcriptome modeling toward virtual cells](/20260324-20260402/2603.25240v1-lingshu-cell-a-generative-cellular-world-model-for-transcriptome-modeling-toward-virtual-cells)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于第二原发癌预测的联邦学习
-41. [Adversarial Domain Adaptation Enables Knowledge Transfer Across Heterogeneous RNA-Seq Datasets](/20260304-20260402/2603.08062v1-adversarial-domain-adaptation-enables-knowledge-transfer-across-heterogeneous-rna-seq-datasets)  
+   evidence：单细胞转录组学和细胞状态建模的生成模型
+48. [FEAST: Fully Connected Expressive Attention for Spatial Transcriptomics](/20260324-20260402/2603.25247v1-feast-fully-connected-expressive-attention-for-spatial-transcriptomics)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：个性化医疗中RNA-seq数据的领域自适应
-42. [Weakly Supervised Teacher-Student Framework with Progressive Pseudo-mask Refinement for Gland Segmentation](/20260304-20260402/2603.08605v1-weakly-supervised-teacher-student-framework-with-progressive-pseudo-mask-refinement-for-gland-segmentation)  
+   evidence：在空间转录组学中从全切片图像推断空间基因表达
+49. [Physics-informed structured learning of a class of recurrent neural networks with guaranteed properties](/20260324-20260402/2603.25574v1-physics-informed-structured-learning-of-a-class-of-recurrent-neural-networks-with-guaranteed-properties)  
+   标签：评分：9.0/10、query:dl
+   evidence：物理信息驱动的循环神经网络学习
+50. [Colon-Bench: An Agentic Workflow for Scalable Dense Lesion Annotation in Full-Procedure Colonoscopy Videos](/20260324-20260402/2603.25645v1-colon-bench-an-agentic-workflow-for-scalable-dense-lesion-annotation-in-full-procedure-colonoscopy-videos)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于结直肠癌组织病理学分级和腺体分割的深度学习
-43. [Weakly Supervised Teacher-Student Framework with Progressive Pseudo-mask Refinement for Gland Segmentation](/20260304-20260402/2603.08605v2-weakly-supervised-teacher-student-framework-with-progressive-pseudo-mask-refinement-for-gland-segmentation)  
+   evidence：用于癌症预防的结肠镜检查病变标注AI系统
+51. [QHap: Quantum-Inspired Haplotype Phasing](/20260324-20260402/2603.25762v1-qhap-quantum-inspired-haplotype-phasing)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：结直肠癌组织病理学的弱监督分割
-44. [Weakly Supervised Teacher-Student Framework with Progressive Pseudo-mask Refinement for Gland Segmentation](/20260304-20260402/2603.08605v3-weakly-supervised-teacher-student-framework-with-progressive-pseudo-mask-refinement-for-gland-segmentation)  
+   evidence：用于精准医疗和基因组分析的单倍型相位分析工具
+52. [Focus-to-Perceive Representation Learning: A Cognition-Inspired Hierarchical Framework for Endoscopic Video Analysis](/20260324-20260402/2603.25778v1-focus-to-perceive-representation-learning-a-cognition-inspired-hierarchical-framework-for-endoscopic-video-analysis)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于结直肠癌腺体分割的弱监督深度学习
-45. [Multi-Kernel Gated Decoder Adapters for Robust Multi-Task Thyroid Ultrasound under Cross-Center Shift](/20260304-20260402/2603.08906v1-multi-kernel-gated-decoder-adapters-for-robust-multi-task-thyroid-ultrasound-under-cross-center-shift)  
+   evidence：深度学习用于病灶检测的医学影像
+53. [Adapting Segment Anything Model 3 for Concept-Driven Lesion Segmentation in Medical Images: An Experimental Study](/20260324-20260402/2603.25945v1-adapting-segment-anything-model-3-for-concept-driven-lesion-segmentation-in-medical-images-an-experimental-study)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于甲状腺超声恶性肿瘤评估的多任务深度学习
-46. [PathoScribe: Transforming Pathology Data into a Living Library with a Unified LLM-Driven Framework for Semantic Retrieval and Clinical Integration](/20260304-20260402/2603.08935v2-pathoscribe-transforming-pathology-data-into-a-living-library-with-a-unified-llm-driven-framework-for-semantic-retrieval-and-clinical-integration)  
+   evidence：用于医学图像病灶分割的深度学习
+54. [Switch Attention: Towards Dynamic and Fine-grained Hybrid Transformers](/20260324-20260402/2603.26380v1-switch-attention-towards-dynamic-and-fine-grained-hybrid-transformers)  
+   标签：评分：9.0/10、query:dl
+   evidence：新型混合Transformer架构与注意力机制
+55. [Clinical named entity recognition in the Portuguese language: a benchmark of modern BERT models and LLMs](/20260324-20260402/2603.26510v1-clinical-named-entity-recognition-in-the-portuguese-language-a-benchmark-of-modern-bert-models-and-llms)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于病理数据和癌症护理集成的LLM驱动框架
-47. [MIL-PF: Multiple Instance Learning on Precomputed Features for Mammography Classification](/20260304-20260402/2603.09374v1-mil-pf-multiple-instance-learning-on-precomputed-features-for-mammography-classification)  
+   evidence：在乳腺癌数据上使用BERT和LLM进行临床命名实体识别
+56. [Beyond Benchmarks: A Framework for Post Deployment Validation of CT Lung Nodule Detection AI](/20260324-20260402/2603.26785v1-beyond-benchmarks-a-framework-for-post-deployment-validation-of-ct-lung-nodule-detection-ai)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于乳腺摄影分类的多实例学习
-48. [A Guideline-Aware AI Agent for Zero-Shot Target Volume Auto-Delineation](/20260304-20260402/2603.09448v1-a-guideline-aware-ai-agent-for-zero-shot-target-volume-auto-delineation)  
+   evidence：用于CT医学影像肺结节检测的人工智能
+57. [PhyDCM: A Reproducible Open-Source Framework for AI-Assisted Brain Tumor Classification from Multi-Sequence MRI](/20260324-20260402/2603.26794v1-phydcm-a-reproducible-open-source-framework-for-ai-assisted-brain-tumor-classification-from-multi-sequence-mri)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于食管癌放疗靶区勾画的 AI 智能体
-49. [Tracking Cancer Through Text: Longitudinal Extraction From Radiology Reports Using Open-Source Large Language Models](/20260304-20260402/2603.09638v2-tracking-cancer-through-text-longitudinal-extraction-from-radiology-reports-using-open-source-large-language-models)  
+   evidence：AI辅助MRI脑肿瘤分类
+58. [A Hierarchical Sheaf Spectral Embedding Framework for Single-Cell RNA-seq Analysis](/20260324-20260402/2603.26858v1-a-hierarchical-sheaf-spectral-embedding-framework-for-single-cell-rna-seq-analysis)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：从放射报告中提取纵向信息以追踪癌症进展
-50. [Leveraging whole slide difficulty in Multiple Instance Learning to improve prostate cancer grading](/20260304-20260402/2603.09953v1-leveraging-whole-slide-difficulty-in-multiple-instance-learning-to-improve-prostate-cancer-grading)  
+   evidence：单细胞RNA测序分析与生物信息学特征
+59. [ImmSET: Sequence-Based Predictor of TCR-pMHC Specificity at Scale](/20260324-20260402/2603.26994v1-immset-sequence-based-predictor-of-tcr-pmhc-specificity-at-scale)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：多实例学习用于组织病理学图像中的前列腺癌分级
-51. [An Automated Radiomics Framework for Postoperative Survival Prediction in Colorectal Liver Metastases using Preoperative MRI](/20260304-20260402/2603.10216v1-an-automated-radiomics-framework-for-postoperative-survival-prediction-in-colorectal-liver-metastases-using-preoperative-mri)  
+   evidence：用于癌症TCR-pMHC特异性预测的Transformer架构
+60. [MOOZY: A Patient-First Foundation Model for Computational Pathology](/20260324-20260402/2603.27048v2-moozy-a-patient-first-foundation-model-for-computational-pathology)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于结直肠癌肝转移术后生存预测的影像组学框架
-52. [Sparse Task Vector Mixup with Hypernetworks for Efficient Knowledge Transfer in Whole-Slide Image Prognosis](/20260304-20260402/2603.10526v1-sparse-task-vector-mixup-with-hypernetworks-for-efficient-knowledge-transfer-in-whole-slide-image-prognosis)  
+   evidence：用于计算病理学和临床任务的患者优先基础模型
+61. [Model-free Feature Screening via Revised Chatterjee's Rank Correlation for Ultra-high Dimensional Censored Data](/20260324-20260402/2603.27085v1-model-free-feature-screening-via-revised-chatterjees-rank-correlation-for-ultra-high-dimensional-censored-data)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：利用超网络和知识迁移进行全切片图像预后分析
-53. [Bayesian Design and Analysis of Precision Trials with Partial Borrowing](/20260304-20260402/2603.10830v1-bayesian-design-and-analysis-of-precision-trials-with-partial-borrowing)  
+   evidence：超高维生存数据的特征筛选
+62. [Preconditioned Attention: Enhancing Efficiency in Transformers](/20260324-20260402/2603.27153v1-preconditioned-attention-enhancing-efficiency-in-transformers)  
+   标签：评分：9.0/10、query:dl
+   evidence：增强 Transformer 注意力机制的效率和优化
+63. [DeepBayesFlow: A Bayesian Structured Variational Framework for Generalizable Prostate Segmentation via Expressive Posteriors and SDE-Girsanov Uncertainty Modeling](/20260324-20260402/2603.27263v1-deepbayesflow-a-bayesian-structured-variational-framework-for-generalizable-prostate-segmentation-via-expressive-posteriors-and-sde-girsanov-uncertainty-modeling)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：胃癌精准临床试验的贝叶斯设计
-54. [Evidential learning driven Breast Tumor Segmentation with Stage-divided Vision-Language Interaction](/20260304-20260402/2603.11206v1-evidential-learning-driven-breast-tumor-segmentation-with-stage-divided-vision-language-interaction)  
+   evidence：用于通用前列腺MRI分割的贝叶斯框架
+64. [Clore: Interactive Pathology Image Segmentation with Click-based Local Refinement](/20260324-20260402/2603.27625v1-clore-interactive-pathology-image-segmentation-with-click-based-local-refinement)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于乳腺肿瘤MRI分割的深度学习
-55. [Leveraging Large Language Models and Survival Analysis for Early Prediction of Chemotherapy Outcomes](/20260304-20260402/2603.11594v1-leveraging-large-language-models-and-survival-analysis-for-early-prediction-of-chemotherapy-outcomes)  
+   evidence：交互式病理图像分割
+65. [Object Detection Based on Distributed Convolutional Neural Networks](/20260324-20260402/2603.28050v1-object-detection-based-on-distributed-convolutional-neural-networks)  
+   标签：评分：9.0/10、query:dl
+   evidence：基于分布式卷积神经网络的目标检测
+66. [Prototype-Enhanced Multi-View Learning for Thyroid Nodule Ultrasound Classification](/20260324-20260402/2603.28315v1-prototype-enhanced-multi-view-learning-for-thyroid-nodule-ultrasound-classification)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：利用大语言模型和生存分析早期预测乳腺癌化疗结果
-56. [Multimodal classification of Radiation-Induced Contrast Enhancements and tumor recurrence using deep learning](/20260304-20260402/2603.11827v1-multimodal-classification-of-radiation-induced-contrast-enhancements-and-tumor-recurrence-using-deep-learning)  
+   evidence：用于甲状腺结节超声分类与诊断的深度学习
+67. [Building evidence-based knowledge graphs from full-text literature for disease-specific biomedical reasoning](/20260324-20260402/2603.28325v1-building-evidence-based-knowledge-graphs-from-full-text-literature-for-disease-specific-biomedical-reasoning)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于胶质母细胞瘤复发分类的多模态3D深度学习
-57. [ELISA: An Interpretable Hybrid Generative AI Agent for Expression-Grounded Discovery in Single-Cell Genomics](/20260304-20260402/2603.11872v1-elisa-an-interpretable-hybrid-generative-ai-agent-for-expression-grounded-discovery-in-single-cell-genomics)  
+   evidence：用于肝细胞癌和结直肠癌疾病推理的知识图谱
+68. [Building evidence-based knowledge graphs from full-text literature for disease-specific biomedical reasoning](/20260324-20260402/2603.28325v2-building-evidence-based-knowledge-graphs-from-full-text-literature-for-disease-specific-biomedical-reasoning)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于单细胞基因组学和基因标记发现的可解释AI代理
-58. [ELISA: An Interpretable Hybrid Generative AI Agent for Expression-Grounded Discovery in Single-Cell Genomics](/20260304-20260402/2603.11872v2-elisa-an-interpretable-hybrid-generative-ai-agent-for-expression-grounded-discovery-in-single-cell-genomics)  
+   evidence：用于肝癌和结直肠癌推理的知识图谱
+69. [Key-Embedded Privacy for Decentralized AI in Biomedical Omics](/20260324-20260402/2603.28334v1-key-embedded-privacy-for-decentralized-ai-in-biomedical-omics)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于单细胞RNA测序数据分析和生物学发现的AI智能体
-59. [Fair Lung Disease Diagnosis from Chest CT via Gender-Adversarial Attention Multiple Instance Learning](/20260304-20260402/2603.12988v1-fair-lung-disease-diagnosis-from-chest-ct-via-gender-adversarial-attention-multiple-instance-learning)  
+   evidence：生物医学组学数据的隐私保护去中心化人工智能
+70. [KGroups: A Versatile Univariate Max-Relevance Min-Redundancy Feature Selection Algorithm for High-dimensional Biological Data](/20260324-20260402/2603.28417v1-kgroups-a-versatile-univariate-max-relevance-min-redundancy-feature-selection-algorithm-for-high-dimensional-biological-data)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：通过深度学习从胸部CT中进行公平的肺癌诊断
-60. [Diffusion-Based Feature Denoising and Using NNMF for Robust Brain Tumor Classification](/20260304-20260402/2603.13182v1-diffusion-based-feature-denoising-and-using-nnmf-for-robust-brain-tumor-classification)  
+   evidence：高维生物数据的特征选择算法
+71. [Rich-U-Net: A medical image segmentation model for fusing spatial depth features and capturing minute structural details](/20260324-20260402/2603.29404v1-rich-u-net-a-medical-image-segmentation-model-for-fusing-spatial-depth-features-and-capturing-minute-structural-details)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：利用深度学习和NNMF进行鲁棒性脑肿瘤MRI分类
-61. [A Computer-aided Framework for Detecting Osteosarcoma in Computed Tomography Scans](/20260304-20260402/2603.13376v1-a-computer-aided-framework-for-detecting-osteosarcoma-in-computed-tomography-scans)  
+   evidence：用于提高诊断准确性的医学图像分割模型
+72. [Survival In-Context: Prior-fitted In-context Learning Tabular Foundation Model for Survival Analysis](/20260324-20260402/2603.29475v1-survival-in-context-prior-fitted-in-context-learning-tabular-foundation-model-for-survival-analysis)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于 CT 扫描中检测骨肉瘤的机器学习框架
-62. [Synthetic Melanoma Image Generation and Evaluation Using Generative Adversarial Networks](/20260304-20260402/2603.13497v1-synthetic-melanoma-image-generation-and-evaluation-using-generative-adversarial-networks)  
+   evidence：生存分析的预测建模
+73. [Brain MR Image Synthesis with Multi-contrast Self-attention GAN](/20260324-20260402/2604.00070v1-brain-mr-image-synthesis-with-multi-contrast-self-attention-gan)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于黑色素瘤图像合成与检测的生成对抗网络
-63. [Histo-MExNet: A Unified Framework for Real-World, Cross-Magnification, and Trustworthy Breast Cancer Histopathology](/20260304-20260402/2603.14416v1-histo-mexnet-a-unified-framework-for-real-world-cross-magnification-and-trustworthy-breast-cancer-histopathology)  
+   evidence：用于神经肿瘤评估的磁共振图像合成
+74. [Large Language Models for Variant-Centric Functional Evidence Mining](/20260324-20260402/2604.00075v1-large-language-models-for-variant-centric-functional-evidence-mining)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：用于乳腺癌组织病理学分类的深度学习框架
-64. [BiTro: Bidirectional Transfer Learning Enhances Bulk and Spatial Transcriptomics Prediction in Cancer Pathological Images](/20260304-20260402/2603.14897v1-bitro-bidirectional-transfer-learning-enhances-bulk-and-spatial-transcriptomics-prediction-in-cancer-pathological-images)  
+   evidence：用于挖掘肿瘤基因组变异功能证据的LLM
+75. [QUEST: A robust attention formulation using query-modulated spherical attention](/20260324-20260402/2604.00199v1-quest-a-robust-attention-formulation-using-query-modulated-spherical-attention)  
+   标签：评分：9.0/10、query:dl
+   evidence：Transformer模型的新型注意力机制公式
+76. [TP-Seg: Task-Prototype Framework for Unified Medical Lesion Segmentation](/20260324-20260402/2604.00684v1-tp-seg-task-prototype-framework-for-unified-medical-lesion-segmentation)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：癌症病理分析中的转录组学和全切片成像
-65. [Sample-Efficient Adaptation of Drug-Response Models to Patient Tumors under Strong Biological Domain Shift](/20260304-20260402/2603.16185v1-sample-efficient-adaptation-of-drug-response-models-to-patient-tumors-under-strong-biological-domain-shift)  
+   evidence：用于AI辅助诊断的统一医学病灶分割
+77. [Stochastic Attention: Connectome-Inspired Randomized Routing for Expressive Linear-Time Attention](/20260324-20260402/2604.00754v1-stochastic-attention-connectome-inspired-randomized-routing-for-expressive-linear-time-attention)  
+   标签：评分：9.0/10、query:dl
+   evidence：用于线性时间复杂度的随机注意力机制
+78. [Foundation Model-guided Iteratively Prompting and Pseudo-Labeling for Partially Labeled Medical Image Segmentation](/20260324-20260402/2604.01038v1-foundation-model-guided-iteratively-prompting-and-pseudo-labeling-for-partially-labeled-medical-image-segmentation)  
    标签：评分：9.0/10、query:ai-pm
-   evidence：精准肿瘤学中针对患者肿瘤的药物反应模型
-66. [Synergizing Deep Learning and Biological Heuristics for Extreme Long-Tail White Blood Cell Classification](/20260304-20260402/2603.16249v1-synergizing-deep-learning-and-biological-heuristics-for-extreme-long-tail-white-blood-cell-classification)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：深度学习与生物启发式方法用于白血病筛查
-67. [Synergizing Deep Learning and Biological Heuristics for Extreme Long-Tail White Blood Cell Classification](/20260304-20260402/2603.16249v3-synergizing-deep-learning-and-biological-heuristics-for-extreme-long-tail-white-blood-cell-classification)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于白血病筛查和白细胞分类的深度学习
-68. [Understanding Cell Fate Decisions with Temporal Attention](/20260304-20260402/2603.16562v1-understanding-cell-fate-decisions-with-temporal-attention)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：化疗下癌症细胞群体命运预测的深度学习方法
-69. [Looking for (Genomic) Needles in a Haystack: Sparsity-Driven Search for Identifying Correlated Genetic Mutations in Cancer](/20260304-20260402/2603.16721v1-looking-for-genomic-needles-in-a-haystack-sparsity-driven-search-for-identifying-correlated-genetic-mutations-in-cancer)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于识别癌症中相关基因突变的算法框架
-70. [LoGSAM: Parameter-Efficient Cross-Modal Grounding for MRI Segmentation](/20260304-20260402/2603.17576v1-logsam-parameter-efficient-cross-modal-grounding-for-mri-segmentation)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于脑肿瘤MRI分割的深度学习与跨模态定位技术
-71. [Cell-Type Prototype-Informed Neural Network for Gene Expression Estimation from Pathology Images](/20260304-20260402/2603.18461v1-cell-type-prototype-informed-neural-network-for-gene-expression-estimation-from-pathology-images)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：利用细胞类型原型从病理图像中估计基因表达
-72. [Multimodal Model for Computational Pathology:Representation Learning and Image Compression](/20260304-20260402/2603.18660v1-multimodal-model-for-computational-pathologyrepresentation-learning-and-image-compression)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：计算病理学与临床数据整合的多模态模型
-73. [Gastric-X: A Multimodal Multi-Phase Benchmark Dataset for Advancing Vision-Language Models in Gastric Cancer Analysis](/20260304-20260402/2603.19516v1-gastric-x-a-multimodal-multi-phase-benchmark-dataset-for-advancing-vision-language-models-in-gastric-cancer-analysis)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：胃癌分析与诊断的多模态基准数据集
-74. [Gastric-X: A Multimodal Multi-Phase Benchmark Dataset for Advancing Vision-Language Models in Gastric Cancer Analysis](/20260304-20260402/2603.19516v2-gastric-x-a-multimodal-multi-phase-benchmark-dataset-for-advancing-vision-language-models-in-gastric-cancer-analysis)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于胃癌分析和诊断的多模态基准数据集
-75. [Adapting a Pre-trained Single-Cell Foundation Model to Spatial Gene Expression Generation from Histology Images](/20260304-20260402/2603.19766v1-adapting-a-pre-trained-single-cell-foundation-model-to-spatial-gene-expression-generation-from-histology-images)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：利用基础模型从组织学图像预测空间基因表达
-76. [Hyper-Connections for Adaptive Multi-Modal MRI Brain Tumor Segmentation](/20260304-20260402/2603.19844v1-hyper-connections-for-adaptive-multi-modal-mri-brain-tumor-segmentation)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：自适应多模态MRI脑肿瘤分割
-77. [GIP-RAG: An Evidence-Grounded Retrieval-Augmented Framework for Interpretable Gene Interaction and Pathway Impact Analysis](/20260304-20260402/2603.20321v1-gip-rag-an-evidence-grounded-retrieval-augmented-framework-for-interpretable-gene-interaction-and-pathway-impact-analysis)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于精准医疗的可解释基因相互作用和通路分析
-78. [SkinCLIP-VL: Consistency-Aware Vision-Language Learning for Multimodal Skin Cancer Diagnosis](/20260304-20260402/2603.21010v1-skinclip-vl-consistency-aware-vision-language-learning-for-multimodal-skin-cancer-diagnosis)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于多模态皮肤癌诊断的视觉语言模型
-79. [DGRNet: Disagreement-Guided Refinement for Uncertainty-Aware Brain Tumor Segmentation](/20260304-20260402/2603.21086v1-dgrnet-disagreement-guided-refinement-for-uncertainty-aware-brain-tumor-segmentation)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：基于MRI扫描的脑肿瘤分割深度学习研究
-80. [Representation-Level Adversarial Regularization for Clinically Aligned Multitask Thyroid Ultrasound Assessment](/20260304-20260402/2603.21095v1-representation-level-adversarial-regularization-for-clinically-aligned-multitask-thyroid-ultrasound-assessment)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于风险类别预测的多任务甲状腺超声评估
-81. [Enhancing Brain Tumor Classification Using Vision Transformers with Colormap-Based Feature Representation on BRISC2025 Dataset](/20260304-20260402/2603.21234v1-enhancing-brain-tumor-classification-using-vision-transformers-with-colormap-based-feature-representation-on-brisc2025-dataset)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于MRI脑肿瘤分类的视觉Transformer
-82. [PGR-Net: Prior-Guided ROI Reasoning Network for Brain Tumor MRI Segmentation](/20260304-20260402/2603.21626v1-pgr-net-prior-guided-roi-reasoning-network-for-brain-tumor-mri-segmentation)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于临床诊断和治疗规划的脑肿瘤MRI分割
-83. [Multimodal Survival Analysis with Locally Deployable Large Language Models](/20260304-20260402/2603.22158v1-multimodal-survival-analysis-with-locally-deployable-large-language-models)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：使用大语言模型结合基因组谱和临床数据进行多模态生存分析
-84. [Cross-Slice Knowledge Transfer via Masked Multi-Modal Heterogeneous Graph Contrastive Learning for Spatial Gene Expression Inference](/20260304-20260402/2603.22821v1-cross-slice-knowledge-transfer-via-masked-multi-modal-heterogeneous-graph-contrastive-learning-for-spatial-gene-expression-inference)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：从病理图像预测空间转录组学
-85. [An Explainable AI-Driven Framework for Automated Brain Tumor Segmentation Using an Attention-Enhanced U-Net](/20260304-20260402/2603.23344v1-an-explainable-ai-driven-framework-for-automated-brain-tumor-segmentation-using-an-attention-enhanced-u-net)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于MRI脑肿瘤自动分割的可解释人工智能
-86. [Detection and Classification of (Pre)Cancerous Cells in Pap Smears: An Ensemble Strategy for the RIVA Cervical Cytology Challenge](/20260304-20260402/2603.23742v1-detection-and-classification-of-precancerous-cells-in-pap-smears-an-ensemble-strategy-for-the-riva-cervical-cytology-challenge)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：巴氏涂片中癌细胞的检测与分类
-87. [LEMON: a foundation model for nuclear morphology in Computational Pathology](/20260304-20260402/2603.25802v1-lemon-a-foundation-model-for-nuclear-morphology-in-computational-pathology)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：计算病理学中细胞核形态的基础模型
-88. [MUST: Modality-Specific Representation-Aware Transformer for Diffusion-Enhanced Survival Prediction with Missing Modality](/20260304-20260402/2603.26071v1-must-modality-specific-representation-aware-transformer-for-diffusion-enhanced-survival-prediction-with-missing-modality)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：缺失模态下的精准肿瘤学多模态生存预测
-89. [PhyDCM: A Reproducible Open-Source Framework for AI-Assisted Brain Tumor Classification from Multi-Sequence MRI](/20260304-20260402/2603.26794v1-phydcm-a-reproducible-open-source-framework-for-ai-assisted-brain-tumor-classification-from-multi-sequence-mri)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于AI辅助脑肿瘤分类的开源框架
-90. [Dictionary-based Pathology Mining with Hard-instance-assisted Classifier Debiasing for Genetic Biomarker Prediction from WSIs](/20260304-20260402/2603.26809v1-dictionary-based-pathology-mining-with-hard-instance-assisted-classifier-debiasing-for-genetic-biomarker-prediction-from-wsis)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：从结直肠癌全切片图像中预测遗传生物标志物
-91. [Statistical modeling of breast cancer radiomic features and hazard using image registration-aided longitudinal CT data](/20260304-20260402/2603.26888v1-statistical-modeling-of-breast-cancer-radiomic-features-and-hazard-using-image-registration-aided-longitudinal-ct-data)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：乳腺癌影像组学与生存率的统计建模
-92. [Physics-Embedded Feature Learning for AI in Medical Imaging](/20260304-20260402/2603.28057v1-physics-embedded-feature-learning-for-ai-in-medical-imaging)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：物理嵌入深度学习用于医学影像中的肿瘤生长动力学建模与分类
-93. [Building evidence-based knowledge graphs from full-text literature for disease-specific biomedical reasoning](/20260304-20260402/2603.28325v2-building-evidence-based-knowledge-graphs-from-full-text-literature-for-disease-specific-biomedical-reasoning)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：利用大模型构建肝癌和结直肠癌的疾病特定知识图谱
-94. [Optimized Weighted Voting System for Brain Tumor Classification Using MRI Images](/20260304-20260402/2603.28357v1-optimized-weighted-voting-system-for-brain-tumor-classification-using-mri-images)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：集成学习用于MRI图像的脑肿瘤分类
-95. [NeoNet: An End-to-End 3D MRI-Based Deep Learning Framework for Non-Invasive Prediction of Perineural Invasion via Generation-Driven Classification](/20260304-20260402/2603.29449v1-neonet-an-end-to-end-3d-mri-based-deep-learning-framework-for-non-invasive-prediction-of-perineural-invasion-via-generation-driven-classification)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：深度学习用于癌症神经周围浸润的无创预测
-96. [Improving Generalization of Deep Learning for Brain Metastases Segmentation Across Institutions](/20260304-20260402/2604.00397v1-improving-generalization-of-deep-learning-for-brain-metastases-segmentation-across-institutions)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：用于医学影像中脑转移瘤分割的深度学习
-97. [Maximizing T2-Only Prostate Cancer Localization from Expected Diffusion Weighted Imaging](/20260304-20260402/2604.00985v1-maximizing-t2-only-prostate-cancer-localization-from-expected-diffusion-weighted-imaging)  
-   标签：评分：9.0/10、query:ai-pm
-   evidence：基于MRI序列的前列腺癌定位机器学习研究
+   evidence：利用基础模型和伪标签进行医学图像分割
 
 ### 速读区论文标签
-1. [WSI-INR: Implicit Neural Representations for Lesion Segmentation in Whole-Slide Images](/20260304-20260402/2603.03749v1-wsi-inr-implicit-neural-representations-for-lesion-segmentation-in-whole-slide-images)  
+1. [Transformers Trained via Gradient Descent Can Provably Learn a Class of Teacher Models](/20260324-20260402/2603.22801v1-transformers-trained-via-gradient-descent-can-provably-learn-a-class-of-teacher-models)  
+   标签：评分：8.0/10、query:dl
+   evidence：Transformer架构的理论基础
+2. [FixationFormer: Direct Utilization of Expert Gaze Trajectories for Chest X-Ray Classification](/20260324-20260402/2603.22939v1-fixationformer-direct-utilization-of-expert-gaze-trajectories-for-chest-x-ray-classification)  
+   标签：评分：8.0/10、query:dl
+   evidence：利用专家注视轨迹进行X射线分类的Transformer架构
+3. [MedCausalX: Adaptive Causal Reasoning with Self-Reflection for Trustworthy Medical Vision-Language Models](/20260324-20260402/2603.23085v1-medcausalx-adaptive-causal-reasoning-with-self-reflection-for-trustworthy-medical-vision-language-models)  
    标签：评分：8.0/10、query:ai-pm
-   evidence：使用隐式神经表示进行全切片图像病变分割
-2. [HIDDENdb: Co-dependency database reveals a plethora of genetic and protein interactions](/20260304-20260402/2603.06903v1-hiddendb-co-dependency-database-reveals-a-plethora-of-genetic-and-protein-interactions)  
+   evidence：医学视觉语言模型诊断中的因果推理
+4. [VoDaSuRe: A Large-Scale Dataset Revealing Domain Shift in Volumetric Super-Resolution](/20260324-20260402/2603.23153v1-vodasure-a-large-scale-dataset-revealing-domain-shift-in-volumetric-super-resolution)  
    标签：评分：8.0/10、query:ai-pm
-   evidence：基于多组学的基因和蛋白质协同依赖数据库
-3. [Class Visualizations and Activation Atlases for Enhancing Interpretability in Deep Learning-Based Computational Pathology](/20260304-20260402/2603.07170v1-class-visualizations-and-activation-atlases-for-enhancing-interpretability-in-deep-learning-based-computational-pathology)  
-   标签：评分：8.0/10、query:ai-pm
-   evidence：基于深度学习的计算病理学癌症分类的可解释性
-4. [Rectified flow-based prediction of post-treatment brain MRI from pre-radiotherapy priors for patients with glioma](/20260304-20260402/2603.08385v1-rectified-flow-based-prediction-of-post-treatment-brain-mri-from-pre-radiotherapy-priors-for-patients-with-glioma)  
-   标签：评分：8.0/10、query:ai-pm
-   evidence：AI驱动的随访MRI生成用于胶质瘤治疗优化
-5. [Supporting Workflow Reproducibility by Linking Bioinformatics Tools across Papers and Executable Code](/20260304-20260402/2603.08195v1-supporting-workflow-reproducibility-by-linking-bioinformatics-tools-across-papers-and-executable-code)  
-   标签：评分：7.0/10、query:ai-pm
-   evidence：链接论文与代码中的生物信息学工具以支持工作流复现
-6. [VIVID-Med: LLM-Supervised Structured Pretraining for Deployable Medical ViTs](/20260304-20260402/2603.09109v1-vivid-med-llm-supervised-structured-pretraining-for-deployable-medical-vits)  
-   标签：评分：7.0/10、query:ai-pm
-   evidence：大语言模型监督的医学视觉Transformer预训练
-7. [VIVID-Med: LLM-Supervised Structured Pretraining for Deployable Medical ViTs](/20260304-20260402/2603.09109v2-vivid-med-llm-supervised-structured-pretraining-for-deployable-medical-vits)  
-   标签：评分：7.0/10、query:ai-pm
-   evidence：LLM监督的医学视觉Transformer预训练
-8. [Omics Data Discovery Agents](/20260304-20260402/2603.10161v1-omics-data-discovery-agents)  
-   标签：评分：7.0/10、query:ai-pm
-   evidence：用于获取和转换非结构化组学数据的LLM智能体
-9. [Learning Generalizable 3D Medical Image Representations from Mask-Guided Self-Supervision](/20260304-20260402/2603.13660v1-learning-generalizable-3d-medical-image-representations-from-mask-guided-self-supervision)  
-   标签：评分：6.0/10、query:ai-pm
-   evidence：3D医学图像表示的自监督学习
-10. [Discriminative Representation Learning for Clinical Prediction](/20260304-20260402/2603.20921v1-discriminative-representation-learning-for-clinical-prediction)  
-   标签：评分：6.0/10、query:ai-pm
-   evidence：用于临床结果预测的判别性表示学习
-11. [Project Imaging-X: A Survey of 1000+ Open-Access Medical Imaging Datasets for Foundation Model Development](/20260304-20260402/2603.27460v1-project-imaging-x-a-survey-of-1000-open-access-medical-imaging-datasets-for-foundation-model-development)  
-   标签：评分：6.0/10、query:ai-pm
-   evidence：用于基础模型开发的医学影像数据集综述
+   evidence：用于医学影像和体积超分辨率的深度学习
+5. [From Arithmetic to Logic: The Resilience of Logic and Lookup-Based Neural Networks Under Parameter Bit-Flips](/20260324-20260402/2603.22770v1-from-arithmetic-to-logic-the-resilience-of-logic-and-lookup-based-neural-networks-under-parameter-bit-flips)  
+   标签：评分：7.0/10、query:dl
+   evidence：神经架构的结构属性及其在参数位翻转下的韧性
+6. [Towards The Implicit Bias on Multiclass Separable Data Under Norm Constraints](/20260324-20260402/2603.22824v1-towards-the-implicit-bias-on-multiclass-separable-data-under-norm-constraints)  
+   标签：评分：7.0/10、query:dl
+   evidence：优化几何与基于梯度的泛化算法
+7. [The Coordinate System Problem in Persistent Structural Memory for Neural Architectures](/20260324-20260402/2603.22858v1-the-coordinate-system-problem-in-persistent-structural-memory-for-neural-architectures)  
+   标签：评分：7.0/10、query:dl
+   evidence：神经架构中持久结构记忆的基础原理
+8. [Designing to Forget: Deep Semi-parametric Models for Unlearning](/20260324-20260402/2603.22870v1-designing-to-forget-deep-semi-parametric-models-for-unlearning)  
+   标签：评分：7.0/10、query:dl
+   evidence：用于高效机器去学习的深度半参数模型
+9. [REALITrees: Rashomon Ensemble Active Learning for Interpretable Trees](/20260324-20260402/2603.22750v1-realitrees-rashomon-ensemble-active-learning-for-interpretable-trees)  
+   标签：评分：6.0/10、query:dl
+   evidence：用于构建近优模型集成的主动学习框架
+10. [KARMA: Knowledge-Action Regularized Multimodal Alignment for Personalized Search at Taobao](/20260324-20260402/2603.22779v2-karma-knowledge-action-regularized-multimodal-alignment-for-personalized-search-at-taobao)  
+   标签：评分：6.0/10、query:dl
+   evidence：解决大模型微调过程中的语义坍缩问题
+11. [Universal and efficient graph neural networks with dynamic attention for machine learning interatomic potentials](/20260324-20260402/2603.22810v1-universal-and-efficient-graph-neural-networks-with-dynamic-attention-for-machine-learning-interatomic-potentials)  
+   标签：评分：6.0/10、query:dl
+   evidence：具有动态注意力的图神经网络
+12. [EchoKV: Efficient KV Cache Compression via Similarity-Based Reconstruction](/20260324-20260402/2603.22910v1-echokv-efficient-kv-cache-compression-via-similarity-based-reconstruction)  
+   标签：评分：6.0/10、query:dl
+   evidence：用于优化大语言模型性能的高效KV缓存压缩
 
 
 <div class="dpr-home-promo-card">

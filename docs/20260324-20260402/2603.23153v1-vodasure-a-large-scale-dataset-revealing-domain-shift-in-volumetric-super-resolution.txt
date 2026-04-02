@@ -1,0 +1,670 @@
+Title: VoDaSuRe: A Large-Scale Dataset Revealing Domain Shift in Volumetric Super-Resolution
+
+URL Source: https://arxiv.org/pdf/2603.23153v1
+
+Published Time: Wed, 25 Mar 2026 01:39:34 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# VoDaSuRe: A Large-Scale Dataset Revealing Domain Shift in Volumetric Super-Resolution 
+
+August Leander Høeg Sophia Wiinberg Bardenfleth Hans Martin Kjer Tim Bjørn Dyrby Vedrana Andersen Dahl Anders Bjorholm Dahl Technical University of Denmark, Kgs. Lyngby, Denmark 
+
+{aulho, soeba, hmkj, tbdy, vand, abda }@dtu.dk 
+
+Abstract 
+
+Recent advances in volumetric super-resolution (SR) have demonstrated strong performance in medical and scientific imaging, with transformer- and CNN-based approaches achieving impressive results even at extreme scaling factors. In this work, we show that much of this performance stems from training on downsampled data rather than real low-resolution scans. This reliance on downsampling is partly driven by the scarcity of paired high- and low-resolution 3D datasets. To address this, we introduce VoDaSuRe, a large-scale volumetric dataset containing paired high- and low-resolution scans. When training models on VoDaSuRe, we reveal a significant discrepancy: SR models trained on downsampled data produce substantially sharper predic-tions than those trained on real low-resolution scans, which smooth fine structures. Conversely, applying models trained on downsampled data to real scans preserves more struc-ture but is inaccurate. Our findings suggest that current SR methods are overstated – when applied to real data, they do not recover structures lost in low-resolution scans and in-stead predict a smoothed average. We argue that progress in deep learning-based volumetric SR requires datasets with paired real scans of high complexity, such as VoDa-SuRe. Our dataset and code are publicly available through: 
+
+https://augusthoeg.github.io/VoDaSuRe/ 
+
+1. Introduction 
+
+Volumetric super-resolution promises to reveal details in low-resolution 3D scans, but are today’s deep learning mod-els truly reconstructing missing high-resolution details, or merely learning to reverse downsampling? Recent advances in deep learning-based volumetric super-resolution (SR) have achieved impressive results. However, we show that much of this success is a conse-quence of the training setup rather than genuine predic-tive capability. The vast majority of volumetric SR ap-
+
+(a) (b) (c) (d) 
+
+> Down-scaled 4 ×
+> Recorded 4× res. diff.
+
+(e) (f)   
+
+> High res. Low res. High res. Low res. SR result SR result
+
+Figure 1. Example from VoDaSuRe: (a) volume of bamboo show-ing the cropped area in red, (b) high resolution crop, (c) 4 × down-sampled, (d) scan at 4 × lower resolution, (e) SR of bamboo, (f) SR of cardboard. The top row in (e) and (f) is trained on downsampled HR-LR pairs, the bottom row is trained on actual LR data. 
+
+proaches generate paired high- and low-resolution (LR) vol-umes by simulating degradation by downsampling the high-resolution (HR) scans [5–7, 11, 29, 31, 40, 43, 44, 47]. This setup yields near-perfect reconstructions due to the overide-alistic correspondence between low and high resolution data enforced by the degradation model, but severely misrepre-sents the discrepancies observed in actual LR data. Fur-thermore, volumetric benchmark datasets are dominated by medical imaging, which often lack fine structural variations, making SR tasks using these datasets largely trivial. When trained on real low-resolution scans, i.e., volumes recorded at different resolutions, the predicted structures change dramatically, losing the high-frequency details ob-served in reconstructions obtained using downsampled in-
+
+> arXiv:2603.23153v1 [cs.CV] 24 Mar 2026 Figure 2. VoDaSuRe sample overview, including zoom-ins shown in red-framed cubes. From left to right: bamboo, cardboard, elm, larch, MDF, oak, cypress, animal bone, human vertebrae, and human femur. High- and low-resolution scans are interleaved in the zoom-in cubes.
+
+put data (Fig. 1). This raises a question: Are current SR methods capable of recovering structures that vanish at low resolution, or do they simply predict plausible averages? To address this question, we introduce VoDaSuRe – the 
+
+Vo lumetric Da taset for Su per-Re solution, a large-scale CT dataset designed for SR research. VoDaSuRe contains sam-ples scanned at multiple resolutions using the same micro-CT scanning setup, along with downsampled volumes for benchmarking. Using VoDaSuRe, we investigate the perfor-mance discrepancy of SR models trained on downsampled data vs. registered data scanned in actual low-resolution. Our results reveal the presence of a domain shift in SR predictions: models trained on downsampled data recover fine structures accurately, while models trained on scanned low-resolution data produce unrealistic, spatially averaged predictions. Applying models trained on downsampled data to real low-resolution scans surprisingly produces volumes that appear structurally plausible, yet lack precision com-pared to predictions obtained from training using downsam-pled data. These findings highlight the limitations of current SR approaches and the need for datasets with physically ac-quired LR data that enable scientifically relevant progress. VoDaSuRe spans diverse structural complexity, includ-ing wood, composite material, and bone (human and ani-mal). Bone volumes exhibit high contrast and smooth vari-ations, whereas wood-based samples range from regular solid wood to chaotic fiber composites with extremely fine canal structures. In addition to high structural complexity, VoDaSuRe is the largest volumetric SR dataset in terms of total voxel count with paired multi-resolution data, with 16 
+
+paired scans ( 32 in total), comprising ∼ 194 .0×10 9 voxels. VoDaSuRe is intended as a research benchmark for studying volumetric SR under realistic acquisition condi-tions. Although we do not claim direct transferability to clinical MRI/CT, VoDaSuRe includes bone scans relevant to medical analysis tasks such as estimating bone volume fraction and lacunar statistics. Clinical photon-counting de-tectors [14, 39] and cone-beam CT [24, 41, 53] for imag-ing fine bone structures and soft tissue have also emerged, which motivates studying SR for complex microstructures. 
+
+Our contributions are: 
+
+• We introduce VoDaSuRe, a large-scale volumetric SR dataset with paired high- and low-resolution scans and synthetically downsampled versions for comparison. • We benchmark state-of-the-art CNN- and ViT-based SR methods across multiple volumetric datasets, including medical datasets and VoDaSuRe, revealing large domain gaps between downsampled and real LR data settings. • We implement a data pipeline based on the OME-Zarr format for efficient out-of-core sampling of 3D patches. • We release VoDaSuRe and our code publicly to enable reproducible SR research. 
+
+2. Related work 
+
+Super-resolution for volumetric images . A family of SR approaches for 3D volumes adopts slice-wise strategies [4, 57], where each slice is upscaled independently to in-crease in-plane resolution. While computationally efficient, these approaches ignore cross-plane information and risk discontinuities across volumetric predictions. In contrast, fully volumetric methods use 3D convolutional [47, 49] or ViT layers [11, 17] to learn spatial correlations in all dimen-sions, improving accuracy at higher computational cost. As reseach interest in volumetric SR expands, various approaches have emerged. Axial SR methods increase res-olution in the slice direction of LR MRI while preserving in-plane resolution [12, 20, 48, 52]. Arbitrary scale SR meth-ods produce continuously upscaled volumetric images us-Dataset #samples #gigavoxels Volume shape Domain Modalities Accessibility Paired res. NAMIC [50] 20 ∼ 0.2 256 × 256 × 176 Brain MRI T1w, T2w, fMRI, DTI On request ✗                                                                                                                                                                                                                              
+
+> Kirby 21 [26] 21 ∼0.3256 ×256 ×180 Brain MRI T2w, FLAIR, DTI Public ✗
+> IXI a600 ∼5.9256 ×256 ×(144 -150) Brain MRI T1w, T2w, PD Public ✗
+> fastMRI [54] 8400 ∼11 .0256 ×256 ×20 (mean) Brain & knee MRI T1w, T2w, FLAIR Public ✗
+> BraTS 2023 [34] 1470 ∼13 .1240 ×240 ×155 Brain MRI (Glioma) T1w, T2w On request ✗
+> LiTS [3] 130 ∼17 .4512 ×512 ×(74 -987) Liver CT Clinical CT Public ✗
+> HCP 1200 [42] 1113 ∼29 .2320 ×320 ×256 Brain MRI T1w, T2w Public ✗
+> LIDC-IDRI [18] 1010 ∼104 .3512 ×512 ×(65 -764) Thorax CT Clinical CT Public ✗
+> CTSpine1K [9] 1005 ∼134 .9512 ×512 ×(85 -736) Spine CT Clinical CT Public ✗
+> Kodama et al. [25] 1 (2) ∼0.1512 ×512 ×200 Materials Lab- & synchrotron CT On request ✓
+> Li et al. [27] 61 (122) ∼0.9512 ×512 ×28 Brain MRI T1w, T2w, FLAIR On request ✓
+> Chu et al. [8] 20 (40) ∼2.2480 ×512 ×224 Brain MRI T1w, T2w Unavailable ✓
+> WAND [33] 170 (846) ≤19 .4≤320 ×320 ×224 Brain MRI T1w, T2w, fMRI, TRUST Public ✓
+> Klos et al. [23] 1 (6) ∼20 .51181 ×1695 ×1695 (mean) Materials Lab-CT Public ✓
+> Karamov et al. [21] 1 (2) ∼28 .32560 ×2560 ×2160 (mean) Materials Synchrotron CT On request ✓
+> RPLHR-CT [52] 250 (500) ∼52 .0512 ×512 ×(191 -396) Thorax CT Clinical CT On request ✓
+> I13-2 XCT [13] 1 (4) ∼53 .22510 ×2510 ×2110 Materials Synchrotron CT Public ✓
+> FACTS [2] 13 (26) ∼57 .61014 ×1372 ×1584 (mean) Femur CT Lab- & clinical CT Public ✓
+> VoDaSuRe (ours) 16 (32) ∼194 .03330 ×1820 ×1870 (mean) bMedical/Materials Lab CT Public ✓
+> a
+
+https://brain-development.org/ixi-dataset/ 
+
+> b
+
+The volume shape of the samples in VoDaSuRe varies, however all HR scans are chunked in cubes of 160 3 voxels. 
+
+Table 1. Overview of volumetric image datasets, including single-resolution and paired multi-resolution datasets. In terms of total corre-sponding LR-HR voxel pairs and mean volume shape, VoDaSuRe is several times larger than existing paired resolution 3D datasets. 
+
+ing implicit neural representations [28, 32, 51, 60], whereas multi-contrast SR methods exploit images from multiple imaging modalities to enrich feature extraction [20, 28, 32]. A common practice in most SR research is the use of synthetically generated data, where LR volumes are pro-duced by downsampling their HR counterparts. This prac-tice makes the SR problem easier than when using LR data physically acquired at reduced resolution. True LR acquisi-tion differs fundamentally from downsampling: it often pro-vides higher contrast and better signal-to-noise ratios, but may introduce acquisition or reconstruction artifacts. To be practical, SR methods must reconstruct HR images despite these artifacts. Therefore, data for developing SR methods must have the same properties as data scanned in different resolutions. Despite the proposal of sophisticated degrada-tion models, progress towards improving the generalization of volumetric SR in real-world scenarios remains limited by the lack of paired multi-resolution volumetric datasets. 
+
+Volumetric datasets . Although volumetric datasets vary in acquisition methods, resolution scales, and application domains, medical imaging datasets remain the most com-mon data category for volumetric SR [20]. The use of SR for medical images is motivated by benefits such as higher diagnostic accuracy, better treatment planning, shorter ac-quisition times, and reduced radiation exposure [5–7, 20]. The most widely used medical datasets used for SR are listed in the top part of Tab. 1. NAMIC [50] was used for SR in [19, 38], Kirby 21 [37] has been used for SR in [10, 17, 29, 38, 46, 47, 56], IXI (Information eXtraction from Images) [30] has been used for SR in [17, 20, 29, 43, 45, 58], fastMRI [54] was used for SR in [28], BraTS (Brain Tumor Segmentation Challenge) [37] was used for SR in [17, 28, 47, 60], and HPC (Human Connectome Project) [5– 7] has been used for SR in [11, 17, 30, 31, 44, 51, 59]. Ad-ditionally, ADNI (Alzheimer’s Disease Neuroimaging Ini-tiative) was employed for SR in [31, 40]. Despite their popularity, most medical datasets have rel-atively low in-plane resolution of ≤ 320 2 voxels. Recently, higher resolution medical datasets with an in-plane size of 512 2 voxels have emerged, including CTSpine1K [9], LiTS [3], KiTS [16], and LIDC-IDRI [18]. However, these datasets have not been widely used in volumetric SR. Acquiring 3D data at multiple resolutions is expensive, slow, and increases radiation exposure, so most 3D datasets are available only at a single resolution. Consequently, LR data for SR training must be generated synthetically. Typ-ical downsampling methods involve Gaussian smoothing followed by interpolation (e.g., cubic or linear), used for slice-wise, volumetric, and axial SR. To better approximate MRI acquisition, k-space truncation has been proposed [5– 7], which removes high-frequency components to introduce aliasing while preserving spatial dimensions. Expanding on this, Ayaz et al. [1] proposed a more comprehensive degra-dation approach to simulate LR MRI acquisition. 
+
+Paired image datasets for volumetric SR . Despite the proposal of more realistic SR degradation models for gener-ating LR data from HR scans, such methods fail to capture CT-related artifacts such as beam hardening, motion, and ring artifacts. Instead, the actual differences are best ob-tained by scanning paired LR-HR images. The datasets listed in the lower part of Tab. 1 include scans acquired at multiple resolutions. These comprise: lab-Figure 3. Illustration of our data curation pipeline for VoDaSuRe. We collect multi-resolution nested CT scans of the same sample, after which we crop and register the LR data to the downsampled HR volumes. LR and HR volumes are masked and their intensity histograms are matched. All scans are saved to OME-Zarr with up to four resolution levels, using separate groups for HR, LR, and registered data. 
+
+CT and synchrotron CT of batteries by Kodama et al. [25]; paired brain MRI scans from different scanners by Li et al. [27]; multi-modal brain MRI for cross-modal SR by Chu et al. [8]; the WAND dataset of brain MRI with varying modalities and protocols [33]; a recent lab-CT dataset of a diamond-like lattice cuboid scanned at six resolutions by Klos et al. [23]; the RPLHR-CT dataset with 250 paired chest CT volumes [52]; the I13-2 XCT synchrotron CT dataset of a Zinc-Doped Zeolite sample at four resolutions [13]; and the Femur Archaeological CT Super-resolution (FACTS) dataset with 12 femurs scanned using clinical and lab-CT [2]. In addition to these, Karamov et al. [21] curated a paired synchrotron CT dataset of fiber composites. Although these works enable more realistic SR tasks, the volumes within these datasets are either 1) small-scale (≤ 512 3), 2) span a narrow set of microstructural domains, 3) provide a small number of volumes, 4) or are not easy to download. Their limited size and narrow domain coverage prevent fair and reproducible method comparison. In con-trast, VoDaSuRe provides registered, real multi-resolution volumetric scans acquired across multiple structural do-mains, offering the first large-scale benchmark for studying genuine resolution enhancement in volumetric imaging. 
+
+3. VoDaSuRe dataset 
+
+The VoDaSuRe dataset consists of multi-resolution X-ray CT volumes of 16 biological and non-biological samples spanning diverse volumetric microstructures. In terms of total voxel for which paired LR data have been acquired, VoDaSuRe is the largest volumetric dataset to feature both synthetically downsampled and physically acquired, co-registered LR scans obtained using the same scanner setup. Unlike multi-modality datasets, where discrepencies be-tween low and high resolution arise from different imaging setups (e.g., micro-CT vs. clinical CT), VoDaSuRe isolates the effects of pure resolution difference, allowing the study of realistic degradation processes and enabling training of models that generalize across real-world resolution scales. In terms of samples, our dataset includes four human fe-murs and four vertebrae, animal bone (ox), wood samples from five tree species, and composites including medium-density fiberboard (MDF) and cardboard laminate (Fig. 2). An overview of all samples, including scanner type, reso-lution levels, and volume dimensions for HR, LR, and co-registered scans, is provided in the supplementary material. 
+
+3.1. Data acquisition 
+
+We faced an important choice when acquiring VoDaSuRe: how large a resolution gap should separate the LR and HR scans. A gap that is too small leads to trivial SR tasks, whereas increasing the resolution beyond the smallest fea-ture size only enlarges the data without adding meaningful structural information. Based on this trade-off, we selected a fixed resolution difference of 4× between all HR and LR acquisitions. We then tuned the specific voxel-size ranges for each sample so that fine-scale features are fully resolved only in the HR scans, while coarser structures remain visi-ble in both. This ensures that every LR–HR pair represents a non-trivial and informative SR task. Because our samples contain microstructures at differ-ent spatial scales, we used two lab-CT scanners, each tuned for a specific resolution range. Human vertebra and fe-mur bone samples were scanned using a Nikon XT H 225 lab-CT scanner. The remaining samples were acquired us-ing a Zeiss Xradia Versa 520 lab-CT scanner. In both se-tups, higher resolution scans were obtained by increasing sample-detector distance, which enlarges the projected cone angle to increase magnification at the cost of lower contrast. 
+
+3.2. Data curation 
+
+Our data pipeline includes scanning, registration, masking, intensity matching, and OME-Zarr conversion, see Fig. 3. 
+
+Initial processing . All scans are percentile clipped to remove outliers. Volumes are then normalized to [0; 65535] HR LR RCAN HAT EDDSR mDCSRN MFER SuperFormer RRDBNet3D MTVNet HR LR RCAN HAT EDDSR mDCSRN MFER SuperFormer RRDBNet3D MTVNet HR LR RCAN HAT EDDSR mDCSRN MFER SuperFormer RRDBNet3D MTVNet HR LR RCAN HAT EDDSR mDCSRN MFER SuperFormer RRDBNet3D MTVNet HR LR RCAN HAT EDDSR mDCSRN MFER SuperFormer RRDBNet3D MTVNet HR LR RCAN HAT EDDSR mDCSRN MFER SuperFormer RRDBNet3D MTVNet Figure 4. Visual comparison of SR predictions on CTSpine1K, LIDC-IDRI and VoDaSuRe at scale 4×. From top to bottom: CTSpine1K, LIDC-IDRI, VoDaSuRe (downsampled), and VoDaSuRe (registered) – two examples. The LR inputs and corresponding HR ground truth images are shown on the left, separated by the red line. 
+
+and cast to unsigned short. To enable SR tasks at multiple scales ( 2×, 4×, 8×), we create pyramid volumes of both HR and LR scans using local mean downsampling, reduc-ing resolution by a factor of 2 up to a maximum of 8×.Foreground masks are created using either thresholding or UNet-based segmentation, depending on scan complexity. 
+
+Registration . Registration of LR/HR volumes is per-formed using ITK-Elastix [36]. We initialize registration by pairing downsampled HR and LR scans with approximate voxel sizes. Each LR scan is coarsely cropped to the HR scan field of view, after which translational registration is done to achieve initial alignment. The alignment is then re-fined using affine registration, allowing small deformations of the LR volume to achieve voxel-level correspondence. Finally, the registered LR volumes are cropped to match the HR field of view, and voxels outside this region are masked. 
+
+Intensity matching . To account for contrast differences between LR and HR scans, we match the intensities of each slice in the registered LR volumes. Specifically, we match the cumulative distribution function of all masked slices of each registered LR volume to their corresponding down-sampled HR slices. This preserves the structure of each registered LR slice, while adjusting the relative intensities to match those in HR. This step is necessary in order to stabilize SR training, as the L1-loss function used for opti-mization is highly sensitive to relative contrast differences. 
+
+OME-Zarr conversion and data loading . The volumes in VoDaSuRe are exceptionally large, requiring efficient storage and access. To mitigate memory constraints, all data were converted to the OME-Zarr format [35], which ex-tends Zarr with multi-resolution pyramids and OME-NGFF metadata, offering an ideal fit for SR tasks operating across scales. For each sample, we create an OME-Zarr image pyramids of the HR, LR, and registered volumes. Chunk sizes are empirically optimized for high I/O throughput and minimal cache misses when sampling HR/LR 3D patches. Scale 2× PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS                                                                       
+
+> HAT 35.94 / .9258 / .0430 / .0571 38.11 / .9713 / .0339 / .0257 33.92 / .9062 / .0419 / .0614 23.32 / .8921 / .1638 / .1571 17.44 / .4755 / .3377 / .4661
+> RCAN 36.62 / .9282 / .0402 / .0505 39.04 / .9736 / .0309 / .0218 35.01 / .9111 / .0379 / .0549 23.28 / .8687 / .1654 / .1575 17.40 / .4691 / .3337 / .4807
+> EDDSR 37.04 / .9292 / .0380 / .0597 39.87 / .9752 / .0274 / .0268 34.40 / .9096 / .0395 / .0651 24.86 / .9066 / .1445 / .1563 17.63 / .4755 / .3277 / .4527
+> SuperFormer 38.24 / .9330 / .0338 / .0495 41.45 / .9780 / .0229 / .0197 37.03 / .9162 / .0311 / .0526 25.00 / .9090 / .1429 / .1398 18.17 / .5246 / .3089 / .3958
+> MFER 39.05 / .9325 / .0317 / .0458 43.14 / .9776 / .0194 / .0168 38.82 / .9160 / .0274 / .0462 25.30 / .9093 / .1404 / .1457 17.98 / .5152 / .3184 / .4176
+> mDCSRN 38.89 / .9352 / .0317 / .0430 42.58 / .9798 / .0203 / .0172 37.84 / .9190 / .0289 / .0463 25.17 / .9089 / .1438 / .1457 17.97 / .5110 / .3149 / .4220
+> MTVNet 39.27 / .9355 / .0307 / .0436 43.16 / .9801 / .0192 / .0164 39.36 / .9215 / .0261 / .0430 24.82 / .9066 / .1479 / .1434 18.21 / .5249 / .3080 / .3898
+> RRDBNet3D 39.88 /.9387 /.0288 /.0400 44.81 /.9821 /.0161 /.0141 40.47 /.9256 /.0239 /.0382 25.50 /.9106 /.1397 /.1378 18.25 /.5377 /.3057 /.3864
+
+Method CTSpine1K LiTS LIDC-IDRI VoDaSuRe (Downsampled) VoDaSuRe (Registered) 
+
+Scale 4× PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS                                                                       
+
+> HAT 30.44 / .8391 / .0839 / .1776 31.72 / .9106 / .0732 / .1083 29.50 / .8270 / .0721 / .1717 16.61 / .5032 / .3553 / .3855 15.41 / .3543 / .4526 / .4986
+> RCAN 31.38 / .8512 / .0757 / .1635 32.83 / .9229 / .0652 / .0854 30.71 / .8417 / .0634 / .1550 16.95 / .5512 / .3434 / .3722 15.37 / .3235 / .4146 / .5076
+> EDDSR 31.57 / .8530 / .0729 / .1738 33.20 / .9255 / .0610 / .0978 30.12 / .8433 / .0675 / .1679 18.15 / .6222 / .3051 / .3488 15.82 / .3995 / .3889 / .4650
+> SuperFormer 33.95 / .8674 / .0561 / .1539 35.58 / .9396 / .0457 / .0747 33.23 / .8616 / .0476 / .1378 18.53 / .6415 / .2931 / .3150 16.24 /.4395 /.3729 /.4250
+> MFER 34.36 / .8720 / .0540 / .1478 36.17 / .9439 / .0447 / .0687 33.40 / .8658 / .0526 / .1307 18.58 / .6518 / .2898 / .3283 15.99 / .4187 / .3851 / .4402
+> mDCSRN 34.77 / .8741 / .0512 / .1484 36.57 / .9461 / .0407 / .0684 33.92 / .8689 / .0437 / .1310 18.65 / .6666 / .2871 / .3121 16.11 / .4257 / .3781 / .4434
+> MTVNet 34.39 / .8742 / .0539 / .1464 36.25 / .9464 / .0428 / .0675 33.76 / .8696 / .0452 / .1261 18.81 / .6619 / .2888 / .3237 16.18 / .4204 / .3775 / .4408
+> RRDBNet3D 35.57 /.8803 /.0472 /.1398 37.86 /.9526 /.0353 /.0607 35.26 /.8761 /.0387 /.1201 19.08 /.6779 /.2746 / .3250 16.22 / .4390 / .3729 / .4337
+
+Method CTSpine1K LiTS LIDC-IDRI VoDaSuRe (Downsampled) VoDaSuRe (Registered) 
+
+Table 2. Quantitative comparison of state-of-the-art SR models on datasets CTSpine1K, LiTS, LIDC-IDRI and VoDaSuRe using down-sampled and registered LR input data. The best performance metrics PSNR ↑ / SSIM ↑ / NRMSE ↓ / LPIPS ↓ are highlighted in bold .
+
+Method PSNR / SSIM / NRMSE / LPIPS PSNR / SSIM / NRMSE / LPIPS 
+
+HAT 16.38 / .4806 / .3606 / .5220 14.58 / .3118 / .4445 / .5132 
+
+RCAN 16.38 / .4337 / .3644 / .5208 14.57 / .3429 / .4433 / .4894 
+
+EDDSR 16.62 / .4847 / .3560 / .5101 15.18 / .3945 / .4202 / .4560 
+
+SuperFormer 16.54 / .4891 / .3579 / .5045 15.12 / .3895 / .4191 / .4409 
+
+MFER 16.51 / .4812 / .3598 / .5063 14.89 / .3837 / .4296 / .4593 
+
+mDCSRN 16.77 / .4794 / .3576 / .5132 14.94 / .4000 / .4266 / .4488 
+
+MTVNet 16.73 / .4689 / .3647 / .5148 14.72 / .3540 / .4407 / .4610 
+
+RRDBNet3D 16.74 / .4781 / .3548 / .5092 14.94 / .3923 / .4221 / .4542 
+
+Training VoDaSuRe (Downsampled) 
+
+Evaluation VoDaSuRe (Registered) 2× VoDaSuRe (Registered) 4×
+
+Table 3. Quantitative results for cross-domain experiments on Vo-DaSuRe registered and downsampled at 2× and 4× upscaling. 
+
+We further implement a PyTorch-compatible data loader that supports concurrent 3D patch sampling and augmen-tation, enabling out-of-core training on volumes exceed-ing system memory. Leveraging OME-Zarr’s hierarchical structure allows efficient access to arbitrary 3D patch sizes without pre-splitting or manual volume bookkeeping. 
+
+4. Experiments 
+
+Model selection . We select eight recognized state-of-the-art SR methods, including six volumetric and two 2D ap-proaches. The volumetric SR methods are: EDDSR [47], SuperFormer [11], MFER [29], mDCSRN [7], MTVNet [17], RRDBNet3D [49], and the 2D SR methods are: RCAN [57] and HAT [4]. The version of MTVNet L3 used in this study has fewer input features than in [17]. We use the author’s suggested parameters for the remaining models. 
+
+Datasets . To evaluate model performance on datasets in the size range of VoDaSuRe, we use the three medical imaging datasets: CTSpine1K [9], LiTS [3], LIDC-IDRI [18], in addition to VoDaSuRe. These datasets include clin-ical CT scans with an in-plane resolution of 512 × 512 , and a varying number of slices of human spine, liver, and thorax regions, respectively. The medical datasets are only avail-able at one resolution, so models are trained on LR volumes downsampled from the HR volumes. For VoDaSuRe, we consider two SR tasks: VoDaSuRe (downsampled) tests the effect of downsampling, while VoDaSuRe (registered) tests the effect of using scanned LR-HR paired data. For VoDa-SuRe (registered) at scale 2×, we downsample HR scans by a factor 2 to obtain 2× resolution difference. VoDaSuRe training and test splits are partly obtained by leaving out whole samples, and partly by separating single samples. For the vertebrae and femur samples of VoDaSuRe, we reserve whole scans for testing. For the remaining samples, we split the volumes along the axial direction to create volumes for training and testing, reserving ∼ 1/10 th of each volume for testing. See supplementary material for additional details. 
+
+Training . All models are trained on a single H100 80GB GPU for 100K iterations using the AdamW optimizer [22] with β1 = 0 .9 and β2 = 0 .999 . We first train all models from scratch at 2× upscaling using a batch size of 16 . For 
+
+4× upscaling, we finetune models trained for 2× upscaling for another 100K iterations using a batch size of 8. The LR patch size is set to 32 3 for all methods, or 32 2 for 2D methods. For augmentations, we use a combination of ran-dom 3D angular rotations and flipping in (x, y, z ), random contrast adjustment, and scaling. All model parameters are optimized using a constant learning rate and pure L1 loss. 
+
+Performance evaluation . We produce SR reconstruc-tions of all volumes in the test set by tiled aggregation of SR predictions with an overlap of four voxels on all sides. Overlapping prediction regions are smoothed using a 3D Hanning window. Performance metrics Peak Signal-to-TV: 63.25 TV: 48.59 TV: 59.01 TV: 51.91 TV: 55.93 TV: 53.93 TV: 56.85 TV: 71.55 TV: 18.61 TV: 11.78 TV: 27.24 TV: 23.68 TV: 36.85 TV: 33.92 TV: 26.73 TV: 27.87 TV: 38.67 TV: 10.15 TV: 17.14 TV: 9.60 TV: 8.49 TV: 16.71 TV: 6.61 TV: 21.69 TV: 9.35 TV: 13.73 TV: 29.43 TV: 2.29 TV: 14.35 TV: 9.00 Figure 5. Visualizations from VoDaSuRe. Top row: HR data, middle row: SR predictions using downsampled LR data, bottom row: SR predictions using real LR data. All outputs are obtained at 4× upscaling using RRDBNet3D. Total variation (TV) is shown for each slice. TV: 58.52 High-resolution 
+
+> RRDBNet3D, TV: 36.27 Train: Down. / Test: Down.
+> RRDBNet3D, TV: 5.42 Train: Reg. / Test: Reg.
+> RRDBNet3D, TV: 15.08 Train: Down. / Test: Reg.
+
+Figure 6. SR prediction obtained using different combinations of training/test data. From left to right: HR data, training/testing on downsampled data, training/testing on registered data, training on downsampled and testing using registered data. Predictions are obtained using RRDBNet3D at scale 4×.
+
+Noise Ratio (PSNR), Structural Similarity Index Measure (SSIM), Normalized Root Mean Square Error (NRMSE) and Learned Perceptual Image Patch Similarity (LPIPS) [55] are computed slice-wise across the prediction volume and averaged over all non-zero slices. For 2D methods, met-rics are evaluated on every sth slice, where s is the SR scale. 
+
+4.1. In-domain experiments 
+
+Table 2 shows a quantitative comparison of state-of-the-art SR methods on the evaluated datasets, with visual compar-isons of all methods shown in Fig. 4. In medical imaging datasets CTSpine1K, LiTS and LIDC-IDRI, where LR is obtained by downsampling, all methods achieve impres-sive performance. Top-performing methods reach PSNR values of ≥ 40 dB at scale 2×, and ≥ 35 dB at scale 
+
+4×. Conversely, in VoDaSuRe (downsampled), all methods substantially drop in performance, despite using the same degradation method. The best PSNR is 25 .50 dB for 2×
+
+and 19 .08 dB at scale 4×, with similar trends for SSIM, NRMSE and LPIPS. This shows that SR on VoDaSuRe (downsampled) is substantially more challenging than on CTSpine1K, LiTS, and LICD-IDRI. Despite lower perfor-mance, all methods recover most of the structural variation. On VoDaSuRe (registered), where we use scanned LR data, we observe a clear difference. All models produce noticeably more blurred output images compared to mod-els trained on downsampled data, which is also reflected in lower performance. The best model achieves PSNR of 
+
+18 .25 dB at 2× scale difference and 16 .24 dB at 4×, with similar trends in SSIM, NRMSE and LPIPS (see Tab. 2). These differences show that models trained using pixel-wise loss fail to capture missing microstructural details in real LR data, and instead predict unrealistically smoothed outputs. To assess the loss of high-frequency information in SR predictions, we compute the total variation (TV) for high-resolution images, predictions from synthetically downsam-pled inputs, and predictions from scanned LR data, see Fig. 5. TV decreases notably in SR predictions using down-sampled LR inputs compared with HR data, which can be explained by a general smoothing effect of SR. Yet, we ob-serve an even lower TV in predictions using scanned LR data. This substantial loss of fine-scale structural detail con-firms that SR of actual scanned LR data is a significantly harder SR task than upscaling downsampled LR volumes. 
+
+4.2. Cross-domain experiments 
+
+To illustrate the difference between training on downsam-pled and real LR data, we perform cross-domain experi-ments on VoDaSuRe, see Tab. 3 and Fig. 6. We observe that models trained on downsampled LR data exhibit clear per-formance drops when evaluated using registered LR scans. This illustrates that training on downsampled data is a prac-tice that cannot be successfully adapted to real data. 
+
+4.3. Ablations 
+
+We conduct four ablation experiments using VoDaSuRe, see Fig. 7. First, we test whether the observed smoothing is in-Difference image: HR, LR w. shift 
+
+> Downsampled w. shift RRDBNet3D (4 ×)
+> Downsampled w.o shift RRDBNet3D (4 ×)
+> Registered w.o shift RRDBNet3D (4 ×)
+
+(a) Ablation on the effect misregistration between LR and HR data. w.o LPIPS loss Downsampled LR (4 ×)
+
+> w.o LPIPS loss Registered LR (4 ×)
+> w. LPIPS loss Downsampled LR (4 ×)
+> w. LPIPS loss Registered LR (4 ×)
+
+(b) Ablation on the effect of perceptual (LPIPS) loss at scale 4×.                   
+
+> MTVNet Elm original (4 ×)13.86 / .3296 / .4279 / .4219
+> MTVNet Elm w. downsampling (4 ×)14.89 / .2588 / .3818 / .7277
+> RRDBNet3D Elm original (4 ×)13.88 / .3440 / .4220 / .4122
+> RRDBNet3D Elm w. downsampling (4 ×)14.84 / .2718 / .4183 / .6949
+> Method Sample Downsampling HR & LR PSNR / SSIM / NRMSE / LPIPS MTVNet, TV: 8.14
+> W/ downsampling
+> MTVNet, TV: 6.85
+> W/O downsampling
+> RRDBNet3D, TV: 7.54
+> W/ downsampling
+> RRDBNet3D, TV: 6.96
+> W/O downsampling
+
+(c) Ablation on the effect of downsampling both HR and real LR data.                
+
+> MTVNet Wood ✓16.13 / .4942 / .3489 / .3933
+> MTVNet Wood ✗15.83 / .4953 / .3614 / .4264
+> RRDBNet3D Wood ✓16.16 / .5123 / .3447 / .3818
+> RRDBNet3D Wood ✗15.86 / .4910 / .3603 / .4526
+> Method Sample Include during training PSNR / SSIM / NRMSE / LPIPS MTVNet (2 ×)Sample excluded
+> MTVNet (2 ×)Sample included
+> RRDBNet3D (2 ×)Sample excluded
+> RRDBNet3D (2 ×)Sample included
+
+(d) Ablation on the effect of excluding specific samples during training. 
+
+Figure 7. Ablation experiments on VoDaSuRe. 
+
+ducible via registration error. We purposely misalign the downsampled Elm volume and retrain RRDBNet3D, see Fig. 7a. While misalignment reduces prediction sharpness, it does not reproduce the characteristic smoothing observed when training on real LR scans, suggesting that acquisition effects are the primary cause of the observed domain shift. Next, we investigate the use of perceptual loss for bridg-ing the domain gap, see Fig. 7b. Training RRDBNet3D us-ing a combination of L1 and LPIPS loss (λ = 0 .02) results in noticable increase in texture, yet predictions remain un-realistic compared to HR data, and the domain gap persists. Third, we test the effect of creating 2× scale difference in scanned data by downsampling the HR scans, see Fig. 7c. By also downsampling the LR scans 2×, we obtain a scale difference of 4×. Training RRDBNet3D and MTVNet with and without downsampling, we observe minor performance differences and similar smoothing effects, indicating that the domain shift is intrinsic to real LR data. This confirms the 2× downsampling of the HR scans as a viable practice. Finally, we test generalization to unseen materials by training on bamboo, oak, and larch wood while evaluat-ing on elm and cypress, see Fig. 7d. We obtain compa-rable results across all metrics, demonstrating that models trained on VoDaSuRe enable generalization across similar microstructures, albeit with similarly smoothed predictions. 
+
+5. Discussion and conclusion 
+
+We introduce VoDaSuRe, a high-resolution benchmark for volumetric super-resolution featuring both synthetically downsampled and physically acquired low-resolution scans obtained using identical imaging setups. VoDaSuRe in-cludes diverse microstructures from biological and non-biological materials, including wood, composite materials, and bone, filling a gap between scientific and biomedical imaging and enabling SR benchmarking across complex 3D structures. To our knowledge, VoDaSuRe is the largest vol-umetric dataset with multi-resolution data for all scans. Training state-of-the-art SR models using pixel-wise loss on real LR data, we reveal a clear domain shift in SR pre-dictions. All models produce spatially averaged predictions lacking the high-frequency information observed in both HR and LR data. This effect is not observable in downsam-pled data, suggesting that SR models primarily learn to in-vert degradation instead of reconstructing microstructures. Using total variation, we confirm a loss of high-frequency spatial detail in SR predictions, supported by consistent drops in performance metrics and visual observations. This effect is not reproducible via misregistration alone, indicat-ing that the domain gap arises from the LR acquisition, and while adding perceptual loss produces more textured pre-dictions, it does not resolve the domain gap. These findings highlight the need for more advanced approaches that can address the domain shift observed in real data to retain the relevance of SR for scientific and practical applications. Using Local Attribution Mapping [15], we analyzed how SR models leverage spatial context across datasets. All models exhibited higher diffusion indices (DI) on VoDa-SuRe, particularly ViT-based methods (HAT, SuperFormer, MTVNet), indicating greater reliance on image context. However, we observed no clear correlation between DI and performance, suggesting that contextual dependency alone does not guarantee SR accuracy. See Supp. for details. In summary, VoDaSuRe provides a challenging bench-mark for studying SR generalization under realistic acquisi-tion conditions, supporting the development of more robust and physically grounded volumetric SR models. Acknowledgments 
+
+Research reported in this publication is supported by the Infrastructure for Quantitative AI-based Tomography (QUAITOM) supported by the Novo Nordisk Founda-tion (Grant number NNF21OC0069766) and the Mul-tiscale label-free 3D x-ray imaging: Visualizing cells and tissue architecture simultaneously (Xtreme-CT) sup-ported by the Novo Nordisk Foundation (Grant number NNF22OC0077698). 
+
+References 
+
+[1] Aymen Ayaz, Rien Boonstoppel, Cristian Lorenz, Juergen Weese, Josien Pluim, and Marcel Breeuwer. Effective deep-learning brain mri super resolution using simulated train-ing data. Computers in Biology and Medicine , 183:109301, 2024. 3 [2] Sophia W. Bardenfleth, Vedrana A. Dahl, Chiara Villa, Galateia Kazakia, and Anders B. Dahl. Superresolution of real-world multiscale bone CT verified with clinical bone measures. In Medical Image Understanding and Analysis ,pages 160–173, Cham, 2024. Springer Nature Switzerland. 3, 4 [3] Patrick Bilic, Patrick Christ, Hongwei Bran Li, Eugene Vorontsov, Avi Ben-Cohen, Georgios Kaissis, Adi Szeskin, Colin Jacobs, Gabriel Efrain Humpire Mamani, Gabriel Chartrand, et al. The liver tumor segmentation benchmark (LiTS). Medical image analysis , 84:102680, 2023. 3, 6 [4] Xiangyu Chen, Xintao Wang, Wenlong Zhang, Xiangtao Kong, Yu Qiao, Jiantao Zhou, and Chao Dong. Hat: Hybrid attention transformer for image restoration. arXiv preprint arXiv:2309.05239 , 2023. 2, 6 [5] Yuhua Chen, Feng Shi, Anthony G Christodoulou, Yibin Xie, Zhengwei Zhou, and Debiao Li. Efficient and ac-curate MRI super-resolution using a generative adversar-ial network and 3D multi-level densely connected network. In International conference on medical image computing and computer-assisted intervention , pages 91–99. Springer, 2018. 1, 3 [6] Yuhua Chen, Yibin Xie, Zhengwei Zhou, Feng Shi, Anthony Christodoulou, and Debiao Li. Brain MRI super resolution using 3D deep densely connected neural networks. In 2018 IEEE 15th international symposium on biomedical imaging (ISBI 2018) , pages 739–742. IEEE, 2018. [7] Yuhua Chen, Anthony G. Christodoulou, Zhengwei Zhou, Feng Shi, Yibin Xie, and Debiao Li. MRI super-resolution with GAN and 3D multi-level densenet: Smaller, faster, and better. arXiv preprint arXiv:2003.01217 , 2020. 1, 3, 6 [8] Lei Chu, Baoqiang Ma, Xiaoxi Dong, Yirong He, Tongtong Che, Debin Zeng, Zihao Zhang, and Shuyu Li. A paired dataset of multi-modal MRI at 3 Tesla and 7 Tesla with man-ual hippocampal subfield segmentations. Scientific Data , 12 (1):260, 2025. 3, 4 [9] Yang Deng, Ce Wang, Yuan Hui, Qian Li, Jun Li, Shiwei Luo, Mengke Sun, Quan Quan, Shuxin Yang, You Hao, et al. CTSpine1K: A large-scale dataset for spinal verte-brae segmentation in computed tomography. arXiv preprint arXiv:2105.14711 , 2021. 3, 6 [10] Jinglong Du, Lulu Wang, Yulu Liu, Zexun Zhou, Zhongshi He, and Yuanyuan Jia. Brain MRI super-resolution using 3D dilated convolutional encoder–decoder network. IEEE Access , 8:18938–18950, 2020. 3 [11] Cristhian Forigua, Maria Escobar, and Pablo Arbelaez. Su-perFormer: Volumetric Transformer Architectures for MRI Super-Resolution. In Simulation and Synthesis in Medi-cal Imaging , pages 132–141, Cham, 2022. Springer Inter-national Publishing. 1, 2, 3, 6 [12] Rongjun Ge, Guanyu Yang, Chenchu Xu, Yang Chen, Limin Luo, and Shuo Li. Stereo-Correlation and Noise-Distribution Aware ResVoxGAN for Dense Slices Reconstruction and Noise Reduction in Thick Low-Dose CT. In Medical Image Computing and Computer Assisted Intervention – MICCAI 2019 , pages 328–338, Cham, 2019. Springer International Publishing. 2 [13] Calum Green, Sharif Ahmed, Shashidhara Marathe, Liam Perera, Alberto Leonardi, Killian Gmyrek, Daniele Dini, and James Le Houx. Three-dimensional, multimodal syn-chrotron data for machine learning applications. Scientific Data , 12(1):329, 2025. 3, 4 [14] Jo¨ el Greffier, Ana¨ ıs Viry, Antoine Robert, Mouad Khorsi, and Salim Si-Mohamed. Photon-counting CT systems: atechnical review of current clinical possibilities. Diagnostic and interventional imaging , 106(2):53–59, 2025. 2 [15] Jinjin Gu and Chao Dong. Interpreting super-resolution networks with local attribution maps. In 2021 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 9195–9204, 2021. 8, 13 [16] Nicholas Heller, Fabian Isensee, Dasha Trofimova, Resha Tejpaul, Zhongchen Zhao, Huai Chen, Lisheng Wang, Alex Golts, Daniel Khapun, Daniel Shats, et al. The KiTS21 chal-lenge: Automatic segmentation of kidneys, renal tumors, and renal cysts in corticomedullary-phase CT. arXiv preprint arXiv:2307.01984 , 2023. 3 [17] August Leander Høeg, Sophia W Bardenfleth, Hans Mar-tin Kjer, Tim B Dyrby, Vedrana Andersen Dahl, and Anders Dahl. MTVNet: Multi-contextual transformers for volumes– network for super-resolution with long-range interactions. In 
+
+Northern Lights Deep Learning Conference 2026 , 2026. 2, 3, 6 [18] Samual G. Armato III et al. Data from lidc-idri, 2015. 3, 6 [19] Yutaro Iwamoto, Kyohei Takeda, Yinhao Li, Akihiko Shi-ino, and Yen-Wei Chen. Unsupervised MRI super resolution using deep external learning and guided residual dense net-work with multimodal image priors. IEEE Transactions on Emerging Topics in Computational Intelligence , 7(2):426– 435, 2022. 3 [20] Zexin Ji, Beiji Zou, Xiaoyan Kui, Jun Liu, Wei Zhao, Chengzhang Zhu, Peishan Dai, and Yulan Dai. Deep learning-based magnetic resonance image super-resolution: a survey. Neural Computing and Applications , pages 1–28, 2024. 2, 3 [21] Radmir Karamov, Christian Breite, Stepan V Lomov, Ivan Sergeichev, and Yentl Swolfs. Super-resolution processing of synchrotron CT images for automated fibre break analysis of unidirectional composites. Polymers , 15(9):2206, 2023. 3, 4 [22] Diederik Kingma and Jimmy Ba. Adam: A method for stochastic optimization. International Conference on Learn-ing Representations , 2014. 6 [23] Antoine Klos, Luc Salvo, and Pierre Lhuissier. Super-resolution X-ray tomography using deep learning applied to the 3D quantification of defects in lattice structures. Scien-tific Reports , 15(1):36664, 2025. 3, 4 [24] Yui Yin Ko, Wei-Fa Yang, and Yiu Yan Leung. The role of cone beam computed tomography (CBCT) in the diagnosis and clinical management of medication-related osteonecro-sis of the jaw (MRONJ). Diagnostics , 14(16):1700, 2024. 2[25] M Kodama, A Takeuchi, M Uesugi, and S Hirai. Machine learning super-resolution of laboratory CT images in all-solid-state batteries using synchrotron radiation CT as train-ing data. Energy and AI , 14:100305, 2023. 3, 4 [26] Bennett A. Landman, Alan J. Huang, Aliya Gifford, Deepti S. Vikram, Issel Anne L. Lim, Jonathan A.D. Far-rell, John A. Bogovic, Jun Hua, Min Chen, Samson Jarso, Seth A. Smith, Suresh Joel, Susumu Mori, James J. Pekar, Peter B. Barker, Jerry L. Prince, and Peter C.M. van Zijl. Multi-parametric neuroimaging reproducibility: A 3-T re-source study. NeuroImage , 54(4):2854–2866, 2011. 3 [27] Bryan M Li, Leonardo V Castorina, Maria del CVald´ es Hern´ andez, Una Clancy, Stewart J Wiseman, Eleni Sakka, Amos J Storkey, Daniela Jaime Garcia, Yajun Cheng, Fergus Doubal, et al. Deep attention super-resolution of brain magnetic resonance images acquired under clinical protocols. Frontiers in Computational Neuroscience , 16: 887633, 2022. 3, 4 [28] Guangyuan Li, Lei Zhao, Jiakai Sun, Zehua Lan, Zhan-jie Zhang, Jiafu Chen, Zhijie Lin, Huaizhong Lin, and Wei Xing. Rethinking Multi-Contrast MRI Super-Resolution: Rectangle-Window Cross-Attention Trans-former and Arbitrary-Scale Upsampling. In 2023 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 21173–21183, 2023. 3 [29] Hongbi Li, Yuanyuan Jia, Huazheng Zhu, Baoru Han, Jing-long Du, and Yanbing Liu. Multi-level feature extraction and reconstruction for 3D MRI image super-resolution. Comput-ers in Biology and Medicine , 171:108151, 2024. 1, 3, 6 [30] Yinhao Li, Yutaro Iwamoto, Lanfen Lin, Rui Xu, Ruofeng Tong, and Yen-Wei Chen. VolumeNet: A lightweight par-allel network for super-resolution of MR and CT volumet-ric data. IEEE Transactions on Image Processing , 30:4840– 4854, 2021. 3 [31] Wei Lu, Zhijin Song, and Jinghui Chu. A novel 3D med-ical image super-resolution method based on densely con-nected network. Biomedical Signal Processing and Control ,62:102120, 2020. 1, 3 [32] Julian McGinnis, Suprosanna Shit, Hongwei Bran Li, Vasi-liki Sideri-Lampretsa, Robert Graf, Maik Dannecker, Ji-azhen Pan, Nil Stolt-Ans´ o, Mark M¨ uhlau, Jan S Kirschke, et al. Single-subject multi-contrast MRI super-resolution via implicit neural representations. In International Conference on Medical Image Computing and Computer-Assisted Inter-vention , pages 173–183. Springer, 2023. 3 [33] Carolyn B McNabb, Ian D Driver, Vanessa Hyde, Garin Hughes, Hannah L Chandler, Hannah Thomas, Christopher Allen, Eirini Messaritaki, Carl J Hodgetts, Craig Hedge, et al. WAND: A multi-modal dataset integrating advanced MRI, MEG, and TMS for multi-scale brain analysis. Scien-tific Data , 12(1):220, 2025. 3, 4 [34] Bjoern H Menze, Andras Jakab, Stefan Bauer, Jayashree Kalpathy-Cramer, Keyvan Farahani, Justin Kirby, Yuliya Burren, Nicole Porz, Johannes Slotboom, Roland Wiest, et al. The multimodal brain tumor image segmentation benchmark (BRATS). IEEE transactions on medical imag-ing , 34(10):1993–2024, 2014. 3 [35] Josh Moore, Daniela Basurto-Lozada, S´ ebastien Besson, John Bogovic, Jord˜ ao Bragantini, Eva M Brown, Jean-Marie Burel, Xavier Casas Moreno, Gustavo de Medeiros, Erin E Diel, et al. OME-Zarr: a cloud-optimized bioimaging file format with international community support. Histochem-istry and Cell Biology , 160(3):223–251, 2023. 5 [36] Konstantinos Ntatsis, Niels Dekker, Viktor Van Der Valk, Tom Birdsong, D Zuk´ ıczuk´ ıc, Stefan Klein, Marius Staring, and Matthew McCormick. itk-elastix: Medical image reg-istration in Python. In Proceedings of the 22nd Python in Science Conference , pages 101–105, 2023. 5 [37] Chi-Hieu Pham, Aur´ elien Ducournau, Ronan Fablet, and Franc ¸ois Rousseau. Brain MRI super-resolution using deep 3d convolutional networks. In 2017 IEEE 14th International Symposium on Biomedical Imaging (ISBI 2017) , pages 197– 200, 2017. 3 [38] Chi-Hieu Pham, Carlos Tor D´ ıez, H´ el` ene Meunier, Nathalie Bednarek, Ronan Fablet, Nicolas Passat, and Franc ¸ois Rousseau. Multiscale brain MRI super-resolution using deep 3D convolutional networks. Computerized Medical Imaging and Graphics , 77, 2019. 3 [39] Jilmen Quintiens and G Harry van Lenthe. Photon-counting computed tomography for microstructural imaging of bone and joints. Current osteoporosis reports , 22(4):387–395, 2024. 2 [40] Irina S´ anchez and Ver´ onica Vilaplana. Brain MRI super-resolution using 3D generative adversarial networks. arXiv preprint arXiv:1812.11440 , 2018. 1, 3 [41] Kristina Siddall, Xiaohua Zhang, and Avice O’Connell. Emerging clinical applications for cone beam breast CT: changing the breast imaging paradigm. Current Breast Can-cer Reports , 16(2):134–141, 2024. 2 [42] David C. Van Essen, Stephen M. Smith, Deanna M. Barch, Timothy E.J. Behrens, Essa Yacoub, and Kamil Ugurbil. The WU-Minn Human Connectome Project: An overview. Neu-roImage , 80:62–79, 2013. Mapping the Connectome. 3 [43] Haoqian Wang, Xiaowan Hu, Xiaole Zhao, and Yulun Zhang. Wide weighted attention multi-scale network for ac-curate MR image super-resolution. IEEE Transactions on Circuits and Systems for Video Technology , 32(3):962–975, 2021. 1, 3 [44] Jiancong Wang, Yuhua Chen, Yifan Wu, Jianbo Shi, and James Gee. Enhanced generative adversarial network for 3D brain MRI super-resolution. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , pages 3627–3636, 2020. 1, 3 [45] Jueqi Wang, Jacob Levman, Walter Hugo Lopez Pinaya, Petru-Daniel Tudosiu, M Jorge Cardoso, and Razvan Mari-nescu. InverseSR: 3D brain MRI super-resolution using a la-tent diffusion model. In International conference on medical image computing and computer-assisted intervention , pages 438–447. Springer, 2023. 3 [46] Lulu Wang, Jinglong Du, Huazheng Zhu, Zhongshi He, and Yuanyuan Jia. Brain MR Image Super-resolution us-ing 3D Feature Attention Network. In 2020 IEEE In-ternational Conference on Bioinformatics and Biomedicine (BIBM) , pages 1151–1155, 2020. 3 [47] Lulu Wang, Jinglong Du, Ali Gholipour, Huazheng Zhu, Zhongshi He, and Yuanyuan Jia. 3D dense convolutional neural network for fast and accurate single MR image super-resolution. Computerized Medical Imaging and Graphics ,93:101973, 2021. 1, 2, 3, 6 [48] Lulu Wang, Huazheng Zhu, Zhongshi He, Yuanyuan Jia, and Jinglong Du. Adjacent slices feature transformer net-work for single anisotropic 3D brain MRI image super-resolution. Biomedical Signal Processing and Control , 72: 103339, 2022. 2 [49] Xintao Wang, Ke Yu, Shixiang Wu, Jinjin Gu, Yihao Liu, Chao Dong, Yu Qiao, and Chen Change Loy. ESRGAN: Enhanced super-resolution generative adversarial networks. In Computer Vision – ECCV 2018 Workshops , pages 63–79. Springer, 2019. 2, 6 [50] NAMIC Wiki. Downloads - NAMIC Wiki, 2017. [Online; accessed 6-November-2025]. 3 [51] Qing Wu, Yuwei Li, Yawen Sun, Yan Zhou, Hongjiang Wei, Jingyi Yu, and Yuyao Zhang. An Arbitrary Scale Super-Resolution Approach for 3D MR Images via Implicit Neu-ral Representation. IEEE Journal of Biomedical and Health Informatics , 27(2):1004–1015, 2023. 3 [52] Pengxin Yu, Haoyue Zhang, Han Kang, Wen Tang, Corey W Arnold, and Rongguo Zhang. RPLHR-CT dataset and trans-former baseline for volumetric super-resolution from CT scans. In International Conference on Medical Image Com-puting and Computer-Assisted Intervention , pages 344–353. Springer, 2022. 2, 3, 4 [53] Sun Yu, Cheng-Cheng Shi, Ji Ma, Ye Wang, Ming Zhu, Jian-Zhuang Ren, Xin-Wei Han, Teng-Fei Li, et al. Clinical eval-uation of high-resolution cone-beam computed tomography for the implantation of flow-diverter stents in intracranial aneurysms. Journal of Clinical Neuroscience , 103:14–19, 2022. 2 [54] Jure Zbontar, Florian Knoll, Anuroop Sriram, Tullie Mur-rell, Zhengnan Huang, Matthew J Muckley, Aaron Defazio, Ruben Stern, Patricia Johnson, Mary Bruno, et al. fastMRI: An open dataset and benchmarks for accelerated MRI. arXiv preprint arXiv:1811.08839 , 2018. 3 [55] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shecht-man, and Oliver Wang. The unreasonable effectiveness of deep features as a perceptual metric. In Proceedings of the IEEE conference on computer vision and pattern recogni-tion , pages 586–595, 2018. 7 [56] Wanqi Zhang, Lulu Wang, Wei Chen, Yuanyuan Jia, Zhong-shi He, and Jinglong Du. 3D Cross-Scale Feature Trans-former Network for Brain MR Image Super-Resolution. In 
+
+ICASSP 2022 - 2022 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , pages 1356–1360, 2022. 3 [57] Yulun Zhang, Kunpeng Li, Kai Li, Lichen Wang, Bineng Zhong, and Yun Fu. Image super-resolution using very deep residual channel attention networks. In Computer Vision – ECCV 2018 , pages 294–310, Cham, 2018. Springer Interna-tional Publishing. 2, 6 [58] Yulun Zhang, Kai Li, Kunpeng Li, and Yun Fu. MR im-age super-resolution with squeeze and excitation reasoning attention network. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 13425–13434, 2021. 3 [59] Hexiang Zhou, Yawen Huang, Yuexiang Li, Yi Zhou, and Yefeng Zheng. Blind super-resolution of 3D MRI via unsu-pervised domain transformation. IEEE Journal of Biomedi-cal and Health Informatics , 27(3):1409–1418, 2022. 3 [60] Jin Zhu, Chuan Tan, Junwei Yang, Guang Yang, and Pietro Lio’. Arbitrary scale super-resolution for medical images. 
+
+International Journal of Neural Systems , 31(10):2150037, 2021. PMID: 34304719. 3 VoDaSuRe: A Large-Scale Dataset Revealing Domain Shift in Volumetric Super-Resolution 
+
+# Supplementary Material 
+
+6. VoDaSuRe dataset overview 
+
+A detailed overview of all 16 samples in the VoDaSuRe dataset is provided in Tab. 4, including volume shapes, slice splits (when applicable), voxel sizes, and scanning devices. The table lists only the physically acquired scans (HR/LR) and the registered LR volumes. Additional downsampled pyramid levels produced during OME-Zarr conversion are omitted for clarity. Note that the voxel sizes of the LR, and registered LR scans differ slightly, as the voxel size of the acquired LR scans did not exactly match the desired 4×
+
+resolution difference compared with HR. This discrepancy is accounted for during the registration procedure. 
+
+Sample selection . To ensure a diverse set of struc-tural characteristics, we intentionally include materials with varying degrees of microstructural complexity. We chose wood samples due to their well-organized tubular struc-tures, as well as MDF and cardboard for their more chaotic arrangements of layers and fibers. We also chose to incor-porate bone samples (femur, vertebrae, and animal bone) to have volumes with smoother structures typically seen in medical imaging datasets of clinical volumes. The finest microstructures in wood, MDF, and cardboard samples lie near the resolution limit of the LR scans but are clearly visi-ble in the HR scans. This design choice ensures meaningful super-resolution scenarios where relevant structural details are partially lost in the LR input. 
+
+Stitching & reconstruction . All scans are reconstructed using the standard software provided with each scanner. Similarly, stitching of multiple vertical scans is performed using the native stitching tools of the respective devices. 
+
+7. VoDaSuRe preprocessing 
+
+Intensity matching . During the curation of VoDaSuRe, we observed notable differences in intensity distributions be-tween all acquired LR and HR scans. For LR scans, the reduced cone-beam dispersion of the CT setup resulted in increased detector counts, improved signal-to-noise ratio, and higher contrast compared with HR acquisition. In some scans, the effect of region-of-interest scanning in high res-olution (the scan region surrounded by material that is not accounted for in the reconstruction) resulted in small inten-sity differences between HR and LR scans in regions fur-thest from the rotational axis. To mitigate this, we applied intensity matching of registered LR slices to downsampled HR slices. Fig. 8 shows the effect of intensity matching us-ing bamboo. The LR slice appears noticeably brighter with Downscaled HR slice             
+
+> VoDaSuRe - Bamboo
+> Unmatched LR slice
+> Matched LR slice
+> 010000 20000 30000 40000 50000 60000
+> 0.000
+> 0.001
+> 0.002
+> 0.003
+> 0.004
+> 0.005 Probability
+> Slice intensity histogram
+> HR slice Unmatched slice
+> 010000 20000 30000 40000 50000 60000 Intensity
+> 0.000
+> 0.001
+> 0.002
+> 0.003
+> 0.004
+> 0.005 Probability
+> HR slice Matched slice
+
+Figure 8. Visualization of the intensity matching procedure used in VoDaSuRe. The intensity distribution of registered LR slices is adjusted to match the distribution of downsampled HR slices. 
+
+stronger contrast than the HR slice, which is also reflected in the intensity histograms of the two slices. After intensity matching, the intensity profile of the LR slice matches that of the HR slice but retains the same structural information. We initially attempted to match the intensities of regis-tered LR slices directly to HR slices, but found that this led to unrealistic intensity scaling. The HR slices contain a sig-nificantly larger proportion of high-intensity voxels due to their higher resolution, whereas these details are spatially averaged in the LR scans. Consequently, direct HR–LR matching causes the LR slices to become oversaturated. To avoid this, we first downsample the HR slices to the LR voxel size and then perform intensity matching. This down-sampling suppresses high-frequency content while main-taining overall intensity statistics, resulting in more stable and physically meaningful intensity alignment. 
+
+Registration . Fig. 13 illustrates the accuracy of the HR-LR registration after intensity matching. Cropped regions from corresponding HR and registered LR volumes high-light the expected loss in microstructural detail. To as-sess spatial alignment, we create checkerboard visualiza-tions and absolute difference images. The checkerboard im-ages confirm the continuity of structures across the HR and registered LR volumes and demonstrates the effectiveness of our registration procedure. Similarly, the absolute differ-ence images of the HR, and bicubic-interpolated LR slices validate the alignment, and also reveal the high-frequency information absent in the LR volumes. LAM crop LITS 
+
+RCAN DI: 23.65 
+
+HAT DI: 5.98 
+
+EDDSR DI: 9.40 
+
+MFER DI: 17.35 
+
+mDCSRN DI: 37.09 
+
+SuperFormer DI: 9.24 
+
+RRDBNet3D DI: 47.99 
+
+MTVNet DI: 49 .21 LAM crop VoDaSuRe 
+
+RCAN DI: 29.45 
+
+HAT DI: 24.87 
+
+EDDSR DI: 10.57 
+
+MFER DI: 33.04 
+
+mDCSRN DI: 39.60 
+
+SuperFormer DI: 36.02 
+
+RRDBNet3D DI: 54.58 
+
+MTVNet DI: 58 .91 LAM crop VoDaSuRe 
+
+RCAN DI: 33.14 
+
+HAT DI: 38.03 
+
+EDDSR DI: 13.63 
+
+MFER DI: 27.87 
+
+mDCSRN DI: 46.11 
+
+SuperFormer DI: 46.00 
+
+RRDBNet3D DI: 57.87 
+
+MTVNet DI: 66 .68 Figure 9. LAM comparisons of SR models. Top row: example from CTSpine1K, middle and bottom row: examples from VoDaSuRe. The highest DI ↑ is highlighted in bold .HAT 
+
+> RCAN
+> EDDSR
+> MFER
+> mDCSRN
+> SuperFormer
+> RRDBNet3D
+> MTVNet
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> 30
+> 35
+> DI average
+> 3.54
+> 3.63
+> 3.53
+> 15.69
+> 13.75
+> 13.73
+> 13.27
+> 16.97
+> 5.87
+> 5.97
+> 5.80
+> 6.19
+> 8.33
+> 8.14
+> 8.19
+> 12.92
+> 16.78
+> 16.75
+> 17.24
+> 20.52
+> 7.36
+> 7.25
+> 6.40
+> 18.07
+> 25.23
+> 24.27
+> 24.77
+> 25.35
+> 26.21
+> 25.31
+> 25.36
+> 32.71
+> Mean Diffusion Index averages across datasets
+> LiTS
+> CTSpine1K
+> LIDC-IDRI
+> VoDaSuRe (Downsampled)
+
+Figure 10. Diffusion index (DI) averages using datasets CT-Spine1K, LiTS and LIDC-IDRI for all SR models. The highest DI ↑ scores for each dataset are highlighted in bold .
+
+8. LAM analysis 
+
+To assess the degree of contextual dependency of SR predic-tions across datasets, we employ Local Attribution Mapping (LAM) [15]. Using LAM, we compare the spread of input voxel attributions for SR models trained on datasets with fine microstructures, e.g. VoDaSuRe, and models trained on medical data with smoother variations. Fig. 9 shows slice-averaged LAM results at scale 4×, where regions of higher intensities indicate stronger pixel/voxel contributions. We also report the slice-wise average Diffusion Index (DI) [15] as an estimate for overall context usage. Examples show that all models leverage broader involvement of input vox-els in VoDaSuRe. To quantify this effect, we evaluate all SR models on 100 randomly sampled 3D patches from CT-Spine1K, LiTS, LIDC-IDRI, and VoDaSuRe, and calcu-late the average DI of all models across all patches, see Fig. 10. We observe consistently higher DI across all meth-ods, meaning SR models rely on broader spatial context in VoDaSuRe compared with CTSpine1K, LiTS and LIDC-IDRI. This suggests that long-range information is more important in VoDaSuRe than in medical imaging datasets, where models rely more on local image context. In par-ticular, we observe ViT-based methods HAT, SuperFormer and MTVNet exhibiting noticeably greater increases in dif-fusion index using VoDaSuRe compared with CNN-based methods. Despite this, we did not find a correlation in per-formance, as the CNN-based RRDBNet3D was the overall strongest baseline in both medical datasets and VoDaSuRe. 
+
+9. OME-Zarr dataloader 
+
+Fig. 11 shows our data loading pipeline. We instantiate N
+
+worker processes that concurrently load volumetric patches from disk, with each worker using multiple threads that each maintain their own data queues to avoid contention. After loading and augmentation, patches are stored in the respective thread’s data queue. During runtime, the main process collates batches of patches from all worker pro-cesses to maintain data throughput. This way, our pipeline scales to extremely large datasets, as full volumes are never held in system memory. Each OME-Zarr store in VoDa-SuRe contains multiple resolution levels. By sampling patches from corresponding regions at different levels, we conveniently generate LR–HR pairs. The resolution gap between pyramid levels defines the SR scale, with each step yielding a 2× difference. Our implementation is fully PyTorch-compatible and integrates seamlessly with training frameworks that use volumetric patch-based sampling for tasks such as segmentation, classification, and detection. torch.utils.data.Dataloader  
+
+> Process 0
+> Transform
+> Thread 1
+> Load patch
+> Transform
+> Thread 2
+> Load patch
+> Transform
+> Thread M
+> Load patch
+> Process 1
+> Transform
+> Thread 1
+> Load patch
+> Transform
+> Thread 2
+> Load patch
+> Transform
+> Thread M
+> Load patch
+> Process N
+> Transform
+> Thread 1
+> Load patch
+> Transform
+> Thread 2
+> Load patch
+> Transform
+> Thread M
+> Load patch
+> multiprocessing.Queue multiprocessing.Queue multiprocessing.Queue
+> ome.zarr
+> 3D Patches
+> level 0
+> level 1
+> level 2
+> Compressed
+> data chunk
+> (D, H, W)
+> Resolution
+> levels
+
+2
+
+4Figure 11. Illustration of the data loading pipeline for VoDaSuRe based on the OME-Zarr data format. TV: 53.71 TV: 36.86 TV: 49.36 TV: 35.17 TV: 44.96 TV: 36.84 TV: 33.76 TV: 70.22 TV: 16.37 TV: 11.15 TV: 19.69 TV: 17.06 TV: 32.36 TV: 20.27 TV: 19.72 TV: 18.18 TV: 19.25 TV: 10.00 TV: 14.65 TV: 9.80 TV: 6.73 TV: 14.26 TV: 5.86 TV: 13.22 TV: 7.82 TV: 9.37 TV: 14.78 TV: 2.10 TV: 12.52 TV: 9.05 TV: 11.77 TV: 11.04 TV: 16.00 TV: 11.86 TV: 12.67 TV: 12.07 TV: 12.09 TV: 13.31 TV: 10.28 TV: 9.24 
+
+Figure 12. Visualizations from VoDaSuRe. From top to bottom: HR data, model predictions using downsampled LR data, model predic-tions using real LR data, and model predictions obtained by training on downsampled data but evaluating using real LR data input. All outputs are obtained at 4× upscaling using RRDBNet3D. Total variation (TV) is shown for each slice. 
+
+10. Additional visualizations 
+
+Fig. 12 shows additional visualizations of SR model predic-tions using different training and evaluation data configura-tions from VoDaSuRe at scale 4×. Using downsampled LR data for training but real LR input data for evaluation results in distorted model predictions, highlighting the difference between the two data domains. Fig. 14 provides a show-case of orthogonal image slices from VoDaSuRe, including HR, registered LR and unregistered LR slices. Images are normalized for the purpose of visualization. 
+
+11. Training time 
+
+Tab. 5 summarizes the average training time of SR models at scale 4×. Training time is measured as the time to com-plete 100K training iterations averaged across all datasets. 
+
+12. Evaluation metrics and frequency analysis 
+
+We report PSNR, SSIM, NRMSE and LPIPS for quantita-tive evaluation and include total variation (TV) as an indica-tor of spatial smoothing. While TV captures reductions in local variation in model predictions, it does not distinguish between the removal of noise and the loss of meaningful high-frequency structure. Therefore, our interpretation of TV is done together with visual inspection, which clearly il-lustrates the characteristic smoothing effect observed when training on real LR data. To further analyze frequency char-acteristics, we additionally compute power spectrum visu-alizations and radial frequency profiles for three slice ex-amples from VoDaSuRe, see Fig. 15. As spatial frequency increases, we find that SR predictions derived from scanned LR data exhibit faster decline in signal power compared with SR predictions derived from downsampled images. Sample name Scan Volume shape (D×H×W) Slice split (train/test) Voxel size [μm] Scanning device Data size 
+
+High-resolution 5440 × 1920 × 1920 4960 / 480 1.671 × 1.671 × 1.671 37 .4 GB 
+
+Low-resolution 3520 × 1920 × 1920 - 6.637 × 6.637 × 6.637 24 .2 GB 
+
+Registered 1360 × 480 × 480 1240 / 120 6.684 × 6.684 × 6.684 597 .7 MB 
+
+High-resolution 5120 × 1920 × 1920 4640 / 480 2.031 × 2.031 × 2.031 35 .2 GB 
+
+Low-resolution 3360 × 1920 × 1920 - 8.017 × 8.017 × 8.017 23 .1 GB 
+
+Registered 1280 × 480 × 480 1160 / 120 8.124 × 8.124 × 8.124 562 .5 MB 
+
+High-resolution 5440 × 1920 × 1920 4960 / 480 1.671 × 1.671 × 1.671 37 .4 GB 
+
+Low-resolution 1920 × 1920 × 1920 - 6.636 × 6.636 × 6.636 13 .2 GB 
+
+Registered 1360 × 480 × 480 1240 / 120 6.684 × 6.684 × 6.684 597 .7 MB 
+
+High-resolution 5440 × 1920 × 1920 4960 / 480 1.671 × 1.671 × 1.671 37 .4 GB 
+
+Low-resolution 3520 × 1920 × 1920 - 6.637 × 6.637 × 6.637 24 .2 GB 
+
+Registered 1360 × 480 × 480 1240 / 120 6.684 × 6.684 × 6.684 597 .7 MB 
+
+High-resolution 3680 × 1920 × 1920 3200 / 480 1.671 × 1.671 × 1.671 25 .3 GB 
+
+Low-resolution 3520 × 1920 × 1920 - 6.637 × 6.637 × 6.637 24 .2 GB 
+
+Registered 920 × 480 × 480 800 / 120 6.685 × 6.685 × 6.685 404 .3 MB 
+
+High-resolution 4960 × 1920 × 1920 4480 / 480 1.199 × 1.199 × 1.199 34 .1 GB 
+
+Low-resolution 1920 × 1920 × 1920 - 4.798 × 4.798 × 4.798 13 .2 GB 
+
+Registered 1240 × 480 × 480 1120 / 120 4.796 × 4.796 × 4.796 544 .9 MB 
+
+High-resolution 5440 × 1920 × 1920 4960 / 480 1.671 × 1.671 × 1.671 37 .4 GB 
+
+Low-resolution 3200 × 1920 × 1920 - 6.637 × 6.637 × 6.637 22 .0 GB 
+
+Registered 1360 × 480 × 480 1240 / 120 6.684 × 6.684 × 6.684 597 .7 MB 
+
+High-resolution 5120 × 1920 × 1920 4640 / 480 1.669 × 1.669 × 1.669 35 .2 GB 
+
+Low-resolution 3200 × 1920 × 1920 - 6.637 × 6.637 × 6.637 22 .0 GB 
+
+Registered 1280 × 480 × 480 1160 / 120 6.674 × 6.674 × 6.674 562 .5 MB 
+
+High-resolution 1600 × 1280 × 1920 58 × 58 × 58 7.3 GB 
+
+Low-resolution 600 × 600 × 600 232 × 232 × 232 412 .0 MB 
+
+Registered 400 × 320 × 480 232 × 232 × 232 117 .2 MB 
+
+High-resolution 1280 × 1600 × 1760 58 × 58 × 58 6.7 GB 
+
+Low-resolution 600 × 600 × 600 232 × 232 × 232 412 .0 MB 
+
+Registered 320 × 400 × 440 232 × 232 × 232 107 .4 MB 
+
+High-resolution 1120 × 1760 × 1600 58 × 58 × 58 5.9 GB 
+
+Low-resolution 600 × 600 × 600 232 × 232 × 232 412 .0 MB 
+
+Registered 280 × 440 × 400 232 × 232 × 232 94 .0 MB 
+
+High-resolution 960 × 1440 × 1600 58 × 58 × 58 4.1 GB 
+
+Low-resolution 600 × 600 × 600 232 × 232 × 232 412 .0 MB 
+
+Registered 240 × 360 × 400 232 × 232 × 232 65 .9 MB 
+
+High-resolution 1920 × 1920 × 1920 22 × 22 × 22 13 .2 GB 
+
+Low-resolution 800 × 960 × 640 88 × 88 × 88 937 .5 MB 
+
+Registered 480 × 480 × 480 88 × 88 × 88 210 .9 MB 
+
+High-resolution 1920 × 1920 × 1920 22 × 22 × 22 13 .2 GB 
+
+Low-resolution 800 × 960 × 640 88 × 88 × 88 937 .5 MB 
+
+Registered 480 × 480 × 480 88 × 88 × 88 210 .9 MB 
+
+High-resolution 1920 × 1920 × 1920 22 × 22 × 22 13 .2 GB 
+
+Low-resolution 960 × 800 × 960 88 × 88 × 88 1.4 GB 
+
+Registered 480 × 480 × 480 88 × 88 × 88 210 .9 MB 
+
+High-resolution 1920 × 1920 × 1920 22 × 22 × 22 13 .2 GB 
+
+Low-resolution 960 × 800 × 960 88 × 88 × 88 1.4 GB 
+
+Registered 480 × 480 × 480 88 × 88 × 88 210 .9 MB 
+
+Bamboo Zeiss Versa 520 
+
+Cardboard Zeiss Versa 520 
+
+Cypress Zeiss Versa 520 
+
+Elm Zeiss Versa 520 
+
+MDF Zeiss Versa 520 
+
+Ox bone Zeiss Versa 520 
+
+Oak Zeiss Versa 520 
+
+Larch Zeiss Versa 520 
+
+Femur 15 Train Nikon XT H 225 
+
+Femur 21 Train Nikon XT H 225 
+
+Femur 74 Train Nikon XT H 225 
+
+Femur 01 Test Nikon XT H 225 
+
+Vertebrae A Train Nikon XT H 225 
+
+Vertebrae B Train Nikon XT H 225 
+
+Vertebrae C Train Nikon XT H 225 
+
+Vertebrae D Test Nikon XT H 225 
+
+Table 4. Overview of VoDaSuRe, including sample names, volume shapes, slice splits for training and testing, voxel sizes and scanning devices. For vertebrae and femur samples, we reserve whole scans for training/test, while remaining scans are split into training/test slices. 
+
+Method 
+
+No. of parameters 15.6M 20.8M 0.8M 20.4M 1.7M 1.7M 67.0M 26.1M 
+
+Avg. training time 9.47 h 5.64 h 8.09 h 32.85 h 50.65 h 7.76 h 31.05 h 16.48 h 
+
+RCAN HAT EDDSR SuperFormer MFER mDCSRN MTVNet RRDBNet3D 
+
+Table 5. Average training time of SR methods at 4× upscaling. The measured times is the average time to complete 100K training iterations across datasets CTSpine1K, LiTS, LIDC-IDRI and VoDaSuRe. VoDaSuRe - Bamboo HR crop REG crop (4 ×) Checkerboard image Absolute difference VoDaSuRe - Larch HR crop REG crop (4 ×) Checkerboard image Absolute difference VoDaSuRe - Cardboard HR crop REG crop (4 ×) Checkerboard image Absolute difference VoDaSuRe - Oak HR crop REG crop (4 ×) Checkerboard image Absolute difference VoDaSuRe - Femur 01 HR crop REG crop (4 ×) Checkerboard image Absolute difference VoDaSuRe - Vertebrae A HR crop REG crop (4 ×) Checkerboard image Absolute difference Figure 13. Evaluation of HR-LR registrations in VoDaSuRe. From left to right: Full HR slice, cropped HR slice, cropped registered LR slice, checkerboard image, and absolute difference image between HR and interpolated LR slice. Figure 14. Orthogonal slices from VoDaSuRe, including high-resolution (left), registered (middle) and unregistered LR slices (right). HR reference Downsampled LR (4 ×) Registered LR (4 ×)     
+
+> 0.00.20.40.60.81.0
+
+Normalized spatial frequency 
+
+> 10 −8
+> 10 −6
+> 10 −4
+> 10 −2
+> 10 0
+> Normalized power spectrum
+
+Radially averaged power spectrum    
+
+> HR reference Downsampled LR Registered LR
+> −8416 28
+
+log 2 magnitude HR reference Downsampled LR (4 ×) Registered LR (4 ×)     
+
+> 0.00.20.40.60.81.0
+
+Normalized spatial frequency 
+
+> 10 −9
+> 10 −7
+> 10 −5
+> 10 −3
+> 10 −1
+> Normalized power spectrum
+
+Radially averaged power spectrum    
+
+> HR reference Downsampled LR Registered LR
+> −8416 28
+
+log 2 magnitude HR reference Downsampled LR (4 ×) Registered LR (4 ×)     
+
+> 0.00.20.40.60.81.0
+
+Normalized spatial frequency 
+
+> 10 −9
+> 10 −7
+> 10 −5
+> 10 −3
+> 10 −1
+> Normalized power spectrum
+
+Radially averaged power spectrum    
+
+> HR reference Downsampled LR Registered LR
+> −8416 28
+
+log 2 magnitude Figure 15. Comparison of spatial frequency distributions for HR images, and SR predictions using downsampled and real LR images from VoDaSuRe using RRDBNet3D at scale 4×. The bottom row shows the log 2 power spectra computed from the FFTs of the corresponding images in the top row. Radially averaged power profiles (right) show the relative distribution of power as a function of spatial frequency.

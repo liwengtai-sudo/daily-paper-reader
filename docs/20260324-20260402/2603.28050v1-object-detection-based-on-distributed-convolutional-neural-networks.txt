@@ -1,0 +1,156 @@
+Title: Object Detection Based on Distributed Convolutional Neural Networks
+
+URL Source: https://arxiv.org/pdf/2603.28050v1
+
+Published Time: Tue, 31 Mar 2026 01:38:35 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Object Detection Based on Distributed Convolutional Neural Networks 
+
+## Liang Sun Shandong University of Science and Technology Jinan, 250031 P.R. China 
+
+> liangsun@sdust.edu.cn
+
+## Abstract 
+
+Based on the Distributed Convolutional Neural Net-work(DisCNN), a straightforward object detection method is proposed. The modules of the output vector of a DisCNN with respect to a specific positive class are positively mono-tonic with the presence probabilities of the positive features. So, by identifying all high-scoring patches across all possi-ble scales, the positive object can be detected by overlap-ping them to form a bounding box. The essential idea is that the object is detected by detecting its features on mul-tiple scales, ranging from specific sub-features to abstract features composed of these sub-features. Training DisCNN requires only object-centered image data with positive and negative class labels. The detection process for multiple positive classes can be conducted in parallel to significantly accelerate it, and also faster for single-object detection be-cause of its lightweight model architecture. 
+
+Index Terms —Object detection, feature detection, dis-tributed neural networks, convolutional neural networks, feature disentanglement. 
+
+## 1. Introduction 
+
+Object detection is always based on object recognition. One of the most popular object recognition methods is the con-volutional neural network (CNN) trained with the cross-entropy loss via backpropagation [1–4]. It has led to a range of object detection methods, such as R-CNN [5], Fast R-CNN [6], Faster R-CNN [7], Mask R-CNN [8], and YOLO [9], all of which are end-to-end models that produce a sin-gle output vector representing both the object and its lo-cation. Therefore, object features and location are entan-gled, making object detection challenging. Recently, a new type of CNN, called distributed CNN (DisCNN), has been proposed that extracts only the features of a specific pos-itive class while neglecting those of all other classes [10]. The secret recipe is to use a novel loss function, Negatives to Origin (N2O), which introduces an additional constraint that forces the negatives to Origin, in addition to the cross-entropy loss, so that DisCNN produces zero responses to negative features. Therefore, positive features are disentan-gled not only from features of other classes but also from location information. This may provide an easy but con-vincing way to detect objects. In this work, a novel object detection method based on DisCNN is proposed. Firstly, based on the N2O loss, a Dis-CNN is trained on a dataset comprising a single positive class and two or more negative classes using backpropa-gation. During object detection, the large image contain-ing positives and complex backgrounds is first partitioned into small patches using multi-scale sliding windows. The patches are then fed to the DisCNN, after being resized to the training data size. Finally, the modules of the DisCNN output vectors are used as a metric to assess the probability that a patch contains a positive sample or positive features, and by overlapping the best-scoring patches of all multi-scale sliding windows, the positive can be localized. The advantage of the method is that: 1. No location-related labeled data, such as bonding boxes, is required for train-ing, and only object-centered image data, along with posi-tive and negative class labels, suffice. 2. DisCNN is much lighter-weight than a general multi-class CNN, so the posi-tive object detection process can be much faster, and DisC-NNs of different positive classes can be deployed on multi-ple GPUs in a distributed manner to detect the positives in a parallel way to keep it still fast for a multi-positive detection scenario. 3. The detection of the whole object is achieved by the detection of its features on multiple scales; therefore, the recognition and localization of the object can be confi-dently accurate. 4. Sub-features of the object can also be detected. 
+
+## 2. Model and training 
+
+Before object detection, a DisCNN is first trained based on the N2O loss using backpropagation. The entire training process is consistent with that in the literature [10], and this chapter primarily introduces the essential technical details.        
+
+> arXiv:2603.28050v1 [cs.CV] 30 Mar 2026 Table 1. Model Architecture. The convolutional layer param-eters are denoted as “ conv <receptivef ieldsize >−<numberof channels > ”.
+
+DisCNN input(96x96RGB) Conv3-64 Batch Normalization ReLU Max pooling Conv3-32 Batch Normalization ReLU Max pooling Conv3-16 Batch Normalization ReLU Max pooling Conv3-8 Batch Normalization ReLU Max pooling FC-288 FC-128 FC-16 
+
+2.1. DisCNN architecture 
+
+DisCNN adopts the architecture of VGG model [11], as shown in Tab. 1, except for the absence of a softmax layer, and reduces the number of feature maps to 8, since 8 fea-tures may be sufficient for cars, such as wheels, license plates, lights, etc. Therefore a DisCNN for one positive class is lightweight, which reduces the time of both training and detection. 
+
+2.2. Training with N2O loss 
+
+The N2O loss essentially constrains the negatives to the ori-gin, while the positives are mapped to a compact set in a higher-dimensional space, just like the cross-entropy loss. There is a fundamental data requirement for H2O loss as presented in Lemma 1. 
+
+Lemma 1. The H2O loss requires that the positive class have no features in common with the negative class in the training data. 
+
+Meanwhile, for most object detection scenarios, small positives embedded in large backgrounds are more com-mon. Thus, the data produced by uniform patch partitioning may be extremely imbalanced and require more negatives in the training dataset, as described in Lemma 2. 
+
+Lemma 2. For object detection, a considerable number of negatives are required for training data. 
+
+For example, in accordance with Lemma 1 and Lemma 2, the subset {car, bird, cat, deer, dog, horse, mon-key } of the STL-10 dataset [12, 13] is qualified to train a DisCNN, where the car is regarded as the positive class and the rest are negatives that have no features in common with the car. The trained DisCNN has an important property, as described in Lemma 3, which is essential for object detec-tion. 
+
+Lemma 3. The trained DisCNN detects only positive sam-ples, while negatives receive a zero response. 
+
+Therefore, based on Lemma 3, if a small patch from a large detection scenario can activate DisCNN that produces a non-zero vector, it indicates a positive lies in it. This is where the principal idea of this work comes from. 
+
+## 3. Object detection 
+
+The DisCNN trained with the N2O loss is now being used for object detection. First, an algorithm is proposed to de-tect positives in a multi-positive scenario. Then, by apply-ing it to a one-car detection scenario, we conclude that the output vector module of DisCNN and the presence proba-bilities of positive-class features are positively monotonic. Finally, the algorithm is evaluated in a real-world traffic sce-nario to detect multiple cars. 
+
+3.1. Object detection algorithm 
+
+The algorithm is presented as show in Algorithm 1. 
+
+Remark 1. The training process in Algorithm 1 requires only object-centered image data along with positive and negative class labels; no location-related labels, such as bounding boxes, are required. 
+
+Remark 2. Obviously, Algorithm 1 can be executed re-peatedly on datasets of different positive classes, thus en-abling multi-class object detection. Then, DisCNNs for dif-ferent positive classes can be deployed in a distributed man-ner across multiple GPUs to localize positives in parallel, thereby significantly accelerating detection even when mul-tiple positives of different classes are present. 
+
+3.2. Module is a metric for the presence probability of positive features 
+
+With the subset {car, bird, cat, deer, dog, horse, monkey } of the STL-10 data set, where the car is the positive class, and the rest are negatives, carefully selecting three fixed sws =Algorithm 1 Object detection algorithm 
+
+Step 1: Based on the N2O loss, a DisCNN as shown in Tab. 1 is initialized and trained using backpropagation on a dataset qualified according to Lemma 1 and Lemma 2, with image size of n × n. Assume the large image to be detected on is l × m
+
+Step 2: Set the initial sliding window size sws =
+
+min (l, m ), and minimum sliding window size min sws 
+
+is roughly chosen by the minimum feature size. 
+
+Step 3: Set stride = sws/ 3, window attenuation wa =
+
+sws/ 20 , and partition the large image to be detected into patches with current sws and stride .
+
+Step 4: Feed the patches into the DisCNN, which is re-sized into n × n, and then compute the modules of the output vectors. 
+
+Step 5: Choose an appropriate threshold thr , if 
+
+module > thr , the corresponding patch is positive, which contains positive features. 
+
+Step 6: Preserve all the location information xmin ,
+
+ymin , xmax , ymax of the positive patches, and let 
+
+sws = sws − wa .
+
+Step 7: If sws > min sws , then goto setp3; else goto step 8. 
+
+Step 8: Compute the center coordinates of the pos-itive patches, cluster them, and then draw a bonding box for each cluster with [ min (xmins ), min (ymins ),
+
+max (xmaxs ), max (ymaxs )] of each cluster. Thus, the positives in the large image are detected and located. 280, 180, 50, three iterations can be carried out in a one-car detection scenario Fig. 1a according to Steps 1 to 4 of Algorithm 1. Then by analyzing the positive patches sorted by module, as shown in Fig. 1b, Fig. 1c, and Fig. 1d, we can find that it responds high modules to features such as plate, light, wheel when sws = 50, features such as car head, body when sws = 180, and the whole car feature, a combination of sub-features when sws = 280. Therefore, the following proposition can be deduced. 
+
+Proposition 1. The module of the DisCNN’s output vector is a metric of the presence probability of positive features. 
+
+Based on Proposition 1, Algorithm 1 detects positive features, from concrete to abstract, by identifying the best-scoring patches across multi-scale sliding windows. Then, by overlapping these patches, a max-boundary bonding box can be drawn to localize the positive. 
+
+3.3. One-car scenario: object detection via feature detection 
+
+Using the same car-positive dataset as Sec. 3.2, Algorithm 1 is fully executed this time. With a sliding window ranging from 400 to 40, the features of all scales are detected by a threshold of 6, as shown in Fig. 4a. By overlapping them, a maximum-boundary bonding box can be drawn to locate the positive, as shown in Fig. 4b. So Algorithm 1 is valid in object detection. 
+
+Proposition 2. DisCNN detects the positive by identify-ing its multi-scale features, from the positive itself to sub-features, thereby ensuring detection accuracy. 
+
+Moreover, if the car to be detected is of known size, the initial sws and min sws in Algorithm Algorithm 1 can be chosen appropriately to reduce the detection time. For ex-ample, changing the sliding window size range from [400, 40) to [220, 180) significantly reduces the detection time from 1.18 to 0.14 seconds. By a threshold of 5, the result is shown in Fig. 4c and Fig. 4d. Meanwhile, if the sliding window is adopted in the range [60, 40), which is relatively small compared to the car, with a threshold of 6.6, the result is shown in Fig. 3. Therefore, it can detect car sub-features, such as license plates, lights, and wheels. 
+
+Proposition 3. DisCNN can be used for sub-feature detec-tion of the positive class. 
+
+3.4. Multi-car scenario 
+
+This time, the scenario of multiple cars is detected with Al-gorithm 1. Using the same car-positive dataset as Sec. 3.2, with a sliding window ranging from 400 to 40, cars on dif-ferent scales are detected by a threshold of 7, as shown in Fig. 4. Therefore, Algorithm 1 is still valid in multi-object detection. Note that the multi-car image is fairly large, and when the sliding windows are too small, the number of par-titioned patches may be too large for our GPU memory. So when detecting relatively small cars with small sliding win-dows, we first have to cut out the subgraph containing them to avoid GPU memory failure. 
+
+## 4. Conclusion 
+
+A multi-class object detection framework is presented based on an independent one-class object detection algorithm. All kinds of objects from different positive classes can be detected in parallel by DisCNNs trained separately on the corresponding datasets for each positive class. The most interesting fact is that with relatively small sliding windows, sub-features of the object can also be detected. This may indicate that the overall object is recognized by its components (i.e., sub-features), revealing the es-sential principle of DisCNN. For example, if only a light is captured by a small sliding window, the output mod-ule is fairly high, as shown in the sixth patch of Fig. 3b. This module might stand for the distribution of cars, i.e., 
+
+p(car ), in which P(car ) = P(car |light )P(light ). In (a) One-car scenario 
+
+> (b) Sliding window size = 280
+> (c) Sliding window size = 180
+> (d) Sliding window size = 50
+
+Figure 1. Patches sorted by modules 
+
+this case, P(light ) is close to 1, as the light almost oc-cupies the entire patch, whose feature map is activated maximally. P(car |light ) is a prior probability distribu-tion that is constant for all cars. In another case, the fourth patch of Fig. 3b is considered, assume P(car |light )
+
+and P(car |light ) that are known prior probabilities, and 
+
+P(car ) = P(car |light )P(light ) + P(car |plate )P(plate ),where P(light ) and P(plate ) can be measured by how much the feature maps for them are activated. Therefore, we can assume that DisCNN recognizes objects by evalu-ating P(object ) = Pni=1 P(object |f eature i)P(f eature i),the underlying principle of which would be an important research topic. 
+
+## References 
+
+[1] Yann LeCun, Patrick Haffner, L´ eon Bottou, and Yoshua Ben-gio. Object recognition with gradient-based learning. In 
+
+Shape, contour and grouping in computer vision , pages 319– 345. Springer, 1999. 1 [2] Yann LeCun, L´ eon Bottou, Yoshua Bengio, and Patrick Haffner. Gradient-based learning applied to document recog-nition. Proceedings of the IEEE , 86(11):2278–2324, 2002. [3] Yann LeCun, Koray Kavukcuoglu, and Cl´ ement Farabet. Convolutional networks and applications in vision. In Pro-ceedings of 2010 IEEE international symposium on circuits and systems , pages 253–256. IEEE, 2010. [4] Yann LeCun, Yoshua Bengio, and Geoffrey Hinton. Deep learning. nature , 521(7553):436–444, 2015. 1 [5] Ross Girshick, Jeff Donahue, Trevor Darrell, and Jitendra Malik. Rich feature hierarchies for accurate object detection and semantic segmentation. In Proceedings of the IEEE con-ference on computer vision and pattern recognition , pages 580–587, 2014. 1 [6] Ross Girshick. Fast r-cnn. In Proceedings of the IEEE inter-national conference on computer vision , pages 1440–1448, 2015. 1 [7] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun. Faster r-cnn: Towards real-time object detection with region proposal networks. Advances in neural information process-ing systems , 28, 2015. 1 [8] Kaiming He, Georgia Gkioxari, Piotr Doll´ ar, and Ross Gir-shick. Mask r-cnn. In Proceedings of the IEEE international conference on computer vision , pages 2961–2969, 2017. 1 [9] Joseph Redmon, Santosh Divvala, Ross Girshick, and Ali Farhadi. You only look once: Unified, real-time object de-tection. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 779–788, 2016. 1 [10] Liang Sun. Distributed convolutional neural networks for object recognition. arXiv preprint arXiv:2603.09220 , 2026. 1[11] Karen Simonyan and Andrew Zisserman. Very deep convo-lutional networks for large-scale image recognition. arXiv preprint arXiv:1409.1556 , 2014. 2 [12] Adam Coates, Andrew Ng, and Honglak Lee. An analysis of single-layer networks in unsupervised feature learning. In 
+
+Proceedings of the fourteenth international conference on artificial intelligence and statistics , pages 215–223. JMLR Workshop and Conference Proceedings, 2011. 2 [13] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In 2009 IEEE conference on computer vision and pattern recognition , pages 248–255. Ieee, 2009. 2 (a) Bonding boxes of sliding windows from 400 to 40 (b) Bonding box with max boundary of Fig. 4a 
+
+(c) Bonding boxes of sliding windows from 220 to 180 (d) Bonding box with max boundary of Fig. 4c 
+
+Figure 2. One-car detection 
+
+(a) Bonding boxes of sliding windows from 60 to 40 (b) Car sub-features captured 
+
+Figure 3. Car sub-feature detection (a) Bonding boxes of sliding windows from 400 to 140 
+
+(b) Bonding box with max boundary of Fig. 4a 
+
+(c) Bonding boxes of sliding windows from 140 to 50 (d) Bonding box with max boundary of Fig. 4c 
+
+Figure 4. multi-car detection

@@ -1,0 +1,784 @@
+Title: Universal and efficient graph neural networks with dynamic attention for machine learning interatomic potentials
+
+URL Source: https://arxiv.org/pdf/2603.22810v1
+
+Published Time: Wed, 25 Mar 2026 00:45:57 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Universal and efficient graph neural networks with dynamic attention for machine learning interatomic potentials 
+
+Shuyu Bi 1, Zhede Zhao 1, Qiangchao Sun 1, Tao Hu 1* , Xionggang Lu 1,Hongwei Cheng 1* 
+
+> 1
+
+School of Materials Science and Engineering & State Key Laboratory of Advanced Refractories & State Key Laboratory of Advanced Special Steels, Shanghai University, Shanghai, 200444, P. R. China. *Corresponding authors. E-mails: taohu@shu.edu.cn; hwcheng@shu.edu.cn 
+
+Abstract 
+
+The core of molecular dynamics simulation fundamentally lies in the interatomic potential. Tra-ditional empirical potentials lack accuracy, while first-principles methods are computationally prohibitive. Machine learning interatomic potentials (MLIPs) promise near-quantum accuracy at lin-ear cost, but existing models still face challenges in efficiency and stability. We presents Machine Learning Advances Neural Network (MLANet), an efficient and robust graph neural network frame-work. MLANet introduces a dual-path dynamic attention mechanism for geometry-aware message passing and a multi-perspective pooling strategy to construct comprehensive system representations. This design enables highly accurate modeling of atomic environments while achieving exceptional computational efficiency, making high-fidelity simulations more accessible. Tested across a wide range of datasets spanning diverse systems, including organic molecules (e.g., QM7, MD17), periodic inor-ganic materials (e.g., Li-containing crystals), two-dimensional materials (e.g., bilayer graphene, black phosphorus), surface catalytic reactions (e.g., formate decomposition), and charged systems, MLANet maintains competitive prediction accuracy while its computational cost is markedly lower than main-stream equivariant models, and it enables stable long-time molecular dynamics simulations. MLANet provides an efficient and practical tool for large-scale, high-accuracy atomic simulations. 
+
+# Introduction 
+
+Molecular dynamics (MD) simulations have emerged as a cornerstone methodology for investigat-ing dynamical processes across a wide spectrum of scientific disciplines, including chemistry, biology, physics, and materials science, effectively bridging atomic-scale interactions to macroscopic functional properties[1]. At the heart of MD resides the calculation of interatomic potentials, which has traditionally relied on empirical potential functions[2–9]. While these classical force fields offer O(N) computational efficiency, their accuracy is fundamentally limited by predefined functional forms and manual parameteri-zation, often failing to capture complex many-body interactions[10–13] . To achieve quantum-mechanical accuracy, ab initio molecular dynamics (AIMD) methods based on density functional theory (DFT) have been extensively utilized and applied [14]. Although DFT provides rigorous first-principles precision, its prohibitive O(N ³) computational scaling restricts simulations to systems below 1,000 atoms and picosec-ond timescales, making large-scale phenomena like defect dynamics or catalytic reactions computationally intractable [15, 16]. For such cases, parallelized domain decomposition and specialized algorithms can extend the accessible scale of classical MD , albeit without quantum accuracy. The advent of machine learning interatomic potentials (MLIPs) has revolutionized this landscape, offering near-DFT accuracy with linear computational scaling. By training on ab initio datasets, MLIPs infer energies and forces through data-driven representations, bypassing explicit electronic structure 1
+
+> arXiv:2603.22810v1 [cs.LG] 24 Mar 2026
+
+calculations[17, 18] . Early invariant MLIPs like CGCNN[19], SchNet[20] and DimeNet[21] relied on hand-crafted geometric features (e.g., interatomic distances, angles), but their fixed descriptors struggled to distinguish configurations with identical local geometries[22, 23] . Subsequent advances in MLIPs, such as ALIGNN[24] and M3GNet[25], incorporated higher-body terms like dihedral angles, improving angular resolution while maintaining E(3) invariance . A paradigm shift occurred with the introduction of SE(3)-equivariant architectures, which explicitly preserve rotational and translational symmetries through tensor representations . Models like Allegro[26], NequIP[27] and MACE[28] leverage spherical harmon-ics and irreducible representations (irreps) to encode atomic environments, achieving sub-meV/atom errors on benchmarks through tensor product operations. These equivariant MLIPs demonstrate superior data efficiency, requiring orders of magnitude fewer training samples than invariant counterparts. Recent extensions, such as eSCN, reduce the computational overhead of high-order irreps (Lmax) from O(L6)to O(L3), enabling maximum rotation order up to lmax = 8 while retaining quantum accuracy[29] . Despite these advances, critical challenges persist: Computational complexity remains a significant barrier, as high-order tensor products in equivariant models incur substantial costs, limiting practical 
+
+lmax values and forcing trade-offs between angular resolution and speed [15, 16]. This computational burden mirrors the traditional trade-offs seen in classical force field development, where higher accuracy typically came at the expense of performance [30, 31]. Parallelization bottlenecks further compound these issues - the message-passing mechanism in MLIPs expands the effective communication radius to rc × Nlayers in spatial decomposition schemes, causing redundant computations and poor scaling beyond 32,000 atoms even on 64 GPUs[32]. In this work, we propose the MLANet framework. The model employs a geometry-aware dual-path dynamic attention mechanism within its equivariant message-passing layers, which adaptively modulates interatomic interactions based on both geometric and chemical features, alongside a physics-informed multi-perspective pooling strategy that mitigates information loss by combining complementary pool-ing operations. These designs are engineered to balance high accuracy with superior computational efficiency, addressing a central challenge in modern equivariant graph neural networks. The following sections systematically demonstrate its performance: validating its accuracy and stability in predicting energies and forces on organic molecular datasets such as QM7[33, 34] and MD17[35]; examining its fitting and generalization capabilities for energy-volume relationships, atomic pair interactions, and long-range van der Waals forces in inorganic material systems including SiO 2[36], Ge-Sb-Te[37], and black phosphorus[38]; and assessing its application potential in systems such as two-dimensional materials (e.g., bilayer graphene[39]) and surface catalysis (e.g., formic acid decomposition[27]). In addition, the model demonstrates competitive performance in charged systems and quantum chemical property pre-dictions for organic molecules[40–42]. Our results show that while maintaining accuracy comparable to mainstream equivariant models, MLANet achieves a significant improvement in computational efficiency, providing an efficient and reliable solution for high-accuracy atomic simulations across scales. 
+
+# Results 
+
+Model Architecture 
+
+The core of our framework builds upon an equivariant graph neural network with two specialized compo-nents (Fig. 1): Equivariant Message Passing with geometry-aware dual-path dynamic Graph Attention that combines tensor products with spherical harmonics to maintain SE (3)-equivariance during neigh-bor aggregation and adaptively modulate message flows based on both geometric distances and chemical embeddings; multi-perspective Pooling that concatenate additive, mean, and max graph-level features before final prediction. 
+
+Graph Construction 
+
+The atomic system is represented as a graph G = ( V, E, C ), where: V = {vi}Ni=1 is the node feature vector formed by concatenating atomic type embeddings: 
+
+vi = Embedding( zi) (1) 2Embedding  
+
+> MLA Net
+> Global Pooling
+> MLP Layers ×N
+> Linear
+> ×N
+> Energy
+> Force
+> Stress
+
+𝐍𝐨𝐝𝐞 
+
+𝐎𝐮𝐭𝐩𝐮𝐭  
+
+> Atomic Graph
+
+𝐄𝐝𝐠𝐞  
+
+> Message Passing
+> Output
+> Equivariant
+> Gate
+> Transform
+> Sum
+> Edge Feature
+> Node Feature
+
+𝐐  𝐊 𝐕  𝒓 𝒊𝒋 
+
+> Spherical
+> Harmonics
+> Tensor
+> Product
+> Tensor
+> Product
+> Edge Attention TP
+> Node
+> Attention
+> TP
+> Softmax
+
+𝐎𝐮𝐭𝐩𝐮𝐭 
+
+> Radial Basis
+
+a b cFig. 1 The architecture of MLANet. a Overall Model Architecture. b Internal Structure of MLANet. c Message Passing Layer of MLANet. 
+
+where zi denotes the atomic type. E = {ei,j } represents edge features, and the Bessel function basis is defined as: RBF n(x) = 
+
+r 2
+
+rcut 
+
+jn
+
+ αn,m xrcut 
+
+
+
+|jn(αn,m )| (2) where jn is the n-th order Bessel function. αn,m is the m-th root of jn. rcut is the cutoff radius. The normalization ensures orthonormality within the cutoff radius. The edge construction method accounts for periodic boundary conditions, where C ∈ R3×3 is the optional unit cell matrix. We do not explicitly provide the unit cell as model input; it is implicitly considered through the edge construction process. 
+
+Equivariant Message Passing and Update 
+
+The message passing layer in MLANet implements a geometry-aware dual-path dynamic attention mechanism. Its operation proceeds through the following sequence of mathematical operations: The spherical harmonics up to maximum rotation order lmax are computed for the normalized direction vectors ˆ rij between neighboring atoms: 
+
+Y1(ˆ rij ) = SH(ˆ rij ) (3) Edge features are transformed by processing raw edge attributes through head-specific linear layer 
+
+Wedge raw , processing spherical harmonics through separate linear layer Wedge sh and combining both components additively: 
+
+eij = Wedge raw (edge attr) + Wedge sh (Y1(ˆ rij )) (4) Node features are linearly transformed into queries ( qi) and keys ( kj ), with edge features added to both: 
+
+qi = Wq xi + eij , kj = Wkxj + eij (5) The attention weights are computed by taking the tensor product (TP) between queries and keys, scaling by temperature parameter τ and applying softmax normalization over neighboring atoms j:
+
+αij = softmax 
+
+ TP( qi, k j )
+
+τ
+
+
+
+(6) A gating mechanism is computed by transforming neighbor features with vj = Wv xj , computing tensor product with qi and applying sigmoid activation σ:
+
+βij = σ(TP( qi, v j )) (7) 3The final message combines transformed neighbor features ( vj ) weighted by gate βij and query features ( qi) weighted by complementary gate (1 −βij ), and Weighted by their respective attention scores 
+
+αhij :
+
+mij = βij · vj + (1 − βij ) · qi (8) 
+
+mi = αij · mij (9) The final node update consists of linear transformation of aggregated messages ( Wtrans ), gating operation (described below) and residual connection with input features: 
+
+x(l+1)  
+
+> i
+
+= Gate ( Wtrans mi) + x(l) 
+
+> i
+
+(10) The gating mechanism plays a crucial role in the node feature update process, ensuring that the model can effectively apply non-linear transformations while preserving SE (3)-equivariance. In our architecture, we employ SiLU (Swish) activation for scalar features and non-scalar features, which enhances model expressiveness while maintaining stable gradient flow. The mathematical formulation of the gate operation is defined as: Gate( x) = ( ϕscalars (xs)) ⊕ (( ϕgates (xn)) ⊙ xnon-scalars ) (11) where xs denotes the scalar features (irreps with l = 0), processed through Linear s with SILU activation. 
+
+xn represents higher-order features (irreps with l > 0). ϕ denotes SILU activation. 
+
+⊙ denotes element-wise multiplication. ⊕ indicates concatenation of processed components. The activation functions are defined as: SiLU( x) = x · σ(x) (12) where σ(x) is the sigmoid function. 
+
+Physics-Informed Multi-Perspective Pooling 
+
+For each graph G in batch, we compute three pooling operations and concatenate them: 
+
+vadd = X
+
+> i∈G
+
+xi, vmean = 1
+
+|G|
+
+X
+
+> i∈G
+
+xi
+
+vmax = max  
+
+> i∈G
+
+xi, vpooled = vadd ⊕ vmean ⊕ vmax 
+
+(13) Additive Pooling preserves extensive properties (e.g., total energy as a sum), Mean Pooling captures intensive, size-invariant properties and Max Pooling highlights critical local environments (e.g., active sites). By concatenating these representations and learning their optimal combination, MLANet con-structs a richer, more robust global descriptor. This mitigates information loss, enhances generalization, and eliminates the need for complex, computationally heavy post-processing layers to achieve accurate energy predictions. 
+
+Prediction Heads 
+
+The architecture uses separate prediction heads for Energy ( E ∈ R), Forces ( ⃗ fi ∈ R3) and Stress ( σ ∈ R6): 
+
+E = MLP energy (vpooled ) (14) ⃗fi = MLP forces (xi ⊕ vpooled [bi]) (15) 
+
+σ = MLP stress (vpooled ) (16) 
+
+Learning curves and scaling behavior of MLANet 
+
+To investigate the influence of the angular momentum parameter and the training set size on the model’s learning capacity and efficiency, we conduct training experiments using different angular momentum parameters and varying training set sizes. These experiments are performed on two distinct datasets: the QM7 dataset[33, 34], representing non-periodic small organic molecular systems, and the Li-containing subset of the Mptrj dataset[43], representing inorganic periodic crystals. We first evaluate MLANet on the QM7 organic small molecule dataset. Multiple models are trained using varying numbers of training samples (10, 100, 500, 1000, 2500, 5000, and 6449) and test on a fixed 420 40 60 80 100 120 
+
+> Relative Molecular Mass
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> 1200
+> 1400
+> 1600
+> Frequency
+
+a Mean: 96.2         
+
+> ±1 : 8.7
+> 2250 2000 1750 1500 1250 1000 750 500
+> Atomization Energy (kcal/mol)
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> 350
+> 400
+> Frequency
+
+b Mean: -1539 kcal/mol    
+
+> ±1 : 224 kcal/mol
+> 10 110 210 3
+> Training Size
+> 10 1
+> Energy MAE (kcal/mol)
+
+c MLANet(l=1)   
+
+> MLANet(l=2)
+> MLANet(l=3)
+> l=1 l=2 l=3
+> Model Variant
+> 0
+> 2000
+> 4000
+> 6000
+> 8000
+> 10000
+> Memory Usage (MB)
+
+d Memory (MB) 
+
+> Speed (s/Epoch)
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> Time consumption (s/Epoch)
+
+Fig. 2 Learning Curves and Model Efficiency of MLANet on QM7. a Histogram of molecular masses in the QM7 dataset, b histogram of atomization energies. c Log–log learning curve of energy prediction MAE versus training set size, 
+
+d memory usage and training time per epoch for MLANet with maximum rotation order lmax ∈ { 1, 2, 3}.
+
+set of 716 samples, with the learning target being the atomization energy. The distribution of relative molecular mass (Fig. 2a) and atomization energy (Fig. 2b) within the QM7 dataset is illustrated. The similarity in the distribution of these small molecules suggests that the dataset is relatively homogeneous, which facilitates model learning. The log-log learning curves are presented (Fig. 2c), plotting the mean absolute error (MAE) of the predicted atomization energy against the training set size for MLANet models with maximum rotation order lmax ∈ { 1, 2, 3}. The MAE for all three models shows a clear linear decreasing trend on the log-log scale, consistent with typical power-law scaling. Notably, the model with 
+
+l = 2 achieves a lower MAE than the model with l = 3 across most data regimes, indicating that a higher angular momentum cutoff does not guarantee better performance for energy prediction, especially with limited training data. Finally, the computational cost is reported (Fig. 2d), showing the memory usage and training time per epoch for different l values. As expected, both memory consumption and training time increase substantially with higher l, highlighting the trade-off between model expressivity and computational efficiency. We then evaluate MLANet on the lithium-containing subset of the Mptrj dataset. Models are trained for 500 epochs using varying numbers of training samples (25,000, 50,000, 100,000, and 219,033) and tested on a fixed set of 1,449 samples. The learning targets are the energy, forces, and stress (Fig. S1 in the Supplementary Information(SI)). The learning curves and computational efficiency of MLANet on this subset are presented (Fig. 3a to 3c). The panels show the scaling of the prediction mean absolute error (MAE) for energy, forces, and stress with respect to the training set size for MLANet variants with maximum rotation order lmax ∈ { 1, 2, 3}. All three properties exhibit the same trend: the performance of MLANet becomes more sensitive to the dataset size as l increases. With larger datasets, higher l variants demonstrate stronger fitting capability and achieve lower MAEs. Conversely, with smaller datasets, they are more prone to overfitting, resulting in higher MAEs. This indicates that flexibly selecting l based on the available data scale and the specific system is crucial for achieving an optimal balance between efficiency and accuracy. The final panel compares the memory usage and training speed per epoch for each model variant (Fig. 3d), which follows the expected pattern where both computational cost and memory consumption increase with l.5Inorganic systems 
+
+To demonstrate the fitting capability of the model, we train it on several inorganic material systems. The energy-volume curves for several silica polymorphs calculated using DFT[36] (with the SCAN functional) and MLANet are presented (Fig. S2 in the SI). Accurate reproduction of these curves is a key initial test for evaluating a potential’s thermodynamic behavior, as the 0 K energy-volume diagram is critical for predicting phase transitions. MLANet (colored points) shows excellent agreement with the SCAN-DFT reference (black curves), confirming its high-precision predictive performance. The potential energy scans for atomic pair interactions calculated using DFT[37] and MLANet are presented (Fig. S3 in the SI). The results cover scans of isolated dimers for all atomic pair types in the Ge–Sb–Te system. MLANet (red curves) reproduces the DFT calculations (white circles) accurately, showcasing MLANet’s high-precision predictive capability for intermetallic interactions. The binding energy–distance curves for bilayer black phosphorus exfoliation calculated using DFT+MBD[38] and MLANet are presented in Fig. 4a and 4b. Testing on this dataset reflects the model’s comprehensive predictive ability for both short-range and long-range interactions. By incorporating a long-range interaction term, MLANet (red curve) precisely reproduces the DFT+MBD reference data (black dashed curve), demonstrating the long-range awareness of the model. Furthermore, as shown in Fig. 4c and 4d, MLANet with the long-range term also accurately captures the exfoliation energetics of two Hittorf’s phosphorus polymorphs (P2/c and P2/n structures), further validating its transferability across different phosphorene systems. 
+
+Small organic molecules 
+
+To evaluate the model’s predictive accuracy, inference speed, and stability, we conducte further tests on a series of aperiodic organic small-molecule datasets. Building upon the learning curve discussed above, we present a comparison of the mean absolute error (MAE) and standard deviation for atomization energy predictions across different models on the QM7 dataset (Table. 1). MLANet achieves the lowest error and smallest standard deviation, demonstrating its superior accuracy in predicting atomization energies. In addition to the classical tasks of energy and force prediction for machine-learned interatomic potentials, we also evaluate MLANet on the QM9[40] and QM9S[41] dataset for predicting molecular quantum chemical properties (Table. S1 in the SI and Table. 2). MLANet achieves accuracy comparable 10 5
+
+> Training Size
+> 10 1
+> 2 × 10 1
+> 3 × 10 1
+> 4 × 10 1
+> Energy MAE (meV/atom)
+
+a MLANet(l=1) 
+
+> MLANet(l=2)
+> MLANet(l=3)
+> 10 5
+> Training Size
+> 10 2
+> 8 × 10 1
+> 9 × 10 1
+> Force MAE (meV/Å)
+
+b MLANet(l=1) 
+
+> MLANet(l=2)
+> MLANet(l=3)
+> 10 5
+> Training Size
+> 2 × 10 0
+> 3 × 10 0
+> Stress MAE (meV/Å^3)
+
+c MLANet(l=1)   
+
+> MLANet(l=2)
+> MLANet(l=3)
+> l=1 l=2 l=3
+> Model Variant
+> 0
+> 5000
+> 10000
+> 15000
+> 20000
+> Memory Usage (MB)
+
+d Memory (MB) 
+
+> Speed (s/Epoch)
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> Time consumption (s/Epoch)
+
+Fig. 3 Learning curves and computational efficiency for MLANet on the lithium-containing subset of Mptrj. a, b, c Log-log plots show the scaling of energy, force, and stress prediction errors (MAE) with training set size for MLANet variants with maximum rotation order lmax ∈ { 1, 2, 3}. d The panel compares memory usage and training speed per epoch across model variants. 
+
+6Table 1 Results on the QM7 datasets. Boldface indicates the best performance. Errors shown in parentheses are obtained as the standard deviations from ten-fold cross validation. 
+
+Method MAE [kcal/mol] AttentiveFP[44] 66.2 (2.8) DMPNN [45] 105.8 (13.2) DTNN [46] 8.2 (3.9) GraphConv [47] 118.9 (20.2) GROVER (base)[48] 72.5 (5.9) MPNN [49] 113.0 (17.2) N-GRAM[50] 125.6 (1.5) PAGTN (global)[51] 47.8 (3.0) PhysChem[52] 59.6 (2.3) SchNet[20] 74.2 (6.0) Weave [53] 59.6 (2.3) GGST+EK[54] 11.3 (0.6) 2GGST+EK[54] 3.4 (0.3) MLANet 3.07 (0.09 )
+
+to models evaluated on the QM9 dataset, as well as to other models except those specifically designed for predicting the QM9S dataset (DetaNet and EnviroDetaNet), demonstrating its feasibility in this domain. To evaluate the force prediction capability of MLANet, we conducte tests on the MD17 dataset[35]. First, we performe small-scale training by randomly selecting 950 samples for training, 50 for validation, and the remainder for testing. The force MAE results are presented in Table. S2 in the SI. MLANet demonstrates strong competitiveness, achieving leading MAE values across various small molecules, with the lowest error observed on benzene-containing systems. Subsequently, we perform large-scale training using 9500 randomly selected samples for training, 500 for validation, and 10000 for testing. After model training, we select four molecules for molecular 2 0 2 4 6 8
+
+> 100
+> 80
+> 60
+> 40
+> 20
+> 0
+> 20
+> 40
+> Energy (meV atom  1)
+
+## a DFT+MBD      
+
+> MLANet
+> 202468
+> 100
+> 80
+> 60
+> 40
+> 20
+> 0
+> 20
+> 40
+
+## b DFT+MBD       
+
+> MLANet
+> 20246810
+
+Change in interlayer distance (Å) 
+
+> 40
+> 20
+> 0
+> 20
+> 40
+> Energy (meV atom  1)
+
+## c DFT+MBD       
+
+> MLANet
+> 20246810
+
+Change in interlayer distance (Å) 
+
+> 40
+> 20
+> 0
+> 20
+> 40
+
+## d DFT+MBD 
+
+> MLANet
+
+Fig. 4 Exfoliation of phosphorene. a, b Exfoliation curves of black phosphorene predicted by the MLANet model without ( a) and with ( b) the long-range interaction term (red lines), compared with DFT + MBD reference data (black dashed lines). c, d Exfoliation curves of Hittorf’s phosphorus (P2/c and P2/n structures) predicted by the MLANet model including the long-range interaction term compared with DFT + MBD reference data points The plots show the energy evolution with interlayer distance. 
+
+7Table 2 Model performance (MAE) on the QM9S dataset. 
+
+SchNet[20] DimeNet++[55] PaiNN[56] NequIP [27] DetaNet [41] EnviroDetaNet [57] MLANet Dipole Moment (D/˚ A) 0.0790 0.0246 0.0102 0.0124 0.0087 0.0069 0.0188 Polarizability ( a30) - - 0.1536 0.1925 0.1374 0.0657 0.1745 
+
+dynamics (MD) simulations to assess the stability and speed of MLANet. Fig. 5 presents the results for aspirin, ethanol, malonaldehyde, and naphthalene (numerical values are provided in Table. S3 in the SI). As shown, MLANet achieves relatively low force MAE, albeit slightly higher than models such as NequIP[27] and CAMP[58]. Simultaneously, it maintains stable simulations throughout the entire 300 ps duration. In terms of simulation speed, while not matching simpler scalar-based models, it significantly outperforms existing tensor-based models, even by an order of magnitude. SchNet 
+
+> ForceNet
+> DeepPot-SE
+> PaiNN
+> DimeNet
+> GemNet-T
+> SphereNet
+> NequIP
+> CAMP
+> MLANet
+> 0.0
+> 0.5
+> 1.0
+> Normalized value  Aspirin
+
+a Forces MAE Stability Speed 
+
+> SchNet
+> ForceNet
+> DeepPot-SE
+> PaiNN
+> DimeNet
+> GemNet-T
+> SphereNet
+> NequIP
+> CAMP
+> MLANet
+> 0.0
+> 0.5
+> 1.0
+> Normalized value  Ethanol
+
+b Forces MAE Stability Speed 
+
+> SchNet
+> ForceNet
+> DeepPot-SE
+> PaiNN
+> DimeNet
+> GemNet-T
+> SphereNet
+> NequIP
+> MLANet
+> 0.0
+> 0.5
+> 1.0
+> Normalized value  Naphthalene
+
+c Forces MAE Stability Speed 
+
+> SchNet
+> ForceNet
+> DeepPot-SE
+> PaiNN
+> DimeNet
+> GemNet-T
+> SphereNet
+> NequIP
+> MLANet
+> 0.0
+> 0.5
+> 1.0
+> Normalized value  Salicylic Acid
+
+d Forces MAE Stability Speed 
+
+Fig. 5 Performance comparison of force prediction accuracy (MAE), MD stability, and computational speed for small molecule systems. Metrics are normalized to their maximum values for visualization. See Table. S3 in the SI for numerical data. Speed tests used a single NVIDIA V100 GPU. 
+
+Two-dimensional system 
+
+Two-dimensional (2D) materials play a significant role in material systems, exhibiting unique physical and chemical properties due to their partial periodicity. We evaluate MLANet on a bilayer graphene dataset[39], focusing on its potential energy surfaces under different stacking configurations (Fig. 6a). Starting from the AB stacking configuration, the binding energy curve for bilayer graphene exfoliation predicted by MLANet aligns well with DFT results (Fig. 6b). Moreover, MLANet accurately predict the rigid-sliding potential energy surfaces (with fixed interlayer distances) at three different interlayer spac-ings (13.2 ˚ A, 13.4 ˚ A, and 13.6 ˚ A) (Fig. 6c to 6h). For the flexible-sliding potential energy surface (where the interlayer distance adjusts with structural stability) at an interlayer spacing of 13.2 ˚ A, MLANet suc-cessfully reproduce the overall energy landscape, despite some minor non-smooth energy points (Fig. 6i to 6j). In addition, the energy variation curves along the y-direction from AA to SP stacking for all four sliding conditions are also well reproduced by MLANet (Fig. 6k), showing good agreement with DFT predictions. Furthermore, we present the RMSE of MLANet in predicting energies for sliding and exfoliation in bilayer graphene (Table. 3). MLANet achieve accurate results, ranking second only to the more structurally complex models NequIP and hNN. 
+
+Table 3 RMSE values of binding energies and sliding energies for the potentials against reference DFT calculations in bilayer graphene.                              
+
+> AIREBO [59] Reaxff [60] GAP2020 [61] LCBOP[62] DP [63] NEP [64] REBO-ILP [65, 66] NequIP [27] hNN[67] MLANet Slinding Energy (meV/atom) 1.1 0.7 2.5 0.9 0.6 0.7 1.0 0.4 0.4 0.5 Binding Energy (meV/atom) 17.7 16.0 10.3 7.4 3.5 2.6 1.6 1.2 0.8 1.3
+
+Formate decomposition 
+
+To evaluate the performance of MLANet in surface catalytic systems, we test it on the formic acid decomposition dataset[27]. This dataset describes the decomposition of formic acid on a Cu surface 8a
+
+> x
+> y
+
+AB 
+
+AA 
+
+SP      
+
+> 234567
+
+Interlayer Spacing (Å) 
+
+> 50
+> 25
+> 0
+> 25
+> 50
+> 75
+> 100
+> Energy (meV/atom)
+
+b DFT  
+
+> MLANet
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+> y Shift (Å)
+
+i MLANet  
+
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+
+j
+
+AA 
+
+AB 
+
+SP  
+
+> DFT
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+> y Shift (Å)
+
+c MLANet  
+
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+
+d DFT  
+
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+
+e MLANet  
+
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+
+f DFT  
+
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+> y Shift (Å)
+
+g MLANet  
+
+> 0a
+
+x Shift (Å) 
+
+> 0
+> 3 a
+
+h DFT 
+
+> SP AB AA
+
+y Shift (Å) 
+
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> 12
+> Energy (meV/atom)
+
+k DFT (flexible) 
+
+> MLANet (flexible)
+> DFT (3.2 Å)
+> MLANet (3.2 Å)
+> DFT (3.4 Å)
+> MLANet (3.4 Å)
+> DFT (3.6 Å)
+> MLANet (3.6 Å)
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> 3.5
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> 3.5
+> Energy (meV/atom)
+> 0.0
+> 1.5
+> 3.0
+> 4.5
+> 6.0
+> 7.5
+> 9.0
+> 10.5
+> 12.0
+> 0.0
+> 1.5
+> 3.0
+> 4.5
+> 6.0
+> 7.5
+> 9.0
+> 10.5
+> 12.0
+> 0.0
+> 0.8
+> 1.6
+> 2.4
+> 3.2
+> 4.0
+> 4.8
+> 5.6
+> 0.0
+> 0.8
+> 1.6
+> 2.4
+> 3.2
+> 4.0
+> 4.8
+> 5.6
+> Energy (meV/atom)
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> Energy (meV/atom)
+
+Fig. 6 Comparison of MLANet predictions and DFT calculations. a AB, AA, and SP stacking configurations, whose positions are marked on the MLANet potential energy surface plot. b Binding energy curves of AB-stacked bilayer graphene from DFT (blue) and MLANet (orange). c, d Rigid-sliding potential energy surfaces of bilayer graphene from MLANet and DFT at a separation of 3.2 ˚ A. e, f Rigid-sliding potential energy surfaces of bilayer graphene from MLANet and DFT at a separation of 3.4 ˚ A. g, h Rigid-sliding potential energy surfaces of bilayer graphene from MLANet and DFT at a separation of 3.6 ˚ A. i, j Flexible-sliding potential energy surfaces of bilayer graphene from MLANet and DFT at a separation of 3.2 ˚ A. The energy zero for both DFT and MLANet is set to the total energy of AB-stacked bilayer graphene. 
+
+k Energy scan curves along the AA-to-SP direction under four conditions from panel j, where the curves and data points represent predictions from MLANet and DFT, respectively. 
+
+(HCOO ∗ → H∗ + CO 2). The mean absolute errors (MAEs) for energy and forces are shown in the Table. 4. 
+
+Table 4 Results on the Formate Decomposition datasets. 
+
+Dataset Metric NequIP[27] MACE[28] Mattersim[68] Grace[69] AlphaNet[70] MLANet 
+
+Formate Decomposition Force MAE (meV/˚ A) 47.3 54.1 46.8 53.9 42.5 44.9 Energy MAE (meV/atom) 0.50 0.31 0.45 0.48 0.23 2.31 
+
+On this dataset, MLANet achieve MAEs of 44.9 meV/˚ A for forces and 2.31 meV/atom for energy. Although the energy error is relatively high, the low force error demonstrates MLANet’s capability in simulating surface catalytic reactions with diverse interactions. 
+
+Water 
+
+To evaluate the performance of MLANet in liquid systems, we test it on the bulk water dataset[71]. The root mean square errors (RMSEs) for energy and forces are presented in the Table. 5. MLANet achieve the best energy RMSE of 0.47 meV/atom, and its force RMSE of 60 meV/˚ A is also competitive 9with other models. However, on this relatively small dataset consisting of only 1593 configurations, MLANet exhibits signs of overfitting. We believe that, as indicated by our earlier analysis, MLANet will demonstrate greater advantages on larger-scale datasets, where overfitting can be effectively mitigated, leading to improved robustness and higher accuracy.                             
+
+> Table 5 Model performance on the water dataset. RMSEs of energy and forces are in the units of meV/atom and meV/˚ A, respectively.
+> BPNN [71] ACE [72] REANN [73] DeePMD [74] NequIP [27] MACE [28] CACE [75] CAMP [58] MLANet Energy 2.3 1.7 0.8 2.1 0.94 0.63 0.59 0.59 0.47 Forces 120 99 53 92 45 36 47 34 60
+
+Charged system 
+
+On the charged system datasets[42], compared to existing methods such as Qeq[76] and LES[77] that maintain charge conservation by incorporating long-range electrostatic interactions, MLANet demon-strates competitive performance in terms of force RMSE by directly embedding charge as a feature (Table. 6). In the C 10 H2/C 10 H+3 and Ag +/− 
+
+> 3
+
+datasets, MLANet achieves lower RMSE than other direct charge-embedding approaches. Moreover, on the Na 8/9Cl +8 dataset, it surpasses models that include explicit long-range electrostatic interaction terms, attaining the lowest RMSE. Future integration of long-range electrostatic interactions into the direct force model is expected to yield even better performance.  
+
+> Table 6 Results on the different charge-state datasets
+
+Dataset Metric 4G-HDNNP[42] Maruf’s NequIP[78] ReaxNet[79] MLANet C10 H2/C 10 H+3 Force RMSE (eV/˚ A) 0.078 0.071 0.023 0.074 
+
+Ag +/− 
+
+> 3
+
+Force RMSE (eV/˚ A) 0.033 - 0.005 0.024 
+
+Na 8/9Cl +8 Force RMSE (eV/˚ A) 0.032 2.145 0.028 0.012 
+
+Interface speed 
+
+In addition to the MD speed test conducted on the NVIDIA V100 mentioned earlier, we also perform inference speed tests on an NVIDIA 4060 laptop with 8GB VRAM, representing a common user envi-ronment (Table. S4 in the SI). The results demonstrate that MLANet can simulate systems with over a thousand atoms even on 8GB VRAM, showcasing its excellent efficiency. 
+
+# Methods 
+
+Datasets 
+
+QM7[33, 34]:The QM7 dataset is a subset of the GDB-13 database, which contains nearly one billion stable and synthetically accessible organic molecules. QM7 comprises molecules with up to 23 atoms, including seven heavy atoms (C, N, O, S), resulting in a total of 7,165 molecules. Following previous studies, we employ ten-fold cross-validation for testing. Mptrj[43]:The MPtrj dataset comprises 1,580,395 structures, 1,580,395 energy values, 7,944,833 magnetic moments, 49,295,660 force entries, and 14,223,555 stress components. The structures and cor-responding labels were parsed from all GGA/GGA+U static/relaxation trajectories in the Materials Project database (version 2022.9), employing a selection methodology designed to exclude incompatible calculations and duplicate structures. For model testing, we extracted all structures containing lithium (Li). The resulting training set consists of 219,033 structures, while the test set contains 1,449 structures. SiO 2[36]:The SiO 2 dataset consists of 3074 structures, containing a total of 268,118 atoms. This dataset is generated using an iterative method, sometimes driven by empirical potentials. GeSbTe[37]:The GeSbTe dataset is calculated using the PBE functional. It covers a series of com-positions along the pseudobinary line from GeTe to Sb 2Te 3 and is created through a two-step iterative process. It contains 2692 structures, with a total of 341,132 atoms. 10 Phosphorus[38]:The phosphorus dataset contains structures generated by GAP-RSS, including liquid, crystalline, and isolated fragments. It consists of 4798 structures, with a total of 140,910 atoms. In this dataset, we used the average distance embedding between each atom and all other atoms to represent long-range interactions. QM9[40]:The QM9 dataset is constructed based on quantum chemical calculations, covering over 130,000 organic molecules composed of carbon, hydrogen, nitrogen, oxygen, and fluorine, with molecular weights not exceeding 900 Daltons. The dataset uses density functional theory (DFT) calculations to obtain quantum chemical properties such as geometric structures, energies, and charge distributions of the molecules in their ground states. During the construction process, researchers employed high-precision computational methods to ensure the accuracy and reliability of the data. We use 110,000 structures for training, 10,000 for validation, and the remainder for testing. QM9S[41]:The QM9S dataset comprises approximately 130,000 organic molecules, encompassing a comprehensive set of quantum mechanical properties. These include molecular geometries, scalar prop-erties (e.g., energy and partial charges), vector properties (such as dipole moments and atomic forces), second-order tensor properties (e.g., polarizability), and third-order tensor properties (e.g., hyperpolariz-ability). For consistency with prior work, we adopt the established data splitting scheme used in previous studies, dividing the dataset into training, validation, and test sets in a ratio of 90:5:5. MD17[35]:The MD17 dataset is a publicly available dataset for molecular dynamics research, con-taining energy and force information from molecular dynamics trajectories of eight organic molecules. It is designed to support the application of machine learning models in constructing accurate energy-conserving molecular force fields. We first use 950 structures for training, 50 for validation, and the remainder for testing on eight organic molecules. Then, on four of these organic molecules, we use 9,500 for training, 500 for validation, and 10,000 for testing. Bilayer graphene[39]:The defective bilayer graphene dataset contains multiple structures with three stacking configurations: V0V0, V0V1, and V1V1. It includes DFT+MBD calculation results for various cases. The training, validation, and test sets consist of 3,988, 4,467, and 200 structures, respectively. Formate decomposition[27]:The dataset for formate decomposition on a Cu surface contains 6,855 structures generated by the nudged elastic band (NEB) method and AIMD simulations. The training, validation, and test sets consist of 2,500, 250, and 4,105 structures, respectively. Water[71]:The water dataset contains 1,593 liquid water configurations, each consisting of 192 atoms, corresponding to 64 water molecules. These data are derived from density functional theory calculations at the revPBE0-D3 level. The dataset is split into training, validation, and test sets in a ratio of 90:5:5. Charged system[42]:The C 10 H2/C 10 H+3 , Ag +/− 
+
+> 3
+
+, and Na 8/9Cl +8 datasets contain 10,019, 11,013, and 5,000 structures, respectively. For each dataset, we use 90% of the data for training and the remainder for validation. 
+
+Training details 
+
+The model was implemented using PyTorch and trained on two NVIDIA GeForce RTX 4090 GPUs with 24GB memory each. The training objective combines weighted losses for energy ( E), forces ( F ), predictions: 
+
+Ltotal = λE LE + λF LF (17) where λE and λF balance the relative importance of each term. The loss components utilize the L1 loss function for robust regression: 
+
+LE = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Ei − ˆEi ,
+
+LF = 13N
+
+> N
+
+X
+
+> i=1
+
+X
+
+> α∈{ x,y,z }
+
+Fi,α − ˆFi,α .
+
+The energy loss LE computes the MAE between predicted and true energies across the batch, while the force loss LF averages over all force components (3D vectors per atom). The hyperparameters details in different datasets are shown in Table. S5 and S6 in the SI. 11 Discussion 
+
+In this work, we presents MLANet, a graph neural network framework that integrates equivariant message passing with dynamic graph attention and multi-perspective pooling. Experimental results demonstrate that MLANet achieves a favorable balance among prediction accuracy, computational efficiency, and simulation stability, positioning it as a competitive new tool for large-scale atomic simulations. MLANet demonstrates excellent predictive accuracy across diverse systems. It achieves competitive results on standard molecular benchmarks (e.g., QM7, MD17) and accurately models complex phenomena in materials, including phase transitions in SiO 2, intermetallic interactions in Ge-Sb-Te, and long-range forces in bilayer black phosphorus. Crucially, MLANet combines this high accuracy with remarkable computational efficiency and scalability. Its performance scales favorably with data volume, and it offers practical guidance for balancing model complexity via maximum rotation order lmax with data size and cost. In direct speed benchmarks, MLANet runs significantly faster—by up to an order of magni-tude—than comparable models like NequIP, while maintaining simulation stability over long molecular dynamics trajectories (e.g., 300 ps for 4 molecules). The success of MLANet stems from its architectural innovations. First, the geometry-aware dual-path dynamic attention mechanism explicitly decouples the importance assessment of messages from their fea-ture transformation, significantly enhancing the model’s ability to discriminate subtle variations in local chemical environments. Second, the physics-informed multi-perspective pooling strategy—integrating additive, mean, and max operations—captures complementary feature information from extensive, inten-sive, and critical-local perspectives, leading to a more comprehensive and robust system representation. Together, these innovations enable the model to learn a highly accurate potential energy surface while maintaining markedly lower computational cost, a synergy that underpins its practical efficiency and generalization capability. MLANet exhibits inherent computational efficiency as a direct-force model; however, its force predic-tion accuracy remains inferior to that of energy-conserving gradient-force models. This limitation restricts its applicability in tasks requiring high force-field smoothness and precise Hessian matrices, such as transition-state searches. Recent studies indicate that training direct-force models on large-scale datasets incorporating second-order derivative information (Hessian matrices) can substantially enhance the sym-metry and accuracy of predicted forces, potentially enabling performance comparable to gradient-force models in reaction pathway exploration. Consequently, by integrating training data with higher-order physical observables, MLANet may achieve accuracy approaching that of gradient-force models while preserving computational efficiency, thereby evolving into a versatile tool for large-scale simulations that balances speed and precision. In future work, we will enhance the MLANet framework through active learning for data generation, development of more efficient equivariant operators, and training on more comprehensive datasets that incorporate higher-order physical information. These advancements are intended to establish MLANet as a robust computational tool for ultra-large-scale atomic simulations in critical domains such as catalysis and energy materials. 
+
+# Data availability 
+
+The datasets used in this paper are publicly available (see “Methods”). 
+
+# Acknowledgements 
+
+This work is supported by the National Natural Science Foundation of China (52574471, 52404423, 52334009), the Open Research Fund of Songshan Lake Materials Laboratory (2023SLABFK12), the Science and Technology Commission of Shanghai Municipality (23ZR1421600), and Research Project of State Key Laboratory of Advanced Special Steel (Shanghai)(SKLASS 2025-Z12). This work was also supported by Shanghai Technical Service Center of Science and Engineering Computing, Shanghai University. 
+
+# Author contribution 
+
+Shuyu Bi: Writing–original draft, Writing–review & editing, Software, Methodology, Investigation, For-mal analysis, Data curation. Zhede Zhao: Writing–review & editing. Qiangchao Sun: Supervision. Tao Hu: Writing–review & editing, Investigation, Supervision, Resources. Xionggang Lu: Resources. Hongwei Cheng: Supervision, Resources, Project administration, Investigation, Funding acquisition. 12 Competing interests 
+
+The authors declare no competing interests. 
+
+# References 
+
+[1] Alder, B. J. & Wainwright, T. E. Studies in Molecular Dynamics. I. General Method. The Journal of Chemical Physics 31 , 459–466 (1959). URL https://pubs.aip.org/jcp/article/31/2/459/1031509/ Studies-in-Molecular-Dynamics-I-General-Method. [2] Weiner, S. J. et al. A new force field for molecular mechanical simulation of nucleic acids and proteins. Journal of the American Chemical Society 106 , 765–784 (1984). URL https://pubs.acs. org/doi/abs/10.1021/ja00315a051. [3] Cygan, R. T., Liang, J.-J. & Kalinichev, A. G. Molecular Models of Hydroxide, Oxyhydroxide, and Clay Phases and the Development of a General Force Field. The Journal of Physical Chemistry B 
+
+108 , 1255–1266 (2004). URL https://pubs.acs.org/doi/10.1021/jp0363287. [4] Neria, E., Fischer, S. & Karplus, M. Simulation of activation free energies in molecular systems. 
+
+The Journal of Chemical Physics 105 , 1902–1921 (1996). URL https://pubs.aip.org/jcp/article/ 105/5/1902/477923/Simulation-of-activation-free-energies-in. [5] Daw, M. S. & Baskes, M. I. Semiempirical, Quantum Mechanical Calculation of Hydrogen Embrit-tlement in Metals. Physical Review Letters 50 , 1285–1288 (1983). URL https://link.aps.org/doi/ 10.1103/PhysRevLett.50.1285. [6] Jorgensen, W. L., Chandrasekhar, J., Madura, J. D., Impey, R. W. & Klein, M. L. Com-parison of simple potential functions for simulating liquid water. The Journal of Chem-ical Physics 79 , 926–935 (1983). URL https://pubs.aip.org/jcp/article/79/2/926/776316/ Comparison-of-simple-potential-functions-for. [7] Ewald, P. P. Die Berechnung optischer und elektrostatischer Gitterpotentiale. Annalen der Physik 
+
+369 , 253–287 (1921). URL https://onlinelibrary.wiley.com/doi/10.1002/andp.19213690304. [8] Smith, W. R., Henderson, D. & Tago, Y. Mean spherical approximation and optimized cluster theory for the square-well fluid. The Journal of Chemical Physics 67 , 5308–5316 (1977). URL https://pubs. aip.org/jcp/article/67/11/5308/787441/Mean-spherical-approximation-and-optimized-cluster. [9] Rappe, A. K., Casewit, C. J., Colwell, K. S., Goddard, W. A. & Skiff, W. M. UFF, a full peri-odic table force field for molecular mechanics and molecular dynamics simulations. Journal of the American Chemical Society 114 , 10024–10035 (1992). URL https://pubs.acs.org/doi/abs/10.1021/ ja00051a040. [10] Unke, O. T. et al. Machine Learning Force Fields. Chemical Reviews 121 , 10142–10186 (2021). URL https://pubs.acs.org/doi/10.1021/acs.chemrev.0c01111. [11] Mueller, T., Hernandez, A. & Wang, C. Machine learning for interatomic potential models. The Journal of Chemical Physics 152 , 050902 (2020). URL https://pubs.aip.org/jcp/article/152/5/ 050902/199257/Machine-learning-for-interatomic-potential-models. [12] Shapeev, A. V. Moment Tensor Potentials: a class of systematically improvable interatomic poten-tials. Multiscale Modeling & Simulation 14 , 1153–1173 (2016). URL http://arxiv.org/abs/1512. 06054. [13] Stocker, S., Gasteiger, J., Becker, F., G¨ unnemann, S. & Margraf, J. T. How robust are modern graph neural network potentials in long and hot molecular dynamics simulations? Machine Learning: Science and Technology 3, 045010 (2022). URL http://dx.doi.org/10.1088/2632-2153/ac9955. [14] Kohn, W. & Sham, L. J. Self-consistent equations including exchange and correlation effects. Phys. Rev. 140 , A1133–A1138 (1965). URL https://link.aps.org/doi/10.1103/PhysRev.140.A1133. 13 [15] Plimpton, S. Fast parallel algorithms for short-range molecular dynamics (1993). URL http://dx. doi.org/10.2172/10176421. [16] Niethammer, C. et al. ls1 mardyn : The Massively Parallel Molecular Dynamics Code for Large Systems. Journal of Chemical Theory and Computation 10 , 4455–4464 (2014). URL https://pubs. acs.org/doi/10.1021/ct500169q. [17] Reiser, P. et al. Graph neural networks for materials science and chemistry. Communications Materials 3, 93 (2022). URL https://www.nature.com/articles/s43246-022-00315-6. [18] Li, Y., Zhang, X., Liu, M. & Shen, L. A critical review of machine learning interatomic potentials and hamiltonian. Journal of Materials Informatics 5 (2025). URL https://www.oaepublish.com/ articles/jmi.2025.17. [19] Xie, T. & Grossman, J. C. Crystal Graph Convolutional Neural Networks for an Accurate and Interpretable Prediction of Material Properties. Physical Review Letters 120 , 145301 (2018). URL http://arxiv.org/abs/1710.10324. [20] Sch¨ utt, K. T., Sauceda, H. E., Kindermans, P.-J., Tkatchenko, A. & M¨ uller, K.-R. SchNet – A deep learning architecture for molecules and materials. The Journal of Chemical Physics 148 , 241722 (2018). URL https://pubs.aip.org/jcp/article/148/24/241722/962591/ SchNet-A-deep-learning-architecture-for-molecules. [21] Gasteiger, J., Groß, J. & G¨ unnemann, S. Directional Message Passing for Molecular Graphs (2022). URL http://arxiv.org/abs/2003.03123. [22] Unke, O. T. & Meuwly, M. PhysNet: A Neural Network for Predicting Energies, Forces, Dipole Moments and Partial Charges. Journal of Chemical Theory and Computation 15 , 3678–3693 (2019). URL http://arxiv.org/abs/1902.08408. [23] Lu, Y., Peng, J., Zhu, Y. & Chen, Z. applicable, N. (ed.) Pre-training Molecular Graph Rep-resentations with Motif-Enhanced Message Passing . (ed.applicable, N.) 2024 International Joint Conference on Neural Networks (IJCNN) , 1–8 (IEEE, Yokohama, Japan, 2024). [24] Choudhary, K. & DeCost, B. Atomistic Line Graph Neural Network for improved materials property predictions. npj Computational Materials 7, 185 (2021). URL https://doi.org/10.1038/ s41524-021-00650-1. [25] Chen, C. & Ong, S. P. A universal graph deep learning interatomic potential for the periodic table. Nature Computational Science 2, 718–728 (2022). URL https://www.nature.com/articles/ s43588-022-00349-3. [26] Musaelian, A. et al. Learning local equivariant representations for large-scale atomistic dynamics. Nature Communications 14 , 579 (2023). URL https://www.nature.com/articles/ s41467-023-36329-y. [27] Batzner, S. et al. E(3)-equivariant graph neural networks for data-efficient and accurate interatomic potentials. Nature Communications 13 , 2453 (2022). URL https://www.nature.com/articles/ s41467-022-29939-5. [28] Batatia, I., Kovacs, D. P., Simm, G. N. C., Ortner, C. & Csanyi, G. Oh, A. H., Agarwal, A., Belgrave, D. & Cho, K. (eds) MACE: Higher order equivariant message passing neural networks for fast and accurate force fields . (eds Oh, A. H., Agarwal, A., Belgrave, D. & Cho, K.) Advances in Neural Information Processing Systems (2022). URL https://openreview.net/forum?id=YPpSngE-ZU. [29] Fu, X. et al. Learning smooth and expressive interatomic potentials for physical property prediction (2025). URL https://arxiv.org/abs/2502.12147. arXiv:2502.12147. [30] Slim, H. A. & Wilson, M. R. Toward Large Scale Parallelization for Molecular Dynamics of Small Chemical Systems: A Combined Parallel Tempering and Domain Decomposition Approach. Journal 
+
+14 of Chemical Theory and Computation 4, 1570–1575 (2008). URL https://pubs.acs.org/doi/10.1021/ ct800255r. [31] Liu, J., Byggmastar, J., Fan, Z., Qian, P. & Su, Y. Large-scale machine-learning molecular dynamics simulation of primary radiation damage in tungsten (2023). URL http://arxiv.org/abs/2305.08140. [32] Batatia, I. et al. A foundation model for atomistic materials chemistry (2025). URL https://arxiv. org/abs/2401.00096. arXiv:2401.00096. [33] Blum, L. C. & Reymond, J.-L. 970 million druglike small molecules for virtual screening in the chemical universe database GDB-13. J. Am. Chem. Soc. 131 , 8732 (2009). [34] Rupp, M., Tkatchenko, A., M¨ uller, K.-R. & von Lilienfeld, O. A. Fast and accurate modeling of molecular atomization energies with machine learning. Physical Review Letters 108 , 058301 (2012). [35] Chmiela, S. et al. Machine learning of accurate energy-conserving molecular force fields. Science Advances 3, e1603015 (2017). URL https://www.science.org/doi/abs/10.1126/sciadv.1603015. [36] Erhard, L. C., Rohrer, J., Albe, K. & Deringer, V. L. A machine-learned interatomic potential for silica and its relation to empirical models. npj Computational Materials 8, 90 (2022). URL https://www.nature.com/articles/s41524-022-00768-w. [37] Zhou, Y., Zhang, W., Ma, E. & Deringer, V. L. Device-scale atomistic modelling of phase-change memory materials. Nature Electronics 6, 746–754 (2023). URL https://www.nature.com/articles/ s41928-023-01030-x. [38] Deringer, V. L., Caro, M. A. & Cs´ anyi, G. A general-purpose machine-learning force field for bulk and nanostructured phosphorus. Nature Communications 11 , 5461 (2020). URL https://www. nature.com/articles/s41467-020-19168-z. [39] Ying, P., Natan, A., Hod, O. & Urbakh, M. Effect of Interlayer Bonding on Superlubric Sliding of Graphene Contacts: A Machine-Learning Potential Study. ACS Nano 18 , 10133–10141 (2024). URL https://pubs.acs.org/doi/10.1021/acsnano.3c13099. [40] Ramakrishnan, R., Dral, P. O., Rupp, M. & von Lilienfeld, O. A. Quantum chemistry structures and properties of 134 kilo molecules. Scientific Data 1 (2014). [41] Zou, Z. et al. A deep learning model for predicting selected organic molecular spectra. Nature Com-putational Science 3, 957–964 (2023). URL https://www.nature.com/articles/s43588-023-00550-y. [42] Ko, T. W., Finkler, J. A., Goedecker, S. & Behler, J. A fourth-generation high-dimensional neural network potential with accurate electrostatics including non-local charge transfer. Nature Communications 12 , 398 (2021). URL https://www.nature.com/articles/s41467-020-20427-2. [43] Deng, B. et al. Chgnet as a pretrained universal neural network potential for charge-informed atomistic modelling. Nature Machine Intelligence 1–11 (2023). [44] Xiong, Z. et al. Pushing the Boundaries of Molecular Representation for Drug Discovery with the Graph Attention Mechanism. Journal of Medicinal Chemistry 63 , 8749–8760 (2020). URL https://pubs.acs.org/doi/10.1021/acs.jmedchem.9b00959. [45] Yang, K. et al. Analyzing Learned Molecular Representations for Property Prediction. Journal of Chemical Information and Modeling 59 , 3370–3388 (2019). URL https://pubs.acs.org/doi/10.1021/ acs.jcim.9b00237. [46] Wu, Z. et al. MoleculeNet: a benchmark for molecular machine learning. Chemical Science 9,513–530 (2018). URL https://xlink.rsc.org/?DOI=C7SC02664A. [47] Kipf, T. & Welling, M. Semi-supervised classification with graph convolutional networks. ArXiv 
+
+abs/1609.02907 (2016). URL https://api.semanticscholar.org/CorpusID:3144218. 15 [48] Rong, Y. et al. Larochelle, H., Ranzato, M., Hadsell, R., Balcan, M. & Lin, H. (eds) Self-supervised graph transformer on large-scale molecular data . (eds Larochelle, H., Ranzato, M., Hadsell, R., Balcan, M. & Lin, H.) 34th Conference on Neural Information Processing Systems (NeurIPS 2020) ,Vol. 16 of Advances in Neural Information Processing Systems , 12559–12571 (Neural Information Processing Systems (NeurIPS), United States, 2020). URL https://nips.cc/Conferences/2020. [49] Gilmer, J., Schoenholz, S. S., Riley, P. F., Vinyals, O. & Dahl, G. E. Precup, D. & Teh, Y. W. (eds) 
+
+Neural message passing for quantum chemistry . (eds Precup, D. & Teh, Y. W.) Proceedings of the 34th International Conference on Machine Learning , Vol. 70 of Proceedings of Machine Learning Research , 1263–1272 (PMLR, 2017). URL https://proceedings.mlr.press/v70/gilmer17a.html. [50] Liu, S., Demirel, M. F. & Liang, Y. Wallach, H. et al. (eds) N-gram graph: Simple unsupervised representation for graphs, with applications to molecules . (eds Wallach, H. et al. ) Advances in Neural Information Processing Systems , Vol. 32 (Curran Associates, Inc., 2019). URL https://proceedings. neurips.cc/paper files/paper/2019/file/2f3926f0a9613f3c3cc21d52a3cdb4d9-Paper.pdf. [51] Chen, B., Barzilay, R. & Jaakkola, T. Path-augmented graph transformer network (2019). URL https://arxiv.org/abs/1905.12712. arXiv:1905.12712. [52] Yang, S., Li, Z., Song, G. & Cai, L. Ranzato, M., Beygelzimer, A., Dauphin, Y., Liang, P. & Vaughan, J. W. (eds) Deep molecular representation learning via fusing physical and chem-ical information . (eds Ranzato, M., Beygelzimer, A., Dauphin, Y., Liang, P. & Vaughan, J. W.) Advances in Neural Information Processing Systems , Vol. 34, 16346–16357 (Cur-ran Associates, Inc., 2021). URL https://proceedings.neurips.cc/paper files/paper/2021/file/ 884d247c6f65a96a7da4d1105d584ddd-Paper.pdf. [53] Kearnes, S., McCloskey, K., Berndl, M., Pande, V. & Riley, P. Molecular graph convolutions: moving beyond fingerprints. Journal of Computer-Aided Molecular Design 30 , 595–608 (2016). URL http://link.springer.com/10.1007/s10822-016-9938-8. [54] Koke, C. & Kutyniok, G. Graph scattering beyond wavelet shackles , NIPS ’22 (Curran Associates Inc., Red Hook, NY, USA, 2022). [55] Gasteiger, J., Giri, S., Margraf, J. T. & G¨ unnemann, S. Fast and uncertainty-aware directional message passing for non-equilibrium molecules (2020). [56] Sch¨ utt, K., Unke, O. & Gastegger, M. Meila, M. & Zhang, T. (eds) Equivariant message passing for the prediction of tensorial properties and molecular spectra . (eds Meila, M. & Zhang, T.) Proceedings of the 38th International Conference on Machine Learning , Vol. 139 of Proceedings of Machine Learning Research , 9377–9388 (PMLR, 2021). URL https://proceedings.mlr.press/v139/schutt21a. html. [57] Xu, Y. et al. Pretrained E(3)-equivariant message-passing neural networks with multi-level repre-sentations for organic molecule spectra prediction. npj Computational Materials 11 , 203 (2025). URL https://www.nature.com/articles/s41524-025-01698-z. [58] Wen, M., Huang, W.-F., Dai, J. & Adhikari, S. Cartesian atomic moment machine learning interatomic potentials. npj Computational Materials 11 (2025). [59] Stuart, S. J., Tutein, A. B. & Harrison, J. A. A reactive potential for hydrocarbons with inter-molecular interactions. The Journal of Chemical Physics 112 , 6472–6486 (2000). URL https: //doi.org/10.1063/1.481208. [60] Chenoweth, K., van Duin, A. & Goddard, W. Reaxff reactive force field for molecular dynamics simulations of hydrocarbon oxidation. The journal of physical chemistry. A 112 , 1040–53 (2008). [61] Rowe, P., Deringer, V. L., Gasparotto, P., Cs´ anyi, G. & Michaelides, A. An accurate and transferable machine learning potential for carbon. The Journal of Chemical Physics 153 , 034702 (2020). URL https://doi.org/10.1063/5.0005084. 16 [62] Los, J. H. & Fasolino, A. Intrinsic long-range bond-order potential for carbon: Performance in monte carlo simulations of graphitization. Phys. Rev. B 68 , 024107 (2003). URL https://link.aps.org/doi/ 10.1103/PhysRevB.68.024107. [63] Wang, H., Zhang, L., Han, J. & E, W. Deepmd-kit: A deep learning package for many-body potential energy representation and molecular dynamics. Computer Physics Communications 228 , 178–184 (2018). URL https://www.sciencedirect.com/science/article/pii/S0010465518300882. [64] Fan, Z. et al. Gpumd: A package for constructing accurate machine-learned potentials and perform-ing highly efficient atomistic simulations. The Journal of Chemical Physics 157 , 114801 (2022). URL https://doi.org/10.1063/5.0106617. [65] Brenner, D. W. et al. A second-generation reactive empirical bond order (rebo) potential energy expression for hydrocarbons. Journal of Physics: Condensed Matter 14 , 783 (2002). URL https: //doi.org/10.1088/0953-8984/14/4/312. [66] Ouyang, W., Mandelli, D., Urbakh, M. & Hod, O. Nanoserpents: Graphene nanoribbon motion on two-dimensional hexagonal materials. Nano letters 18 9 , 6009–6016 (2018). URL https://api. semanticscholar.org/CorpusID:206749457. [67] Wen, M. & Tadmor, E. B. Hybrid neural network potential for multilayer graphene. Phys. Rev. B 
+
+100 , 195419 (2019). URL https://link.aps.org/doi/10.1103/PhysRevB.100.195419. [68] Yang, H. et al. Mattersim: A deep learning atomistic model across elements, temperatures and pressures. arXiv preprint arXiv:2405.04967 (2024). URL https://arxiv.org/abs/2405.04967. [69] Bochkarev, A., Lysogorskiy, Y. & Drautz, R. Graph atomic cluster expansion for semilocal inter-actions beyond equivariant message passing. Phys. Rev. X 14 , 021036 (2024). URL https: //link.aps.org/doi/10.1103/PhysRevX.14.021036. [70] Yin, B. et al. AlphaNet: scaling up local-frame-based neural network interatomic potentials. npj Computational Materials 11 , 332 (2025). [71] Cheng, B., Engel, E. A., Behler, J., Dellago, C. & Ceriotti, M. Ab initio thermodynamics of liquid and solid water. Proceedings of the National Academy of Sciences 116 , 1110–1115 (2019). URL https://www.pnas.org/doi/abs/10.1073/pnas.1815117116. [72] Drautz, R. Atomic cluster expansion for accurate and transferable interatomic potentials. Phys. Rev. B 99 , 014104 (2019). URL https://link.aps.org/doi/10.1103/PhysRevB.99.014104. [73] Zhang, Y., Xia, J. & Jiang, B. Physically motivated recursively embedded atom neural networks: Incorporating local completeness and nonlocality. Phys. Rev. Lett. 127 , 156002 (2021). URL https: //link.aps.org/doi/10.1103/PhysRevLett.127.156002. [74] Zhang, L., Han, J., Wang, H., Car, R. & E, W. Deep potential molecular dynamics: A scalable model with the accuracy of quantum mechanics. Phys. Rev. Lett. 120 , 143001 (2018). URL https: //link.aps.org/doi/10.1103/PhysRevLett.120.143001. [75] Cheng, B. Cartesian atomic cluster expansion for machine learning interatomic potentials. npj Computational Materials 10 , 157 (2024). [76] Rapp´ e, A. K. & Goddard, W. A. Charge equilibration for molecular dynamics simulations. The Jour-nal of Physical Chemistry 95 , 3358–3363 (1991). URL https://api.semanticscholar.org/CorpusID: 17553155. [77] Kim, D. et al. A universal augmentation framework for long-range electrostatics in machine learning interatomic potentials. Journal of Chemical Theory and Computation (2025). [78] Maruf, M. U., Kim, S. & Ahmad, Z. Equivariant machine learning interatomic potentials with global charge redistribution. The journal of physical chemistry letters 9078–9087 (2025). URL 17 https://api.semanticscholar.org/CorpusID:277271866. [79] Gao, R. et al. A foundation machine learning potential with polarizable long-range interactions for materials modelling. Nature Communications 16 , 10484 (2025). URL https://www.nature.com/ articles/s41467-025-65496-3. 18

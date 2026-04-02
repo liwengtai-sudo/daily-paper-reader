@@ -1,0 +1,684 @@
+Title: Towards The Implicit Bias on Multiclass Separable Data Under Norm Constraints
+
+URL Source: https://arxiv.org/pdf/2603.22824v1
+
+Published Time: Wed, 25 Mar 2026 00:47:30 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# Towards The Implicit Bias on Multiclass Separable Data under Norm Constraints 
+
+## Shengping Xie ∗
+
+## , Zekun Wu †
+
+## , Quan Chen ‡
+
+## , Kaixu Tang §
+
+## School of Mathematical Sciences, Peking University 
+
+Abstract 
+
+Implicit bias induced by gradient-based algorithms is essential to the generalization of overparame-terized models, yet its mechanisms can be subtle. This work leverages the Normalized Steepest Descent 
+
+(NSD) framework to investigate how optimization geometry shapes solutions on multiclass separable data. We introduce NucGD a geometry-aware optimizer designed to enforce low rank structures through nuclear norm constraints. Beyond the algorithm itself, we connect NucGD with emerging low-rank pro-jection methods, providing a unified perspective. To enable scalable training, we derive an efficient 
+
+SVD-free update rule via asynchronous power iteration. Furthermore, we empirically dissect the im-pact of stochastic optimization dynamics, characterizing how varying levels of gradient noise induced by mini-batch sampling and momentum modulate the convergence toward the expected maximum margin solutions. Our code is accessible at: 
+
+https://github.com/Tsokarsic/observing-the-implicit-bias-on-multiclass-seperable-data .
+
+# 1 Introduction 
+
+A key mystery in deep learning is how overparameterized models, such as neural networks, achieve strong generalization. Despite having the capacity to overfit, these models spontaneously learn simple representa-tions through gradient-based training. This behavior suggests the existence of an " implicit bias ", where the optimization algorithm itself favors low-complexity models. The phenomenon of implicit bias is currently best characterized within the context of unregularized Em-pirical Risk Minimization (ERM) on linearly separable data. Seminally, Soudry et al. [1] demonstrated that for linear models trained via Gradient Descent (GD) with exponential loss, the weight vector asymptotically converges to the direction of the maximum ℓ2 margin SVM solution. This foundational result was recently extended to the multiclass setting by Ravi et al. [2], confirming the universality of GD’s preference for margin maximization. 
+
+> ∗
+
+2300010702@stu.pku.edu.cn 
+
+> †
+
+2300010701@stu.pku.edu.cn 
+
+> ‡
+
+2300010617@stu.pku.edu.cn 
+
+> §
+
+2300012401@stu.pku.edu.cn 
+
+1
+
+> arXiv:2603.22824v1 [cs.LG] 24 Mar 2026
+
+However, modern large-scale model training relies heavily on adaptive gradient methods. Recent studies [3, 4] have revealed that optimizers like Adam and AdamW exhibit an implicit bias associated with the 
+
+ℓ∞ norm, converging to the maximum ℓ∞ margin solution. Furthermore, matrix-preconditioned methods typified by Muon [5] and SHAMPOO [6] have been interpreted as approximations of steepest descent under spectral norm constraints [7, 8]. To integrate these diverse findings, Fan et al. [9] proposed the Normalized Steepest Descent (NSD) framework, which models optimization updates as steepest descent steps constrained by a specific norm ball: 
+
+∆t := arg max 
+
+> ∥∆∥·≤γ
+
+⟨∇t, ∆⟩, xt+1 = xt − ∆t
+
+Theoretical analysis within this framework establishes that on multiclass separable data, the convergence di-rection aligns with the maximum margin solution corresponding to the specific norm. Furthermore, replacing the gradient ∇t with the momentum Mt does not alter the results. This paradigm of implicit bias analysis exhibits strong generality. Specifically, when performing steepest descent with the spectral norm constraint and replacing ∇t with momentum Mt, the corresponding optimizer is Muon. When the ℓ∞ norm is adopted as the constraint, it corresponds to SignGD, while Adam can be viewed as a smoothed version of SignGD [8]. This connection thus unifies the previously fragmented theoretical frameworks into a coherent narrative. 
+
+Contributions. Building on the previous research, our contributions contains two aspects: 
+
+• Proposed Optimizer with Low-Rank Implicit Bias 
+
+We propose NucGD a novel optimizer derived from nuclear norm constraints, and investigate its implicit bias towards the maximum nuclear norm margin solution, which naturally promotes parsimonious low-rank representations. Crucially, we establish a novel link between NucGD and popular low-rank gradient projection methods (e.g., Galore [10]), offering a unified theoretical justification for their efficacy. To make NucGD practical, we further derive an SVD-free implementation using asynchronous power iteration and discuss its asymptotic property. 
+
+• Analysis of Implicit Bias under Stochastic Optimization Dynamics. 
+
+We implement NSD algorithms for multiclass linear models under various geometric constraints( ℓ2, ℓ∞,spectral, nuclear), and dissect the effect of stochastic optimization dynamics, specifically focusing on gradient noise induced by mini-batch sampling and trajectory smoothing via momentum.Through these experiments, we empirically observe and verify the convergence behavior of implicit bias in multiclass classification scenarios. 22 Preliminaries 
+
+In this section, we mainly follow the setting used in [9]. 
+
+Multiclass linear model. Consider multiclass classification problem with training data x1, . . . , xn and labels y1, . . . , y n. Each data point xi ∈ Rd is a d-dimensional embedding space (denote data matrix 
+
+X = [ x1, . . . , xn]⊤ ∈ Rn×d), and each label yi ∈ [k] represents one of k classes. We assume each class contains at least one data point. The classifier fW : Rd → Rk is a linear model with weight matrix 
+
+W = [ w1, w2, · · · , wk]⊤ ∈ Rk×d. Each wi ∈ Rd denotes a linear model fi(x) = w⊤ 
+
+> i
+
+x of class i .We train the model using empirical cross entropy loss: 
+
+L(W ) := − 1
+
+n
+
+X
+
+> i∈[n]
+
+log ( Syi (W x i)) . (1) Where the softmax map is defined as: Sc(a) = 
+
+h exp( a[c])  
+
+> Pkc′=1 exp( a[c′])
+
+ikc=1 
+
+.
+
+Separable Data and Max Margin Solutions We define the SVM margin for a well-trained classifier to evaluate its robustness and generalization ability as follow: 
+
+m(W ) = min  
+
+> i∈[n],y ̸=yi
+
+(W x i[yi] − W x i[y]) = min  
+
+> i∈[n],y ̸=yi
+
+(w⊤ 
+
+> yi
+
+xi − w⊤ 
+
+> y
+
+xi)
+
+Then m(W ) ≥ 0 is equivalent to a correct classification of all data samples. To analyze the implicit regularization of optimization algorithms, we need to assume the data are linearly separable , so that we can further analyze its behavior after perfectly fit the training data: 
+
+∃W s.t. m(W ) > 0
+
+As the model is linear, if we let W ′ = cW ′ and c → +∞, we can reach m(W ) → +∞, however, we can evaluate the generalization properties for the weights with its relative margin computed by dividing its norm: 
+
+m.(W ) = m(W )
+
+∥W ∥.
+
+(2) Where ∥ · ∥ . can be replaced by any matrix norm. As ∥ · ∥ . is linear, this metric can reflect the the separability to the data of the direction of W . So We can intuitively reason that the higher m.(W ) is, the better generalization ability the model contains. However, since different norms capture distinct properties of the weight matrix, the optimal directions under different norms may not align. We define the max SVM margin solution under norm ∥ · ∥ . as follow: 
+
+W . = argmax  
+
+> ∥W∥.=1
+
+m(W ) (3) Here, we mainly focus on common norms such as Frobenius norm ∥W ∥F , ℓ∞ norm ∥W ∥max , spectral norm 
+
+∥W ∥2 and nuclear norm ∥W ∥∗
+
+Normalized Steepest Descent. We consider a family of optimization algorithms for an objective function 3f under a specific norm ∥·∥ . with an optional first-order momentum. At each training step, the algorithm first computes the gradient and accumulates it into the momentum state. However, instead of directly applying the momentum to the weights, the algorithm updates the parameters along the steepest descent direction of the momentum within a norm-constrained ball. 
+
+Gt = ∇f (xt),
+
+Mt = μMt−1 + (1 − μ)Gt,
+
+∆t = argmax 
+
+> ∥∆∥.≤γ
+
+⟨Mt, ∆⟩,
+
+xt+1 = xt − ∆t, (4) Where γ > 0 and μ ∈ [0 , 1) denotes the step size and the momentum weight, respectively. When μ = 0 and 
+
+f is linear, it is equivalent to do a steepest descent in the respective norm-constraint ball. The above framework contains a wide range of existing popular training algorithms for deep learning. Ac-cording to [9], the detailed information of each algorithm and their corresponding norm can be shown in Table 2. Method Norm Constraint Update ∆ Reference NGD Unit ∥ · ∥ 2-ball  
+
+> G
+> ∥G∥2
+
+Hazan et al. [11] NMD-GD M  
+
+> ∥M∥2
+
+Cutkosky and Mehta [12] SignGD Unit ∥ · ∥ max -ball sign (G) Bernstein et al. [13] Signum sign (M ) Bernstein et al. [13] Spectral-GD Unit ∥| · |∥ ∞-ball U V T Bernstein and Newhouse [14] Muon ˜U ˜V T Liu et al. [5] Table 1: Summary of existing algorithms under the framework of NSD under respective norm constraints. Here U, V, ˜U , ˜V are computed by the SVD decomposition of the gradient or momentum, and the algorithms listed above each group correspond to the momentum-free method. 
+
+Theoretical Analysis of Implicit Bias. Fan et al. [9] has presented a theoretical analysis on implicit bias for Normalized Steepest Algorithms (4) 
+
+Theorem 1. For multiclass linear model defined in equation (1) with separable data, under basic assump-tions, when the step size is taken of order p1/t , the relative margin of the weight matrix equation (2) follow the iterate of NSD will converge to the maximum relative margin: 
+
+m.(W .) − m.(WT ) ≤ O 
+
+ log TT 1/2
+
+
+
+4We can also imply the direction of the weight matrix also align well with the max margin solution in equation (3) under the corresponding norm. 
+
+lim 
+
+> t→∞
+
+Wt
+
+∥Wt∥.
+
+≈ W .
+
+# 3 NucGD : Normalized Steepest Descent Under Nuclear Norm 
+
+Theorem 1 motivates a promising strategy, indicating that NSD-type algorithms have the potential to induce solutions with favorable structural properties. By explicitly solving norm-constrained optimization problems, we can derive algorithms that steer the model towards the desired direction. Beyond the norms considered previously, The nuclear norm ∥A∥∗ of a matrix A ∈ Rm×n is the sum of its singular values: ∥A∥∗ = P 
+
+> i
+
+σi. As σi ≥ 0 by definition, ∥A∥∗ is also the L1 norm of its vector of singular values and it acts as the tightest convex surrogate of the matrix rank. Just as L1 regularization steers learning problems towards solutions with many zero entries, nuclear norm regularization steers matrix learning problems towards low-rank solutions with many zero singular values [15], which encourages low rank models. Low-rank models are known to capture the intrinsic global structure and latent relationships in data more faithfully, which in turn often leads to improved generalization performance in tasks . For this reason, nuclear norm regularization has seen widespread use in deep learning. However, explicitly adding nuclear norm as regularization term is computational costly, as computing the nuclear norm of a matrix requires full SVD decomposition which is impractical in large scale training. Meanwhile, relying on Theorem 1 and above analysis, NSD algorithms under nuclear norm potentially contains an implicit bias toward low rank models as it converge to the max margin solutions under nuclear norm for a linear model, therefore it is expected to play the similar role as explicit low rank regularization. To further validate this observation,we visualized the detailed information of the max margin solutions under nuclear norm and the previous norms appeared in Table 1 in Figure 1 2. From Figure 1, though the direction of different solutions are relatively similar, the nuclear norm max-margin solution demonstrated a much better low-rankness compared to other solutions with 4 of the spectrum close to 0. Previous verification reflects the deriving of NSD under nuclear norm is of value. To formulate the NucGD Algorithm, Theorem 2 provides us a theoretical approach to compute the steepest descent update direction. 
+
+Theorem 2. Consider a matrix M ∈ Rk×d with its Singular Value Decomposition (SVD) given by M =
+
+> min {k,d }
+
+X
+
+> i=1
+
+σiuiv⊤ 
+
+> i
+
+. Here, σ1 ≥ σ2 ≥ · · · ≥ 0 are the singular values, and ui ∈ Rk, vi ∈ Rd denote the corresponding orthogonal and unit left and right singular vectors, respectively. Then we have: 
+
+γu 1v⊤ 
+
+> 1
+
+∈ arg max 
+
+> ∆∈Rk×d,∥∆∥∗≤γ
+
+⟨M , ∆⟩
+
+5(a) correlation between different matrix (b) spectrum of each matrix 
+
+Figure 1: Correlations and spectrum for max margin solutions under different norm 
+
+Figure 2: The Weight Heatmap of max margin solutions under different norm 
+
+Proof. By duality of nuclear norm and spectral norm: 
+
+⟨M , ∆⟩ ≤ ∥| M |∥ ∞ · ∥ ∆∥∗ = σ1 · ∥ ∆∥∗ ≤ σ1γ. 
+
+For ∆∗ = γu 1v⊤ 
+
+> 1
+
+, we have ∥∆∗∥∗ = γ ·∥ u1v⊤ 
+
+> 1
+
+∥∗ = γ and ⟨M , ∆∗⟩ = γtr (M ⊤u1v⊤ 
+
+> 1
+
+) = γσ 1∥u1∥2∥v1∥2 = γσ 1,so we finished the proof. Furthermore, if σ1 > σ 2, γu 1vT 
+
+> 1
+
+is the unique solution. By Theorem 2, we can introduce the update rule of NucGD in Algorithm 1. 
+
+NucGD as low rank projections : though the analytic iteration of NucGD requires full SVD decomposition, we can rewrite the computation of steepest descent direction by following observation: 
+
+Remark 1. For matrix M ∈ Rk×d with its SVD decomposition M =
+
+> min {k,d }
+
+X
+
+> i=1
+
+σiuiv⊤ 
+
+> i
+
+, we have: 
+
+u1v⊤ 
+
+> 1
+
+= u1u⊤ 
+
+> 1
+
+M
+
+∥u⊤ 
+
+> 1
+
+M ∥2
+
+Proof. Easy to compute u1u⊤ 
+
+> 1
+
+M = σ1u1u⊤ 
+
+> 1
+
+u1v⊤ 
+
+> 1
+
+= σ1u⊤ 
+
+> 1
+
+v1, ∥u⊤ 
+
+> 1
+
+M ∥ = σ1∥u1u⊤ 
+
+> 1
+
+v⊤ 
+
+> 1
+
+∥ = σ1∥v⊤ 
+
+> 1
+
+∥ = σ1.6Algorithm 1 NucGD (Analytic view) 
+
+Require: stepsize γ; momentum parameter 0 ≤ μ < 1.
+
+Initialize: initial weight W0 ∈ Rk×d, momentum M−1 = 0 k×d.
+
+for t = 0 , . . . , T − 1 do 
+
+Gt ← ∇f (Wt)
+
+Mt ← μMt−1 + (1 − μ)Gt
+
+Ut, Σt, Vt ← SVD (Mt)
+
+∆t ← γUt[: , 1] Vt[1 , :] 
+
+Wt+1 ← Wt − ∆t
+
+return {Wt}Tt=0 
+
+Algorithm 2 NucGD with Power Iteration 
+
+Require: stepsize γ; momentum parameter 0 ≤ μ < 1.
+
+Initialize: initial weight W0 ∈ Rk×d, momentum M−1 = Ok×d. Initial projection vector p−1 ∼ N (0 , I k)
+
+for t = 0 , . . . , T − 1 do 
+
+Gt ← ∇f (Wt)
+
+Mt ← μMt−1 + (1 − μ)Gt
+
+pt ← MtM ⊤ 
+
+> t
+
+pt−1/∥MtM ⊤ 
+
+> t
+
+pt−1∥2 ▷ Do single step power iteration based on previous pt−1
+
+∆t ← γptp⊤ 
+
+> t
+
+Mt/∥p⊤ 
+
+> t
+
+Mt∥2 ▷ Compute update direction based on Remark 1
+
+Wt+1 ← Wt − ∆t
+
+return {Wt}Tt=0 
+
+By remark 1, the implementation of NucGD only rely on the computation of its principle singular vector, which is also the principal eigenvector of matrix N = M M ⊤.To estimate the dominant eigenvector of a matrix, power iteration is a widely used method featuring high computational efficiency and fast conver-gence. By successive matrix-vector multiplications and vector normalization, it can yield highly accurate dominant eigenvectors with minimal computational cost. We rely on the strategies used in [16], as momentum in adjacent steps usually have a high degree of similarity, we can use the estimated eigenvector of the previous step as a initialization of power iteration at current step, and further reduce the number of power iteration steps at every training step. Algorithm 2 presents an efficient implementation NucGD by doing one power iteration steps per training step rely on the historical estimations asynchronously. Furthermore, we establish a convergence result, stating that in practical conditions, the power iteration direction will converge to the exact descent direction of NucGD . The details are in Appendix B. 74 Experiments 
+
+We verify the theoretical predictions of the NSD framework by reproducing the baseline results of Fan et al. [9] (see Appendix A for details).In this section, we focus on the analysis to extending settings. 
+
+Experimental setup. We generate a synthetic multiclass dataset by first sampling k class centers {cy }ky=1 
+
+i.i.d. from a standard normal distribution, and then sampling nper class points per class from N (cy , σ 2Id). In all experiments, we use k = 15 classes, feature dimension d = 25 , nper class = 50 (thus n = 750 ), noise level 
+
+σ = 0 .1, and random seed 12344 . We verify linear separability by solving the entrywise ℓ∞ norm multiclass SVM feasibility problem. We use a k-class linear classifier fW (x) = W x (no bias) trained with cross-entropy loss. Four optimizers (SignGD, NGD, Muon, NucGD) are evaluated. Weights are initialized with the zero initialization.The theretical maximum margin solution is solved by cvxpy .
+
+Metrics. To quantify the implicit bias and convergence quality, we mainly employ two key metrics to compare the learned weight W (produced by the optimizer at step T ) against the theoretical maximum margin solution W ∗ defined in Equation (3): (i) Correlation: We treat the weights as vectors in the parameter space and utilize the cosine similarity based on the Frobenius norm: Corr (W , W ∗) = ⟨W , W ∗⟩∥W ∥F ∥W ∗∥F
+
+,
+
+where ⟨· , ·⟩ denotes the standard Euclidean inner product. (ii) Margin error: The normalized maximum margin according to Equation (2) is: 
+
+m∥·∥ · (W ) = m(W )
+
+∥W ∥·
+
+, where m(W ) = min 
+
+> i
+
+
+
+W ⊤ 
+
+> yi
+
+xi − max  
+
+> j̸=yi
+
+W ⊤ 
+
+> j
+
+xi
+
+
+
+.
+
+We can define the relative margin error corresponding to the specific norm ∥ · ∥ · as 
+
+ϵ∥·∥ · (W ) = | m∥·∥ · (W ) − m∥·∥ · (W ∗) |
+
+m∥·∥ · (W ∗)
+
+## 4.1 Experiments of NucGD 
+
+We empirically investigate NucGD , and compare it with other NSD variants induced by ℓ2, ℓ∞, and spectral norms. The goal of these experiments is to verify (from optimization trajectories and solution structure) that the learned classifier follows the implicit-bias prediction: the algorithm tends to approach the max-margin direction associated with its underlying norm geometry, and the induced geometry leaves a visible footprint on the singular-value spectrum of the learned weight matrix. 
+
+Results (from Fig. 3). (a) Max-margin spectra. The singular-value spectra of max-margin solutions under different norms show qualitatively distinct structures: the nuclear norm max-margin solution exhibits 8a pronounced spectral collapse in the tail, with several trailing singular values dropping close to numerical zero, indicating a substantially smaller effective rank than the alternatives. In contrast, the max-margin solutions under ℓ2/ℓ ∞/spectral-type constraints keep a much flatter tail (without an equally sharp drop), suggesting comparatively higher-rank structure. 
+
+(b) Normalized-margin error along NucGD. The margin-error curves measured against different max-margin references reveal a clear ordering: the nuclear norm error Err ∗(t) decays the most and attains the smallest terminal gap, while errors against the ℓ2, spectral, and ℓ∞ max-margin directions level off at larger values. This indicates that the trajectory produced by NucGD is closest (in the normalized-margin sense) to the nuclear norm max-margin solution among the candidates considered. 
+
+(c) Alignment (correlations) along NucGD. Consistent with the margin-error view, the correlation curves show that NucGD achieves the highest alignment with the nuclear norm max-margin direction and maintains the largest terminal correlation. Alignments to ℓ2, spectral, and ℓ∞ references saturate strictly lower, indicating that NucGD is not merely approaching a generic max-margin direction but is selectively biased towards the nuclear norm one. 
+
+(d) Final NSD solution spectra across algorithms. Finally, comparing the singular-value spectra of the final solutions produced by different NSD algorithms, the NucGD solution displays the strongest suppression of small singular values (the sharpest decay in the tail), which matches the low-rank signature suggested by the nuclear max-margin spectrum in (a). Other NSD variants (e.g., spectral and ℓ∞) retain noticeably flatter tails, reflecting different structural biases. 
+
+Mechanistic interpretation (norm geometry ⇒ low-rank updates). The above patterns can be explained directly from the geometry of steepest descent under the nuclear norm. For a gradient matrix 
+
+Gt = ∇L(Wt), the NSD direction under ∥ · ∥ ∗ solves( here we assume the maximum singular value of Gt is single): 
+
+∆t ∈ arg min  
+
+> ∥∆∥∗≤1
+
+⟨Gt, ∆⟩ ⇐⇒ ∆t = − u1v⊤ 
+
+> 1
+
+,
+
+where u1, v 1 are the top left/right singular vectors of Gt (Theorem 2). Thus, each NucGD step is driven predominantly by a rank-one outer product aligned with the leading singular mode of the gradient. Accumu-lating such updates naturally concentrates mass on a small number of dominant singular directions, which provides a principled explanation for (i) the rapid emergence of spectral tail collapse and (ii) the preferential alignment with the nuclear norm max-margin direction observed in (b)–(c). Importantly, this mechanism is specific to the nuclear/spectral dual pair and does not hold for ℓ2 or entrywise ℓ∞ geometries, hence the distinct spectra and alignment behavior across different NSD algorithms. 9(a) Max-margin spectra (b) Margin error (NucGD) (c) Correlations (NucGD) 
+
+> (d) NSD solution spectra
+
+Figure 3: NucGD experiments: (a) singular value spectra of max-margin solutions under different norms; (b) normalized-margin error along NucGD measured against different max-margin references; (c) correlations between NucGD iterates and different max-margin directions; (d) singular value spectra of final solutions produced by different NSD algorithms. 
+
+## 4.2 Experiments under Stochastic Settings 
+
+In this section, we study the impact of gradient noise on implicit bias. Specifically, we examine the effects of varying the mini-batch size B and the momentum weight μ.For a fixed dataset, the mini-batch gradient ˆGt = 1
+
+> B
+
+P 
+
+> i∈B t
+
+∇ℓi(Wt) serves as a stochastic estimator of the full gradient, whose variance typically decreases as B increases (roughly ∝ 1/B ). Therefore, smaller batch sizes correspond to higher gradient noise, while larger batch sizes lead to dynamics closer to full-batch training. In (4), we introduce a parameter Mt to record the accumulated history information of first momentum, and mixture it with current gradient Gt with weight μ. Under a stochastic setting, adding momentum can filter high frequency noise, which accelerate the gradient descent algorithm efficiently.Therefore, smaller momentum weights correspond to higher gradient noise. Two experiments are implemented: 
+
+(a) We evaluate different batch sizes B ∈ { 1, 5, 50 , 250 , 750 }, while keeping other hyperparameters fixed. 
+
+(b) We evaluate different coefficients μ for both full-batch and mini-batch gradients. Note that the range of 
+
+μ is adapted to each setting to ensure numerical stability. 
+
+Results of (a). Figures 4 visualize how the final alignment (correlation) and the normalized margin vary with the batch size. Overall, the impact of noise is optimizer-dependent: (i) for Muon , the smallest batch size B = 1 leads to unstable optimization (low accuracy and negative normalized margin), while moderate/larger batch sizes recover perfect classification and strong alignment; (ii) for NGD , larger batch sizes (less noise) consistently improve both the final normalized margin and correlation; (iii) for NucGD , smaller batch sizes yield higher correlation, suggesting that a certain level of noise can 10 promote alignment with the max-margin direction for this optimizer; (iv) for SignGD , the best correlation is attained at a small batch size ( B = 5 ), and then slightly decreases as B increases.       
+
+> (a) Margin error of Muon (b) Margin error of NGD (c) Margin error of NucGD (d) Margin error of SignGD
+> (e) Correlation of Muon (f) Correlation of NGD (g) Correlation of NucGD (h) Correletion of SignGD
+
+Figure 4: Effect of noise controlled by batch size B
+
+Results of (b). Figures 5 depict the variations in correlation and normalized margin with respect to the momentum weight μ with B = 50 . The results show that increasing μ significantly impacts the implicit bias: it leads to a lower normalized margin bγ while increasing the correlation. 11 (a) Margin errer of Muon (b) Margin errer of NGD (c) Margin errer of NucGD (d) Margin errer of SignGD    
+
+> (e) Correlation of Muon (f) Correlation of NGD (g) Correlation of NucGD (h) Coffelation of SignGD
+
+Figure 5: Effect of momentum weight μ, mini-batch training This phenomenon is exclusive to the mini-batch setting. In Figure 6, we visualize the performance with different μ under full-batch gradient descent and observe that the impact is negligible: the implicit bias is significant under all levels of μ. This suggests that μ influences implicit bias primarily by modulating gradient noise; consequently, in the absence of noise (full-batch), its effect diminishes.        
+
+> (a) Muon: bγ(b) NGD: bγ(c) NucGD: bγ(d) SignGD: bγ
+
+Figure 6: Effect of momentum weight μ, full-batch training 12 5 Conclusion and Future Work 
+
+In this work, we studied the implicit bias of gradient-based optimization algorithms for multiclass linear classification on separable data through the lens of the Normalized Steepest Descent (NSD) framework, and further investigated the effect of gradient noise induced by mini-batch sampling and momentum. Building on the theoretical analysis of Fan et al. [9], we unified a broad class of optimization meth-ods—including NGD, SignGD, and matrix-preconditioned methods such as Muon—by interpreting them as steepest descent under different norm constraints. Under this unified view, we empirically verified that NSD algorithms converge in direction to the corresponding norm-induced maximum-margin solutions. Motivated by the benefits of low-rank structure, we extended the NSD framework to the nuclear norm set-ting and proposed a new algorithm, NucGD . By exploiting the duality between the nuclear and spectral norms, we showed that NucGD updates along the leading singular directions of the momentum matrix. To avoid the computational cost of full SVD, we further derived an efficient implementation based on asynchronous power iteration. Extensive experiments demonstrate that NucGD exhibits a clear implicit bias toward the maximum nu-clear norm margin solution. Compared with NSD variants under ℓ2, ℓ∞, and spectral norms, NucGD achieves stronger alignment with the nuclear norm max-margin direction and produces solutions with significantly enhanced low-rank structure. These results indicate that NucGD can effectively recover the benefits of nuclear norm regularization through implicit optimization dynamics. Overall, our work extends implicit bias anal-ysis to nuclear norm geometries and provides both theoretical and empirical support for low-rank–oriented normalized steepest descent. As future work, it would be natural to extend the analysis of NucGD beyond linear models to deep architectures and get more substantial generalization results. Meanwhile, as NucGD has similar update logic with normalized subspace optimizers such as [10], a theoretical convergence guarantee under basic stochastic non-convex setting is also expected, which may better characterize its convergence rate and rank dynamics in stochastic settings. Empirically, exploring tighter connections between NucGD and practical low-rank training techniques, such as parameter-efficient fine-tuning and communication-efficient algorithms in distributed learning also presents a promising direction. 13 References 
+
+[1] Daniel Soudry, Elad Hoffer, Mor Shpigel Nacson, Suriya Gunasekar, and Nathan Srebro. The implicit bias of gradient descent on separable data. Journal of Machine Learning Research , 19(70):1–57, 2018. [2] Hrithik Ravi, Clay Scott, Daniel Soudry, and Yutong Wang. The implicit bias of gradient descent on separable multiclass data. Advances in Neural Information Processing Systems , 37:81324–81359, 2024. [3] Chenyang Zhang, Difan Zou, and Yuan Cao. The implicit bias of adam on separable data. Advances in Neural Information Processing Systems , 37:23988–24021, 2024. [4] Shuo Xie and Zhiyuan Li. Implicit bias of adamw. arXiv preprint arXiv:2404.04454 , 2024. [5] Jingyuan Liu, Jianlin Su, Xingcheng Yao, Zhejun Jiang, Guokun Lai, Yulun Du, Yidao Qin, Weixin Xu, Enzhe Lu, Junjie Yan, et al. Muon is scalable for llm training. arXiv preprint arXiv:2502.16982 ,2025. [6] Vineet Gupta, Tomer Koren, and Yoram Singer. Shampoo: Preconditioned stochastic tensor optimiza-tion. In International Conference on Machine Learning , pages 1842–1850. PMLR, 2018. [7] Artem Riabinin, Egor Shulgin, Kaja Gruntkowska, and Peter Richtárik. Gluon: Making muon & scion great again!(bridging theory and practice of lmo-based optimizers for llms). arXiv preprint arXiv:2505.13416 , 2025. [8] Tim Tsz-Kit Lau, Qi Long, and Weijie Su. Polargrad: A class of matrix-gradient optimizers from a unifying preconditioning perspective. arXiv preprint arXiv:2505.21799 , 2025. [9] Chen Fan, Mark Schmidt, and Christos Thrampoulidis. Implicit bias of spectral descent and muon on multiclass separable data. arXiv preprint arXiv:2502.04664 , 2025. [10] Jiawei Zhao, Zhenyu Zhang, Beidi Chen, Zhangyang Wang, Anima Anandkumar, and Yuandong Tian. Galore: Memory-efficient llm training by gradient low-rank projection. arXiv preprint arXiv:2403.03507 , 2024. [11] Elad Hazan, Kfir Levy, and Shai Shalev-Shwartz. Beyond convexity: Stochastic quasi-convex optimiza-tion. Advances in neural information processing systems , 28, 2015. [12] Ashok Cutkosky and Harsh Mehta. Momentum improves normalized sgd. In International conference on machine learning , pages 2260–2268. PMLR, 2020. [13] Jeremy Bernstein, Yu-Xiang Wang, Kamyar Azizzadenesheli, and Animashree Anandkumar. signsgd: Compressed optimisation for non-convex problems. In International conference on machine learning ,pages 560–569. PMLR, 2018. [14] Jeremy Bernstein and Laker Newhouse. Old optimizer, new norm: An anthology. arXiv preprint arXiv:2409.20325 , 2024. [15] Christopher Scarvelis and Justin M Solomon. Nuclear norm regularization for deep learning. Advances in Neural Information Processing Systems , 37:116223–116253, 2024. [16] Thijs Vogels, Sai Praneeth Karimireddy, and Martin Jaggi. Powersgd: Practical low-rank gradient compression for distributed optimization. Advances in Neural Information Processing Systems , 32, 2019. 14 Appendix A Reproduction 
+
+We reproduce the implicit bias reported by Fan et al. [9]( NucGD added). The concise results are as follows, corresponding well with the normalized steepest descent framework. 
+
+Figure 7: Correlation between GD based solution and optimal solution corresponding to specific norm 
+
+Figure 8: Margin error between GD based solution and optimal solution corresponding to specific norm 
+
+# B Convergence Analysis of Power Iteration Direction 
+
+Consider the algorithm proposed in 2, where we perform a single step of power iteration during each gradient update: pt = MtM Tt pt−1   
+
+> ∥MtMTtpt−1∥
+
+. Intuitively, the gap between the exact principal left singular vector ut and the 
+
+empirical principal left singular vector pt will vanish when the algorithm converges. Here we establish a theoretical guarantee for this intuition. We use the tangent of the angle (denoted by ∠(·, ·)) to measure the discrepancy between two unit vectors. Without loss of generality, we assume ∠(ut, u t−1), ∠(ut, p t) ∈ [0 , π 
+
+> 2
+
+]. The assumptions are stated below: 1. lim t→∞ tan ∠(ut−1, u t) = 0 . (Vanishing Drift )15 2. The ratio σ2(Mt) 
+
+> σ1(Mt)
+
+≤ ρ < 1 holds uniformly for all t, where σ1(Mt) and σ2(Mt) are the first and second singular values of Mt, and ρ is a constant. (Uniform Spectral Gap )3. lim inf t→∞ tan ∠(pt, u t) < ∞.First, we prove a lemma stating the contraction property of the power iteration step: 
+
+Lemma 1. Under Assumption 2, tan ∠(pt, u t) ≤ ρ2 tan ∠(pt−1, u t), ∀t ≥ 1.
+
+Proof. Let σ1 ≥ σ2 ≥ · · · ≥ σmin {k,d } ≥ 0 be the singular values of Mt. Then the eigenvalues of Nt = MtM Tt
+
+are λi = σ2 
+
+> i
+
+for i ≤ min {k, d } or λi = 0 otherwise. We decompose the vector pt−1 in the basis of the eigenvectors {u(i) 
+
+> t
+
+}ki=1 of Nt:
+
+pt−1 = c1u(1)  
+
+> t
+
++
+
+> k
+
+X
+
+> i=2
+
+ciu(i) 
+
+> t
+
+,
+
+where u(i) 
+
+> t
+
+are eigenvectors corresponding to λi for i ≥ 2 and u(1)  
+
+> t
+
+= ut. When c1 = 0 , the inequality holds trivially (assuming the angle is π/ 2, or treating tangent as infinity). For c1̸ = 0 , we have: 
+
+tan ∠(pt−1, u t) = 
+
+qPki=2 c2
+
+> i
+
+|c1| .
+
+Thus Ntpt−1 = c1λ1u(1)  
+
+> t
+
++ Pki=2 ciλiu(i) 
+
+> t
+
+. The tangent of the new angle is: 
+
+tan ∠(pt, u t) = 
+
+qPki=2 c2 
+
+> i
+
+λ2
+
+> i
+
+|c1|λ1
+
+.
+
+Applying 
+
+qPki=2 c2 
+
+> i
+
+λ2 
+
+> i
+
+≤ λ2
+
+qPki=2 c2 
+
+> i
+
+, we obtain: 
+
+tan ∠(pt, u t) ≤ λ2
+
+λ1
+
+qPki=2 c2
+
+> i
+
+|c1| = σ22
+
+σ21
+
+tan ∠(pt−1, u t) ≤ ρ2 tan ∠(pt−1, u t).
+
+Theorem 3. Under Assumptions 1–3, we have lim t→∞ ⟨pt, u t⟩ = 1 .
+
+Proof. Denote δt = tan ∠(ut, u t−1) and et = tan ∠(pt, u t).Choose a constant N > 0 such that for all t ≥ N , δt ≤ min { K(1 −ρ2) 
+
+> K2+ρ2
+
+, 1−ρ2 
+
+> 1+ ρ2
+
+} (by Assumption 1). Take a finite upper bound K > lim inf t→∞ et and find T > N with eT < K (by Assumption 3). Consider the angle between the previous estimate pT −1 and the current true eigenvector uT . By the triangle inequality for angles: 
+
+∠(pT −1, u T ) ≤ ∠(pT −1, u T −1) + ∠(uT −1, u T ). (1) Since δtet ≤ K2(1 −ρ2) 
+
+> K2+ρ2
+
+< 1, implying the sum of angles is less than π/ 2, we can apply the tangent function to (1) and combine it with the Lemma: 
+
+eT ≤ ρ2 tan ∠(pT −1, u T ) ≤ ρ2 δT + eT −1
+
+1 − δT eT −1
+
+< ρ 2 δT + K
+
+1 − Kδ T
+
+≤ K. (2) 16 By induction, we can prove et < K for all t ≥ T . Consequently, the following contraction property holds: 
+
+et ≤ ρ2 et−1 + δt
+
+1 − δtet−1
+
+≤ ρ2
+
+1 − Kδ t
+
+(et−1 + δt) ≤ ρ(et−1 + δt) for all t ≥ T. (3) Applying the inequality recursively and using Assumption 1, we get: 
+
+eT +k ≤ ρkeT +
+
+> k−1
+
+X
+
+> i=0
+
+ρk−iδT +i+1 ≤ ρkeT + ρ
+
+1 − ρ sup 
+
+> t>T
+
+δt → 0 as k → ∞ .
+
+This concludes the proof. 
+
+Remark 2. Assumptions 1 and 2 are practical in training, and their geometric insight is valid. Assumption 3 essentially requires that the estimate does not become orthogonal to the true vector infinitely often. In practice, one might employ a Random Restart strategy: restart pt+1 ∼ N (0 , I k) if the norm of the projected vector collapses, which helps avoid trivial solutions and satisfy Assumption 3 almost surely. 
+
+17
