@@ -1,0 +1,354 @@
+Title: Interpretable Multiple Myeloma Prognosis with Observational Medical Outcomes Partnership Data
+
+URL Source: https://arxiv.org/pdf/2603.20341v1
+
+Published Time: Tue, 24 Mar 2026 00:05:39 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+# Interpretable Multiple Myeloma Prognosis with Observational Medical Outcomes Partnership Data 
+
+Salma Rachidi 
+
+Aalto University Dept. of Computer Science 
+
+Espoo, Finland 0009-0002-5132-485X 
+
+Aso Bozorgpanah 
+
+Aalto University Dept. of Computer Science 
+
+Espoo, Finland 0009-0007-1502-0927 
+
+Eric Fey 
+
+Helsinki University Hospital 
+
+Helsinki, Finland 0009-0005-7847-7479 
+
+Alexander Jung 
+
+Aalto University Dept. of Computer Science 
+
+Espoo, Finland 0000-0001-7538-0990 
+
+Abstract —Machine learning (ML) promises better clinical decision-making, yet opaque model behavior limits the adoption in healthcare. We propose two novel regularization techniques for ensuring the interpretability of ML models trained on real-world data. In particular, we consider the prediction of five-year survival for multiple myeloma patients using clinical data from Helsinki University Hospital. To ensure the interpretability of the trained models, we use two alternative constructions for a penalty term used for regularization. The first one penalizes deviations from the predictions obtained from an interpretable logistic regression method with two manually chosen features. The second construction requires consistency of model predic-tions with the revised international staging system (R-ISS). We verify the usefulness of the proposed regularization techniques in numerical experiments using data from 812 patients. They achieve an accuracy up to 0.721 on a test set and SHAP values show that the models rely on the selected important features. 
+
+Index Terms —interpretable ML, survival prediction, clinical ML, mulitple myeloma. 
+
+I. I NTRODUCTION 
+
+Machine learning (ML) methods have increasing potential to support clinical decision making [1]. In healthcare applica-tions, predictive accuracy alone is insufficient: ML systems must also be interpretable to enable trustworthy decision making [2]. While expressive ML models can capture complex dependencies in clinical data, they often operate as black boxes, making their predictions difficult to justify and validate clinically [3]. Most existing approaches address interpretability using post-hoc explanation methods, such as feature attribution [4], [5]. Although useful for model analysis, these techniques do not influence the training process [6] and provide no guarantees that the learned decision function is clinically meaningful or stable. Multiple myeloma (MM) is a malignancy of plasma cells that predominantly affects older patients, and survival out-comes depend on a heterogeneous set of clinical variables, in-cluding laboratory measurements, staging scores, cytogenetic markers, and treatment-related factors [7]. In this work, we adopt a training-time approach to inter-pretability by explicitly incorporating clinically motivated con-
+
+This work was partially supported by the Research Council of Finland under grants 349966, 363624, the Jane and Aatos Erkko Foundation under grant A835. 
+
+straints into the learning objective of models predicting prog-nosis of MM patients. This perspective builds on our recent work on explainable empirical risk minimization (EERM), which formalizes interpretability as a regularization term in the training objective [8]. We construct regularizers that penalize deviations from desired interpretable behavior, thereby shaping the optimization landscape so that the resulting models are interpretable by design. 
+
+Contributions. This paper makes two main contributions.  
+
+> •
+
+We propose two training-time regularizers for inter-pretability. The first aligns a flexible neural network with an auxiliary, intrinsically interpretable model trained on clinically selected features. The second enforces stage-consistent predictions based on the Revised International Staging System (R-ISS) [9], embedding established clin-ical risk stratification directly into the learning objective.  
+
+> •
+
+We apply the proposed regularization framework to real-world MM data extracted from an Observational Medical Outcomes Partnership (OMOP) Common Data Model (CDM) database at Helsinki University Hospital (HUS) [10], demonstrating that interpretable-by-design models can achieve competitive predictive performance while exhibiting clinically coherent behavior. 
+
+Related work. Several studies have applied machine learn-ing to survival prediction in MM, using different ML models such as logistic regression, random forests, and gradient-boosted trees [11]–[13]. Interpretability in these works is typically addressed using post-hoc explanation methods such as SHAP or permutation-based feature importance. In contrast, our approach incorporates interpretability directly into the training objective via explicit regularization, yielding models that are interpretable by design. II. P ROBLEM SETTING 
+
+We consider the problem of predicting five-year survival for patients diagnosed with MM using routinely collected clinical data. Each patient is represented by a feature vector comprising demographic information and laboratory measurements, and the prediction target is a binary label indicating whether the patient died within five years from diagnosis. 
+
+Simple models as auxiliary structure. Simple and intrinsi-cally interpretable models, such as logistic regression models 
+
+> arXiv:2603.20341v1 [cs.LG] 20 Mar 2026
+
+trained on a small number of carefully selected features, are often used in clinical practice as baseline risk predictors [14]. While such models may be limited in expressive power, they provide transparent and clinically plausible decision rules. In this work, we treat the predictions of such interpretable models as auxiliary signals that encode domain knowledge. These signals are not used as final predictors, but rather to guide the training of more expressive models through explicit regularization. 
+
+Clinical staging as domain structure. Prognosis in MM is commonly stratified using the Revised International Stag-ing System (R-ISS), which combines beta-2 microglobulin (B2M), albumin, lactate dehydrogenase (LDH), and cytoge-netic abnormalities to define three clinically meaningful risk stages [9]. Patients assigned to the same stage are expected to exhibit broadly similar survival behavior. In this work, we exploit this clinically established structure as a source of domain knowledge for constructing interpretability-driven regularization terms that encourage clinically coherent model predictions. III. D ATASET 
+
+Data source. The data are extracted from a clinical database at Helsinki University Hospital (HUS) structured according to the OMOP CDM. This CDM was developed by the Ob-servational Health Data Sciences and Informatics (OHDSI) community to provide a standardized representation of clinical data and facilitate federated analysis across institutions [10]. 
+
+Cohort and prediction target. Each data point corresponds to a patient diagnosed with MM and treated at HUS. The prediction target (or label) is five-year survival from the date of diagnosis, represented as a binary label indicating whether the patient died within five years. Only patients with known 5-year survival (i.e. at least 5-year follow-up for censored patients) and available values for beta-2 microglobulin (B2M), albumin, and lactate dehydrogenase (LDH), the core components of the R-ISS, are included. 
+
+Features. The feature vector includes (i) age at diagnosis and (ii) biomarker values measured within a time window of −30 to +30 days from diagnosis, where the most recent available measurement within this window is used. The se-lected features reflect established prognostic factors in multiple myeloma as well as prior clinical and ML studies [9], [11], [15]–[17]. All patients have known age at diagnosis. Missing values in other features are imputed using the mean of the corresponding feature computed on the training data. A summary of the resulting dataset is provided in Table I. IV. M ETHODOLOGY 
+
+We study two constructions of regularizers that enforce interpretability of ML models directly during training. The proposed regularizers are model agnostic and can be com-bined with any hypothesis class trained via empirical risk minimization. Moreover, they are independent of the specific choice of loss function and can be used with a wide range of training objectives. In this work, we instantiate the approach TABLE I: Summary of the dataset                
+
+> Aspect Description
+> Data Points 812 myeloma patients treated at HUS who have known 5-year survival status and available values for albumin, LDH and B2M Features Age at diagnosis, 16 blood measurements (al-bumin, LDH, B2M, hemoglobin, platelets, crea-tinine, C reactive protein, alkaline phosphatase, free lambda light chains, free kappa light chains, leukocytes, protein, ionized calcium, im-munoglobulin A, immunoglobulin Gand im-munoglobulin M) and percentage of plasma cells in bone marrow Label Binary : 1 if the patient died within 5 years from diagnosis, 0 if the patient survived at least 5 years Data distribution 417 data points with label 1 and 395 with label 0 stage 1: 18/111 (16.2 % ) with label 1 stage 2: 325/595 (54.6 %) with label 1 stage 3: 74/106 (69.8 %) with label 1
+
+using artificial neural networks (ANNs) and the logistic loss to demonstrate compatibility with expressive, high-capacity models in a standard classification setting. In both constructions, we assume that a predictor for MM survival is learned. The first construction aligns the predictor with an auxiliary, intrinsically interpretable model for MM survival. The second construction enforces consistency of predictions within R-ISS stages. Given a labeled training set {(x(r), y (r))}mr=1 , we learn a predictor ˆh ∈ H by solving 
+
+ˆh ∈ arg min h∈H 
+
+ 1
+
+m
+
+> m
+
+X
+
+> r=1
+
+L
+
+
+
+h(x(r)), y (r)
+
++ α R(h)
+
+
+
+. (1) The main contribution of this work are two interpretability-driven constructions of a regularizer R(h).Note that our approach is agnostic to the choice of loss function L and model H used in (1). In our experiments we train an ANN using logistic loss [18, Ch. 3]. The regular-ization parameter α ≥ 0 in (1) controls the strength of the interpretability constraint: α = 0 means no interpretability requirement, while larger values of α increasingly enforce clinical interpretability. 
+
+A. Auxiliary Alignment Regularizer 
+
+The first regularizer R(AA) (h) leverages a simple, intrinsi-cally interpretable auxiliary model g. This auxiliary model is pre-trained and delivers a soft label g(x) ∈ (0 , 1) for a patient with features x. We can interpret g(x) as a risk score assigned by the auxiliary model to a patient with features x.The regularizer R(AA) (h) is then obtained by measuring the deviation between the predictions of the learned model h
+
+and the auxiliary model g on a given dataset D. In particular, we use the Kullback–Leibler (KL) divergence between the Bernoulli distributions induced by h(x) and g(x):
+
+R(AA) (h) = 1
+
+|D| 
+
+X
+
+> x∈D
+
+"bg(x) log 
+
+ bg(x)
+
+h(x)
+
+
+
++  1 − bg(x) log 
+
+ 1 − bg(x)1 − h(x)
+
+ #
+
+.
+
+(2) We stress that this construction can be applied to any model 
+
+h ∈ H and auxiliary model bg that deliver soft label values in 
+
+(0 , 1) . For example, g or h could be obtained from decision trees or random forests. In our experiments (see Section V), the auxiliary model bg
+
+is obtained from logistic regression trained on a small number features. To select these features, we perform an exhaustive search over all possible pairs of candidate features. The feature pair yielding the lowest validation loss is selected. 
+
+B. Stage-Consistency Regularizer 
+
+The second regularizer, denoted R(SC) (h), exploits clini-cally established R-ISS staging information. Each patient is assigned to a stage based on routinely available biomarkers using the procedure summarized in Algorithm 1, adapted to the absence of cytogenetic information in the available data [9], [19]. The thresholds for normal and elevated LDH values follow reference ranges used at HUS [20]. Let D(s) denote the subset of patients in the training set with stage s. The stage-consistency regularizer penalizes deviations of individual predictions from the mean outcome within each stage: 
+
+R(SC) (h) = 
+
+> S
+
+X
+
+> s=1
+
+1
+
+|D (s)|
+
+X
+
+> x∈D (s)
+
+ h(x) − μ(s)2,μ(s) = 1
+
+|D (s)|
+
+X
+
+> r:x(r)∈D (s)
+
+y(r). (3) Like R(AA) (h), also R(SC) (h) can be combined with any model h ∈ H .
+
+Algorithm 1 Staging with R-ISS  
+
+> 1:
+
+Input: B2M, LDH, albumin, and age of a patient.  
+
+> 2:
+
+if age < 70 then  
+
+> 3:
+
+high ldh ← (LDH > 235)  
+
+> 4:
+
+else  
+
+> 5:
+
+high ldh ← (LDH > 255)  
+
+> 6:
+
+end if  
+
+> 7:
+
+if B2M < 3.5 and albumin ≥ 35 and not high ldh then  
+
+> 8:
+
+stage ← 1 
+
+> 9:
+
+else if B2M ≥ 5.5 and high ldh then  
+
+> 10:
+
+stage ← 3 
+
+> 11:
+
+else  
+
+> 12:
+
+stage ← 2 
+
+> 13:
+
+end if  
+
+> 14:
+
+return stage 
+
+V. N UMERICAL EXPERIMENTS 
+
+Our numerical experiments evaluate whether the regular-izers introduced in Section IV can steer model training in a clinically meaningful way without degrading predictive performance. We study this trade-off in the MM five-year survival prediction task described in Section II. We first establish baseline performance, and then analyze how varying the regularization strength α in (1) affects predic-tive accuracy, AUC, loss decomposition, and feature attribution for both regularization strategies. 
+
+A. Data splits and evaluation protocol 
+
+The data points are randomly partitioned into three disjoint subsets: 1) D(aux) , consisting of 122 patient records, used exclu-sively to estimate the parameters of the auxiliary logistic regression model bg.2) D(kf) , consisting of 568 patient records, used for k-fold cross-validation, hyperparameter tuning, and training of the final ANN models H in (1). This dataset is also used to select the two features used for the auxiliary model bg
+
+with respect to its loss values using exhaustive search. 3) D(test) , consisting of 122 patient records, solely reserved for final performance and interpretability evaluation. Hyperparameters of the ANN architecture and optimizer are selected by minimizing the mean validation loss over the k
+
+folds using D(kf) with α = 0 . The final models are trained on these hyperparameters on different values of α, in regular intervals from 1 to 8. The high values of α compared to [19] are justified by the ratio between L and R for both regularization techniques. All reported metrics, SHAP analyses, figures, and tables are computed exclusively on D(test) , unless stated otherwise. This protocol ensures a strict separation between model selection, auxiliary supervision, and final evaluation. 
+
+B. Baselines 
+
+The selected features for the auxiliary logistic regression model are LDH and age. These are clinically significant features because older patients tend to have poorer survival statistics for many cancer types [21], including MM [9], and LDH is one of the biomarkers used for R-ISS. The baselines include the auxiliary logistic regression model, an ANN trained with the stage-based regularizer only, and the unregularized ANN ( α = 0 ). Table II reports accuracy and AUC for the three baseline models on both D(kf) and the independent test set D(test) .On D(test) , the auxiliary model achieves the highest perfor-mance, with accuracy 0.697 and AUC 0.696 , closely followed by the unregularized ANN. This indicates that a simple, clinically grounded model based on age and LDH already provides strong predictive signal. The stage-based baseline performs noticeably worse, suggesting that coarse stage-level supervision alone is insufficient to capture the full predictive structure of the data. TABLE II: Metrics on baselines                      
+
+> Auxiliary model Stage-based α= 0
+> Dataset Acc AUC Acc AUC Acc AUC
+> D(kf) 0.646 0.645 0.634 0.627 0.736 0.734
+> D(test) 0.697 0.696 0.631 0.621 0.689 0.686
+
+C. Auxiliary-alignment regularization 
+
+We first study the effect of the auxiliary-alignment reg-ularizer (2). Figure 1a shows the accuracy and AUC on 
+
+D(test) as functions of α. These predictive performance values are comparable to, and in some cases slightly better than, the unregularized baseline. This demonstrates that aligning the ANN with the auxiliary interpretable model does not substantially deteriorate predictive performance.     
+
+> 02468
+> 0.66
+> 0.68
+> 0.7
+> 0.72
+> α
+> Score
+
+Accuracy AUC        
+
+> (a) Accuracy and AUC on D(test) for ANNs trained on different values of α.
+> 02468
+> 0.2
+> 0.4
+> 0.6
+> α
+> Loss value
+
+Log loss 
+
+Reg term     
+
+> (b) Dependency of logistic loss (blue) and regularizer R(AA) (or-ange), evaluated on the test set D(test) , on the regularization param-eter α.
+
+Fig. 1: Comparison of scores and loss values with respect to 
+
+α for models using the auxiliary-alignment regularizer (2). Figure 1b shows the logistic loss L and regularizer value 
+
+R(AA) , evaluated on D(test) , obtained for the ANN trained via (1) for different values of α. As α increases, the regulariza-tion term R decreases monotonically, while the logistic loss 
+
+L increases gradually. The most pronounced change occurs between α = 0 and α = 1 , after which the trade-off stabilizes. This behavior confirms that the regularizer effectively enforces auxiliary alignment while preserving predictive performance over a wide range of α.Interpretability effects are summarized in Table III, which reports SHAP-based feature rankings for different values of 
+
+α. Even for small α, the regularizer shifts feature importance toward age and LDH, the two variables used in the auxiliary model bg and well-established clinical risk factors. In contrast, these features are ranked second and third in the unregularized ANN (using (1) with α = 0 ). TABLE III: Summary of SHAP value ranks for the auxiliary-alignment regularizer. The columns show which features were ranked 1st, 2nd or 3rd for each value of alpha according to the mean absolute Shapley values on D(test) . ’lambda’ and ’kappa’ correspond to the respective free light chains.                               
+
+> Rank 1st 2nd 3rd
+> α
+> 0lambda age LDH 1age LDH kappa 2age LDH albumin 3age LDH hemoglobin 4age LDH hemoglobin 5age LDH kappa 6age LDH hemoglobin 7age LDH kappa 8age LDH kappa
+
+D. Stage-consistency regularization 
+
+We next examine the stage-consistency regularizer (3). Figure 2a reports accuracy and AUC on D(test) as functions of α in (1). In contrast to the auxiliary-alignment case, predictive performance degrades steadily as α increases, with the exception of a small performance recovery around α = 2 .Overall, both accuracy and AUC remain below the unregular-ized baseline for most values of α.Figure 2b depicts the logistic loss L and regularizer value 
+
+R(SC) , evaluated on D(test) , obtained for the ANN trained via (3) for different values of α. As expected, increasing α reduces the regularization term R while increasing the logistic loss 
+
+L, with the largest change again occurring between α = 0 
+
+and α = 1 . The higher performance degradation compared to Figure 1b indicates that enforcing within-stage consistency imposes a stronger constraint (via (3)), compared to aligning with an auxiliary model (via (2)). Table IV summarizes SHAP-based feature rankings for the stage-consistency regularizer. As α increases, the model pro-gressively emphasizes LDH, albumin, and B2M—features di-rectly used in R-ISS staging. This confirms that the regularizer successfully injects the intended clinical structure. However, this emphasis comes at the cost of reduced sensitivity to within-stage heterogeneity, which likely explains the observed loss in predictive performance. VI. C ONCLUSION 
+
+We studied two interpretability-driven regularization strate-gies for five-year survival prediction in patients with MM. The results show that interpretability constraints can be in-corporated directly into model training without substantially degrading predictive performance, when the imposed structure aligns well with clinically meaningful notions of similar-ity. In particular, auxiliary-alignment regularization provides a favorable trade-off between predictive accuracy and in-terpretability, whereas coarser stage-based consistency con-straints reduce model flexibility and predictive performance. These findings highlight the importance of carefully selecting 0 2 4 6 8
+
+0.64 
+
+0.66 
+
+0.68 
+
+α
+
+> Score
+
+Accuracy 
+
+AUC 
+
+(a) Accuracy and AUC on D(test) for ANNs trained on different values of α.
+
+0 2 4 6 8
+
+0.2
+
+0.4
+
+0.6
+
+α
+
+> Loss value
+
+Log loss 
+
+Reg term 
+
+(b) Dependency of logistic loss (blue) and regularizer R(SC) (orange), evaluated on the test set D(test) , on the regularization parameter α.
+
+Fig. 2: Comparison of scores and loss values with respect to 
+
+α for models using the stage-consistency regularizer (3). TABLE IV: Summary of SHAP value ranks for the stage-consistency regularizer. The columns show the ranks of the features used in Algorithm 1 for each value of alpha according to the mean absolute Shapley values on D(test) .
+
+Feature LDH Albumin B2M Age 
+
+α
+
+0 3rd 5th 8th 2nd 1 1st 2nd 5th 3rd 2 1st 2nd 3rd 7th 3 1st 2nd 3rd 7th 4 1st 2nd 3rd 11th 5 1st 2nd 3rd 11th 6 1st 2nd 4th 12th 7 1st 2nd 3rd 11th 8 1st 2nd 3rd 9th 
+
+clinically grounded structures when designing interpretability-aware learning objectives. REFERENCES [1] Hanna MG, Pantanowitz L, Dash R, Harrison JH, Deebajah M, Pantanowitz J, Rashidi HH. Future of Artificial Intelli-gence—Machine Learning Trends in Pathology and Medicine. Mod Pathol. 2025;38(4):100705. doi:10.1016/j.modpat.2025.100705 [2] Ali S, Abuhmed T, El-Sappagh S, Muhammad K, Alonso-Moral JM, Confalonieri R, Guidotti R, Del Ser J,D´ ıaz-Rodr´ ıguez N, Herrera F. Explainable Artificial Intelligence (XAI): What we know and what is left to attain Trustworthy Artificial Intelligence. Information Fusion. 2023; 99:1566-2535. doi: https://doi.org/10.1016/j.inffus.2023.101805 [3] Amann J, Blasimme A, Vayena E, Frey D, Madai VI. Explainability for artificial intelligence in healthcare. BMC Medical Informatics and Decision Making. 2020; 20(1):1-9. [4] Ribeiro MT, Singh S. Guestrin C. Why should I trust you? Explaining the predictions of any classifier. Proc. 22nd ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining (KDD). 2016; 1135-1144. [5] Lundberg SM, Lee SI. A unified approach to interpreting model predic-tions. Advances in Neural Information Processing Systems (NeurIPS). 2017; 4765-4774. [6] Molnar C. Interpretable Machine Learning - A Guide for Making Black Box Models Explainable. 3rd ed. 2022. Available from https: //christophm.github.io/interpretable-ml-book/ [7] Abduh MS. An overview of multiple myeloma: A monoclonal plasma cell malignancy’s diagnosis, management, and treatment modalities. Saudi J Biol Sci. 2024;31(2):103920. doi:10.1016/j.sjbs.2023.103920. [8] Zhang L, Karakasidis G, Odnoblyudova A, Dogruel L, Tian Y, Jung A. Explainable empirical risk minimization. Neural Comput & Applic. 2024; 36:3983–96. doi: https://doi.org/10.1007/s00521-023-09269-3. [9] International Myeloma Foundation. International Staging System (ISS) and Revised ISS (R-ISS) [Internet]. International Myeloma Foundation; Reviewed 24 Aug 2021. Available from https: //www.myeloma.org/international-staging-system-iss-reivised-iss-r-iss (accessed on 23.10.2025) [10] Bergius K. Health Data Harmonization in Finland through the Observa-tional Medical Outcomes Partnership Common Data Model: Opportuni-ties for the Pharmaceutical Industry. Bachelor’s thesis, Aalto University, Espoo 2025. [11] Georgoula M. Application of Machine Learning methods to predict critical Multiple Myeloma events. Master’s thesis, National Technical University of Athens, Athens, 2024. [12] Belmonte JM, Blanquer M, Bernab´ e G, Jim´ enez F, Garc´ ıa JM. Survival risk prediction in hematopoietic stem cell transplantation for multiple myeloma. J Integr Bioinform. 2025;22(2):20240053. doi: https://doi.org/ 10.1515/jib-2024-0053 [13] Chen R, Garapati S, Wu D, Ko S, Falk S, Dierov D, Stasiw A, Opong AS, Carson KR. Machine Learning Based Predictive Model of 5-Year Survival in Multiple Myeloma Autologous Transplant Patients. Blood. 2019;134(1):2156. doi: https://doi.org/10.1182/blood-2019-129432 [14] Wolfrath N, Wolfrath J, Hu H, Banerjee A, Kothari AN. Stronger baseline models – a key requirement for aligning machine learning research with clinical utility. arXiv; September 2024. Available from: https://arxiv.org/abs/2409.12116v1 [15] Hanbali A, Hassanein M, Rasheed W, Aljurf M, Alsharif F. The Evolution of Prognostic Factors in Multiple Myeloma. Adv Hematol. 2017;2017:4812637. doi: https://doi.org/10.1155/2017/4812637 [16] Kim DS, Yu ES, Kang KW, et al. Myeloma prognostic index at diagnosis might be a prognostic marker in patients newly diagnosed with multiple myeloma. Korean J Intern Med. 2017;32(4):711-721. doi: https://doi. org/10.3904/kjim.2016.054 [17] Tan J, Liu JP, Yao XC, et al. Correlation between initial alkaline phosphatase levels and overall survival in newly diagnosed multiple myeloma patients. Transl Cancer Res. 2024;13(7):3328-3337. doi:10. 21037/tcr-24-330 [18] A. Jung, Machine Learning: The Basics , Springer, 2022. [19] Rachidi S. Explainable machine learning in cancer survival prediction — A case study of myeloma patients. Master’s thesis, Aalto University, Espoo 2025. [20] HUS. Laktaattidehydrogenaasi, plasmasta. HUS Diagnostiikkakeskus; Revised May 2025. Available from https://diagnostiikka.hus.fi/tutkimus? id=4526 (accessed on 23.10.2025) [21] Whitehead S. Cancer Survival in England Patients Diag-nosed: 2006-2010 and Followed up to 2011 [Internet]. Office for National Statistics; 23 Oct 2012. Available from https://www.ons.gov.uk/peoplepopulationandcommunity/ healthandsocialcare/conditionsanddiseases/bulletins/ cancersurvivalinenglandadultsdiagnosed/2012-10-23 (accessed on 23.10.2025)

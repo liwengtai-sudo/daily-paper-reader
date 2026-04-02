@@ -1,0 +1,653 @@
+Title: Brain-WM: Brain Glioblastoma World Model
+
+URL Source: https://arxiv.org/pdf/2603.07562v1
+
+Published Time: Tue, 10 Mar 2026 01:21:50 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+> 1
+
+# Brain-WM: Brain Glioblastoma World Model 
+
+Chenhui Wang, Boyun Zheng, Liuxin Bao, Zhihao Peng, Peter Y. M. Woo, Hongming Shan, Senior Member, IEEE , Yixuan Yuan, Senior Member, IEEE 
+
+Abstract — Precise prognostic modeling of glioblastoma (GBM) under varying treatment interventions is essen-tial for optimizing clinical outcomes. While generative AI has shown promise in simulating GBM evolution, exist-ing methods typically treat interventions as static condi-tional inputs rather than dynamic decision variables. Con-sequently, they fail to capture the complex, reciprocal in-terplay between tumor evolution and treatment response. To bridge this gap, we present Brain-WM, a pioneering brain GBM world model that unifies next-step treatment prediction and future MRI generation, thereby capturing the co-evolutionary dynamics between tumor and treatment. Specifically, Brain-WM encodes spatiotemporal dynamics into a shared latent space for joint autoregressive treatment prediction and flow-based future MRI generation. Then, instead of a conventional monolithic framework, Brain-WM adopts a novel Y-shaped Mixture-of-Transformers (MoT) ar-chitecture. This design structurally disentangles heteroge-neous objectives, successfully leveraging cross-task syn-ergies while preventing feature collapse. Finally, a syner-gistic multi-timepoint mask alignment objective explicitly anchors latent representations to anatomically grounded tumor structures and progression-aware semantics. Exten-sive validation on internal and external multi-institutional cohorts demonstrates the superiority of Brain-WM, achiev-ing 91.5% accuracy in treatment planning and SSIMs of 0.8524, 0.8581, and 0.8404 for FLAIR, T1CE, and T2W se-quences, respectively. Ultimately, Brain-WM offers a ro-bust clinical sandbox for optimizing patient healthcare. The source code is made available at https://github.com/ thibault-wch/Brain-GBM-world-model .
+
+Index Terms — Glioblastoma (GBM), World Model, Treat-ment, Magnetic Resonance Imaging (MRI) 
+
+I. I NTRODUCTION 
+
+Glioblastoma (GBM) is the most aggressive primary malig-nant brain tumor in adults, characterized by diffuse infiltration and a near-universal recurrence rate that results in a median survival of only 11–15 months [1], [2]. Although practical guidelines recommend maximal safe resection followed by 
+
+This work was supported by NSFC/RGC Joint Research Scheme N CUHK4126/25, Innovation and Technology Fund Mainland-Hong Kong Joint Funding Scheme MHP/173/24 (Corresponding authors: Yix-uan Yuan; Hongming Shan) C. Wang and H. Shan are with the Institute of Science and Technol-ogy for Brain-inspired Intelligence, Fudan University, Shanghai 200433, China (e-mail: chenhuiwang21@m.fudan.edu.cn; hmshan@ieee.org) B. Zheng, Z. Peng, and Y. Yuan are with the Department of Electronic Engineering, The Chinese University of Hong Kong, Hong Kong SAR, China (e-mail: byzheng@link.cuhk.edu.hk; zhihao.peng@cityu.edu.hk; yxyuan@ee.cuhk.edu.hk) L. Bao is with the School of Automation, Hangzhou Dianzi University, Hangzhou 310018, China (e-mail: lxbao@hdu.edu.cn). P. Woo is with the Department of Neurosurgery, Prince of Wales Hos-pital, Hong Kong, SAR, China (e-mail: peterwoo@surgery.cuhk.edu.hk) Timeline   
+
+> Demographics
+> Generate Future
+> MRI Images
+> Treatment
+> History
+> Current
+> MRI Images
+> Plan Next -step
+> Treatment
+> Simulate
+> Optimize Brain GBM
+> World Model
+
+Fig. 1. Conceptual overview of Brain-WM. Brain-WM establishes the first brain GBM world model by encoding spatiotemporal dynamics from treatment history, demographics, and multi-modal MRI to unify next-step clinical planning and future tumor morphology synthesis, thereby capturing the co-evolutionary dynamics between treatment and tumor. 
+
+chemoradiotherapy and adjuvant temozolomide, real-world adherence varies significantly [3]. Factors such as advanced age, frailty, and rapid progression often force deviations into heterogeneous second-line regimens or premature discontinu-ation. Consequently, patients with similar baseline character-istics or tumor molecular profiles often experience markedly divergent clinical trajectories, underscoring the critical need to model tumor evolution across varying treatment interventions. Current approaches to modeling GBM evolution broadly fall into two categories: analytical biophysical frameworks and data-driven generative models. Biophysical frameworks utilize mathematical equations to simulate tumor growth and tissue displacement based on known biological principles [4], [5]. While highly interpretable, these frameworks often struggle with extreme patient heterogeneity and require intensive man-ual parameter tuning [6]. Conversely, generative models have demonstrated significant potential to synthesize high-fidelity tumor growth patterns directly from longitudinal medical imaging [7]–[9]. Despite these gains, such models remain predominantly unidirectional and passive, treating interven-tions as static conditional inputs rather than dynamic variables. Consequently, they fail to capture the reciprocal feedback loop between tumor evolution and treatment response. To overcome these limitations, we introduce the first world model [10], [11] tailored for neuro-oncology, framing lon-gitudinal GBM progression as a continuous, interactive se-quence of clinical actions and pathological states. While world models excel in robotics and autonomous systems [12]– [14], their translation to the human brain presents unique challenges. First, a significant semantic gap exists between discrete, low-dimensional treatment planning and continuous, high-dimensional MRI generation. Naively entangling these 
+
+> arXiv:2603.07562v1 [cs.CV] 8 Mar 2026 2
+
+heterogeneous modalities inevitably triggers feature interfer-ence, disrupting the reciprocal feedback loop necessary for optimal clinical forecasting. Second, anatomical hallucina-tions frequently emerge during future MRI generation due to an absence of strict neuroanatomical constraints. To ensure biological plausibility, the model must transcend pixel-level optimization to explicitly capture the morphological character-istics of distinct GBM subregions, e.g. the peritumoral edema, enhancing tumor, and necrotic core. In this work, we introduce Brain-WM, a brain GBM world model designed to unify next-step treatment planning with future MRI generation, as illustrated in Fig. 1. Moving be-yond previous static paradigms, Brain-WM explicitly captures the co-evolutionary dynamics between tumor and treatment: predicted pathological trajectories inform treatment planning, while treatment decisions constrain the biological plausibil-ity of the simulated images. To address the aforementioned semantic gap, we bypass a conventional monolithic design in favor of an advanced Y-shaped Mixture-of-Transformers (MoT). This architectural innovation elegantly disentangles two fundamentally heterogeneous objectives: autoregressive modeling for discrete treatment forecasting and continuous flow-based generation for MRI synthesis. Furthermore, to ensure anatomical consistency, we propose a synergistic multi-timepoint mask alignment (MM-Align) objective. By anchor-ing shared intermediate representations to time-specific masks, the model prioritizes structural tumor priors before determin-ing treatment plans or synthesizing fine-grained appearances. Ultimately, Brain-WM provides a robust in-silico sandbox for clinicians to explore counterfactual scenarios and optimize personalized patient healthcare. The contributions of this work are summarized as follows. 1) We propose Brain-WM, a novel brain GBM world model that unifies autoregressive treatment prediction and flow-based future MRI generation by encoding spatiotemporal dynamics into a shared latent space. 2) We develop a novel Y-shaped MoT architecture that structurally disentangles distinct planning and imaging objectives, leveraging cross-task synergies while pre-venting feature collapse in task-specific subspaces. 3) We design a synergistic multi-timepoint mask alignment objective that anchors shared representations to current and future tumor masks, regularizing the latent space with anatomically grounded, progression-aware seman-tics for superior cross-task performance. 4) Extensive validation on internal and external cohorts shows the superior performance and generalizability of Brain-WM over state-of-the-art (SOTA) methods in both treatment planning and future MRI generation. 
+
+II. R ELATED WORKS 
+
+A. Deep Learning for GBM 
+
+Most deep learning studies on GBM focus on discriminative endpoints like segmentation and survival stratification [15], [16]. To improve precision, recent frameworks inject richer clinical priors into visual backbones: multi-granularity auto-mated and editable prompt learning (MGAEPL) [17] lever-ages tumor grade for boundary refinement, while multimodal graph [18] and attention-based models [19] incorporate demo-graphic and transcriptomic profiles for more robust prognosis. However, they largely produce static outputs, rather than mod-eling longitudinal tumor dynamics. To address this gap, emerg-ing generative methods [8], [9] have begun to study treatment-conditioned tumor evolution, but they typically cover 1-2 treatment categories and are often validated on relatively small cohorts. In contrast, Brain-WM models treatment as a dynamic decision variable through the unification of treatment intent planning and tumor evolution simulation, and is systematically validated across multi-centric cohorts. 
+
+B. World Model 
+
+Current world models primarily serve two functions: learn-ing implicit representations to capture environmental mecha-nisms, e.g. joint embedding predictive architecture [11], and predicting future states for robotics and autonomous driv-ing [12]–[14]. While preliminary adaptations like the med-ical world model (MedWM) [20] introduce this paradigm to healthcare, it inherently isolates treatment planning from future image synthesis. Crucially, adapting world models to GBM is hindered by the challenge of modeling intricate tumor evolution within restrictive brain anatomy. To bridge this gap, we propose Brain-WM, the first dedicated brain world model. Brain-WM unifies treatment planning and future MRI synthe-sis within a cohesive architecture; pivotal to this integration is a novel synergistic multi-timepoint mask alignment to enforce anatomical consistency and progression awareness, thereby advancing precision neuro-oncology. 
+
+III. M ETHODOLOGY 
+
+This section first introduces the problem formulation in Sec. III-A and the proposed multi-modal tokenizers in Sec. III-B. Next, we present the Y-shaped unified MoT architecture and the synergistic multi-timepoint mask alignment in Sec. III-C and Sec. III-D, respectively. Finally, we detail the objective function used to optimize Brain-WM in Sec. III-E. 
+
+A. Problem Formulation 
+
+The primary objective of Brain-WM is to learn a unified GBM world model, denoted as Mψ , that encapsulates the latent dynamics of tumor progression to support two com-plementary tasks: (i) a planning branch that recommends the next-step treatment plan, and (ii) an imaging branch 
+
+that forecasts future MRI states under a specified treatment intervention, as shown in Fig. 2(a). We formulate the patient state at a clinical time point p
+
+as a multi-modal tuple Sp = ( xp, cp). Here, xp represents the multi-parametric MRI images (FLAIR, T1CE, and T2W), while cp denotes the textual clinical context , encompassing the cumulative history of past treatment plans cplan  
+
+> 1: p
+
+and static demographic descriptors cdemo . Conditioned on the current pa-tient state Sp, the model Mψ is trained to jointly optimize two generative objectives: (a) autoregressively predicting the next-step treatment plan ˆcplan 
+
+> p+1
+
+, and (b) synthesizing the future MRI images ˆxp+1 given a specific candidate next-step treatment 3LoRA 
+
+Uni fi ed Self-Attention 
+
+（Causal & Full ）    
+
+> Shared FFN
+> Planning with Autoregression
+> Imaging
+> with Diffusion
+> Text De-Tokenizer
+> 3D MRI De-Tokenizer
+> Plan Head Flow Head
+> Future
+> MRI Images Next-step Treatment Plan
+> The next-step treatment plan is the [CRT].
+> Text Tokenizer
+> 3D Image Tokenizer
+> Planning FFN Imaging FFN
+
+Uni fi ed Self-Attention 
+
+（Causal & Full ）
+
+Brain GBM World Model 
+
+> Text Description
+> Current
+> MRI Images
+
+a 
+
+> Lightweight Mask Aligner
+> Current
+> GBM Mask Future
+> GBM Mask
+> Planning Path Imaging Path
+> Edema ( ED )Enhancing Tumor ( ET )Non-Enhancing Tumor Core ( NET )
+> Unpatchify
+> Unpatchify
+> Unpatchify
+
+b       
+
+> LoRA Low-Rank Adaption Trainable
+> Frozen Elementwise Add
+> Text Token Image Token
+> Female, 57 years old, brain glioma grade 4; Prior treatment: [SUR]; what is the next-step treatment plan? OR conducted treatment: [CRT] within an interval of 92 days.
+> (Brain-WM)
+
+Fig. 2. Overview of our Brain-WM. (a) Brain-WM features a unified Y-shaped Mixture-of-Transformers (MoT) backbone that bifurcates to optimize distinct objectives: autoregressive treatment planning and flow-based future MRI generation. ( b) A multi-timepoint mask alignment objective ensures the learned representations remain anatomically grounded and task-consistent across time. 3D Image Tokenizer 
+
+> Noise Scheduler
+> Semantic Layers
+> Projector
+> 3D Positional Encoding
+> Input MRI Images
+> Conditional MRI Images
+> Input Image Tokens
+> 3D Wan 2.1 VAE 3D Wan 2.1 VAE
+
++
+
+> Enhance Details When Imaging
+> Fusion Layer
+
+Fig. 3. Illustration of the volumetric MRI tokenizer. 
+
+plan and a forecasting interval τ . Formally, we instantiate the unified GBM world model Mψ as: 
+
+Mψ :
+
+(ˆcplan  
+
+> p+1
+
+= Mplan 
+
+> ψ
+
+ Sp
+
+,
+
+ˆxp+1 = Mimg 
+
+> ψ
+
+ Sp, cplan 
+
+> p+1
+
+, τ , (1) where Mplan  
+
+> ψ
+
+and Mimg  
+
+> ψ
+
+denote the specialized planning and imaging heads of the world model, respectively. Crucially, the imaging branch is explicitly conditioned on the specified treatment plan cplan  
+
+> p+1
+
+(either predicted by the model or manually defined), enforcing a causal dependency between treatment action and tumor evolution. 
+
+B. Multi-modal Tokenizers 
+
+To unify treatment planning and imaging, we encode multi-parametric 3D MRI images and clinical narratives as an interleaved sequence of tokens, structuring the input as: 
+
+[BOS] [BOI] {MRI } [EOI] {TXT } [EOS] ,
+
+where [BOS] and [EOS] mark sequence boundaries, while 
+
+[BOI] and [EOI] enclose multi-parametric 3D MRI images. The block {TXT } encodes demographics and treatment his-tory, followed by either a query for treatment planning or a specified treatment for future MRI synthesis. 
+
+1) Clinical Text Tokenizer: To explicitly capture the full spectrum of the patient treatment trajectory, we augment the standard vocabulary with five special planning tokens: 1) 
+
+[SUR] for surgical tumor resection; 2) [CRT] for concurrent chemoradiotherapy; 3) [RT] for standalone radiotherapy; 4) 
+
+[TMZ] for adjuvant temozolomide chemotherapy; and 5) 
+
+[AM] for active monitoring or participation in clinical trials. The {TXT } block is instantiated using a template structure. For example, history is encoded as: “Female, 57 years old, brain glioma grade 4. Prior treatment: [SUR] .” Subsequently, the prompt diverges by task: the planning branch utilizes a fixed query “What is the next-step treatment plan?” , whereas the imaging branch conditions on a specified treatment plan 
+
+“Conducted treatment: [SUR] + [CRT] over an interval of 92 days.” To preserve the original linguistic manifold, we freeze the pre-trained vocabulary weights, fine-tuning only the embeddings of the above five special planning tokens. 
+
+2) Volumetric MRI Tokenizer: We adapt the unified image tokenizer from Show-o2 [21] for volumetric processing of the block {MRI }, as shown in Fig. 3. At each time point 
+
+p, multi-sequence MRI inputs xp (FLAIR, T1CE, T2W) are concatenated channel-wise. The resulting volume is en-coded via the 3D Wan2.1 VAE [22], integrated with distilled SignLIP [23] semantic layers and low-level projectors. This architecture yields a dual-purpose representation where the planning branch utilizes deterministic visual tokens, while the imaging branch operates on noise-augmented latents. To preserve the intrinsic anatomical topology, we superimpose 4
+
+learnable 3D absolute positional embeddings, anchoring each token within the volumetric coordinate system. Notably, the imaging branch is conditioned on the current MRI latent xp
+
+to enhance fine-grained structural details in future forecasting. 
+
+C. Y-shaped Mixture-of-Transformers (MoT) 
+
+While most existing vision-language foundation mod-els [24], [25] typically rely on a monolithic transformer optimized for a single objective, our framework necessitates balancing the distinct regimes of treatment planning and volumetric imaging. To leverage cross-task synergies while preserving task-specific representation subspaces, we propose a Y-shaped MoT architecture. Given a unified token sequence H0 ∈ RL×d comprising concatenated imaging and planning tokens of length L and hidden dimension d, we employ a transformer with N layers. The initial Nsha = N/ 2 layers serve as a shared feature encoder to capture multimodal correlations, while the subse-quent Nspe = N/ 2 layers bifurcate into task-specific branches. Throughout the network, we utilize a unified self-attention mechanism across all layers: 
+
+ˆHℓ = UniAttn  Hℓ−1; M + Hℓ−1, ℓ = 1 , . . . , N, (2) where UniAttn( ·) denotes multi-head self-attention [26] pa-rameterized jointly for both modalities. To govern token visibility, the mask M ∈ RL×L enforces causal dependencies for next-step treatment planning while enabling full context for future MRI generation. Let Itext 
+
+denote the indices of text tokens in H0, we define: 
+
+Mij =
+
+(−∞ , i, j ∈ I text , j > i, 
+
+0, otherwise . (3) This configuration ensures autoregressive causality within the textual domain while permitting bidirectional full attention within the visual domain. The Y-shaped topology is realized via task-conditional Feed-Forward Networks (FFNs). For a specific task tsk ∈{plan , img }, the layer-wise FFN update is defined as: 
+
+H(tsk ) 
+
+> ℓ
+
+=
+
+
+
+ˆH(tsk ) 
+
+> ℓ
+
++ FFN shared 
+
+> ℓ
+
+  ˆH(tsk )
+
+> ℓ
+
+, ℓ ≤ Nsha ,
+
+ˆH(tsk ) 
+
+> ℓ
+
++ FFN (tsk )
+
+> ℓ
+
+  ˆH(tsk )
+
+> ℓ
+
+, ℓ > N sha , (4) where FFN shared  
+
+> ℓ
+
+is shared across tasks in the initial layers, while FFN (tsk ) 
+
+> ℓ
+
+becomes task-specific in the subsequent layers. Finally, the model employs a plan head for autoregressive treatment prediction and a flow head for future MRI genera-tion. The plan head is implemented as a linear layer, while the flow head consists of a transformer stack with adaptive layer normalization modulated by diffusion time steps. 
+
+D. Synergistic Multi-timepoint Mask Alignment 
+
+While the Y-shaped MoT architecture bifurcates for distinct objectives, the shared backbone lacks the supervisory guidance to capture fine-grained tumor morphology and leverage inter-task synergy. To address this, we introduce a synergistic multi-timepoint mask alignment objective, termed MM-Align, inspired by representation alignment (REPA) [27], as shown in Fig. 2(b). This auxiliary supervision anchors the shared latent space to clinically meaningful structures, ensuring that features remain anatomically grounded and semantically co-herent across temporal domains. Specifically, we dynamically supervise the shared representations using the current tumor mask for the planning task and the future tumor mask for the imaging task, enforcing a unified structural regularization that promotes robust representation learning.  
+
+> 1) Mask Aligner Architecture:
+
+We attach a lightweight mask aligner to the shared transformer to promote structure-aware and time-relevant representation learning. Let H(i) denote intermediate image tokens from the shared transformer at depth i, we aggregate multi-scale features {H(i)}i∈I for a predefined index set I via top–down pyramid fusion [28] to predict voxel-wise logits Z, which are converted into a probabilistic segmentation map ˆm via a softmax function: 
+
+ˆm = Softmax( Z), (5) where Z ∈ RB×C×D×H×W , and C represents four segmenta-tion classes, comprising the background and three GBM sub-regions: edema (ED), enhancing tumor (ET), and the non-enhancing tumor core (NET).  
+
+> 2) Dynamic Multi-timepoint Supervision:
+
+To accommodate the dual objectives of our framework, we employ dynamic su-pervision targets. Let mcur and mfut ∈ { 0, 1}B×C×D×H×W
+
+denote the one-hot ground-truth masks for the current and future timepoints, respectively. The active supervision mask 
+
+m is selected based on the task context: m = mcur for the planning and m = mfut for the imaging branch. We optimize a compound loss that consists of a voxel-wise focal loss [29] and a region-based Dice loss [30]. For a voxel 
+
+v ∈ Ω with ground-truth class cv , the focal loss is: 
+
+Lfocal = − 1
+
+|Ω|
+
+X
+
+> v∈Ω
+
+ 1 − ˆmv,c v
+
+γ log   ˆmv,c v
+
+, (6) where γ is the focusing parameter. The total focal loss Lfocal 
+
+is the mean over all voxels. Concurrently, for each tumor sub-region r ∈ RC
+
+(ED/ET/NET), we minimize the Dice loss: 
+
+Ldice = 1
+
+|R C |
+
+X
+
+> r∈R C
+
+
+
+1 − 2⟨ ˆmr , mr ⟩∥ ˆmr ∥1 + ∥mr ∥1
+
+
+
+, (7) where ˆmr and mr are the flattened prediction and label maps for region r, respectively. Then, the total Dice loss Ldice is the mean over all regions. Finally, we formulate the unified alignment objective as: 
+
+Lalign = α(t)
+
+
+
+Lfocal + Ldice 
+
+
+
+, (8) where α(t) acts as a time-dependent weighting coefficient. For the planning task, we fix α(t) = 1 to yield a deterministic trajectory. For the imaging task, α(t) is modulated by the flow-matching noise schedule, assigning lower weights to high-noise steps and higher weights to low-noise steps to ensure reliable structural alignment. At inference, MM-Align can be detached, but retaining it provides more interpretable outputs that offer meaningful visual cues to support clinical review. 5
+
+E. Objective Function 
+
+Our Brain-WM provides two capabilities: autoregressive treatment planning and treatment-conditioned tumor forecast-ing. Both tasks are supervised via a synergistic multi-timepoint alignment objective Lalign , which regularizes the representa-tion to remain anatomically consistent and progression-aware. During training, we employ an alternating optimization strategy, randomly assigning each mini-batch to either the planning or imaging branch. We rely on the patient state 
+
+Sp = ( xp, cp) at clinical time p, where the textual context 
+
+cp aggregates treatment history and demographics. For treatment planning, we formulate the planning task as autoregressive next-token prediction. Conditioned on the current state Sp, the model minimizes the negative log-likelihood of the next-step treatment plan cplan 
+
+> p+1
+
+, regularized by the current-timepoint mask alignment term: 
+
+Lplan = − log p
+
+
+
+cplan  
+
+> p+1
+
+Sp
+
+
+
++ Lalign . (9) For future MRI generation, we adopt a latent flow-matching framework to synthesize the future MRI xp+1 . Let z1 =
+
+E(xp+1 ) be the target latent encoded by the volumetric en-coder E(·) and z0 ∼ N (0, I) the source noise. We define the forward process as a linear interpolation from noise to data: 
+
+zt = tz1 + (1 − t)z0, t ∼ U (0 , 1) . (10) In this formulation, the proposed model Mψ learns to predict the constant velocity field that transports the probability den-sity from z0 to z1. The prediction is conditioned on the current noisy latent zt, the patient state Sp, the specified treatment plan cplan 
+
+> p+1
+
+, and the timestep t:
+
+ˆvt = Mimg 
+
+> ψ
+
+
+
+zt, Sp, cplan 
+
+> p+1
+
+, t 
+
+
+
+. (11) We optimize the flow-matching objective by regressing the targeted direction vt = dzt 
+
+> dt
+
+= z1 − z0, augmented by the future-timepoint mask-alignment term: 
+
+Limg = λimg ∥ˆvt − vt∥22 + Lalign , (12) where λimg balances the generation objective. At inference, the planning head yields the next-step treat-ment token ˆcplan  
+
+> p+1
+
+in a single forward pass. For future MRI generation, we generate the future MRI by sampling the initial latent z0 from a Gaussian prior and iteratively evolving it with an Euler solver [31] with 50 timesteps. At each timestep, the model predicts the velocity field conditioned on the current patient state Sp and the specified plan cplan  
+
+> p+1
+
+to update the latent trajectory. Finally, the terminal latent z1 is decoded to obtain the future MRI. 
+
+IV. E XPERIMENTS 
+
+A. Experiment Setup  
+
+> 1) Datasets:
+
+To ensure robust model generalization across diverse clinical settings, we curated our data from multi-ple institutions. The internal cohort was aggregated from three public datasets: LUMIERE [32], MU-Glioma Post [33], and UCSF-ALPTDG [34], yielding 527 subjects with 1,659 longitudinal timepoints. To maximize temporal diversity, we employed a dense pairing strategy, treating every distinct timepoint pair within a subject as an independent instance. This yielded 3,252 pairs; we used an 8:2 subject-level split for training and internal validation, such that all derived pairs from the same subject were confined to a single split. For external evaluation, we applied the same pairing protocol to an independent validation cohort of 61 subjects (128 timepoints) from the RHUH-GBM [35] and UCSD-PTGBM [36] datasets, deriving 72 data pairs. This external cohort offered a comple-mentary distribution of clinical states, providing a rigorous test for domain generalization: while the internal cohort spans the full spectrum of the GBM treatment pathway, RHUH-GBM is enriched for surgery-related timepoints, whereas UCSD-PTGBM primarily comprises cases under active monitoring. Each timepoint included 3D MRI sequences (FLAIR, T1CE, T2W) and tumor masks.  
+
+> 2) Preprocessing:
+
+Treatment plans and temporal intervals were organized from the official clinical metadata using ChatGPT-5.1 [37], followed by manual verification to guaran-tee data fidelity. All MRI scans were processed using a unified pipeline prior to model training. The protocol comprised four standardized steps [38], [39]: (1) skull-stripping to remove non-brain tissue, (2) spatial registration to a common SRI24 template space [40] to align anatomical structures, (3) cropping a fixed 3D volume of interest ( 192 ×192 ×140 voxels) centered on the brain to remove the non-informative background, and (4) per-subject intensity preprocessing that removes outliers and rescales intensities to [−1, 1] for stable optimization.  
+
+> 3) Implementation Details:
+
+Our Brain-WM builds on the pretrained weights of Show-o2 [21], a unified multimodal model that uses Qwen2.5-1.5B-Instruct [41] as the language backbone. Our network comprises 28 transformer layers, struc-tured as 14 shared layers between the planning and generation branches and 14 task-specific layers. Specifically, intermediate features from the shared layers at index set L = {4, 10 , 14 }
+
+are extracted and fed into the mask aligner. We optimized the model using AdamW [42] in bfloat16 mixed precision via DeepSpeed, employing decoupled learning rates ( 4 × 10 −5 for LoRA adapters and 2 × 10 −5 for the flow head, projection layers, and planning tokens) with a warmup schedule of 50 steps and a weight decay of 0.01. Following established configurations in unified multimodal models [21], [43], we set the weight λimg = 4 . Standard 3D augmentations (flips, translations, and zooming) [44] were applied during training.  
+
+> 4) Evaluation Metrics:
+
+Performance evaluation was con-ducted across two tasks. For treatment planning, we for-mulated the problem as multi-class classification [57] and compared predictions with clinical references using accuracy, F1-score, specificity, and precision. For future MRI generation, we assessed reconstruction fidelity [58], [59] via voxel-wise normalized mean squared error (NMSE), peak signal-to-noise ratio (PSNR), and structural similarity index (SSIM). 
+
+B. Comparison with SOTA methods 
+
+We benchmarked our Brain-WM against SOTA methods on distinct tasks across both internal and external cohorts, assess-ing task-specific efficacy and cross-center generalizability. 6
+
+TABLE I 
+
+QUANTITATIVE EVALUATION OF TREATMENT PLANNING PERFORMANCE ON INTERNAL AND EXTERNAL COHORTS . EVALUATED BASELINES ARE CATEGORIZED INTO FOUR TYPES : (I) O PEN -SOURCE GENERAL , (II) C LOSED -SOURCE GENERAL , (III) M EDICAL DOMAIN -SPECIFIC , AND (IV) TASK -SPECIFIC MODELS . T HE BEST AND SECOND -BEST RESULTS ARE HIGHLIGHTED IN BOLD AND UNDERLINE , RESPECTIVELY .
+
+Methods Type Internal Cohort External Cohort 
+
+Accuracy ↑ F1-Score ↑ Specificity ↑ Precision ↑ Accuracy ↑ F1-Score ↑ Specificity ↑ Precision ↑
+
+Qwen3-VL 4B [45] 
+
+I
+
+20.1 27.7 80.2 52.9 48.2 52.6 87.0 94.4 
+
+InterVL3.5 4B [46] 30.2 28.4 80.0 31.3 61.1 55.7 90.8 68.0 
+
+DeepSeek V3.2 [47] 32.4 40.5 84.6 76.8 27.8 24.1 84.0 46.9 
+
+Claude 4.5 
+
+II 
+
+29.3 40.2 85.5 91.1 27.8 24.1 84.0 46.9 
+
+Gemini 2.5 Pro [48] 32.2 38.8 84.3 67.8 37.0 38.3 85.2 66.1 
+
+GPT 5.1 [37] 36.1 45.1 85.8 82.1 44.4 48.9 88.3 70.2 
+
+MedVLM-R1 2B [49] 
+
+III 
+
+20.5 25.9 80.7 46.9 37.0 34.9 86.3 37.7 
+
+Hulu-Med 4B [50] 24.6 27.5 82.2 50.9 35.2 33.4 85.7 56.6 
+
+Linshu 7B [51] 32.7 43.0 85.5 79.4 48.2 52.1 89.6 75.9 
+
+AliFuse [52] 
+
+IV 
+
+81.6 79.8 89.8 86.3 73.3 75.2 93.1 76.9 
+
+Hyperfusion [53] 85.6 80.0 91.8 82.1 79.3 79.4 93.8 80.4 
+
+Brain-WM (Ours) 91.5 90.4 95.8 90.7 83.5 85.0 94.1 87.2 
+
+TABLE II 
+
+QUANTITATIVE EVALUATION OF FUTURE MRI GENERATION ON INTERNAL AND EXTERNAL COHORTS . RECONSTRUCTION FIDELITY IS MEASURED VIA NMSE (%), PSNR ( DB), AND SSIM ( ×10 −2 ). T HE BEST RESULTS ARE HIGHLIGHTED IN BOLD .
+
+Methods FLAIR T1CE T2W 
+
+NMSE ↓ PSNR ↑ SSIM ↑ NMSE ↓ PSNR ↑ SSIM ↑ NMSE ↓ PSNR ↑ SSIM ↑
+
+Internal Cohort 
+
+LE-DUNet [54] 11.54 21.35 79.81 11.63 21.32 80.16 13.34 20.97 77.39 
+
+LE-GAN [55] 8.86 22.50 80.85 8.11 22.90 81.26 9.55 22.41 78.00 
+
+IL-CLDM [56] 6.93 23.61 83.52 6.39 24.05 83.78 7.31 23.66 81.62 
+
+LDM-GBM [8] 6.64 24.00 83.94 6.14 24.26 84.52 6.77 24.07 82.53 
+
+MedWM [20] 6.59 24.23 84.15 6.11 24.34 84.65 6.68 24.19 82.83 
+
+TaDiff [9] 6.42 24.37 84.43 5.96 24.45 84.95 6.35 24.40 83.30 
+
+Brain-WM (Ours) 5.93 25.05 85.24 5.46 25.29 85.81 5.98 25.17 84.04 
+
+External Cohort 
+
+LE-DUNet [54] 18.05 19.64 75.81 20.09 19.21 75.35 23.31 19.31 72.86 
+
+LE-GAN [55] 14.28 20.67 76.85 14.09 20.88 76.54 15.54 20.58 74.08 
+
+IL-CLDM [56] 12.84 21.40 79.11 12.98 21.22 78.74 14.22 21.42 77.18 
+
+LDM-GBM [8] 10.55 21.42 80.00 10.86 21.09 79.28 12.63 21.20 77.23 
+
+MedWM [20] 10.48 21.90 80.18 10.25 21.46 80.56 12.63 21.67 77.30 
+
+TaDiff [9] 10.16 22.05 80.54 10.01 21.96 81.13 12.17 22.02 77.75 
+
+Brain-WM (Ours) 9.55 22.58 81.46 9.43 22.75 82.09 11.64 22.69 78.53 
+
+1) Treatment Planning Results: To evaluate the treatment-planning capability of our Brain-WM, we compared it against four categories of strong baselines in Table I. The compari-son included (I) open-source general-purpose vision-language models (Qwen3-VL 4B [45], InterVL3.5 4B [46], DeepSeek V3.2 [47]), (II) closed-source general models (Claude 4.5, Gemini 2.5 Pro [48], GPT 5.1 [37]), (III) medical domain-specific models (MedVLM-R1 2B [49], Hulu-Med 4B [50], Linshu 7B [51]), and (IV) task-specific treatment-planning models (AliFuse [52], Hyperfusion [53]). All models were tasked with predicting the next-step treatment plan based on multimodal clinical and imaging contexts. For the VLM base-lines (types I–III), we bridged the architectural gap between 3D volumetric data and 2D vision encoders by processing the 3D MRI inputs as continuous sequences of 2D slices, concep-tually similar to video inputs, whereas the task-specific models (type IV) processed the data natively using 3D encoders. Table I demonstrates that general-purpose VLMs, both open-source and closed-source, struggled with GBM treat-ment planning, confirming that broad instruction tuning is insufficient for specialized clinical reasoning. While medical domain-specific models narrowed this gap by aligning with radiological and oncological semantics, they remained generic question-answering systems lacking the longitudinal reasoning required to track disease temporal progression. We explicitly trained task-specific architectures, i.e. AliFuse and Hyperfu-sion, on our internal cohort. Despite this optimization, they remained constrained by their formulation as static classi-fiers. Relying on shallow input-to-label mappings, they failed to capture spatiotemporal tumor dynamics, underscoring the limitations of snapshot-based discriminative methods. Notably, while baselines like Qwen3-VL 4B and Claude 4.5 exhibited high precision, their low F1-scores betrayed a conservative bias that sacrificed sensitivity critical for oncological planning. In contrast, Brain-WM jointly modeled treatment planning and future MRI generation within a shared latent space. Initialized from a multimodal foundation and refined via domain-specific training, it effectively captured complex GBM evolution, yielding superior robustness to distribution shifts across both internal and external cohorts. 
+
+2) Future MRI Generation Results: To assess Brain-WM’s ability to generate future MRIs, we comprehensively evaluated 7FLAIR T1CE T2W 
+
+Internal Case 2 
+
+Male, 49.0 years old, brain glioma grade 4; Prior treatment: [SUR] + [CRT] + [TMZ] day 70; Conducted treatment: [TMZ] within an interval of 56 days .
+
+GT Future GBM Mask Mask Aligner Focused Region 
+
+FLAIR T1CE T2W 
+
+Current MRI Scans GT Future MRI Scans Brain-WM (Ours) TaDiff MedicalWM IL-CLDM LDM-GBM LE-GAN LE-DUnet 
+
+Internal Case 1 
+
+GT Future GBM Mask Mask Aligner Focused Region 
+
+Female, 60.0 years old, brain glioma grade 4; Prior treatment: None ; Conducted treatment: [SUR] + [CRT] within an interval of 448 days. 
+
+> Resection region Rightward regrowth; ventricle normalized
+> Regrowth Regrowth
+
+Fig. 4. Qualitative results of ours and other competing methods on the internal cohort. FLAIR T1CE T2W FLAIR T1CE T2W 
+
+Current MRI Scans GT Future MRI Scans Brain-WM (Ours) TaDiff MedicalWM IL-CLDM LDM-GBM LE-GAN LE-DUnet GT Future GBM Mask 
+
+Male, 60.0 years old, brain glioma grade 4; Prior treatment: [SUR] ; Conducted treatment: [AM] within an interval of 129 days. 
+
+Mask Aligner Focused Region RHUH Case UCSD Case GT Future GBM Mask Mask Aligner Focused Region 
+
+Female, 64.0 years old, brain glioma grade 4; Prior treatment: None ; Conducted treatment: [SUR] within an interval of 3 days.  
+
+> Resection region
+> Hyperproliferation Closest proliferation
+
+Fig. 5. Qualitative results of ours and other competing methods on the external cohort. 
+
+Brain-WM against SOTA 3D generation methods. Given the lack of standardized benchmarks for this specific 3D lon-gitudinal task, we reproduced representative methods span-ning DenseUNet (LE-DUNet [54]), GAN (LE-GAN [55]), and diffusion families (IL-CLDM [56], LDM-GBM [8], MedWM [20], TaDiff [9]). For fair comparison, we stan-8
+
+dardized clinical context integration using CLIP-based priors across all baselines. Among the diffusion-based approaches, conditioning strategies vary: LDM-GBM and MedWM ex-plicitly utilized the current tumor mask as input to guide generation, whereas TaDiff employed it as implicit supervision by joint prediction of current and future masks. As summarized in Table II and Figs. 4 and 5, we evaluated the quantitative and qualitative performance of Brain-WM for future MRI generation. Focusing on the quantitative analysis, our study yielded five key observations: (1) Diffusion-based architectures established a clear performance advantage over UNet- and GAN-based baselines, driven by their superior ca-pacity to model high-frequency details and complex patholog-ical distributions. (2) Incorporating structural guidance proved pivotal, as structure-aware models, whether relying on explicit mask inputs (LDM-GBM, MedWM) or implicit auxiliary supervision (TaDiff), substantially outperformed the uncon-strained baseline (IL-CLDM) across all evaluation metrics. (3) Crucially, implicit supervision achieved performance parity with explicit conditioning strategies, demonstrating that latent structural constraints can effectively guide synthesis without the prerequisite for inference-time tumor masks. (4) Brain-WM consistently achieved SOTA performance across both internal and external cohorts, utilizing its unified planning-imaging framework with synergistic alignment constraints to secure the lowest NMSE and highest PSNR/SSIM, thereby maintaining robust generalization even under significant do-main shifts where competing methods degrade. (5) Quantita-tive fidelity exhibited a distinct modality-dependent hierarchy, with T1CE yielding the highest quality followed by FLAIR, whereas T2W sequences proved the most challenging due to their heterogeneous tissue contrast. Qualitative comparisons in Figs. 4 and 5 demonstrate that while diffusion models improve texture over UNet and GANs, they lack the precise trajectory modeling achieved by the uni-fied framework of our Brain-WM. In internal case 1, although mask-aware methods (LDM-GBM, MedWM, TaDiff) recog-nized the resection intent, they exhibited substantial spatial deviations from the ground-truth cavity and failed to accurately predict the residual tumor regions. In internal case 2, explicitly conditioned methods (LDM-GBM, MedWM) produced nearly static tumor volumes; conversely, the implicitly supervised TaDiff captured growth directionality on the FLAIR sequence but suffered from overestimated proliferation, hallucinating tissue invasion into the resection cavity, an artifact successfully eliminated by our Brain-WM. Under domain shift in the external RHUH case, explicitly mask-conditioned baselines performed coarse, mechanical resections. While TaDiff gen-erated a plausible cavity, it failed to account for the clinical language context, predicting unreasonable tumor expansion despite the short 3-day interval; in contrast, Brain-WM pro-duced a resection profile highly consistent with the ground truth. Finally, in the external UCSD case, while MedWM and TaDiff modeled the tumor regrowth trend, MedWM exhib-ited hyper-aggressive proliferation that completely filled the resection cavity, and TaDiff showed a similar overestimation. Conversely, Brain-WM achieved the closest alignment with the actual tumor evolution trajectory. Although exact voxel-level                         
+
+> TABLE III
+> INTERNAL NEXT -STEP TREATMENT PLANNING ABLATION RESULTS .
+> Model Variants Accuracy ↑F1-Score ↑Specificity ↑Precision ↑
+> Planning-only 85.9 84.9 91.8 84.2
+> Unified model 87.2 88.6 92.4 88.4
+> +Y-shaped MoT 90.4 89.1 93.7 89.3
+> +MM-Align ( Ours )91.5 90.4 95.8 90.7
+
+reconstruction is intractable due to GBM heterogeneity and surgical variability, Brain-WM provides a reliable anatomical reference to assist clinicians in prospective assessment. 
+
+C. Ablation Study 
+
+This subsection first investigates the impact of individual components on two distinct tasks: treatment planning and future MRI generation, followed by an in-depth analysis of the synergistic multi-timepoint mask alignment (MM-Align). All ablation studies were conducted on the internal cohort.  
+
+> 1) Ablation on Proposed Contributions:
+
+We conducted a sys-tematic ablation study to demonstrate the effectiveness of each proposed component in modernizing the task-specific baseline architecture into Brain-WM. As detailed in Table III for treatment planning and Table IV for future MRI generation, we started with single-task baselines and successively integrated the basic unified formulation, the Y-shaped MoT, and finally the synergistic multi-timepoint mask alignment strategy. For the treatment planning task, transitioning from the planning-only baseline to the unified model, i.e. effectively in-troducing the generation task for the same architecture, yielded immediate performance gains. This finding indicated that the additional future MRI generation facilitated the learning of GBM spatiotemporal dynamics by enforcing tumor-aware fea-ture learning and promoting inter-task synergy. The Y-shaped MoT further boosted performance by structurally decoupling task-shared from task-specific learning. Finally, introducing multi-timepoint alignment provided additional gains, attributed to tumor-aware supervision that explicitly constrained feature semantics to better capture longitudinal tumor evolution. In contrast to the immediate gains observed in planning, the ablation results for future MRI generation exhibited an asymmetric pattern. Starting from a generation-only baseline, the direct addition of the treatment planning task slightly dete-riorated reconstruction quality across all modalities, evidenced by increased NMSE and decreased PSNR/SSIM. This indi-cated task interference, likely due to the competing needs for semantic abstraction (planning) versus voxel-level reconstruc-tion (generation), when parameters were fully shared between conflicting objectives. However, by disentangling task-specific feature refinement through dedicated FFNs while retaining a shared attention backbone, the Y-shaped MoT mitigated task interference; consequently, imaging performance not only recovered but also surpassed the generation-only baseline on FLAIR, T1CE, and T2W. Finally, aligning shared features via multi-timepoint masks yielded consistent improvements. Overall, ablations showed a distinct dynamic: while plan-ning benefits inherently from the generation task, generation 9
+
+TABLE IV 
+
+INTERNAL FUTURE MRI GENERATION ABLATION RESULTS .                                                             
+
+> Model Variants FlAIR T1CE T2W
+> NMSE ↓PSNR ↑SSIM ↑NMSE ↓PSNR ↑SSIM ↑NMSE ↓PSNR ↑SSIM ↑
+> Generation-only 6.48 24.24 84.39 6.06 24.39 84.87 6.47 24.35 83.21
+> Unified model 6.53 23.91 83.78 6.17 24.18 84.37 6.83 23.96 82.37
+> +Y-shaped MoT 6.24 24.61 84.74 5.84 24.72 85.24 6.26 24.68 83.55
+> +MM-Align ( Ours )5.93 25.05 85.24 5.46 25.29 85.81 5.98 25.17 84.04 GT GBM Mask Mask Aligner Predicted Mask Clinical Description
+> Case 2
+> Male, 69.0 years old, brain glioma grade 4; Prior treatment
+> [SUR] ; What is the next-step treatment plan?
+> GT: [CRT] Predicted: [CRT]
+> Case 3
+> Male, 49.0 years old, brain glioma grade 3; Prior treatment
+> [SUR]+[TMZ] day 171 ; What is the next-step treatment plan?
+> GT: [TMZ] Predicted: [TMZ]
+> Case 4
+> Male, 80.0 years old, brain glioma grade 4; Prior treatment
+> [SUR] + [CRT] ; What is the next-step treatment plan?
+> GT: [AM] Predicted: [AM]
+> Case 1
+> Male, 78.0 years old, brain glioma grade 4; Prior treatment
+> None ; What is the next-step treatment plan?
+> GT: [SUR] Predicted: [SUR]
+
+Fig. 6. Qualitative visualization of the masks predicted by the lightweight mask aligner during treatment planning. 
+
+requires Y-shaped MoT structural decoupling and alignment constraints to convert interference into constructive synergy. 
+
+2) Further Analysis of MM-Align: To qualitatively validate the efficacy of the MM-Align, we presented mask visualization results for treatment planning in Fig. 6 and future MRI genera-tion in Figs. 4–5. For treatment planning, Brain-WM produced morphologically consistent segmentation masks, demonstrat-ing its capacity to comprehend tumor topology before deriving appropriate treatment plans (Fig. 6). Note that MM-Align solely employed a lightweight mask aligner operating on in-termediate features that, while not designed for voxel-accurate segmentation, produced anatomically meaningful tumor-aware priors that synergistically supported both treatment planning and future MRI generation. Regarding the future MRI gen-eration task, we visualized the model’s attentional focus by aggregating predicted segmentation labels weighted by infer-ence noise (Figs. 4–5). The results indicated that the predicted masks generally aligned well with the manual annotations and were spatially consistent with the generated tumor regions, confirming that MM-Align effectively guided the generation process. Notably, in the two surgical resection cases (Internal case 1 and RHUH case), the alignment exhibited larger devia-tions from the ground truth, reflecting the challenges of future prediction and subjective variability in surgical operations. Fig. 7 presents the Pearson correlation ( r) results between the MM-Align focused-region volume during future MRI generation and the ground-truth tumor volume, stratified by prediction interval and treatment type. Over time, the correla-tion r exhibited a monotonic decay from 0.810 (0–90 days) to 0–90 
+
+> 90–180
+> 180–360
+> 360+
+> AM
+> TMZ
+> RT
+> CRT
+> SUR
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8  
+
+> Pearson Correlation
+> 0.810
+> 0.745
+> 0.656
+> 0.551
+> 0.796
+> 0.768
+> 0.709
+> 0.670
+> 0.613
+> Intervals Treatments
+
+Fig. 7. Correlation between the MM-Align focused-region volume in future MRI generation and the ground-truth tumor volume. 
+
+0.551 (> 360 days), reflecting the accumulation of aleatoric uncertainty in stochastic tumor dynamics. Across treatment types, the model captured naturalistic pro-gression under active monitoring (AM, r = 0 .796 ) and the sys-temic response pattern associated with temozolomide (TMZ, 
+
+r = 0 .768 ). In contrast, performance declined as interventions became more complex. Specifically, the lower correlation for concurrent chemoradiotherapy (CRT, r = 0.670 ) reflected the difficulty of disentangling mixed radiographic signals and confounders such as pseudoprogression. Finally, the surgery group exhibited the weakest correlation ( r = 0 .613 ), primarily due to abrupt postoperative anatomical changes and inter-operator variability in resection extent, which weaken the linkage between preoperative imaging-derived volumes and subsequent tumor burden. 
+
+V. C ONCLUSION 
+
+Brain-WM advances GBM trajectory simulation by adopt-ing a unified world-modeling framework that couples tu-mor evolution with clinical decision-making. By seamlessly integrating autoregressive next-step treatment planning and flow-based future MRI generation, our framework empowers clinicians with a risk-free sandbox to explore counterfactual scenarios and optimize patient healthcare. We acknowledge that the current version presents a simplified modeling of intervention tasks, prioritizing macroscopic tumor evolution over fine-grained radiotherapeutic dosimetry. Future work will seek to address this limitation by incorporating radiation dose maps and molecular biomarkers to further enrich the patient-specific digital twin. Moving forward, we plan to prospectively evaluate Brain-WM to assess its clinical utility as a human-in-the-loop decision-support tool for precision oncology. 10 
+
+REFERENCES 
+
+[1] R. Stupp et al. , “Radiotherapy plus concomitant and adjuvant temozolo-mide for glioblastoma,” N. Engl. J. Med. , vol. 352, no. 10, pp. 987–996, 2005. [2] P. Y. Woo et al. , “Patterns of care and survival of chinese glioblastoma patients in the temozolomide era: a Hong Kong population-level analysis over a 14-year period,” Neurooncol. Pract. , vol. 10, no. 1, pp. 50–61, 2023. [3] A. Shergalis, A. Bankhead III, U. Luesakul, N. Muangsin, and N. Nea-mati, “Current challenges and opportunities in treating glioblastoma,” 
+
+Pharmacol. Rev. , vol. 70, no. 3, pp. 412–445, 2018. [4] O. Clatz et al. , “Realistic simulation of the 3-d growth of brain tumors in MR images coupling diffusion with biomechanical deformation,” IEEE Trans. Med. Imaging , vol. 24, no. 10, pp. 1334–1346, 2005. [5] C. Hogea, C. Davatzikos, and G. Biros, “An image-driven parameter estimation problem for a reaction–diffusion glioma growth model with mass effects,” J. Math. Biol. , vol. 56, no. 6, pp. 793–825, 2008. [6] J. Lipkov´ a et al. , “Personalized radiotherapy design for glioblastoma: integrating mathematical tumor models, multimodal scans, and bayesian inference,” IEEE Trans. Med. Imaging , vol. 38, no. 8, pp. 1875–1884, 2019. [7] J. Petersen et al. , “Deep probabilistic modeling of glioma growth,” in 
+
+MICCAI , 2019, pp. 806–814. [8] A. G. Leclercq, S. Bougleux, N. N. Moreau, A. Desmonts, R. H´ erault, and A. Corroyer-Dulmont, “Pre to post-treatment glioblastoma MRI prediction using a latent diffusion model,” in MICCAI Work. Deep Gener. Models , 2025, pp. 182–191. [9] Q. Liu et al. , “Treatment-aware diffusion probabilistic model for lon-gitudinal MRI generation and diffuse glioma growth prediction,” IEEE Trans. Med. Imaging , 2025. [10] D. Ha and J. Schmidhuber, “World models,” arXiv:1803.10122 , vol. 2, no. 3, 2018. [11] Y. LeCun, “A path towards autonomous machine intelligence,” Open Review , vol. 62, no. 1, pp. 1–62, 2022. [12] A. Jiang et al. , “IRL-VLA: Training an vision-language-action policy via reward world model,” arXiv:2508.06571 , 2025. [13] Y. Li et al. , “ReVogDrive: A reinforced cognitive framework for end-to-end autonomous driving,” in ICLR , 2026. [14] J. Cen et al. , “RynnVLA-002: A unified vision-language-action and world model,” arXiv:2511.17502 , 2025. [15] B. H. Menze et al. , “The multimodal brain tumor image segmentation benchmark (BRATS),” IEEE Trans. Med. Imaging , vol. 34, no. 10, pp. 1993–2024, 2014. [16] T. Chen, C. Wang, Z. Chen, and H. Shan, “Autoregressive medical image segmentation via next-scale mask prediction,” in MICCAI , 2025, pp. 24– 34. [17] Y. Sun, M. Liu, and C. Lian, “MGAEPL: Multi-granularity automated and editable prompt learning for brain tumor segmentation,” Pattern Recognit. , p. 112509, 2025. [18] J. Sun and Y. Peng, “The cross-modality survival prediction method of glioblastoma based on dual-graph neural networks,” Expert Syst. Appl. ,vol. 254, p. 124394, 2024. [19] Y. Zhong et al. , “Thread the needle: Genomics-guided prompt-bridged attention model for survival prediction of glioma based on mri images,” in MICCAI , 2025, pp. 625–635. [20] Y. Yang et al. , “Medical world model: Generative simulation of tumor evolution for treatment planning,” in ICCV , 2025. [21] J. Xie, Z. Yang, and M. Z. Shou, “Show-o2: Improved native unified multimodal models,” in NeurIPS , 2025. [22] T. Wan et al. , “Wan: Open and advanced large-scale video generative models,” arXiv:2503.20314 , 2025. [23] X. Zhai, B. Mustafa, A. Kolesnikov, and L. Beyer, “Sigmoid loss for language image pre-training,” in ICCV , 2023. [24] C. Li et al. , “LLaVA-Med: Training a large language-and-vision assistant for biomedicine in one day,” in NeurIPS , 2023. [25] J. Zhang, J. Huang, S. Jin, and S. Lu, “Vision-language models for vision tasks: A survey,” IEEE Trans. Pattern Anal. Mach. Intell. , vol. 46, no. 8, pp. 5625–5644, 2024. [26] A. Vaswani et al. , “Attention is all you need,” in NeurIPS , 2017. [27] S. Yu et al. , “Representation alignment for generation: Training diffusion transformers is easier than you think,” in ICLR , 2025. [28] T.-Y. Lin, P. Doll´ ar, R. Girshick, K. He, B. Hariharan, and S. Belongie, “Feature pyramid networks for object detection,” in CVPR , 2017. [29] T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Doll´ ar, “Focal loss for dense object detection,” in ICCV , 2017. [30] F. Milletari, N. Navab, and S.-A. Ahmadi, “V-net: Fully convolutional neural networks for volumetric medical image segmentation,” in 3DV ,2016, pp. 565–571. [31] R. T. Chen, Y. Rubanova, J. Bettencourt, and D. K. Duvenaud, “Neural ordinary differential equations,” in NeurIPS , 2018. [32] Y. Suter et al. , “The LUMIERE dataset: Longitudinal glioblastoma MRI with expert RANO evaluation,” Sci. Data , vol. 9, no. 1, p. 768, 2022. [33] E. Mahmoud et al. , “MU-Glioma Post: A comprehensive dataset of automated MR multi-sequence segmentation and clinical features,” Sci. Data , vol. 12, no. 1, p. 1847, 2025. [34] B. K. Fields et al. , “The university of california san francisco adult longitudinal post-treatment diffuse glioma MRI dataset,” Radiol. Artif. Intell. , vol. 6, no. 4, p. e230182, 2024. [35] S. Cepeda et al. , “The r´ ıo hortega university hospital glioblastoma dataset: A comprehensive collection of preoperative, early postoperative and recurrence MRI scans (RHUH-GBM),” Data Brief , vol. 50, p. 109617, 2023. [36] L. Gagnon et al. , “The university of california san diego post-treatment glioblastoma (UCSD-PTGBM) annotated multimodal mri dataset,” Sci. Data , 2026. [37] J. Achiam et al. , “GPT-4 technical report,” arXiv:2303.08774 , 2023. [38] C. Wang et al. , “Joint learning framework of cross-modal synthesis and diagnosis for Alzheimer’s disease by mining underlying shared modality information,” Med. Image Anal. , vol. 91, p. 103032, 2024. [39] C. Wang, Y. Lei, T. Chen, J. Zhang, Y. Li, and H. Shan, “HOPE: Hybrid-granularity ordinal prototype learning for progression prediction of mild cognitive impairment,” IEEE J. Biomed. Health Inform. , vol. 28, no. 11, pp. 6429–6440, 2024. [40] T. Rohlfing, N. M. Zahr, E. V. Sullivan, and A. Pfefferbaum, “The SRI24 multichannel atlas of normal adult human brain structure,” Hum. Brain Mapp. , vol. 31, no. 5, pp. 798–819, 2010. [41] Q. Team, “Qwen2.5: A party of foundation models,” September 2024. [Online]. Available: https://qwenlm.github.io/blog/qwen2.5/ [42] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” in ICLR , 2019. [43] C. Deng et al. , “Emerging properties in unified multimodal pretraining,” 
+
+arXiv:2505.14683 , 2025. [44] M. J. Cardoso et al. , “MONAI: An open-source framework for deep learning in healthcare,” arXiv:2211.02701 , 2022. [45] S. Bai et al. , “Qwen3-VL technical report,” 2025. [46] W. Wang et al. , “Internvl3. 5: Advancing open-source multimodal mod-els in versatility, reasoning, and efficiency,” arXiv:2508.18265 , 2025. [47] A. Liu et al. , “Deepseek-v3. 2: Pushing the frontier of open large language models,” arXiv:2512.02556 , 2025. [48] G. Comanici et al. , “Gemini 2.5: Pushing the frontier with advanced reasoning, multimodality, long context, and next generation agentic capabilities,” arXiv:2507.06261 , 2025. [49] J. Pan et al. , “MedVLM-R1: Incentivizing medical reasoning capability of vision-language models (VLMs) via reinforcement learning,” in 
+
+MICCAI , 2025, pp. 337–347. [50] S. Jiang et al. , “Hulu-Med: A transparent generalist model towards holis-tic medical vision-language understanding,” arXiv:2510.08668 , 2025. [51] W. Xu et al. , “Lingshu: A generalist foundation model for unified multimodal medical understanding and reasoning,” arXiv:2506.07044 ,2025. [52] Q. Chen and Y. Hong, “Alifuse: Aligning and fusing multimodal medical data for computer-aided diagnosis,” in BIBM , 2024, pp. 3082–3087. [53] D. Duenias et al. , “Hyperfusion: A hypernetwork approach to multi-modal integration of tabular and medical imaging data for predictive modeling,” Med. Image Anal. , vol. 102, p. 103503, 2025. [54] J. Lee et al. , “Synthesizing images of tau pathology from cross-modal neuroimaging using deep learning,” Brain , vol. 147, no. 3, pp. 980–995, 2024. [55] Z. Zhang et al. , “Language-enhanced generative modeling for amyloid PET synthesis from MRI and blood biomarkers,” arXiv:2511.02206 ,2025. [56] Z. Ou, Y. Pan, F. Xie, Q. Guo, and D. Shen, “Image-and-label con-ditioning latent diffusion model: Synthesizing A β-PET from MRI for detecting amyloid status,” IEEE J. Biomed. Health Inform. , 2024. [57] Z. Peng et al. , “OmniBrainBench: a comprehensive multimodal bench-mark for brain imaging analysis across multi-stage clinical tasks,” 2026. [58] A. A. Poli and M. C. Cirillo, “On the use of the normalized mean square error in evaluating dispersion model performance,” Atmos. Environ. Part A, Gen. Top. , vol. 27, no. 15, pp. 2427–2434, 1993. [59] Z. Wang, A. C. Bovik, H. R. Sheikh, and E. P. Simoncelli, “Image quality assessment: from error visibility to structural similarity,” IEEE Trans. Image Process. , vol. 13, no. 4, pp. 600–612, 2004.

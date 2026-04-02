@@ -1,0 +1,530 @@
+Title: 2603.07249v1.pdf
+
+URL Source: https://arxiv.org/pdf/2603.07249v1
+
+Published Time: Tue, 10 Mar 2026 00:47:42 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+1
+
+# LF2L:  Loss  Fusion Horizontal  Federated  Learning Across 
+
+# Heterogeneous Feature Spaces Using  External  Datasets Effectively: 
+
+# A Case Study in Second Primary Cancer Prediction 
+
+Chia -Fu Lin 1 and  Yi -Ju Tseng 1, *
+
+# ABSTRACT 
+
+Second primary cancer (SPC), a  new  cancer in patients  different  from  previously 
+
+diagnosed, is a  growing  concern due to improved cancer survival rates. Early prediction 
+
+of SPC is essential  to  enabl e timely clinical interventions. This study focuses on lung 
+
+cancer survivors treated in Taiwanese hospitals, where the limited size and geographic 
+
+scope of local datasets restrict the effectiveness and generalizability of traditional 
+
+machine learning approa ches. To address this, we incorporate  external  data from th e
+
+publicly available US -based Surveillance, Epidemiology, and End Results (SEER) 
+
+program, significantly increasing data diversity and scale. However, the integration of 
+
+multi -source datasets  presents  challenges such as feature inconsistency and privacy 
+
+constraints. Rather than naively merging data, we  proposed  a loss fusion horizontal 
+
+federated learning  (LF2L ) framework  that  can enable effective cross -institutional 
+
+collaboration while preserving  institutional privacy  by avoiding data sharing . Using  both 
+
+common and unique  feature s and balancing their contributions through a shared loss 
+
+mechanism, our method demonstrates substantial improvements in  the prediction 
+
+performance of  SPC. Experiment results show statistically significant  improvements  in 
+
+AUROC and AUPRC when compared to localized, horizontal federated, and centralized 
+
+learning baselines. This highlights the importance of not only acquiring  external  data but 
+
+also leveraging it effectively to enhance model perfor mance in real -world clinical  model 
+
+development .
+
+Keywords : second primary cancer, federated learning, data augmentation, lung cancer          
+
+> 1Department of Computer Science, National Yang Ming Chiao Tung University, Hsinchu, Taiwan
+> *Corresponding author: Yi -Ju Tseng (yjtseng@nycu.edu.tw)
+> This work was funded by National Science and Technology Council , Taiwan ,under Grant No. NSTC 114 -
+> 2221 -E-A49 -061 and 113 -2813 -C-A49 -009 -E2
+> Chia -Fu Lin and Yi -Ju Tseng
+
+# 1. Introduction 
+
+Second primary cancer (SPC) refers to the development of a new  primary  cancer in 
+
+a patient who has previously been diagnosed with a  different primary  cancer  (National 
+
+Cancer Institute  [NCI] , 2011b) . Unlike recurren t cancer  or metastasis  (NCI, 2011a, 
+
+2025) , where the original cancer spreads to other parts of the body, SPC arises 
+
+independently and poses a growing concern for cancer survivors due to the improved 
+
+survival rate. Early identification of patients at higher risk for SPC is crucial for timely 
+
+inter vention and better clinical outcomes  (Sung et al., 2024) .
+
+The types of  SPC s vary depending on factors such as types of  original cancer, 
+
+lifestyle, treatment modalities (e.g., surgery or chemotherapy), etc. In this study, we focus 
+
+on predicting  SPC  among lung cancer survivors, leveraging real -world clinical data. 
+
+However,  our  data is collected exclusively from hospitals  in Taiwan , which introduces 
+
+two key limitations. First, the sample size is relatively limited,  which may  reduc e the 
+
+power of traditional machine learning models  (Rajput et al., 2023) . Second, because the 
+
+data originates from a single geographic  area , the resulting models may suffer from  lack 
+
+of  generalizability when applied to other populations or healthcare systems. 
+
+To address this limitation, we incorporate data from  additional  available sources, 
+
+specifically the Surveillance, Epidemiology, and End Results (SEER) program 
+
+(Surveillance, Epidemiology, and End Results Program , 2025) , which contains a large 
+
+and diverse cohort of U.S. cancer patients. Integrating SEER data has the potential to 
+
+significantly improve prediction performance by increasing sample diversity and size. 
+
+However, directly merging real -world clinical data  with  datasets  from  the  other sources 
+
+would  introduce challenges due to  privacy issues and  feature heterogeneity  (Soenksen et 
+
+al., 2022) , different  sources often collect different sets of attributes, resulting in sparse 
+
+feature spaces or requiring imputation, which can degrade model performance  (Petrini et 
+
+al., 2022) .
+
+Inspired by the  previous study  (Hong & Tseng, 2022) , we explore an alternative 
+
+route using federated learning (FL) to avoid merging raw data across institutions with the 
+
+additional benefits of preserving privacy  (Zhang et al., 2021) . FL allows collaborative 
+
+model training across multiple data sources without exchanging sensitive patient 
+
+information. However, traditional horizontal federated learning (HFL) requires that all 
+
+participating clients share the same feature space  (Mammen, 2021) , a condition  that is  not 
+
+met in our case. 
+
+To overcome this limitation, we propose a framework called  Loss Fusion 
+
+Federated Learning (LF2L) . This method enables each data source to maintain its 3
+
+> LF2L: Loss Fusion Horizontal Federated Learning Across Heterogeneous Feature Spaces
+
+unique feature set while contributing to the global model through a shared loss 
+
+representation. By  eliminating  the need for feature space alignment, LF2L allows us to 
+
+fully leverage the predictive value of  all available  datasets without introducing sparsity or 
+
+discarding critical information. 
+
+# 2. Method 
+
+Figure 1 : The workflow of the proposed Loss Fusion Horizontal Federated Learning 
+
+Framework (LF2L). β is a learnable parameter, gradually  fine -tu ning the effectiveness of 
+
+the federated learning. 
+
+Figure 1  illustrates the proposed  LF2L  workflow. The process begins by dividing 
+
+the input features into two groups: global and local feature  groups , which may partially 
+
+overlap  (Figure 2 ). The global feature group is used to perform  traditional H FL , where 
+
+model parameters are aggregated via a centralized cloud server. This shared model 
+
+captures generalizable patterns across clients.  The embeddings from the last hidden layer 
+
+in  the  FL  stage  are extracted to serve as inputs for the later training process. After that, 
+
+each client uses its local feature group to train a localized model  (main net) , while 
+
+simultaneously feeding the  embedding s from FL  into a secondary network called the 
+
+prune net. Finally, the overall loss is c alculated  as the sum of the local model’s loss and a 
+
+weighted prune net loss, multiplied by a learnable parameter β. This combined loss is 4
+
+> Chia -Fu Lin and Yi -Ju Tseng
+
+used for backpropagation to update both local model and prune net parameters. 
+
+A.  Feature Grouping 
+
+Figure 2 : Features Grouping in two clients. 
+
+We begin by dividing the features into two distinct sets, which are then grouped into 
+
+different feature groups for use in our models  (Figure 2 ). We first identify the common 
+
+features shared  with  all clients. These shared features are designated as the common 
+
+feature set, as they can be used collaboratively in the  FL  process. The non -overlapping, 
+
+client -specific features are categorized as unique features. 
+
+Ideally, the local feature group should be optimized to include only the most 
+
+relevant features for each client’s specific data, which may involve filtering out less 
+
+informative features. However, in practice, it is often impractical to determine feature 
+
+importance a priori. Therefore, in this experiment, each client's local feature group 
+
+includes both the common (global) features and its unique features to ensure all available 
+
+information is utilized during localized training. 
+
+B.  Federated Learning 
+
+After categorizing the features into global and local groups,  FL  is applied to the 
+
+global feature group across all clients.  Since SPC prediction is a highly imbalanced task, 
+
+with the risk of developing SPC less than 10%, class weights are calculated using the 
+
+method proposed in this study  (Cui et al., 2019) . We then  extract the output from the last 
+
+hidden layer of the global model to serve as input embeddings for subsequent learning 
+
+stages.  The motivation for using the last hidden layer outputs lies in their ability to retain 
+
+rich and high -dimensional representations of the input data. Inspired by the architecture 5
+
+> LF2L: Loss Fusion Horizontal Federated Learning Across Heterogeneous Feature Spaces
+
+of autoencoders  (Hinton & Salakhutdinov, 2006) , this approach helps preserve more 
+
+informative and structured features, providing a meaningful and compact representation 
+
+for the subsequent learning stage s.
+
+C.  Fusing: Localized Learning and Prune Net Guidance 
+
+After retrieving the embeddings from the federated learning model, we feed them 
+
+into a lightweight neural network —referred to as the prune net —comprising one layer. 
+
+Since the embeddings are already trained and have converged, the prune net focuses on 
+
+refin ing the representations further.  The loss  of  the prune net is then multiplied by a 
+
+learnable parameter β and added to the localized learning loss, which is c alculated  from 
+
+training a separate model using the local feature group. In this setup, the prune ne t loss 
+
+acts as a guiding signal, dynamically influencing the optimization process by accelerating 
+
+or decelerating the convergence of local model parameters. 
+
+Once the model reaches convergence, the final prediction output is derived solely 
+
+from the localized learning network, which has been informed by both local features and 
+
+global context. 
+
+# 3. Result 
+
+A.  Dataset 
+
+This study utilizes cancer registry data from two sources:  a private  Taiwanese  cancer 
+
+registry dataset  and the publicly available U.S. SEER Program. The Taiwanese dataset 
+
+comprises cancer registry records collected from five hospitals,  which includes  a total of 
+
+10,545 lung cancer patient records spanning the years 2011 to 2020. In contrast, the 
+
+SEER dataset is based on the "Incidence  - SEER Research Data, 18 Registries, Nov 2020 
+
+Sub", and includes  85 ,290  lung cancer patient records collected from 2000 to 20 18, 
+
+covering  various  racial and demographic groups.  The study is approved by the 
+
+Institutional Review Board of the Chang Gung Medical Foundation with a waiver of 
+
+informed consent ( 201901386 B0). 
+
+To facilitate model development and evaluation, each dataset is partitioned using 
+
+stratified sampling based on the target into two subsets: 70% for training and 30% for 
+
+testing.  Moreover, t o ensure robustness, each experiment is repeated across 30 different 
+
+random seeds. This  repeated  stratified split and testing strategy allows the model to learn 
+
+from a representative portion of the data while reserving an independent set for unbiased 
+
+performance evaluation , which is  an  important consideration given the li mited size of the 
+
+Taiwanese dataset. 
+
+B.  Baseline Models 6
+
+> Chia -Fu Lin and Yi -Ju Tseng
+
+To highlight the importance of  our proposed LF2L and prove it can  effectively 
+
+incorporat e datasets  from different sources  into model training, we design a set of 
+
+baseline models for comparison. The first baseline evaluates localized learning, which is 
+
+trained solely on the  local  dataset, without incorporating any  different sources  data.  The 
+
+second baseline introduces  data by implementing a n HFL framework  (Zhang et al., 
+
+2021) , where only the common features between the  two  datasets are utilized. This setup 
+
+reflects a straightforward but na ive integration of data  from the other sources  without 
+
+considering feature heterogeneity  (Guarrasi et al., 2025) . Finally , we introduce 
+
+centralized learning baselines to further examine the effects of naively merging 
+
+heterogeneous datasets.  We pool  two  datasets  together  and retain all features by  marking 
+
+the unique features  values  as unknown . This  approach  aims  to incorporate information 
+
+from multiple  sources but  handles feature disparity  in effectively. 
+
+C.  Model Performance 
+
+Table 1  presents the model performance when incorporating  SEER  dataset 
+
+resources into the Taiwanese clinical dataset . The results demonstrate that augmenting 
+
+data  even from different sources can still  improve  prediction performance. Compared to 
+
+traditional neural network training, our method achieves a higher AUROC (0.732 6 
+
+0.0 38 7 vs. 0.7196   0.019 6, p = 0.1067) and AUPRC (0.1187   0.025 3 vs. 0.100 4 
+
+0.00 90 , p < 0.00 1). Even when compared to  HFL , our approach significantly outperforms 
+
+both AUROC (0.732 6  0.038 7 vs. 0.715 7 0.018 7, p < 0.05 ) and AUPRC (0.1187  
+
+0.025 3 vs. 0. 0953   0.0072 , p < 0.001). 
+
+Table 1 . Performance of Second Primary Cancer Prediction in Lung Cancer Survivors 
+
+Using the Taiwanese Clinical Dataset with SEER Data as Augmentation 
+
+Method  Model  AUROC (SD)  AUPRC (SD) 
+
+Baselines  Localized Learning  0.7196   0.019 6 0.100 4  0.00 90 
+
+Federated Learning  0.715 7  0.018 7 0.0953   0.0072 
+
+Ours  Adding  SEER  dataset  0.732 6  0.038 7 0.1187   0.025 3
+
+On the other hand,  Table 2  presents the performance of the US -based SEER dataset 
+
+when augmented with the Taiwanese local data. Compared to traditional neural network 
+
+training, our method achieves a higher AUROC (0.733 7  0.0083  vs. 0.7219   0.0 113 , p
+
+< 0.001) and AUPRC (0.1373   0.0063  vs. 0.1317   0. 005 1, p < 0.00 1).  Compared to the 
+
+federated learning baseline, our approach also outperforms in terms of AUROC (0.733 7 
+
+0.0083  vs. 0.729 4  0.0 060 , p < 0.05 ) and achieves a slightly higher AUPRC (0.1373  
+
+0.0 063  vs. 0.1355   0.0 039 , p = 0.1 9), though the latter difference is not statistically 7
+
+> LF2L: Loss Fusion Horizontal Federated Learning Across Heterogeneous Feature Spaces
+
+significant. 
+
+Last,  comparing with  the performance of centralized learning by recklessly pooling 
+
+two heterogeneous datasets —Taiwanese clinical data and SEER —into a single dataset. 
+
+Although  our method  is comparable  in AUPRC ( 0.1187   0.025 3 vs. 0.1171  0.0289 , p =
+
+0.82), it reaches a significant improvement in  AU RO C ( 0.732 6  0.038 7 vs.  0.6890  
+
+0.0908 , p < 0.05 ) in  Taiwanese  dataset . Furthermore , our method results in a higher 
+
+AUROC (0.6890 ± 0.0908 vs. 0.7337 ± 0.0083,  p < 0.01) and a significantly higher 
+
+AUPRC (0.1171 ± 0.0289 vs. 0.1373 ± 0.0063,  p < 0.001)  in SEER dataset .
+
+Table 2.  Performance of Second Primary Cancer Prediction in Lung Cancer Survivors 
+
+Using the SEER Dataset with Taiwanese Clinical Dataset as Augmentation 
+
+Method  Model  AUROC (SD)  AUPRC (SD) 
+
+Baseline s Localized Learning  0.7219   0.0113  0.1317   0.005 1
+
+Federated Learning  0.729 4  0.00 60  0.1355   0.0039 
+
+Ours  Adding  Taiwanese  dataset  0.733 7  0.0083  0.1373   0.0063 
+
+# 4. Discussion 
+
+By comparing the localized learning model with our proposed method, we observe 
+
+that while localized learning leverages all available  local features, it fails to utilize the 
+
+large -scale dataset , which  the SEER dataset contains nearly  eight  times more records than 
+
+the Taiwanese dataset . As a result, the training data remains limited in size, constraining 
+
+the model’s learning capacity and leading to inferior performance.  In contrast, the  HFL 
+
+incorporates data from  two different  sources, thus benefiting from increased sample size. 
+
+However, due to feature alignment constraints, it only uses the common features shared 
+
+between datasets, thereby discarding unique and informative clinical features from the 
+
+Taiwanese  dataset , such as EGFR gene mutati on, and ALK gene mutation , etc . This 
+
+results in a loss of critical domain -specific information and ultimately degrades predictive 
+
+performance. 
+
+Our proposed method addresses both of these limitations. It preserves valuable local 
+
+features from the Taiwanese dataset while leveraging the scale and diversity of the SEER 
+
+dataset through the LF2L framework. Furthermore, centralized learning demonstrate s
+
+how effectively our method leverages additional datasets. Centralized learning  aggregates 
+
+all data into a unified dataset and appears to leverage both quantity and feature diversity, 
+
+but does so in a naive manner, without explicitly addressing feature -level discrepancies 
+
+across datasets. The imputation process introduces sparsity and potential noise, which can 
+
+impair the model’s capacity to learn meaningful patterns. These observations reinforce 8
+
+> Chia -Fu Lin and Yi -Ju Tseng
+
+the need for LF2L, which goes beyond simple dataset aggregation to effectively resolve 
+
+feature heterogeneity in multi -source medical data. 
+
+# References 
+
+Cui, Y., Jia, M., Lin, T. -Y., Song, Y., & Belongie, S. (2019).  Class -Balanced Loss Based on 
+
+Effective Number of Samples  (No. arXiv:1901.05555). arXiv. 
+
+https://doi.org/10.48550/arXiv.1901.05555 
+
+Fauber, B. (2024).  Gini Coefficient as a Unified Metric for Evaluating Many -versus -Many 
+
+Similarity in Vector Spaces  (No. arXiv:2411.07983). arXiv. 
+
+https://doi.org/10.48550/arXiv.2411.07983 
+
+Guarrasi, V., Aksu, F., Caruso, C. M., Feola, F. D., Rofena, A., Ruffini, F., & Soda, P. (2025). A 
+
+Systematic Review of Intermediate Fusion in Multimodal Deep Learning for Biomedical 
+
+Applications.  Image and Vision Computing , 158 , 105509. 
+
+https://doi.org/10.1016/j.imavis.2025.105509 
+
+Hinton, G. E., & Salakhutdinov, R. R. (2006, July 28).  Reducing the Dimensionality of Data with 
+
+Neural Networks . Science. https://www.science.org/doi/10.1126/science.1127647 
+
+Hong, J. -F., & Tseng, Y. -J. (2022, September).  Performance vs. Privacy: Evaluating the 
+
+Performance of Predicting Second Primary Cancer in Lung Cancer Survivors with 
+
+Privacy -preserving Approaches . IEEE Xplore. 
+
+https://ieeexplore.ieee.org/document/9926935 
+
+Mammen, P. M. (2021).  Federated Learning: Opportunities and Challenges  (No. 
+
+arXiv:2101.05428). arXiv. https://doi.org/10.48550/arXiv.2101.05428 
+
+National Cancer Institute. (2011a, February 2).  Definition of metastasis  (nciglobal,ncienterprise) 
+
+[nciAppModulePage]. https://www.cancer.gov/publications/dictionaries/cancer -
+
+terms/def/metastasis 
+
+National Cancer Institute. (2011b, February 2).  Definition of second primary cancer 
+
+(nciglobal,ncienterprise) [nciAppModulePage]. 
+
+https://www.cancer.gov/publications/dictionaries/cancer -terms/def/second -primary -
+
+cancer 
+
+National Cancer Institute. (2025, April 2).  Recurrent Cancer .
+
+https://www.cancer.gov/types/recurrent -cancer 
+
+Petrini, L., Cagnetta, F., Vanden -Eijnden, E., & Wyart, M. (2022).  Learning sparse features can 
+
+lead to overfitting in neural networks  (No. arXiv:2206.12314). arXiv. 
+
+https://doi.org/10.48550/arXiv.2206.12314 
+
+Rajput, D., Wang, W. -J., & Chen, C. -C. (2023). Evaluation of a decided sample size in machine 
+
+learning applications.  BMC Bioinformatics , 24 (1), 48. https://doi.org/10.1186/s12859 -
+
+023 -05156 -9
+
+Soenksen, L. R., Ma, Y., Zeng, C., Boussioux, L., Carballo, K. V., Na, L., Wiberg, H. M., Li, M. 
+
+L., Fuentes, I., & Bertsimas, D. (2022, September 20).  Integrated multimodal artificial 
+
+intelligence framework for healthcare applications . Digital Medicine. 
+
+https://www.nature.com/articles/s41746 -022 -00689 -4
+
+Sung, J. J., Ahn, A. R., Park, H. S., Jang, K. Y., Moon, W. S., Lee, J. -H., Kim, K. M., & Chung, 
+
+M. J. (2024, September).  Incidence and pattern of second primary cancer in patients 
+
+diagnosed with primary cancer —PMC . National Library of Medicine. 
+
+https://pmc.ncbi.nlm.nih.gov/articles/PMC11406571/ 
+
+Surveillance, Epidemiology, and End Results Program . (2025). SEER. 
+
+https://seer.cancer.gov/index.html 
+
+Zhang, C., Xie, Y., Bai, H., Yu, B., Li, W., & Gao, Y. (2021, March 15).  A survey on federated 
+
+learning . ScienceDirect. 
+
+https://www.sciencedirect.com/science/article/abs/pii/S0950705121000381

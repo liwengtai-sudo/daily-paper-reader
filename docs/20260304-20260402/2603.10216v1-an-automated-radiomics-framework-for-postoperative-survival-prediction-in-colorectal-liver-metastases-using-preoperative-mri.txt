@@ -1,0 +1,242 @@
+Title: An Automated Radiomics Framework for Postoperative Survival Prediction in Colorectal Liver Metastases using Preoperative MRI
+
+URL Source: https://arxiv.org/pdf/2603.10216v1
+
+Published Time: Thu, 12 Mar 2026 00:17:47 GMT
+
+Number of Pages: 25
+
+Markdown Content:
+# An Automated Radiomics Framework for Postoperative Survival Prediction in Colorectal Liver Metastases using Preoperative MRI 
+
+Muhammad Alberb 1,2,∗, Jianan Chen 3, Hossam El-rewaidy 4, Paul Karanicolas 5, Arun Seth 6,Yutaka Amemiya 6, Anne Martel 1,2, Helen Cheung 7,8 
+
+> 1
+
+Department of Medical Biophysics, University of Toronto, Toronto, ON, Canada; 2 Physical Sciences Platform, Sunnybrook Research Institute, Toronto, ON, Canada; 3 UCL Cancer Institute, University College London, London, UK; 4 Systems and Biomedical Engineering Department, Cairo University, Giza, Egypt; 5 Department of Surgery, University of Toronto, Toronto, ON, Canada; 6 Department of Laboratory Medicine and Pathobiology, University of Toronto, Toronto, ON, Canada; 7 Sunnybrook Health Sciences Centre, Toronto, ON, Canada; 8 Department of Medical Imaging, University of Toronto, Toronto, ON, Canada 
+
+> ∗
+
+Corresponding author: muhammad.alberb@mail.utoronto.ca 
+
+Abstract Purpose: While colorectal liver metastasis (CRLM) is potentially curable via hepatectomy, patient outcomes remain highly heterogeneous. Postoperative survival prediction is necessary to avoid non-beneficial surgeries and guide personalized therapy. In this study, we present an automated AI-based framework for postoperative CRLM survival prediction using pre- and post-contrast MRI. 
+
+Methods: We performed a retrospective study of 227 CRLM patients who had gadoxetate-enhanced MRI prior to curative-intent hepatectomy between 2013 and 2020. We developed a survival predic-tion framework comprising an anatomy-aware segmentation pipeline followed by a radiomics pipeline. The segmentation pipeline learns liver, CRLMs, and spleen segmentation from partially-annotated data, leveraging promptable foundation models to generate pseudo-labels. To support this pipeline, we pro-pose SAMONAI, a prompt propagation algorithm that extends Segment Anything Model to 3D point-based segmentation. Predicted pre- and post-contrast segmentations are then fed into our radiomics pipeline, which extracts per-tumor features and predicts survival using SurvAMINN, an autoencoder-based multiple instance neural network for time-to-event survival prediction. SurvAMINN jointly learns dimensionality reduction and survival prediction from right-censored data, emphasizing high-risk metas-tases. We compared our framework against established methods and biomarkers using univariate and multivariate Cox regression. 
+
+Results: Our segmentation pipeline achieves median Dice scores of 0.96 (liver) and 0.93 (spleen), driv-ing a CRLM segmentation Dice score of 0.78 and a detection F1-score of 0.79. Accurate segmentation enables our radiomics pipeline to achieve a survival prediction C-index of 0.69. 
+
+Conclusion: Our results demonstrate the potential of integrating segmentation algorithms with radiomics-based survival analysis to deliver accurate, automated, and interpretable CRLM outcome prediction. 
+
+1
+
+> arXiv:2603.10216v1 [cs.CV] 10 Mar 2026
+
+# 1 Introduction 
+
+Colorectal cancer is the second leading cause of cancer-related death worldwide [1]. The liver is the pre-dominant site of colorectal cancer metastases [2] and surgical resection remains the only potentially curative treatment [3]. Nevertheless, patient outcomes remain highly heterogeneous [4]. Postoperative survival pre-diction is essential to avoid non-beneficial surgeries and guide personalized therapy, ultimately improving survival [5]. Conventional clinical and molecular biomarkers lack sufficient predictive power [6, 5], motivating imaging-based risk scores [7]. In multifocal CRLM, prognosis is often driven by aggressive tumors [8]. However, existing imaging scores typically focus on the largest tumor, potentially overlooking multifocality [9]. Moreover, these scores require manual tumor segmentation, which is labor-intensive and prone to inter-rater variability [10, 7]. Automating segmentation via supervised training of deep learning models is limited by the scarcity of fully-annotated datasets [11]. One solution is to complete missing annotations using promptable foundation models, such as Segment Anything Model (SAM) [12] and its medical adaptation, MedSAM [13]. SAM, however, only works on 2D images and therefore requires slice-wise prompting. Although SAM2 [14] and SAM3 [15] overcome this limitation by treating slices as video frames, recent studies show that this approach does not necessarily outperform SAM [16, 17, 18]. MedSAM additionally requires box prompts, which are unsuitable for concave structures, and may suffer, as a result of medical finetuning, from reduced generalizability to unseen protocols [19]. Thus, a depth-aware extension of SAM without medical finetuning, box prompts, or slice-wise prompting is desirable. Segmentation errors, particularly those corresponding to detecting false lesions in non-hepatic regions, can degrade downstream survival prediction [9]. This highlights the importance of developing anatomy-aware segmentation models. Furthermore, automated methods in prognostic studies often utilize post-contrast images only [20, 9]. In clinical practice, radiologists typically evaluate both pre- and post-contrast scans to detect lesions and assess their malignancy [21]. This discrepancy underscores the importance of incorporating pre-contrast features into prognostic models. Following segmentation, a typical radiomics workflow includes feature extraction, feature selection, and modeling. However, decoupling feature selection from prediction can result in losing predictive signals [22]. To mitigate this, one multiple instance learning (MIL) approach jointly performs feature compression and 3-year survival prediction by aggregating tumor-level representations into patient-level outcomes [9]. How-2ever, this approach formulates survival prediction as a binary classification task and excludes censored cases. Additionally, it averages tumor representations, which can obscure contributions from high-risk tumors. The objective of this study is to investigate methods for improving postoperative survival prediction in CRLM. We hypothesize that leveraging pre- and post-contrast MRI to model high-risk tumors through an end-to-end automated framework outperforms conventional methods and existing biomarkers. To this end, we propose a two-stage framework comprising segmentation and radiomics. Our contributions are: • A segmentation pipeline that leverages foundation models to learn from partial labels. • SAMONAI, an algorithm that extends SAM to 3D point-based segmentation. • SurvAMINN, an autoencoder-based MIL neural network for joint dimensionality reduction and sur-vival prediction, accommodating censoring and emphasizing high-risk tumors. 
+
+# 2 Materials and Methods 
+
+2.1 Dataset 
+
+This retrospective study used an institutional dataset of 227 CRLM patients (139 males, 61 years, 31–84; 88 females, 61 years, 29–88) who underwent gadoxetate-enhanced MRI prior to curative-intent hepatectomy between January 2013 and December 2020. The institutional research ethics board granted approval and waived the requirement for informed consent. Studies were obtained as per institutional clinical protocols. Patients received 3D axial T1-weighted imaging (TE ≈1.5 ms, TR ≈3.0 ms, flip angle ≈10 degrees) in the pre-contrast and hepatobiliary phases (20 minute delay). A standard 10 mL intravenous dose of gadoxetate was administered at 1.0 mmol/mL. Studies were performed on 1.5-T or 3.0-T magnets with an eight-channel body phased array coil covering the liver. An abdominal radiologist with 13 years of experience manually segmented all CRLMs with longest axial diameters ≥ 10 mm in both pre- and post contrast images using ITK-SNAP [23]. Segmented tumors per patient ranged from 1 to 12 with multifocal CRLM present in 130 patients. To reduce annotation cost, the liver and spleen were manually segmented for 20 post-contrast images only, which were reserved exclusively for evaluation. Mortality status, survival time, and demographic data, including age and sex, were collected. 82 patients had known postoperative survival time (median 28 months), and the rest were right-censored. Risk scores, 3including Fong score [24] and target tumor enhancement [7], were calculated. For 60 patients, DNA se-quencing was conducted following [25], and gene mutational statuses were recorded, including APC, TP53, KRAS, and NRAS. Exclusion criteria and data splitting are illustrated in Fig. 1, with more details available in supplemental material. 
+
+Figure 1: Dataset processing: (a) cohort definitions and exclusion criteria, (b) patient-level data splitting for training, validation, and testing. Patients with manual liver and spleen annotations were held out from segmentation model development, while patients with available genomics data were held out from both segmentation and survival prediction models development to be exclusively used for testing. 
+
+2.2 Framework Overview 
+
+We propose a fully automated framework for CRLM survival prediction from MRI, consisting of a segmen-tation pipeline followed by a radiomics pipeline. The main objective of the segmentation pipeline is to delineate CRLMs. To enforce anatomical plausibil-ity and suppress extra-hepatic predictions, liver segmentation is required. Additionally, spleen segmentation is incorporated to reduce ambiguity, as automated models often confuse it with the liver [26]. However, due to the limited availability of manual liver and spleen annotations in our dataset, cases with these labels were reserved for evaluation, with only CRLMs labels available during training. To enable learning from partial labels, the segmentation pipeline leverages a promptable foundation model during training to pro-vide pseudo-labels for missing targets. To support this approach and ensure generalizability, we introduce SAMONAI, an algorithm that extends SAM to 3D segmentation. Following segmentation, the radiomics pipeline extracts per-tumor features then models time-to-event survival using SurvAMINN, our MIL network that emphasizes high-risk tumors. During inference, ra-4diomics are extracted from predicted segmentations, enabling end-to-end automation. 
+
+2.3 Segmentation Pipeline 
+
+2.3.1 Segmentation with Partial Labels 
+
+Our segmentation pipeline, shown in Fig. 2, is designed to enable training with partially-labeled datasets. First, a promptable model is applied to segment the liver and spleen in a small subset. These segmentations are used as pseudo-labels to fine-tune a UNETR [27] initialized with a pretrained vision transformer [28] and augmented with an adapter [29]. To minimize manual effort during training, this stage is limited to 15 training and 5 validation samples. Subsequently, this finetuned UNETR is applied to the entire training dataset to generate liver and spleen segmentations. Finally, another training round is conducted to incorpo-rate all CRLM labels. This pipeline is applied independently to pre- and post-contrast MRI. Preprocessing and training are detailed in supplemental material and follow [30]. 
+
+Figure 2: Segmentation pipeline: a promptable foundation model is used to complete partially-annotated masks for a small subset. A few-shot UNETR model is trained on the subset then used to complete the annotations for all cases selected for segmentation model development. Finally, A supervised UNETR model is retrained on the entire training dataset with completed labels. 52.3.2 Segmentation with Prompts 
+
+During training, our segmentation pipeline requires a promptable model for unlabeled structures. To ensure robustness across protocols, we introduce SAMONAI, a prompt propagation algorithm, shown in Fig. 3, that extends SAM to volumetric segmentation. Initially, the user provides prompts in a single slice from any view and SAM segments it. Consequently, positive lines are projected onto intersecting slices from other views. From each of these views, the slice with the longest positive line is segmented by selecting one positive point from the projected line and one negative point from background points along this line. Segmenting three slices from orthogonal views produces positive lines spanning the object. SAMONAI selects positive prompts from these lines and negative prompts beyond a bounding box enclosing the lines, after which SAM segments all slices in parallel. To incorporate 3D awareness, this process is applied to all three views and predictions are averaged. Computational cost is preserved by sampling slices at 13 density and interpolating skipped ones. Predictions are binarized with an adaptive threshold T = μ + 2 σ, where μ and σ are the logits mean and standard deviation. To select optimal prompts, SAMONAI follows three criteria derived from the observation that SAM performs better when prompts match the object’s average intensity, lie near its center, and reside in homo-geneous regions. For a given point p from candidate points P in image I, an intensity criterion Ci is defined as the absolute intensity difference between p and the median of P :
+
+Ci(p) = |I(p) − median q∈P (I(q)) | (1) A location criterion Cl is defined as the Euclidean distance between p and the centroid of P :
+
+Cl(p) = p − 1
+
+|P |
+
+X
+
+> q∈P
+
+q (2) A homogeneity criterion Ch is defined as the standard deviation of intensities within an 11 ×11 neighborhood 
+
+N11 ×11 centered around p:6Ch(p) = 
+
+vuut 1
+
+|N |
+
+X
+
+> r∈N11 ×11 (p)
+
+(I(r) − μp)2, (3) where μp is the mean intensity of N11 ×11 . The total cost Ct is a weighted sum of equations (1), (2), and (3), normalized over P :
+
+Ct(p) = α · ˆCi(p) + β · ˆCl(p) + γ · ˆCh(p), (4) where: • ˆCi(p), ˆCl(p), and ˆCh(p) are the min-max normalization of Ci(p), Cl(p), and Ch(p).• α, β, and γ are weights empirically set to 1, 1, and 2, respectively. For negative points, we exclude the lowest 10% of intensities to avoid selecting a background point. Finally, the optimal prompt is determined by minimizing equation (4). 
+
+2.4 Radiomics Pipeline 
+
+After segmenting CRLMs, our radiomics pipeline, shown in Fig. 4, extracts per-tumor radiomics then per-forms simultaneous dimensionality reduction and survival prediction. 
+
+2.4.1 Radiomics Extraction 
+
+Radiomics are extracted using PyRadiomics (v3.1.0) [31]. Predicted segmentations with longest diameter 
+
+≤ 1st percentile of the training set are excluded, reducing instability. Volumes are resampled to isotropic 
+
+2 mm spacing using B-spline interpolation. Outliers beyond [μ − 3σ, μ + 3 σ] are clipped, where μ and σ
+
+are the intensity mean and standard deviation, respectively. Intensities are z-score normalized, scaled by 100, and discretized into bins of width 5. Statistical, shape, and textural features are extracted, as detailed in supplemental material, and normalized using two-step normalization [9]. 
+
+2.4.2 Survival Prediction 
+
+We propose SurvAMINN, a dense neural network comprising an autoencoder for dimensionality reduction and a MIL regressor for survival prediction from multifocal CRLM. SurvAMINN extends AMINN [9] by 7Figure 3: Overview of SAMONAI applied to the liver: 3D objects are segmented from single points by propagating prompts from one view to another. Positive and negative points are displayed in green and red, respectively. modeling time-to-event, handling censored data, and emphasizing high-risk tumors. The autoencoder is trained to embed per-tumor features and reconstruct them, by minimizing mean squared error: 
+
+LMSE = 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+|xt − ˆxt|2, (5) where xt and ˆxt are the input and reconstructed features, respectively, and T is the number of tumors. The MIL regressor is trained to predict tumor scores from embeddings and pool them into patient haz-ards. To emphasize high-risk tumors, we define patient hazard ηp as the logarithm of sum of exponentials (LSE) of tumor scores {η1, η 2, . . . , η T }:8Figure 4: Radiomics pipeline: per-tumor radiomics are extracted. An autoencoder compresses features and a multiple instance regressor connected to the autoencoder’s bottleneck predicts per-tumor risk scores and pools them into patient hazards. The autoencoder and regressor are jointly trained using a weighted sum of mean squared error LMSE and cox proportional hazard loss LCoxPH .
+
+ηp = log 
+
+> T
+
+X
+
+> t=1
+
+exp( ηt)
+
+!
+
+, (6) This behaves as a soft maximum, letting more aggressive tumors dominate predictions while account-ing for cumulative contributions of multiple lesions and preserving differentiability for optimization. The regressor is optimized using Cox proportional hazard loss: 
+
+LCoxPH = − X
+
+> p:δp=1
+
+ηp − log X
+
+> ˆp∈R (Tp)
+
+eηˆp
+
+ , (7) where δp indicates mortality, Tp denotes survival time, and R(Tp) are patients at risk at Tp. The total loss 
+
+Lt is a weighted combination of equations (5) and (7): 
+
+Lt = (1 − α) · L MSE + α · L CoxPH , (8) where α = current epoch total epochs ∈ [0 , 1] is a scheduling parameter that gradually shifts training from reconstruction to survival prediction, improving stability. 9Figure 5: Segmentation box plots. MedSAM, in blue, and SAMONAI, in orange, denote prompt-based segmentation performance on missing labels. Pipeline (MedSAM), in green, and Pipeline (SAMONAI), in red, denote final automated segmentation performance after integrating each promptable model into our segmentation pipeline. Black dots inside boxes represent mean Dice scores over patients, and gray dots outside boxes represent individual patients beyond the interquartile range. 
+
+# 3 Results 
+
+3.1 Segmentation 
+
+Segmentation algorithms were evaluated using 20 fully-annotated cases, as shown in Fig. 1. Due to the high annotation cost, liver and spleen were only annotated in post-contrast images. To evaluate pre-contrast pre-dictions, annotations were registered to pre-contrast images using affine followed by deformable registration via Elastix [32]. Fig. 5 reports segmentation performance under two evaluation settings. First, we directly compare SAMONAI to MedSAM on missing labels. SAMONAI consistently outperforms MedSAM, with median Dice improvements of 7% (liver) and 8% (spleen) on pre-contrast MRI, and 8% (liver) and 10% (spleen) on post-contrast MRI. Second, we assess the impact of each of them on our segmentation pipeline. SAMONAI improves the pipeline’s median Dice scores by 8% and 6% (liver) and by 9% and 5% (spleen) on pre- and post-contrast MRI, respectively, yielding median Dice scores of 0.95 (liver) and 0.92 (spleen) on pre-contrast images, and 0.96 (liver) and 0.93 (spleen) on post-contrast images. Tumor segmentation achieves median Dice scores of 0.65 and 0.78 for pre- and post-contrast, respectively, with comparable performance for SAMONAI and MedSAM, as both contribute mainly to missing labels. Moreover, we evaluate the tumor detection performance of our segmentation pipeline, as shown in ta-ble 1. As expected due to the enhanced tumor visibility, the post-contrast results surpass the pre-contrast 10 ones, with a 0.79 F1-score. Nevertheless, pre-contrast performance remains satisfactory, with a 0.71 F1-score, despite the inherent challenges in distinguishing tumors without contrast enhancement. A visual example of segmentation quality is provided in Supplementary Fig. S2. These results highlight the potential of pre-contrast predictions to contribute meaningfully to survival analysis. Table 1: Tumor detection results of the SAMONAI-based segmentation pipeline Contrast Precision Recall F1-score TP FP FN Pre-contrast 0.674 0.756 0.713 31 15 10 Post-contrast 0.720 0.878 0.791 36 14 5 
+
+> Note: TP = true positives, FP = false positives, FN = false negatives.
+
+3.2 Survival Prediction 
+
+In evaluating our radiomics pipeline, unless explicitly stated otherwise, we utilize predicted segmentations from both pre- and post-contrast MRI. We conducted four sets of experiments. First, we compare survival prediction using pre- and post-contrast phases individually versus jointly. Figure 6 presents the results using predicted versus manual segmentations. Post-contrast segmentations yield better performance than pre-contrast alone. However, combining both phases consistently improves performance, as confirmed by Wilcoxon rank-sum test [33]. Although replacing ground-truth with pre-dicted segmentations slightly degrades C-Index (0.023 for pre-contrast, 0.015 for post-contrast, and 0.010 for both), the pipeline retains strong predictive power. Kaplan-meier curves and log-rank tests, shown in Supplementary Fig. S4, reflect our pipeline’s capability to stratify patients into low- and high-risk groups. Second, we compare our pooling strategy with alternative approaches. Table 2 presents results obtained by defining patient hazard as the score of the largest tumor, the mean tumor score, or the maximum tumor score. Survival prediction based on the highest-risk tumors, as captured by max pooling, is more accurate than relying on the largest tumor alone or averaging across all tumors. LSE pooling further improves per-formance by accounting for contributions from multiple high-risk tumors, enhancing stability and accuracy. Third, we compare SurvAMINN to independent dimensionality reduction and survival prediction stages, as shown in Table 3. For feature reduction, we evaluate four approaches: no reduction (all features), K-best selection, principal component analysis (PCA), and minimal-redundancy-maximal-relevance (mRMR) [34]. For each reduction method, we train two models: support vector machines (SVM) for 3-year survival bi-11 Figure 6: Survival prediction box plot showing C-index when using pre-contrast (pre), post-contrast (post), and combined contrast phases (both). Black dots inside boxes represent mean C-index over runs, and gray dots outside boxes represent individual runs beyond the interquartile range. Solid boxes correspond to ground-truth manual segmentations and striped boxes correspond to predicted segmentations. Statistical significance, assessed by Wilcoxon rank-sum test’s p-value, confirms that combining pre- and post-contrast MRI yields better performance than using either phase individually. nary classification, and random survival forest (RSF) [35]. Although SVM generally outperforms RSF, its performance is less stable, likely due to the reduced sample size after excluding censored cases. In con-trast, SurvAMINN jointly learns dimensionality reduction and survival prediction using the entire dataset, enabling it to consistently outperform machine learning approaches. Fourth, we compare SurvAMINN to existing clinical and molecular biomarkers, as shown in table 4. Al-though gene mutations, including APC, TP53, KRAS, and NRAS, are acquired after surgery from resected Table 2: Comparison of pooling strategies Pooling C-Index HR (95% CI) pmean 0.556 1.114 (1.040–1.216) 0.759 largest 0.594 1.263 (1.147–1.391) 0.618 max 0.623 1.568 (1.441–1.784) 0.162 LSE 0.691 1.929 (1.890–1.980) <0.001  
+
+> Note: HR = hazard ratio, CI = confidence interval, p = Wald statistic P-value.
+
+12 Table 3: Comparison of SurvAMINN against common machine learning methods Model Reduction C-Index HR (95% CI) pSVM None 0.659 1.781 (1.693–1.876) 0.002 SVM KBest 0.647 1.745 (1.652–1.842) 0.005 SVM PCA 0.667 1.907 (1.793–2.036) 0.004 SVM mRMR 0.634 1.568 (1.494–1.652) 0.011 RSF None 0.632 1.447 (1.368–1.531) 0.072 RSF KBest 0.637 1.543 (1.453–1.653) 0.056 RSF PCA 0.634 1.475 (1.412–1.540) 0.012 RSF mRMR 0.631 1.446 (1.373–1.523) 0.052 SurvAMINN 0.691 1.929 (1.890–1.980) <0.001  
+
+> Note: HR = hazard ratio, CI = confidence interval, p = Wald statistic P-value. None refers to using all extracted features without dimensionality reduction.
+
+samples, they fail to accurately predict survival. Despite the improvement in the C-index when combining SurvAMINN with these biomarkers in a multivariate Cox model, SurvAMINN remains the only predictor with a strong association with survival, as revealed by the hazard ratio (HR), confidence interval (CI), and p-value. Finally, we conduct a randomized test of SurvAMINN, as shown in Supplementary Fig. S5, to further confirm the statistical significance of the achieved C-index. Table 4: Comparison of SurvAMINN against existing clinical and genomic biomarkers using univariate and multivariate Cox regression Univariate Multivariate Biomarker C-Index HR (95% CI) p C-Index HR (95% CI) p
+
+Clinical factors 
+
+0.751 Sex 0.476 0.93 (0.57–1.51) 0.768 1.16 (1.12–1.20) 0.691 Age 0.525 1.34 (0.81–2.22) 0.258 1.54 (1.50–1.58) 0.164 
+
+Risk scores 
+
+Fong [24] 0.545 1.17 (0.74–1.85) 0.500 0.91 (0.88–0.94) 0.741 TuEn [7] 0.538 1.21 (0.81–1.80) 0.347 1.12 (1.09–1.17) 0.737 
+
+Genomic mutations 
+
+APC 0.583 0.82 (0.50–1.34) 0.418 0.59 (0.58–0.61) 0.127 TP53 0.502 1.28 (0.80–2.07) 0.306 1.71 (1.65–1.85) 0.163 KRAS 0.538 0.93 (0.57–1.54) 0.785 0.88 (0.86–0.90) 0.668 NRAS 0.500 1.17 (0.85–1.60) 0.339 0.85 (0.82–0.88) 0.634 
+
+Ours 
+
+SurvAMINN 0.691 1.93 (1.89–1.98) <0.001 3.41 (3.17–4.02) <0.001  
+
+> Note: HR = hazard ratio, CI = confidence interval, p = Wald statistic P-value, TuEn = target tumour enhancement.
+
+13 4 Discussion 
+
+This study presents a CRLM postoperative survival prediction framework from preoperative MRI based on an anatomy-aware segmentation pipeline. On one hand, our zero-shot promptable segmentation method, SAMONAI, achieved substantial liver and spleen segmentation accuracy. Our experiments show that SA-MONAI can outperform medical image segmentation models in terms of accuracy and generalizability. Incorporating SAMONAI into our segmentation pipeline enables learning of liver, CRLMs, and spleen segmentation from partially-annotated data. Our anatomy-aware pipeline eliminates extra-hepatic tumors, improving detection performance for downstream survival prediction. In addition to the detection metrics described in table 1, the predicted post-contrast segmentations were reviewed by the same radiologist who performed the manual segmentation described in section 2.1. The radiologist’s assessment revealed better detection performance than estimated. Our detection metrics count disconnected objects as independent tumors. Therefore, in case of ill-defined segmentation borders, this strategy overestimates false positives (FPs) and false negatives (FNs) by counting disconnected pixels as tumors. The radiologist’s assessment revealed that 13 FPs and 6 FNs were not truly false, but rather single pixels or disconnected borders. Moreover, another source of FPs is that CRLMs with longest diameter ≤ 1 cm are not annotated in the ground-truth. Our pipeline detected 7 small CRLMs that were counted as FPs. Benign lesions are also not included in the manual segmentations. Our pipeline segmented 6 benign lesions (3 cysts and 3 hemangiomas) leading to 6 additional FPs. While benign lesions minimally contribute to prognosis, they are not expected to severely impair our survival prediction pipeline, especially since SurvAMINN estimates patient hazards based on higher-risk tumors, as indicated in equation (6). Although removal of small objects in post processing reduced FPs from 29 to 14 and FNs from 8 to 5, many of the remaining errors were still attributable to the factors discussed above, primarily due to the conservative thresholds used for eliminating small objects. In fact, the radiologist’s assessment revealed that only 3 FPs and 2 FNs were truly false, after neglecting those mentioned above. This suggests that the actual precision and recall exceed 0.93 and 0.95, respectively. Interestingly, the radiologist reported that 2 of the actual FPs corresponded to surgical resection margins in a patient who underwent pre-MRI hepatectomy. Notably, liver segmentation for this case was highly accurate (Dice score ≈ 0.97 ). The third FP, observed in a different patient, was attributed to biliary duct 14 dilation. These three, shown in Supplementary Fig. S3, were the only truly incorrect FPs, likely due to the absence of similar abnormalities in training data. These findings highlight the robustness of our segmentation pipeline. By eliminating the need for labor-intensive manual segmentation, reducing reliance on expert input, and minimizing inter-rater variability, our segmentation pipeline streamlines clinical workflows and paves the way for fully-automated postoperative survival prediction. Our survival prediction results confirm our hypotheses. First, simultaneously utilizing pre- and post-contrast phases improves over individual ones, as shown in Fig. 6. Second, high-risk tumors are more predictive of survival than average or large ones, as shown in table 2. LSE improvement over max pooling suggests that multiple high-risk tumors further impair survival. Third, table 3 highlights that jointly learning dimensionality reduction and survival prediction improves over performing them independently, suggesting that SurvAMINN can preserve features that are crucial for survival prediction. Finally, SurvAMINN proves to be superior to existing clinical and molecular biomarkers shown in table 4. Despite improved automation and predictive performance, our framework has several limitations. For instance, the modest gain from combining pre- and post-contrast MRI suggests insufficient complementary information and suboptimal late fusion, which was employed due to pre- and post-contrast misalignment. Incorporating more informative modalities and tumor-matching algorithms is expected to improve perfor-mance. Furthermore, exclusion of patients with missed tumors can introduce selection bias, highlighting the need to further improve detection sensitivity. Additionally, the segmentation pipeline can be sensitive to the samples selected for pseudo-labeling. Integrating active learning and quality control strategies can enhance robustness. Also, our radiomics pipeline under-utilizes liver and spleen segmentations, which may have prognostic relevance if used for feature extraction. Finally, we aim to extend our framework to pre-dict response to chemotherapy in non-surgical cohorts, which can enhance clinical utility by supporting treatment decision-making for patients who are not candidates for surgery, ultimately contributing to more personalized and effective therapy. In conclusion, this study presents a fully automated CRLM postoperative survival prediction frame-work from pre- and post-contrast MRI. The framework integrates a liver, CRLMs, and spleen segmentation pipeline, powered by promptable foundation models, with a radiomics pipeline for joint dimensionality re-duction and survival prediction based on high-risk tumors. Our experiments demonstrate that our framework can outperform existing machine learning methods and biomarkers, showing a potential to improve CRLM 15 outcome prediction. 
+
+# References 
+
+[1] Sung H, Ferlay J, Siegel RL, Laversanne M, Soerjomataram I, Jemal A, et al. Global Cancer Statistics 2020: GLOBOCAN Estimates of Incidence and Mortality Worldwide for 36 Cancers in 185 Countries. CA: A Cancer Journal for Clinicians. 2021;71(3):209-49. [2] Wang Y, Zhong X Xinyangand He, Hu Z, Huang H, Chen J, Chen K, et al. Liver metastasis from colorectal cancer: pathogenetic development, immune landscape of the tumour microenvironment and therapeutic approaches. Journal of Experimental & Clinical Cancer Research. 2023 Jul;42(1):177. [3] Dong Y, Gruenberger T. Surgical management of colorectal liver metastases—a practical clinical approach. European Surgery. 2023 Jun;55(3):94-9. [4] Spolverato G, Ejaz A, Azad N, Pawlik TM. Surgery for colorectal liver metastases: The evolution of determining prognosis. World J Gastrointest Oncol. 2013 Dec;5(12):207-21. [5] Margonis GA, Vauthey JN. Precision surgery for colorectal liver metastases: Current knowledge and future perspectives. Annals of Gastroenterological Surgery. 2022;6(5):606-15. [6] Tian Y, Wang Y, Wen N, Wang S, Li B, Liu G. Prognostic factors associated with early recurrence following liver resection for colorectal liver metastases: a systematic review and meta-analysis. BMC Cancer. 2024 Apr;24(1):426. [7] Cheung HMC, Karanicolas PJ, Coburn N, Seth V, Law C, Milot L. Delayed tumour enhancement on gadoxetate-enhanced MRI is associated with overall survival in patients with colorectal liver metas-tases. European Radiology. 2019 Feb;29(2):1032-8. [8] Sebagh M, Allard MA, Bosselut N, Dao M, Vibert E, Lewin M, et al. Evidence of intermetastatic het-erogeneity for pathological response and genetic mutations within colorectal liver metastases following preoperative chemotherapy. Oncotarget. 2016;7(16):21591-600. [9] Chen J, Cheung HMC, Milot L, Martel AL. AMINN: Autoencoder-Based Multiple Instance Neural Network Improves Outcome Prediction in Multifocal Liver Metastases. In: Medical Image Computing 16 and Computer Assisted Intervention – MICCAI 2021. Cham: Springer International Publishing; 2021. p. 752-61. [10] Horvat N, Papanikolaou N, Koh DM. Radiomics Beyond the Hype: A Critical Evaluation Toward Oncologic Clinical Use. Radiology: Artificial Intelligence. 2024;6(4):e230437. [11] Rayed ME, Islam SMS, Niha SI, Jim JR, Kabir MM, Mridha MF. Deep learning for medical im-age segmentation: State-of-the-art advancements and challenges. Informatics in Medicine Unlocked. 2024;47:101504. [12] Kirillov A, Mintun E, Ravi N, Mao H, Rolland C, Gustafson L, et al. Segment Anything. arXiv preprint arXiv:230402643. 2023. [13] Ma J, He Y, Li F, Han L, You C, Wang B. Segment anything in medical images. Nature Communica-tions. 2024 Jan;15(1):654. [14] Ravi N, Gabeur V, Hu YT, Hu R, Ryali C, Ma T, et al. SAM 2: Segment Anything in Images and Videos. arXiv preprint arXiv:240800714. 2024. [15] Carion N, Gustafson L, Hu YT, Debnath S, Hu R, Suris D, et al. SAM 3: Segment Anything with Concepts. arXiv preprint arXiv:251116719. 2025. [16] Sengupta S, Chakrabarty S, Soni R. Is SAM 2 better than SAM in medical image segmentation? In: Medical Imaging 2025: Image Processing. vol. 13406. International Society for Optics and Photonics. SPIE; 2025. p. 134062N. [17] Zhu J, Hamdi A, Qi Y, Jin Y, Wu J. Medical SAM 2: Segment medical images as video via Segment Anything Model 2. arXiv preprint arXiv:240800874. 2024. [18] Buyukpatpat H, Sezer EA, Guzel MS. A Comparative Evaluation of Zero-Shot Performance of SAM, SAM2, MedSAM, and MedSAM2 Models on Lung Segmentation. Journal of Imaging Informatics in Medicine. 2025. [19] Zhang H, Su Y, Xu X, Jia K. Improving the generalization of segmentation foundation model under distribution shift via weakly supervised adaptation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition; 2024. p. 23385-95. 17 [20] Chen J, Milot L, Cheung HMC, Martel AL. Unsupervised Clustering of Quantitative Imaging Pheno-types Using Autoencoder and Gaussian Mixture Model. In: Medical Image Computing and Computer Assisted Intervention – MICCAI 2019. Cham: Springer International Publishing; 2019. p. 575-82. [21] Chernyak V, Fowler KJ, Kamaya A, Kielar AZ, Elsayes KM, Bashir MR, et al. Liver Imaging Re-porting and Data System (LI-RADS) Version 2018: Imaging of Hepatocellular Carcinoma in At-Risk Patients. Radiology. 2018;289(3):816-30. [22] Liyanage YW, Zois D, Chelmis C. On–The–Fly Feature Selection and Classification with Application to Civic Engagement Platforms. In: ICASSP 2020 - 2020 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP); 2020. p. 3762-6. [23] Yushkevich PA, Piven J, Cody Hazlett H, Gimpel Smith R, Ho S, Gee JC, et al. User-Guided 3D Active Contour Segmentation of Anatomical Structures: Significantly Improved Efficiency and Reliability. Neuroimage. 2006;31(3):1116-28. [24] Fong Y, Fortner J, Sun RL, Brennan MF, Blumgart LH. Clinical Score for Predicting Recurrence After Hepatic Resection for Metastatic Colorectal Cancer: Analysis of 1001 Consecutive Cases. Annals of Surgery. 1999;230(3). [25] Seth A, Amemiya Y, Cheung H, Hsieh E, Law C, Milot L. Delayed MRI Enhancement of Colorec-tal Cancer Liver Metastases Is Associated With Metastatic Mutational Profile. Cancer Genomics & Proteomics. 2021;18(5):627-35. [26] Hossain MSA, Gul S, Chowdhury MEH, Khan MS, Sumon MSI, Bhuiyan EH, et al. Deep Learning Framework for Liver Segmentation from T1-Weighted MRI Images. Sensors. 2023;23(21). [27] Hatamizadeh A, Tang Y, Nath V, Yang D, Myronenko A, Landman B, et al. UNETR: Transformers for 3D Medical Image Segmentation. In: 2022 IEEE/CVF Winter Conference on Applications of Computer Vision (WACV); 2022. p. 1748-58. [28] Xu T, Hosseini S, Anderson C, Rinaldi A, Krishnan RG, Martel AL, et al. A generalizable 3D frame-work and model for self-supervised learning in medical imaging. arXiv preprint arXiv:250111755. 2025. 18 [29] Chen Z, Duan Y, Wang W, He J, Lu T, Dai J, et al. Vision Transformer Adapter for Dense Predictions. arXiv preprint arXiv:220508534. 2022. [30] Alberb M, Cheung H, Martel A. Live(r) Die: Predicting Survival in Colorectal Liver Metastasis. arXiv preprint arXiv:250908935. 2025. [31] van Griethuysen JJM, Fedorov A, Parmar C, Hosny A, Aucoin N, Narayan V, et al. Computational Radiomics System to Decode the Radiographic Phenotype. Cancer Research. 2017 10;77(21):e104-7. [32] Klein S, Staring M, Murphy K, Viergever MA, Pluim JPW. elastix: A Toolbox for Intensity-Based Medical Image Registration. IEEE Transactions on Medical Imaging. 2010;29(1):196-205. [33] Mann HB, Whitney DR. On a Test of Whether one of Two Random Variables is Stochastically Larger than the Other. The Annals of Mathematical Statistics. 1947;18(1):50 60. [34] Peng H, Long F, Ding C. Feature selection based on mutual information criteria of max-dependency, max-relevance, and min-redundancy. IEEE Transactions on Pattern Analysis and Machine Intelligence. 2005;27(8):1226-38. [35] Ishwaran H, Kogalur U, Blackstone E, Lauer M. Random Survival Forests. The Annals of Applied Statistics. 2008 12;2. [36] Cox DR. Regression Models and Life-Tables. Journal of the Royal Statistical Society: Series B (Methodological). 1972 12;34(2):187-202. 19 Supplemental Materials 
+
+# A Framework Overview 
+
+Our framework consists of a segmentation pipeline followed by a radiomics pipeline. An overview of the framework is shown in figure S1. 
+
+Figure S1: Framework overview: liver, tumors, and spleen are segmented and used to extract radiomic features. An imaging risk score is then predicted from radiomics and combined with other biomarkers to predict patient prognosis. 
+
+# B Dataset Description 
+
+The dataset used for this study was internally acquired at our institution between January 2013 and Decem-ber 2020. The retrospective cohort consists of 227 CRLM patients who have received pre- and post-contrast T1-weighted MRI with the hepatobiliary contrast agent gadoxetic acid (Primovist, Eovist). Ethical approval for this retrospective study was obtained from the institutional research ethics board, which waived the re-quirement for individual informed consent. All imaging data were de-identified and converted to NIfTI format prior to analysis. Studies were obtained as per institutional clinical protocols. The patients received 3D axial T1-weighted imaging (TE ≈1.5 ms, TR ≈3.0 ms, flip angle ≈10 degrees) in the pre-contrast and hepatobiliary phases (20 minute delay). For the contrast agent, a standard 10 mL intravenous dose of gadoxetate at 1.0 mmol/mL was administered. Studies were performed on 1.5-T (GE Twinspeed TM ) or 3.0-T (Philips Achieva TM ) magnets with an eight-channel body phased array coil covering the liver. The dataset also includes segmentations of CRLM tumors with a longest axial diameter ≥ 10 mm for pre- and post-contrast images, overall mortality, and time to survival/death. The manual segmentations were conducted by an abdominal radiologist with 13 years of experience in abdominal segmentation. To validate 20 unsupervised liver and spleen segmentation pipelines, the liver and the spleen were manually segmented by the same radiologist for 20 post-contrast images. The number of segmented tumors per patient varies from 1 to 12 tumors, resulting in a total of 531 and an average of 2.4 tumors per patient. 130 patients have multifocal CRLM with an average of 3.4 tumors per patient. 82 patients have known postoperative survival times, with a median survival of 28 months. The rest of the patients are right-censored. Furthermore, the dataset contains a few known prognostic variables. Specifically, the dataset includes demographic data such as age and sex, clinical biomarkers such as Fong score [24] and target tumor en-hancement [7], as well as genomic biomarkers such as APC, TP53, KRAS, and NRAS mutational status available for a subset of 47 patients. DNA extraction and mutation analysis were performed following the same procedure described by [25]. Genomic mutations were filtered based on their allele frequency and ClinVar pathogenicity classification. The number of occurrences of the specified mutations per patient was used as a prognostic biomarker. For this study, different inclusion criteria were defined for the segmentation and outcome prediction pipelines. For segmentation, all patients with available pre- or post-contrast MRI with tumor segmentation were included. For outcome prediction, additional inclusion criteria were applied, such as available clini-cal data including survival information and preoperative MRI acquisition ≤ 3 months prior to the surgery date. For patients with multiple scans that met these criteria, the MRIs closest to the surgical date were selected for analysis. The subset with available manual liver and spleen segmentations was held out from the segmentation pipeline, and the subset with genomic data was held out from both pipelines to be used as independent testing sets. 
+
+# C Experimental Setup 
+
+C.1 Radiomics Extraction 
+
+Extracted feature classes included first-order statistical, shape-based, gray level co-occurrence matrix (GLCM), gray level run length matrix (GLRLM), gray level size zone matrix (GLSZM), and gray level dependence matrix (GLDM) features. Table S1 summarizes the number of features for each feature class. 21 Table S1: Summary of extracted radiomic features Class Category Features First-order Statistical 18 Shape-based Shape 14 GLCM Textural 22 GLRLM Textural 16 GLSZM Textural 16 GLDM Textural 14 Total 100  
+
+> Note: GLCM = gray level co-occurrence matrix, GLRLM = gray level run length matrix, GLSZM = gray level size zone matrix, GLDM = gray level dependence matrix.
+
+C.2 Evaluation Metrics 
+
+To evaluate segmentation quality, we compute the Dice score for each of the liver, tumor, and spleen. We also evaluate tumor detection by treating tumor instances as detection targets. A predicted tumor is considered a true positive if it achieves a Dice score ≥ 0.1 with a ground-truth tumor. To enforce one-to-one matching, each ground-truth tumor is assigned to at most one predicted tumor, and vice versa, selected as the one with the highest Dice score above 0.1. Any remaining unmatched predicted tumors are counted as false positives, and unmatched ground truth tumors are counted as false negatives. Based on this strategy, we compute standard classification metrics: precision, recall, and F1-score. For outcome prediction, we use the concordance index (C-index) to assess the predictive performance of our method. 
+
+C.3 Training Details 
+
+Segmentation. Due to the high computational cost, segmentation models were trained once and validated using a randomly sampled 25% hold-out validation set. Best validation checkpoints were evaluated on the test set. Models were trained for 1000 epochs with AdamW optimizer with a learning rate of 1 × 10 −4, and a weight decay of 1 × 10 −2, and batch size of 2, and validated every 2 epochs. Learning rate was scheduled with a linear warm-up for 10% of iterations followed by cosine annealing. For preprocessing, volumes were resampled to isotropic voxel spacing of 1 mm. Intensity outliers were removed via 99.9th percentile clipping, and intensities were normalized to [−1, 1] . Empty background regions were cropped. Data augmentation included 3D flipping, rotations, intensity scaling, and shifting. A sliding window of 112 × 112 × 112 was used during inference. For post-processing, extra-hepatic tumors 22 as well as tumors with volume < 100 mm 3 were removed. This threshold was empirically assigned and is much smaller than the smallest tumor in the training data. Training was conducted on a single NVIDIA A100 GPU. 
+
+Outcome Prediction. Experiments were repeated 15 times using different 3-fold cross-validation splits. Since pre- and post-contrast tumor segmentations are unpaired, a late fusion strategy was used by aggregat-ing pre- and post-contrast predictions. Models were trained for 250 epochs using AdamW with 4 × 10 −4
+
+learning rate, 1 × 10 −3 weight decay, and 20% dropout. Class imbalance was mitigated by sampling equal number of censored and uncensored patients per epoch. 
+
+C.4 Statistical Analysis 
+
+To examine the strength of association between individual variables and survival outcomes, we fit Cox Proportional Hazards models [36] on z-score standardized variables and compare their Hazard Ratios (HR). We assess the statistical significance of our findings through multiple approaches. First, we use the Wilcoxon rank-sum test to compare performance between different input settings (i.e., pre/post-contrast vs. both contrasts) [33]. Second, we employ a randomization test by training and evaluating our model 1 × 10 3
+
+different times on data with randomly shuffled survival labels to establish a null distribution. Similar to our actual setup, each random C-index was calculated by averaging scores from 15 different 3-fold cross-validation splits. Third, we stratify patients into high- and low-risk groups by median dichotomizing SurvAMINN hazards averaged over the 15 runs. The groups are compared using Kaplan–Meier curves and the log-rank test. Finally, we evaluate the robustness of HR across repeated runs with 95% confidence intervals (95% CI) of 1 × 10 3 bootstrapped HR estimates, and the two-sided P-values are calculated using Wald test on log-transformed HRs. 
+
+# D Additional Results 
+
+D.1 Segmentation 
+
+We provide a visual comparison of the predicted segmentations against the ground truth for a randomly selected test case, shown in Fig. S2. The dice scores for the pre-contrast segmentation are 0.956 for liver, 0.742 for tumors, and 0.915 for spleen, while the post-contrast scores are 0.963, 0.786, and 0.922, respec-23 tively. The precise delineation observed in both contrast settings highlights the robustness of our pipeline and its potential to rival fully supervised approaches. We also present the two test cases in which the model produced false-positive tumor predictions (Fig. S3). Both cases contain atypical abnormalities, suggesting that these errors may be attributable to the limited representation of such abnormalities in the training data. 
+
+Figure S2: Qualitative assessment of the segmentation pipeline on a sample testing case. 
+
+Figure S3: Failure analysis of the segmentation pipeline illustrating two testing cases with false-positive detections: (a) two FPs located near a surgical resection margin in a patient who underwent hepatectomy prior to MRI acquisition, and (b) one FP corresponding to biliary duct dilatation. 24 Figure S4: Kaplan–Meier curves of our outcome prediction pipeline using (a) ground truth segmentations and (b) predicted segmentations. Five patients, for whom no tumors were predicted, were excluded from the analysis in (b), as hazard scores could not be computed. 
+
+D.2 Outcome Prediction 
+
+The kaplan-meier curves and log-rank tests, as shown in Fig. S4, demonstrate SurvAMINN’s capability to stratify patients into high- and low-risk groups. This significance is further shown in the randomized test of SurvAMINN, as shown in Fig. S5 
+
+Figure S5: Randomized testing of SurvAMINN. Blue bars represent the C-index distribution when training and testing on randomly shuffled labels. Red line represents the observed score without randomization. 25
