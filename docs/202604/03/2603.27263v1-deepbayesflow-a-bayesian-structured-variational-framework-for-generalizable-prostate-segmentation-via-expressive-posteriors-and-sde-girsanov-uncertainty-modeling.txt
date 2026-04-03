@@ -1,0 +1,420 @@
+Title: DeepBayesFlow: A Bayesian Structured Variational Framework for Generalizable Prostate Segmentation via Expressive Posteriors and SDE-Girsanov Uncertainty Modeling
+
+URL Source: https://arxiv.org/pdf/2603.27263v1
+
+Published Time: Tue, 31 Mar 2026 00:46:13 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# DeepBayesFlow: A Bayesian Structured Variational Framework for Generalizable Prostate Segmentation via Expressive Posteriors and SDE-Girsanov Uncertainty Modeling 
+
+# Zhuoyi Fang 
+
+School of Mathematical Sciences Yangzhou University 230802107@stu.yzu.edu.cn 
+
+Abstract 
+
+Automatic prostate MRI segmentation faces persistent chal-lenges due to inter-patient anatomical variability, blurred tis-sue boundaries, and distribution shifts arising from diverse imaging protocols. To address these issues, we propose Deep-BayesFlow, a novel Bayesian segmentation framework de-signed to enhance both robustness and generalization across clinical domains. DeepBayesFlow introduces three key inno-vations: a learnable NF-Posterior module based on normal-izing flows that models complex, data-adaptive latent distri-butions; a NCVI inference mechanism that removes conju-gacy constraints to enable flexible posterior learning in high-dimensional settings; and a SDE-Girsanov module that re-fines latent representations via time-continuous diffusion and formal measure transformation, injecting temporal coherence and physically grounded uncertainty into the inference pro-cess. Together, these components allow DeepBayesFlow to capture domain-invariant structural priors while dynamically adapting to domain-specific variations, achieving accurate and interpretable segmentation across heterogeneous prostate MRI datasets. 
+
+# Introduction 
+
+The prostate, as a vital male reproductive organ, plays an es-sential role in urinary and sexual functions. Prostate cancer remains one of the most common malignancies worldwide, underscoring the critical importance of accurate prostate MRI segmentation for early diagnosis, treatment planning, and disease monitoring (Azad et al. 2024; He et al. 2023; M¨ uller, Soto-Rey, and Kramer 2022). The segmentation task is particularly challenging due to inherent anatomical variability among patients, where prostate size and shape can differ widely. Additionally, the internal zonal anatomy presents subtle contrast differences (Ramesh et al. 2021; Rayed et al. 2024; Chen et al. 2024b), and lesions of-ten appear with blurred boundaries and heterogeneous tex-tures, complicating precise delineation (Valanarasu and Pa-tel 2022; Zhang and Liu 2023). Deep learning-based segmentation methods, especially those derived from the U-Net family, have revolutionized prostate MRI analysis by leveraging hierarchical feature ex-traction and skip connections that preserve spatial resolution (Butoi et al. 2023; Xing et al. 2024; Isensee et al. 2024). Sub-sequent innovations have integrated attention mechanisms and Transformer architectures to capture both local and global contextual information (Wu et al. 2025; Chen et al. 2024a; Hatamizadeh et al. 2022), thereby enhancing the de-tection of fine-grained anatomical structures and improving boundary delineation in prostate imaging (Zhang, Shen, and Jiao 2024; Roy et al. 2023; Wu et al. 2024). These advances have pushed the performance limits on curated datasets with relatively consistent acquisition protocols (Salpea, Tzouveli, and Kollias 2022; Xiao et al. 2023). Despite significant progress in prostate MRI segmen-tation, existing methods often struggle to generalize ro-bustly across diverse clinical scenarios characterized by wide anatomical variability, ambiguous tissue boundaries, and imaging artifacts. The prostate exhibits substantial inter-patient variation in shape and size, with lesion-prone zones frequently presenting diffuse edges and heteroge-neous textures. Moreover, subtle intensity differences be-tween healthy and pathological tissues pose additional challenges for conventional feature-based segmentation ap-proaches. Real-world MRI data further complicate this task due to noise, motion-induced artifacts, and partial volume effects, necessitating segmentation frameworks that are both uncertainty-aware and capable of adapting to distributional shifts. To address the challenges of generalization and uncer-tainty in prostate MRI segmentation, we propose Deep-BayesFlow—a principled Bayesian framework designed to enhance both predictive performance and interpretabil-ity. DeepBayesFlow introduces three key innovations: NF-Posterior, which employs normalizing flows to model rich, input-dependent posterior distributions that go beyond the limitations of traditional Gaussian assumptions; NCVI, a flexible inference strategy that removes conjugacy con-straints, allowing for more accurate posterior estimation across diverse anatomical structures; and the SDE-Girsanov latent diffusion mechanism, which refines latent representa-tions over time through stochastic differential equations and measure transformation, ensuring temporal coherence and physical plausibility. Together, these components form an integrated Bayesian pipeline capable of capturing complex, multimodal uncertainties while preserving high segmenta-tion fidelity across variable imaging conditions and patho-logical diversity. DeepBayesFlow is built upon an encoder-decoder archi-tecture with skip connections and a lightweight probabilis-
+
+> arXiv:2603.27263v1 [eess.IV] 28 Mar 2026
+
+tic head, enabling precise boundary detection and well-calibrated uncertainty estimation. This design supports ro-bust generalization across domains that differ in acqui-sition quality, protocols, and patient demographics. By modeling uncertainty throughout the segmentation process, DeepBayesFlow delivers reliable, interpretable predictions, paving the way for trustworthy deployment in real-world clinical settings. Our main contributions include: 1) The development of DeepBayesFlow , a novel Bayesian segmentation model that unifies flow-based poste-rior learning, non-conjugate variational inference, and stochastic latent diffusion to enhance generalization in prostate MRI segmentation. 2) The introduction of NF-Posterior , a flexible posterior ap-proximation module based on normalizing flows, capable of capturing complex anatomical and pathological uncer-tainty beyond conventional Gaussian assumptions. 3) The design of NCVI , a non-conjugate inference frame-work that decouples prior and posterior forms, enabling robust performance under anatomical variability, noise, and domain shifts. 4) The formulation of SDE-Girsanov , a stochastic differen-tial equation-driven latent diffusion process that injects temporal coherence and physically grounded uncertainty refinement across MRI slices. 5) Comprehensive evaluations on multiple public prostate MRI datasets demonstrating that DeepBayesFlow con-sistently achieves state-of-the-art performance and supe-rior generalization to unseen patient cohorts and imaging conditions. 
+
+# Related work 
+
+Deep learning for prostate image segmentation 
+
+Deep learning has significantly advanced semantic segmen-tation for prostate imaging, with methods grouped into four categories: feature encoder-based, upsampling-based, feature resolution enhancement, and region proposal-based techniques (Liu et al. 2021b; Orlando et al. 2022; Wang et al. 2023a). These methods extract hierarchical features using con-volutional networks like ResNet and Xception, which ad-dress deep network training challenges via residual connec-tions and efficient convolutions (Conze et al. 2023). Recent models such as EfficientNet and transformer-based architec-tures improve representation by balancing model complex-ity and capturing global context (Wang et al. 2023b). To re-cover spatial details lost during downsampling, approaches like FCN, U-Net, and SegNet employ upsampling and skip connections that combine low- and high-level features. Ad-vances include learnable upsampling and attention mecha-nisms to enhance spatial precision (Chen et al. 2021). Atrous (dilated) convolution expands the receptive field without re-ducing resolution, enabling multi-scale context capture as seen in DeepLab variants (Jia et al. 2022). DeepLabV3+ further refines segmentation by fusing features at different scales, integrating efficient convolutions to reduce computa-tional cost (Bhandary et al. 2023). Region proposal networks like Faster R-CNN and Mask R-CNN generate candidate ob-ject regions and perform pixel-level segmentation with pre-cise spatial alignment (Jiang et al. 2023). These frameworks have been adapted for medical imaging to accurately detect and segment anatomical regions and lesions (Sammouda and El-Zaart 2021; Zaridis et al. 2023). These evolving techniques underpin current state-of-the-art prostate segmentation models, balancing accuracy, effi-ciency, and robustness. 
+
+Domain generalization for medical image segmentation 
+
+Domain generalization (DG) focuses on training models us-ing one or multiple source domains that can generalize well to unseen target domains without any access to target data during training (Yoon et al. 2024). This setting is more chal-lenging than domain adaptation but better reflects real-world clinical applications where target domain data is unavailable (Ouyang et al. 2022). DG methods are generally categorized into data-based, learning-based, and representation-based approaches (Hu et al. 2022). Data-based methods enhance model robustness by increasing training data diversity through augmentations or synthetic generation, simulating domain shifts, imaging artifacts, or signal corruptions (Su et al. 2023). Techniques include stacked transformations, adversarial augmentations, mutual information regularization, and causality-inspired data augmentation, all aimed at encouraging domain-invariant feature learning (Liu et al. 2021a). Learning-based strategies improve the training process it-self, often through meta-learning frameworks designed to promote shape compactness, boundary awareness, and dis-entanglement of domain-specific factors (Xu et al. 2022). Episodic training schemes in frequency or other transformed domains fuse information from multiple sources to build more generalizable models (Yao, Hu, and Li 2022). These approaches encourage the model to adapt dynamically to un-seen domain variations (Gao et al. 2024). Representation-based approaches aim to extract domain-invariant features by minimizing distribution discrepancies across domains via adversarial learning, statistical metrics such as Maximum Mean Discrepancy, or entropy regu-larization (Lyu et al. 2022). Feature disentanglement fur-ther separates domain-specific and domain-agnostic com-ponents (Li et al. 2022a). Recent progress also integrates causal inference to identify latent factors truly influencing predictions, enhancing robustness to domain shifts (Wang and Lukasiewicz 2022). Among such methods, BayeSeg (Gao et al. 2023) stands out by modeling domain invari-ance within a Bayesian framework, offering interpretable and principled uncertainty estimation. While representation-based DG has made significant strides in general computer vision, its application to medical image segmentation re-mains limited, with interpretability of invariant features pos-ing ongoing challenges for clinical adoption (Zhao et al. 2022; Hu et al. 2022; Ouyang et al. 2022; Liu, Dou, and Heng 2020; Zhang et al. 2019). Figure 1: Model Architecture Overview of DeepBayesFlow. 
+
+# Method 
+
+Model Overall 
+
+DeepBayesFlow is a principled Bayesian segmentation framework designed to address uncertainty, anatomical am-biguity, and domain variability in prostate MRI analysis. It features dual-stream encoders that disentangle structural and appearance priors and a segmentation decoder that inte-grates multi-source features for voxel-level predictions, en-abling unified modeling of semantic consistency and spa-tial uncertainty. Key innovations include the NF-Posterior module, which uses normalizing flows to learn expressive, invertible latent transformations beyond Gaussian assump-tions; Non-Conjugate Variational Inference (NCVI) that re-moves restrictive conjugacy constraints for flexible posterior adaptation; and the SDE-Girsanov mechanism, which em-ploys stochastic differential equations to model latent vari-able evolution with learned drift corrections, providing a rig-orous and interpretable uncertainty propagation. Together, these components form a mathematically sound and robust probabilistic inference engine, demonstrating superior per-formance in capturing fine anatomical details, quantifying predictive confidence, and generalizing across diverse imag-ing domains, making DeepBayesFlow a powerful tool for prostate MRI segmentation in both research and clinical ap-plications. 
+
+Normalizing Flow for Posterior Modeling of Latent Variable z
+
+NF-Posterior is designed to overcome the restrictive Gaus-sian assumptions commonly imposed in standard variational frameworks, which are inadequate for modeling the rich posterior complexity present in prostate MRI segmentation. Such complexity arises from anatomical variations across patients, uncertain lesion boundaries, and modality-induced artifacts. To this end, NF-Posterior constructs an expressive approximate posterior by transforming a simple base distri-bution u ∼ N (0 , I) via a composition of K invertible and differentiable mappings fk : RD → RD , yielding: 
+
+z = fK ◦ fK−1 ◦ · · · ◦ f1(u), (1) where the resulting density under q(z|x) is evaluated using the change-of-variable formula: 
+
+log q(z|x) = log q(u) −
+
+> K
+
+X
+
+> k=1
+
+log det 
+
+ ∂f k
+
+∂f k−1
+
+
+
+. (2) Each fk is instantiated using Masked Autoregressive Trans-forms (MAF) combined with Reverse Permutation layers Algorithm 1: DeepBayesFlow Inference with SDE-Girsanov, NF-Posterior, and NCVI  
+
+> 1:
+
+// Input: Image I ∈ RB×1×H×W , Num classes K 
+
+> 2:
+
+// 1. Appearance Encoding and Latent Sampling via SDE-Girsanov  
+
+> 3:
+
+(μm, log σ2
+
+> m
+
+) ← ResNet appearance (I) 
+
+> 4:
+
+σm ← exp(0 .5 · log σ2
+
+> m
+
+) 
+
+> 5:
+
+m ← SDE Girsanov (μm, σ m) 
+
+> 6:
+
+// 2. Shape Encoding and Latent Sampling via SDE-Girsanov  
+
+> 7:
+
+(μx, log σ2
+
+> x
+
+) ← ResNet shape (I) 
+
+> 8:
+
+σx ← exp(0 .5 · log σ2
+
+> x
+
+) 
+
+> 9:
+
+x ← SDE Girsanov (μx, σ x) 
+
+> 10:
+
+// 3. Observation Likelihood (NCVI)  
+
+> 11:
+
+r ← I − (x + m) 
+
+> 12:
+
+μρ ← 2γρ+1  
+
+> r2+2 ϕρ
+> 13:
+
+Sample n ← SDE Girsanov (m, log(1 /μ ρ))  
+
+> 14:
+
+// 4. Segmentation Latent Inference  
+
+> 15:
+
+x′ ← RepeatChannels (x, 3)  
+
+> 16:
+
+(μz , log σ2 
+
+> z
+
+) ← EfficientUNet (x′) 
+
+> 17:
+
+σz ← exp(0 .5 · log σ2 
+
+> z
+
+) 
+
+> 18:
+
+z ← SDE Girsanov (μz , σ z ) 
+
+> 19:
+
+// 5. Normalizing Flow Posterior Refinement  
+
+> 20:
+
+if training then  
+
+> 21:
+
+zflat ← Reshape (z, [−1, K ])  
+
+> 22:
+
+znf ← NF Posterior (zflat ) 
+
+> 23:
+
+znf ← Reshape (znf , [B, K, H, W ])  
+
+> 24:
+
+ˆY ← GumbelSoftmax (znf ) 
+
+> 25:
+
+else  
+
+> 26:
+
+ˆY ← Softmax (z) 
+
+> 27:
+
+end if  
+
+> 28:
+
+// 6. NCVI: Compute Variational Regularization Terms  
+
+> 29:
+
+Compute μυ ← 2γυ +KP μz ·(||∇ μx|| 2+2 σ2 
+
+> x)+2 ϕυ
+> 30:
+
+Compute μω ← 2γω +1    
+
+> π·(||∇ μz|| 2+2 σ2
+> z)+2 ϕω
+> 31:
+
+Compute π ← MeanSpatial (μz ) 
+
+> 32:
+
+απ , β π ← UpdatedBetaPrior (μω , ∇μz , σ z ) 
+
+> 33:
+
+ψ ← Digamma (απ + βπ ) − Digamma (βπ ) 
+
+> 34:
+
+// 7. KL Divergences for Loss  
+
+> 35:
+
+KL y ← P μρ · r2 
+
+> 36:
+
+KL z ← P ψ · μω · ||∇ μz || 2 + 2 σ2 
+
+> z
+> 37:
+
+KL x ← P μz · μυ · ||∇ μx|| 2 + 2 σ2 
+
+> x
+> 38:
+
+KL m ← σ0 · (μ2 
+
+> m
+
++ σ2
+
+> m
+
+) 
+
+> 39:
+
+// 8. Return Prediction and Regularizers  
+
+> 40:
+
+return ˆY , KL y , KL z , KL x, KL m, μ ρ, μ ω , μ υto ensure both high expressiveness and efficient Jacobian computation. During training, samples of z are drawn from this flow-based posterior for reconstruction and segmenta-tion learning; during inference, its mean μz is used for deter-ministic prediction. By explicitly modeling complex, input-conditioned uncertainty structures, NF-Posterior enhances the model’s capability to disambiguate fuzzy anatomical structures, such as prostate boundaries near the rectum or bladder wall. 
+
+Non-Conjugate Variational Inference for Flexible Posterior Learning 
+
+NCVI serves as the optimization framework underlying NF-Posterior, removing the classical constraint of conjugacy between the latent prior p(z) and approximate posterior 
+
+qϕ(z|x). While the prior remains a standard normal p(z) = 
+
+N (0 , I), the posterior is modeled by NF-Posterior, enabling a highly non-Gaussian, learnable structure. Training is con-ducted by maximizing the Evidence Lower Bound (ELBO): 
+
+LELBO = Eqϕ(z|x)[log p(y|z)] − KL[ qϕ(z|x)∥p(z)] , (3) where the KL term is tractably computed via: 
+
+KL[ qϕ(z|x)∥p(z)] = Eu∼N (0 ,I)
+
+
+
+log qϕ(z|x)
+
+p(z)
+
+
+
+, (4) with qϕ(z|x) derived through the accumulated log-determinants of the normalizing flow. This unconstrained variational setting allows the posterior to flexibly match the complex latent structure induced by ambiguous prostate boundaries, heterogeneous intensities, or pathology-induced deviations. NCVI enhances the segmentation model’s adapt-ability to out-of-distribution cases, such as atypical gland shapes or rare lesion morphologies, by avoiding rigid prior-posterior coupling. 
+
+Advanced SDE-based Latent Diffusion with Girsanov Transformation 
+
+SDE-Girsanov introduces a continuous-time stochastic per-spective for latent sampling, where posterior inference is formulated as a diffusion process governed by a stochastic differential equation. This dynamic approach is particularly effective in capturing uncertainty evolution and temporally coherent structure across prostate MRI slices. Specifically, the latent variable Zt evolves via an Ornstein–Uhlenbeck-type process: 
+
+dZ t = ( μ − Zt)dt + σ dW t, (5) where μ and σ are learned functions of the input image x,and dW t denotes the increment of a standard Wiener pro-cess. To align this evolution with the learned posterior from NF-Posterior, SDE-Girsanov employs Girsanov’s theorem to perform a measure transformation: 
+
+d ˜Wt = dW t + utdt, ut = μ − Zt
+
+σ , (6) resulting in an equivalent SDE under a new measure Q:
+
+dZ t = σ d ˜Wt. (7) The corresponding likelihood ratio between Q and the orig-inal measure P is expressed by the Radon–Nikodym deriva-tive: 
+
+dQ
+
+dP = exp − 12
+
+Z T
+
+> 0
+
+λ2 
+
+> t
+
+dt +
+
+Z T
+
+> 0
+
+λt dW t
+
+!
+
+, (8) 
+
+λt = μ − Zt
+
+σ . (9) In implementation, the SDE is discretized with Eu-ler–Maruyama steps: 
+
+Zt+∆ t = Zt + ( μ − Zt)∆ t + σ · ˜εt, (10) where ˜εt is a Radon–Nikodym-weighted Gaussian pertur-bation. This temporal evolution allows the latent code to transition gradually from the prior toward the posterior, em-bedding both anatomical priors and data-driven uncertainty. In prostate segmentation, SDE-Girsanov provides temporal smoothness and structure-consistent stochasticity across ad-jacent slices, improving robustness in regions with ambigu-ous tissue interfaces. 
+
+Spatial Priors, Discrete Segmentation, and Bayesian Regularization 
+
+The model integrates spatial structural priors through Lapla-cian regularization applied to latent segmentation variables, which encourages smoothness and helps maintain anatomi-cal boundary integrity. This is implemented by convolving latent shape and segmentation maps with a discrete Lapla-cian operator Dx that penalizes abrupt spatial variations, promoting spatial continuity. To support end-to-end training with discrete segmenta-tion maps, the Gumbel-Softmax reparameterization is em-ployed. This technique provides a differentiable approxima-tion to categorical sampling, enabling gradient-based opti-mization while preserving discrete label assignments during inference. A pseudo-prior distribution π is modeled on the categor-ical latent variables to introduce category-level regulariza-tion. This spatially varying distribution captures class preva-lence and spatial arrangement patterns, guiding the posterior inference toward anatomically plausible segmentations and reducing spurious predictions. The overall training loss combines supervised segmenta-tion objectives, such as Dice and cross-entropy losses, with Bayesian regularization terms derived from the evidence lower bound (ELBO). The regularization terms include KL divergences between the variational posteriors and struc-tured priors over latent variables representing appearance, shape, and segmentation logits. These KL terms are normal-ized by the number of spatial elements N and weighted by a hyperparameter λBayes to balance their impact. Formally, the loss is defined as: 
+
+
+
+L = LDice+CE + λBayes · 1
+
+N LKL ,
+
+LKL = KL[ q(m)∥p(m)] + LKL x + LKL z ,
+
+LKL x = KL[ q(x)∥p(x)] ,
+
+LKL z = KL[ q(z)∥p(z)] .
+
+(11) Experiments 
+
+Datasets 
+
+We utilized two public datasets for prostate segmentation: NCI-ISBI 2013 (Bloch et al. 2015) and PROMISE12 (Lit-jens et al. 2014). The NCI-ISBI 2013 dataset includes 60 T2-weighted prostate MRI training volumes from multi-ple institutions with expert-annotated masks, capturing di-verse anatomical and imaging variations. PROMISE12 con-tains 50 T2-weighted prostate MRI scans from various clin-ical centers acquired using different scanners and proto-cols, providing training labels while test labels are with-held for online evaluation; it is widely used to assess al-gorithm generalizability. All images were resampled to 0.36458×0.36458 mm spacing and histogram-clipped. The 3D volumes were converted into 2D slices, excluding those without the prostate, center-cropped to 384×384, and resized to 192×192. Preprocessing included Z-score normalization and random augmentations such as affine and elastic trans-formations and Gaussian noise to improve model robustness and generalization. 
+
+Implementation Details 
+
+All experiments were implemented in PyTorch using our proposed DeepBayesFlow model and conducted on a single NVIDIA vGPU with 48GB of memory. Training was per-formed with a batch size of 8 for 1200 epochs. The Adam optimizer was used with an initial learning rate of 3e-4, which decayed once at epoch 1000, and a weight decay of 1e-4. To ensure reproducibility, the random seed was fixed at 42 and 4 worker threads were used for data loading. The model accepts single-channel input images and is optimized using a combined loss function, where the cross-entropy loss coefficient was set to 1.0 and the Bayesian loss coefficient to 100.0. During training, model checkpoints were regularly saved, and resuming from specific epochs was supported. For the Bayesian components, prior distributions were con-figured as follows: appearance mean with μ0 = 0 and 
+
+σ0 = 1 ; appearance standard deviation prior ϕρ = 1 × 10 −6
+
+and γρ = 2 ; image boundary prior ϕυ = 1 × 10 −8 and 
+
+γυ = 2 ; segmentation boundary prior ϕω = 1 × 10 −4 and 
+
+γω = 2 ; and segmentation categorical prior with απ = 2 
+
+and βπ = 2 .
+
+Results 
+
+Table 1 and Table 2 report the domain generalization per-formance for prostate MRI segmentation, where models are trained on a single source domain (either RUNMC or BMC) and evaluated on three unseen target domains. This setup re-flects practical clinical deployment scenarios in which mod-els encounter significant distributional shifts due to differ-ences in scanner hardware, imaging protocols, and patient anatomy. In the case where RUNMC is used as the source domain, the proposed method achieves the best performance across all target domains. While baseline methods such as ERM and Cutout exhibit substantial drops in performance, partic-ularly on BIDMC, the proposed method obtains a Dice score of 74.7 on BIDMC and 83.7 on HK, resulting in the high-est average performance of 79.8 across all target domains. Compared to BayeSeg, the proposed method yields consis-tent improvements, especially on more challenging datasets such as BIDMC, where the performance increases by 11.5 points. When BMC is used as the source domain, the proposed method maintains its superiority. It achieves a Dice score of 43.0 on BIDMC and 75.2 on HK, with an overall average of 63.7 across the three target domains. This is significantly higher than the average score of 56.6 obtained by BayeSeg, again demonstrating enhanced robustness to domain shifts and improved adaptability in out-of-distribution settings. Robust generalization is essential for prostate MRI seg-mentation in real-world clinical applications. The proposed method shows stable and accurate segmentation across het-erogeneous domains without requiring retraining or fine-tuning. This level of robustness is crucial for safe and effec-tive clinical deployment across hospitals with varying imag-ing protocols. The visualization results of the proposed DeepBayesFlow model against other state-of-the-arts are shown in Fig-ure 2. Figure 2 presents the visual segmentation results of various prostate MRI segmentation models across three public datasets: BIDMC (left), BMC (middle), and HK (right). Each row corresponds to a different segmenta-tion method, including ERM, Cutout, IBN-Net, RandConv, DSU, BayeSeg, and DeepBayesFlow. Each column displays representative slices from the respective datasets. The seg-mentation outcomes are color-coded as follows: red regions indicate false positives (predicted as foreground but actually background), green regions indicate false negatives (missed foreground regions), and purple regions indicate true posi-tives (correctly predicted foreground). From Figure 2, it is evident that conventional methods such as ERM and Cutout exhibit large false positive and false negative regions across datasets, revealing poor gen-eralization ability. IBN-Net and RandConv show improve-ments but still suffer from discontinuous or incomplete structures. BayeSeg demonstrates more robust performance, reducing both false positives and false negatives to some ex-tent. However, in certain cases, red and green regions re-main, suggesting limitations in boundary precision and sen-sitivity. In contrast, DeepBayesFlow produces cleaner segmenta-tion results with minimal red or green regions and more con-sistent purple regions, indicating high prediction accuracy and reliable boundary delineation. Compared to BayeSeg, DeepBayesFlow shows superior performance in terms of structural continuity, shape consistency, and domain gener-alization. This improvement is particularly noticeable in the HK dataset, where domain shifts are more pronounced due to differences in imaging modalities and anatomical vari-ations. DeepBayesFlow maintains accurate and stable seg-mentation across these challenging conditions. 
+
+Discussion 
+
+Table 3 and Table 4 report the results of an ablation study de-signed to assess the individual and combined contributions Table 1: Domain generalization performance across four datasets with RUNMC as source. The average is computed over all target domains. 
+
+Method RUNMC (Source) BMC BIDMC HK Avg. on Targets 
+
+ERM 83.8 73.7 17.7 68.5 53.3 Cutout (DeVries and Taylor 2017) 82.7 72.6 15.6 69.1 52.4 IBN-Net (Pan et al. 2018) 84.0 78.4 42.8 76.0 65.7 RandConv (Xu et al. 2020) 84.0 75.3 16.6 30.8 40.9 DSU (Li et al. 2022b) 84.1 78.7 31.0 73.9 61.2 BayeSeg (Gao et al. 2023) 84.5 77.7 63.2 82.6 74.5 
+
+Ours 82.4 81.1 74.7 83.7 79.8 
+
+Table 2: Domain generalization performance across four datasets with BMC as source. The average is computed over all target domains. 
+
+Method BMC (Source) RUNMC BIDMC HK Avg. on Targets 
+
+ERM 82.7 69.2 20.3 57.3 48.9 Cutout (DeVries and Taylor 2017) 81.6 68.1 18.1 58.6 48.2 IBN-Net (Pan et al. 2018) 82.9 73.9 25.7 65.5 55.0 RandConv (Xu et al. 2020) 82.9 70.8 19.5 47.1 45.8 DSU (Li et al. 2022b) 83.0 74.2 23.8 63.3 53.7 BayeSeg (Gao et al. 2023) 83.4 73.2 27.6 69.2 56.6 
+
+Ours 83.0 72.9 43.0 75.2 63.7 
+
+of three key components in the model: NF-Posterior, NCVI, and SDE-Girsanov. Experiments are conducted under two different source domain settings, RUNMC and BMC, to evaluate the model’s generalization ability across unseen tar-get domains. When RUNMC is used as the source domain, the base ver-sion without any of the three components (Ver 1) achieves an average Dice score of 74.5 across the target domains. Adding NCVI and SDE-Girsanov (Ver 2) leads to a no-table improvement, especially on BIDMC, raising the av-erage score to 77.8. This suggests that the combination of noise-contrastive variational inference and stochastic pertur-bation improves robustness against domain shift and helps mitigate false negatives in challenging regions. Ver 3, which includes NF-Posterior and SDE-Girsanov, achieves further gains, highlighting the effectiveness of using a flexible pos-terior to better model anatomical uncertainty. Ver 4, com-bining NF-Posterior and NCVI, also improves the baseline but is slightly less effective than the combination in Ver 3. The full version (Ver 5), which incorporates all three com-ponents, consistently outperforms all other configurations, achieving an average target-domain Dice score of 79.8. This demonstrates the complementary nature of the components and their joint benefit in improving segmentation perfor-mance. Similar trends are observed when BMC is used as the source domain. The base model (Ver 1) reaches an aver-age Dice of 56.6. Adding NCVI and SDE-Girsanov (Ver 2) slightly improves performance to 56.7, and the inclusion of NF-Posterior in Ver 3 and Ver 4 provides further gains. The complete model (Ver 5) again achieves the highest scores on all target domains, with an average Dice of 63.7, indicating that all components contribute to generalization, especially in the most challenging cases such as BIDMC. Each module addresses a specific challenge inherent in prostate MRI segmentation. NF-Posterior enhances the model’s ability to represent complex and diverse anatomi-cal distributions, which is crucial for capturing inter-patient variability in prostate shape and appearance. NCVI encour-ages better uncertainty modeling by introducing contrastive learning in the latent space, which helps the model distin-guish between reliable and ambiguous predictions under dis-tribution shift. SDE-Girsanov introduces controlled stochas-ticity in the inference process, which stabilizes predictions in the presence of noise and helps the model adapt to low-contrast boundaries, common in real clinical scans. These three components work in a complementary man-ner: while NF-Posterior improves representation capacity, NCVI regularizes the latent space, and SDE-Girsanov in-troduces robustness to temporal and spatial perturbations. The result is a segmentation model that better generalizes across domains, reduces false positives and false negatives, and maintains anatomical consistency. In clinical practice, this translates to more reliable delineation of the prostate across patients and institutions, which is essential for ac-curate cancer detection, treatment planning, and follow-up evaluation. 
+
+# Conclusion 
+
+In this work, we presented DeepBayesFlow , a novel Bayesian segmentation framework designed to address the key challenges of prostate MRI segmentation, including anatomical variability, boundary ambiguity, and domain shifts across imaging protocols. By integrating a learn-Table 3: Ablation study of different version combinations with RUNMC as source domain. Each version includes/excludes components NF-Posterior, NCVI, and SDE-Girsanov. The average is computed over all target domains. 
+
+Version NF-Posterior NCVI SDE-Girsanov RUNMC (Source) BMC BIDMC HK Avg. on Targets 
+
+Ver 1 × × × 84.5 77.7 63.2 82.6 74.5 Ver 2 × ✓ ✓ 80.6 80.4 70.4 82.7 77.8 Ver 3 ✓ × ✓ 86.1 77.5 73.8 83.7 78.3 Ver 4 ✓ ✓ × 81.5 79.9 70.6 81.4 77.3 
+
+Ver 5 ✓ ✓ ✓ 82.4 81.1 74.7 83.7 79.8 
+
+Table 4: Ablation study of different version combinations with BMC as source domain. Each version includes/excludes com-ponents NF-Posterior, NCVI, and SDE-Girsanov. The average is computed over all target domains. 
+
+Version NF-Posterior NCVI SDE-Girsanov BMC (Source) RUNMC BIDMC HK Avg. on Targets 
+
+Ver 1 × × × 83.4 73.2 27.6 69.2 56.6 Ver 2 × ✓ ✓ 83.4 66.0 40.2 63.9 56.7 Ver 3 ✓ × ✓ 85.5 75.6 36.5 63.9 58.6 Ver 4 ✓ ✓ × 83.6 72.0 36.8 62.9 57.2 
+
+Ver 5 ✓ ✓ ✓ 83.0 72.9 43.0 75.2 63.7 
+
+able normalizing flow-based posterior (NF-Posterior), a non-conjugate variational inference strategy (NCVI), and a time-continuous SDE-based latent diffusion mechanism with Girsanov transformation (SDE-Girsanov), our model achieves expressive posterior modeling, robust uncertainty estimation, and strong generalization capability. These com-ponents work synergistically to capture domain-invariant structural features while adapting flexibly to distribution-specific variations. Comprehensive experiments on multi-domain prostate segmentation datasets demonstrate that DeepBayesFlow outperforms state-of-the-art methods in both accuracy and robustness. In future work, we plan to extend this framework to broader segmentation tasks and in-vestigate the integration of domain-adaptive priors for fur-ther enhancing interpretability and cross-domain reliability. 
+
+# References 
+
+Azad, R.; Devi, D. M.; Merhof, D.; Bhatia, K. K.; Zhou, S.; and Asadi-Aghbolaghi, M. 2024. Medical Image Segmenta-tion Review: The Success of U-Net. IEEE Transactions on Pattern Analysis and Machine Intelligence .Bhandary, S.; Krishnamurthi, G.; Deshpande, S.; and Pala-niappan, K. 2023. Investigation and Benchmarking of U-Nets on Prostate Segmentation Tasks. Computerized Medi-cal Imaging and Graphics , 107: 102241. Bloch, N.; Madabhushi, A.; Feldman, M.; Choyke, P.; Kiki-nis, R.; Tannenbaum, A.; Giger, M.; and Summers, R. 2015. NCI-ISBI 2013 Challenge: Automated Segmentation of Prostate Structures. The Cancer Imaging Archive , 370(6): 5. Butoi, V. I.; Chang, J.-H.; Lee, J.; Bengio, Y.; Paudel, D.; and Rother, C. 2023. Universeg: Universal Medical Im-age Segmentation. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision (ICCV) , 21554– 21564. IEEE. Chen, C.; Li, X.; Wang, J.; Zhang, H.; Wang, Y.; Li, S.; Zhou, S.; and Wang, D. 2024a. Ma-SAM: Modality-Agnostic SAM Adaptation for 3D Medical Image Segmen-tation. Medical Image Analysis , 98: 103310. Chen, J.; Lu, Y.; Yu, Q.; Luo, X.; Adeli, E.; Wang, Y.; Lu, L.; Yuille, A. L.; and Zhou, Y. 2024b. TransUNet: Rethinking the U-Net Architecture Design for Medical Image Segmen-tation through the Lens of Transformers. Medical Image Analysis , 97: 103280. Chen, J.; Zhang, C.; Qian, Y.; Xie, Y.; and Wang, J. 2021. Medical Image Segmentation and Reconstruction of Prostate Tumor Based on 3D AlexNet. Computer Methods and Programs in Biomedicine , 200: 105878. Conze, P.-H.; Jalal, O.; Robert, C.; Smistad, E.; Kerautret, B.; Cervenansky, F.; and Quellec, G. 2023. Current and Emerging Trends in Medical Image Segmentation with Deep Learning. IEEE Transactions on Radiation and Plasma Medical Sciences , 7(6): 545–569. DeVries, T.; and Taylor, G. W. 2017. Improved Regu-larization of Convolutional Neural Networks with Cutout. arXiv:1708.04552. Gao, S.; Hu, S.; Li, W.; Xu, X.; Zhu, S.; Jiang, H.; Shen, D.; and Zhang, D. 2023. BayeSeg: Bayesian Modeling for Med-ical Image Segmentation with Interpretable Generalizability. 
+
+Medical Image Analysis , 89: 102889. Gao, Y.; Zhang, P.; Liu, H.; Wang, L.; Chen, Y.; Li, J.; and Zhou, W. 2024. Desam: Decoupled Segment Anything Model for Generalizable Medical Image Segmentation. In 
+
+Medical Image Computing and Computer-Assisted Interven-tion – MICCAI 2024 . Cham: Springer Nature Switzerland. Hatamizadeh, A.; Tang, J.; Nath, V.; Yang, D.; Myronenko, A.; Landman, B.; Roth, H. R.; and Xu, D. 2022. UNETR: Transformers for 3D Medical Image Segmentation. In Pro-ceedings of the IEEE/CVF Winter Conference on Applica-tions of Computer Vision (WACV) , 1743–1752. IEEE. Figure 2: The visualization results of the proposed DeepBayesFlow model against other state-of-the-arts. He, S.; Liu, H.; Zhu, W.; Dong, M.; Zhang, X.; Li, Z.; and Xu, M. 2023. Accuracy of Segment-Anything Model (SAM) in Medical Image Segmentation Tasks. arXiv:2304.05396. Hu, S.; Yuan, J.; Wu, Y.; Zhao, M.; Zhang, H.; and Tian, Q. 2022. Domain and Content Adaptive Convolution Based Multi-Source Domain Generalization for Medical Image Segmentation. IEEE Transactions on Medical Imaging ,42(1): 233–244. Isensee, F.; Jaeger, P. F.; Kohl, S. A. A.; Petersen, J.; and Maier-Hein, K. H. 2024. nnU-Net Revisited: A Call for Rigorous Validation in 3D Medical Image Segmentation. In 
+
+International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI) . Cham: Springer Nature Switzerland. Jia, H.; Gao, Y.; Wang, R.; Wang, Z.; Guo, Y.; Gao, Y.; and Liu, J. 2022. Learning Multi-Scale Synergic Discriminative Features for Prostate Image Segmentation. Pattern Recogni-tion , 126: 108556. Jiang, J.; Chen, W.; Bai, X.; Qin, J.; Cheng, H.-D.; and Jiang, T. 2023. Segmentation of Prostate Ultrasound Images: The State of the Art and the Future Directions of Segmentation Algorithms. Artificial Intelligence Review , 56(1): 615–651. Li, C.; Zhang, R.; Wang, S.; Xu, W.; Lu, M.; Chen, Y.; and Zhang, M. 2022a. Domain Generalization on Medical Imaging Classification Using Episodic Training with Task Augmentation. Computers in Biology and Medicine , 141: 105144. Li, X.; Huang, Y.; Xu, Y.; Liu, Z.; Gu, S.; Darrell, T.; and Rohrbach, M. 2022b. Uncertainty Modeling for Out-of-Distribution Generalization. arXiv:2202.03958. Litjens, G.; Toth, R.; van de Ven, W.; Hoeks, C.; Kerkstra, S.; van Ginneken, B.; Karssemeijer, N.; and Huisman, H. 2014. Evaluation of Prostate Segmentation Algorithms for MRI: The PROMISE12 Challenge. Medical Image Analysis ,18(2): 359–373. Liu, Q.; Chen, Y.; Zhou, J.; Zheng, W.; and Cai, W. 2021a. FedDG: Federated Domain Generalization on Medical Im-age Segmentation via Episodic Learning in Continuous Fre-quency Space. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . IEEE. Liu, Q.; Dou, Q.; and Heng, P.-A. 2020. Shape-aware Meta-learning for Generalizing Prostate MRI Segmentation to Un-seen Domains. In International Conference on Medical Im-age Computing and Computer-Assisted Intervention (MIC-CAI) , Lecture Notes in Computer Science. Cham: Springer International Publishing. Liu, X.; Zhang, Y.; Zhang, Y.; Wang, H.; and Wang, Y. 2021b. A Review of Deep-Learning-Based Medical Image Segmentation Methods. Sustainability , 13(3): 1224. Lyu, J.; Guo, Y.; Wang, X.; Peng, C.; Zhao, S.; Li, Q.; and Wang, L. 2022. AADG: Automatic Augmentation for Do-main Generalization on Retinal Image Segmentation. IEEE Transactions on Medical Imaging , 41(12): 3699–3711. M¨ uller, D.; Soto-Rey, I.; and Kramer, F. 2022. Towards a Guideline for Evaluation Metrics in Medical Image Segmen-tation. BMC Research Notes , 15(1): 210. Orlando, N.; Alqahtani, S.; Almekkawi, A.; Abolmaesumi, P.; Salcudean, S. E.; Podder, T. K.; and Fenster, A. 2022. Ef-fect of Dataset Size, Image Quality, and Image Type on Deep Learning-Based Automatic Prostate Segmentation in 3D Ul-trasound. Physics in Medicine & Biology , 67(7): 074002. Ouyang, C.; Yuan, J.; Zhu, Y.; Li, Y.; Wang, J.; Zhang, J.; and Wu, J. 2022. Causality-Inspired Single-Source Do-main Generalization for Medical Image Segmentation. IEEE Transactions on Medical Imaging , 42(4): 1095–1106. Pan, X.; Jiang, B.; Yang, Y.; Shi, J.; Wang, X.; and Lu, J. 2018. Two at Once: Enhancing Learning and Generaliza-tion Capacities via IBN-Net. In Proceedings of the Eu-ropean Conference on Computer Vision (ECCV) , 464–479. Springer. Ramesh, K. K. D.; Nandhini, K.; Gomathi, R.; and Kumar, M. S. 2021. A Review of Medical Image Segmentation Al-gorithms. EAI Endorsed Transactions on Pervasive Health and Technology , 7(27). Rayed, M. E.; Morshed, M. N. S.; Kamal, M. M. R.; Mo-men, S. R.; Ahmed, K. N. T.; and Amin, M. R. 2024. Deep Learning for Medical Image Segmentation: State-of-the-Art Advancements and Challenges. Informatics in Medicine Un-locked , 47: 101504. Roy, S.; Valanarasu, J. M. J.; Oza, P.; Hacihaliloglu, I.; and Patel, V. M. 2023. MedNeXt: Transformer-Driven Scal-ing of ConvNets for Medical Image Segmentation. In In-ternational Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI) . Cham: Springer Nature Switzerland. Salpea, N.; Tzouveli, P.; and Kollias, D. 2022. Medical Im-age Segmentation: A Review of Modern Architectures. In 
+
+European Conference on Computer Vision (ECCV) . Cham: Springer Nature Switzerland. Sammouda, R.; and El-Zaart, A. 2021. An Optimized Ap-proach for Prostate Image Segmentation Using K-Means Clustering Algorithm with Elbow Method. Computational Intelligence and Neuroscience , 2021(1): 4553832. Su, Z.; Zhu, M.; Wang, Z.; Liu, B.; Xu, H.; Yu, M.; and Lu, H. 2023. Rethinking Data Augmentation for Single-Source Domain Generalization in Medical Image Segmen-tation. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 37. AAAI Press. Valanarasu, J. M. J.; and Patel, V. M. 2022. UNeXt: MLP-Based Rapid Medical Image Segmentation Network. In In-ternational Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI) , 96–106. Cham: Springer Nature Switzerland. Wang, J.; and Lukasiewicz, T. 2022. Rethinking Bayesian Deep Learning Methods for Semi-Supervised Volumet-ric Medical Image Segmentation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . IEEE. Wang, X.; Wang, Y.; Li, J.; Zhang, Y.; and Song, T. 2023a. Prostate Ultrasound Image Segmentation Based on DSU-Net. Biomedicines , 11(3): 646. Wang, Z.; Ma, H.; Liu, Z.; Zhang, K.; and Li, L. 2023b. A Two-Stage CNN Method for MRI Image Segmentation of Prostate with Lesion. Biomedical Signal Processing and Control , 82: 104610. Wu, J.; Luo, L.; Huang, H.; Wu, J.; Wang, X.; Wang, Y.; and Li, H. 2025. Medical SAM Adapter: Adapting Segment Anything Model for Medical Image Segmentation. Medical Image Analysis , 102: 103547. Wu, J.; Luo, L.; Li, Y.; Huang, H.; Li, X.; Wang, Y.; and Li, H. 2024. MedSegDiff: Medical Image Segmentation with Diffusion Probabilistic Model. In Medical Imaging with Deep Learning (MIDL) . PMLR. Xiao, H.; Sun, M.; Han, Q.; Fang, Z.; Gao, J.; Yang, G.; Gao, G.; Feng, D.; and Li, S. 2023. Transformers in Medical Im-age Segmentation: A Review. Biomedical Signal Processing and Control , 84: 104791. Xing, Z.; Zhang, Y.; Chen, K.; Liu, Y.; Wang, X.; Zhang, R.; Li, M.; and Wang, X. 2024. SegMamba: Long-Range Sequential Modeling Mamba for 3D Medical Image Seg-mentation. In International Conference on Medical Image Computing and Computer-Assisted Intervention (MICCAI) .Cham: Springer Nature Switzerland. Xu, Y.; Huang, K.; Chen, H.; Liu, W.; Yan, P.; Li, K.; Yu, D.; and Shao, L. 2022. Adversarial Consistency for Sin-gle Domain Generalization in Medical Image Segmentation. In Medical Image Computing and Computer-Assisted Inter-vention – MICCAI 2022 , 300–310. Cham: Springer Nature Switzerland. Xu, Z.; Liu, Z.; Huang, Y.; Dai, B.; Li, C.; Song, Y.; and Li, W. 2020. Robust and Generalizable Visual Representation Learning via Random Convolutions. arXiv:2007.13003. Yao, H.; Hu, X.; and Li, X. 2022. Enhancing Pseudo Label Quality for Semi-Supervised Domain-Generalized Medical Image Segmentation. In Proceedings of the AAAI Confer-ence on Artificial Intelligence , volume 36. AAAI Press. Yoon, J. S.; Lee, M. J.; Kim, J. W.; Park, S. M.; Choi, Y. J.; Kim, H. S.; and Lee, K. M. 2024. Domain Generalization for Medical Image Analysis: A Review. Proceedings of the IEEE . To appear. Zaridis, D. I.; Maros, T. N.; Stoll, S.; Khalvati, F.; M¨ uller, H.; Vangelov, B.; Eklund, A.; and S¨ orensen, T. S. 2023. Region-Adaptive Magnetic Resonance Image Enhancement for Im-proving CNN-Based Segmentation of the Prostate and Pro-static Zones. Scientific Reports , 13(1): 714. Zhang, K.; and Liu, D. 2023. Customized Seg-ment Anything Model for Medical Image Segmentation. arXiv:2304.13785. Zhang, L.; Zhang, G.; Wang, P.; and Metaxas, D. N. 2019. When Unseen Domain Generalization is Unnec-essary? Rethinking Data Augmentation. ArXiv preprint arXiv:1906.03347, arXiv:1906.03347. Zhang, Y.; Shen, Z.; and Jiao, R. 2024. Segment Anything Model for Medical Image Segmentation: Current Applica-tions and Future Directions. Computers in Biology and Medicine , 171: 108238. Zhao, Y.; Huang, W.; Wang, L.; Ma, K.; Zhan, X.; Zhang, L.; Xu, X.; and Shen, D. 2022. Efficient Bayesian Uncertainty Estimation for NNU-Net. In Medical Image Computing and Computer-Assisted Intervention – MICCAI 2022 , 122–131. Cham: Springer Nature Switzerland.

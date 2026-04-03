@@ -1,0 +1,2648 @@
+Title: Targeted learning of heterogeneous treatment effect curves for right censored or left truncated time-to-event data
+
+URL Source: https://arxiv.org/pdf/2603.26502v1
+
+Published Time: Mon, 30 Mar 2026 01:07:35 GMT
+
+Number of Pages: 46
+
+Markdown Content:
+# TARGETED LEARNING OF HETEROGENEOUS TREATMENT EFFECT CURVES FOR RIGHT CENSORED OR LEFT TRUNCATED TIME -TO -EVENT DATA 
+
+Matthew Pryce 1, Karla Diaz-Ordaz 1,∗, Ruth H. Keogh 2, Stijn Vansteelandt 31Department of Statistical Science, University College London, London, United Kingdom 
+
+> 2
+
+Department of Medical Statistics, London School of Hygiene & Tropical Medicine, London, WC1E 7HT, United Kingdom 
+
+> 3
+
+Department of Mathematics, Computer Science, and Statistics, Ghent University, Ghent, Belgium *Correspondence address: karla.diaz-ordaz@ucl.ac.uk March 30, 2026 
+
+ABSTRACT 
+
+In recent years, there has been growing interest in causal machine learning estimators for quantify-ing subject-specific effects of a binary treatment on time-to-event outcomes. Estimation approaches have been proposed which attenuate the inherent regularisation bias in machine learning predictions, with each of these estimators addressing measured confounding, right censoring, and in some cases, left truncation. However, the existing approaches are found to exhibit suboptimal finite-sample performance, with none of the existing estimators fully leveraging the temporal structure of the data, yielding non-smooth treatment effects over time. We address these limitations by introducing surv-iTMLE, a targeted learning procedure for estimating the difference in the conditional survival probabilities under two treatments. Unlike existing estimators, surv-iTMLE accommodates both left truncation and right censoring while enforcing smoothness and boundedness of the estimated treatment effect curve over time. Through extensive simulation studies under both right censoring and left truncation scenarios, we demonstrate that surv-iTMLE outperforms existing methods in terms of bias and smoothness of time-varying effect estimates in finite samples. We then illustrate surv-iTMLE’s practical utility by exploring heterogeneity in the effects of immunotherapy on sur-vival among non-small cell lung cancer (NSCLC) patients, revealing clinically meaningful temporal patterns that existing estimators may obscure. Key words: Causal machine learning; Heterogeneous treatment effects; Time-to-event data; Influence functions 
+
+1 Introduction 
+
+Understanding treatment effect heterogeneity has become a vital component in advancing personalized medicine, promoting health equity, and informing policy decisions. Treatment effect heterogeneity is often studied using ob-servational data, yet when outcomes are time-to-event, estimating these effects becomes challenging. Beyond the confounding inherent in observational data, one is typically faced with right censoring (e.g., when individuals are lost to follow-up prior to having an event) and sometimes left truncation (e.g., when individuals enter the study post treat-ment initiation). We explore how these factors impact the identification and estimation of the difference in conditional survival probabilities under two treatments for a given patient. The work we present is motivated by a real-world application, evaluating immunotherapy effectiveness on mor-tality in non–small cell lung cancer (NSCLC) patients. The efficacy of immunotherapies is known to depend on 
+
+> arXiv:2603.26502v1 [stat.ME] 27 Mar 2026
+
+A PREPRINT - M ARCH 30, 2026 patient-level factors, such as the presence of genomic mutations in the tumour, and we explore this using the Flat-iron–Foundation Medicine clinico-genomic database, described in Section 2. As the clinico-genomic database offers a rich array of demographic, clinical, and genomic covariates, we focus on how flexible, machine learning methods can be employed to investigate heterogeneity in treatment effects across patient characteristics. However, as patients’ event times are subject to left truncation, due to patients only joining the clinico-genomic database after genomic testing, and right censoring, as not all patients die before their end of follow-up, these complexities must be addressed when using this data. A tempting strategy when utilizing machine learning to estimate treatment effect heterogeneity is to apply off-the-shelf survival machine learning (ML) algorithms, such as survival random forests, to estimate the conditional survival probability separately in each treatment group as a function of covariates (including pre-treatment confounders and predictors of censoring/truncation). The treatment effect as a function of covariates could then be obtained by taking their difference from the separate estimates. However, such indirect approaches inherit much of the regularisation bias that affects the separate learners — see Morzywolek et al. [2023] for a general review of this problem. Alternatively, some estimators directly target the contrasts between conditional survival probabilities under two treatments in such a way that this regularisation bias is attenuated. A notable example is causal survival forests (CSFs) [Cui et al., 2023], designed to handle right censored (RC) data, and more recently, the so-called ltrc-DR and ltrc-R learners [Wang et al., 2024], which handle left truncated and right censored (LTRC) data. However, each of these estimators have limitations. CSFs restrict the estimation techniques to tree ensembles, while the ltrc learners inherit issues from their loss functions, with the ltrc-DR learner prone to producing unbounded estimates of the survival contrasts, and the ltrc-R learner requiring the contrasts to be estimated conditional on all of the variables used to adjust for confounding. Additionally, these estimators do not fully exploit the temporal structure of the data, requiring the survival contrasts be estimated separately at each time point of interest, which is inefficient and can result in non-smooth and biologically implausible treatment effect curves over time. To overcome these limitations, we introduce surv-iTMLE, a non-parametric targeted learning framework that accommodates RC or LTRC data. This framework leverages sieve-based targeted learning, known as infinite-dimensional targeted minimum loss-based estimation (iTMLE) [Luedtke et al., 2017, Vansteelandt and Morzywołek, 2025, van der Laan et al., 2024] within a two-step pseudo-outcome construction, allowing it to yield estimates of the difference in conditional survival probabilities under two treatments for a given patient that are bounded, stable and smooth over time. We explore these properties using extensive simulations in Section 6, and implement surv-iTMLE and its comparators on our motivating example in Section 7. 
+
+2 Motivating example 
+
+2.1 Background 
+
+Our motivating example focuses on the exploration of treatment effect heterogeneity when considering the use of immunotherapies to treat NSCLC. Immunotherapies work by enhancing the body’s own immune response against cancer cells. However, therapeutic response can vary substantially between patients and is known to differ depending on individual factors, including the presence of genomic mutations [Lee et al., 2017]. Since immunotherapies are typically prescribed instead of more traditional treatments, such as chemotherapies, we explore the difference in con-ditional survival probabilities if patients were to receive an immunotherapy or a chemotherapy, where the focus is on treatments initiated within 30 days of a NSCLC diagnosis. To conduct this study, we use data from the US-based de-identified Flatiron Health-Foundation Medicine NSCLC Clinico-Genomic Database. Clinical data from the Flatiron Health Research Database [Flatiron Health, 2025] are linked to genomic data, derived from Flatiron Medicine’s comprehensive genomic profiling tests (Founda-tionOne®CDx, FoundationOne®) using deterministic matching to provide a de-identified dataset [Frampton et al., 2013, Singal et al., 2019, Milbury et al., 2022]. The data comes from approximately 280 US cancer clinics (800 sites of care) and contains over 20 pre-treatment demographic and clinical variables, extracted from electronic health records, as well as an array of genomic data, obtained from a tumour biopsy taken at a date after diagnosis. It presents a rich resource for exploring our research question, but also presents practical challenges, as patients can only enter the clinico-genomic database once they have undergone genomic testing (i.e., after treatment initiation). This means patients who die prior to genomic testing are not observed in the database, and due to the delayed entry, the observed patient event times can be left truncated, as well as right censored (when they do not die within the observed follow-up period). In this work we explore how causal ML estimators overcome these issues. 2A PREPRINT - M ARCH 30, 2026 
+
+2.2 Notation and data structure 
+
+Let A be the binary treatment, with A = 1 indicating treatment in a class of immunotherapies ( A = 0 otherwise), and let us define the start of follow up for a patient as the time of treatment initiation, t = 0 . Further, let Z be a set of pre-treatment covariates, with X ⊆ Z a subset of these for which heterogeneity is of interest, for instance the presence of an EGFR mutation. Using potential outcomes [Rubin, 2005], we denote T a as the potential event time (since the start of treatment) under treatment level a, a ∈ { 0, 1}, and define O0 = ( Z, A, T 0, T 1) as the ideal data unit, with distribution P0. Let T denote the event time under the observed treatment. With right censored data, 
+
+T is unobserved for censored individuals, and we observe ˜T = min {T, C }, where C is the (partially observed) censoring time. We also define ∆ = 1(T ≤ C) as an event indicator and Q as an individual’s study entry time. In our immunotherapy example, this is either a patient’s time of genomic testing, or their time of treatment initiation, whichever occurs second. Additionally, as no information is available in the clinico-genomic database for patients who die after treatment initiation but before study entry ( 0 < T < Q ), we only observe data for those with T ≥ Q.Finally, since patients cannot be censored prior to undergoing genomic testing or receiving a treatment, we assume censoring only occurs on individuals once they have entered the dataset, C ≥ Q. Thus, we define the observed data as O = ( Z, A, ˜T , ∆, Q ) for individuals with T ≥ Q, with P its corresponding distribution. 
+
+3 Identification 
+
+We explore the difference in conditional survival probabilities under two treatments at times t ∈ (0 , τ ], conditional on a subset of covariates, X:
+
+θ(t|x) = P0(T 1 > t |X = x) − P0(T 0 > t |X = x). (1) Identifiability assumptions for time-to-event estimands have been previously discussed, with Westling et al. [2024] presenting a set of assumptions for identifying the conditional mean survival function using RC data, while Morenz et al. [2024] and Wang et al. [2024] provide assumptions for a variety of time-to-event estimands using LTRC data. Because our motivating example is LTRC, we focus on assumptions required for identification in the LTRC setting, but for assumptions for the RC setting, see Section S8.1 of the Supplementary Material. Our identification assumptions for (1) follow the notation of Westling et al. [2024], but are extended to the LTRC setting using the original time scale, with time 0 defined as the time of treatment initiation, as done by Morenz et al. [2024]. Weaker assumptions stated on the residual time scale, which set time 0 to be at study entry, can be found in Wang et al. [2024], and a discussion of the benefits and drawbacks of these two frameworks is provided by Qian and Betensky [2014]. We require four types of assumption; positivity assumptions (A1): P (A = a|Z) > 0, a ∈ { 0, 1}
+
+and P -almost surely, and (A2): P (C ≥ τ |Z) > 0, P -almost surely, and (A3): P (Q < τ |Z) > 0, P -almost surely. A consistency assumption (A4): When A = a, T = T a. Conditional exchangeability assumptions (A5): 
+
+T aI(T a ≤ τ ) ⊥⊥ A|Z, (A6): T aI(T a ≤ τ ) ⊥⊥ QI (Q < τ )|A = a, Z , and (A7): T aI(T a ≤ τ ) ⊥⊥ CI (C ≤
+
+τ )|Q, A = a, Z, T a ≥ Q. And finally, a no interference assumption (A8): T ai does not vary with aj , for j̸ = i.Under (A1)-(A8), and using the product integral notation which allows events to occur in either discrete or con-tinuous time [Gill and Johansen, 1990], our causal estimand can be identified and written in terms of observable data functions as: 
+
+θ(t|x) = E
+
+ R 
+
+> (0 ,τ ]
+
+{1 − Λ( du |A = 1 , z, u ≥ Q)} − R 
+
+> (0 ,τ ]
+
+{1 − Λ( du |A = 0 , z, u ≥ Q)} X = x
+
+ , (2) where Λ( t|A = a, z, t ≥ Q) = R  
+
+> (0 ,t ]
+> F(du |A=a,z,u ≥Q)
+> R(u−| A=a,z,u ≥Q)
+
+is the conditional cumulative hazard, R(u − | A = a, z, u ≥
+
+Q) = P (u ≤ ˜T |A = a, Z = z, u ≥ Q), and F (u|A = a, z, u ≥ Q) = P ( ˜T ≤ u, ∆ = 1 |A = a, Z = z, u ≥ Q).For the identification proof in the LTRC setting, see Section S1 of the Supplementary Material. Additionally, below we highlight the considerations which should be made when assessing the practical viability of these assumptions. Assumption (A1) requires each individual in the target population to be eligible for either treatment, and (A2) and (A3) require that each individual has a positive probability of being under observation at any given time during the follow-up of interest. These assumptions should be considered when specifying the target population, removing subgroups for whom the treatment is contraindicated, or limiting the follow-up period to a window in which event times are observed. In our NSCLC study, we aimed to avoid violations of the positivity assumptions by restricting follow-up times to three years, and by implementing exclusion criteria similar to those seen in immunotherapy trials, such as excluding immunocompromised patients as they are ineligible for immunotherapy. As treatment effects in these subgroups are often of limited clinical relevance, such exclusions are often not problematic. 3A PREPRINT - M ARCH 30, 2026 The validity of the consistency assumption (A4) can be considered by reviewing the definition/recording of the treatment and event times. For treatments, this includes considering the impact that potential dosage/adherence vari-ations may have on the event times; while for the event times, this may require considering how a patients treatment pathway may impact the data recording mechanism. In our NSCLC study, as the event times are captured from elec-tronic health records, the measurement of outcomes should not differ between patients, irrespective of their treatment pathways. However, as treatment protocols are left to a doctor’s discretion, the treatment dosages received by patients do vary. This issue is very common in observational data. One option for overcoming it is to take a pragmatic ap-proach, defining treatment as treatment initiation, rather than as a specific treatment dose or adherence. We deem this reasonable in our NSCLC study as immunotherapy/chemotherapy dosages are standardized and as prescribing doctors should be following specified guidelines [Le Louedec et al., 2020]. This leaves the no interference assumption (A8) and the conditional exchangeabilty assumptions (A5)-(A7). No interference depends on the outcome and treatment being considered, and in the NSCLC example it is highly plausible as NSCLC is not an infectious disease. Meanwhile, the conditional exchangeability assumptions, (A5)-(A7) are crucial when considering RC or LTRC observational data, as each of these mechanisms can shift the covariate profile of the observed patients at each time point away from that of the target population, or can introduce imbalances in the covariate profiles between the treatment groups. These assumptions rely on a sufficient set of pre-treatment covariates being recorded, however, when using LTRC data this can be problematic, as typically some covariate information is recorded only at study entry, t = Q. For example, in our data, the genomic information is only available at the time of genomic testing t = Q, which can be after treatment initiation. When this occurs, the validity of (A5)-(A7) should be assessed in light of how this information may impact treatment assignment, study entry and censoring times. In our example, the genomic information is not considered to impact the health markers of a patient prior to treatment, and is not known to the treating clinician, so is not expected to influence treatment decision (not to violate (A5)). In such scenarios, one should consider whether the information recorded at study entry, t = Q can be used as a proxy for the pre-treatment variable. We do so by classifying our genomic data into two categories; information which is likely or unlikely to change as a result of treatment assignment and timing of recording. For the information which is unlikely to change (e.g., an EGFR mutation) we use the data at t = Q as a proxy for the pre-treatment data. Crucially, variables which may change as a result of treatment (e.g., a patient’s PD-L1 expression levels) should not be adjusted for, as they are potential mediators. However, this may result in a greater risk of unmeasured confounding. 
+
+4 Existing causal ML estimators 
+
+We now discuss the existing causal ML estimators for our estimand. The use of ML is desirable as it allows users to fully leverage complex data structures, such as those found in the clinico-genomic database, and allows the researcher to avoid unrealistic modelling assumptions. A simple way of implementing ML to estimate the difference in survival probabilities is via a so-called T-learner [Xu et al., 2023] which estimates the difference by plugging in ML based estimates of the two conditional treatment-specific survival curves in eq. (2). However, the T-learner is highly prone to bias when using ML, as it tends to over-smooth the treatment-specific survival curve estimates in subgroups which are under-represented, with this regularisation bias propagating through to the estimates of the difference. Additionally, as it does not optimize the difference directly it can fail to draw upon the fact that this contrast may be smoother than the treatment-specific survival curves. Hence, even if the difference can be learnt at a faster rate than the treatment specific survival curves, the T-learner will not benefit from this property. For these reasons, estimators which directly target the estimand and which are insensitive to errors in nuisance function estimation (functions which are not the target function, such as the conditional treatment-specific survival curves) are typically preferred [Chernozhukov et al., 2017]. A class of estimators which achieve these properties are known as de-biased estimators and are typically derived using the efficient influence function (EIF) of the given estimand, where the EIF quantifies the sensitivity of the esti-mand to perturbations in the data-generating distribution [Hines et al., 2022]. This said, when estimating heterogenous treatment effects, estimands can be infinite dimensional (when any variable in X is continuous) and their EIFs may not be well defined. Instead, one must draw upon the EIF of an appropriately chosen expected loss function [Morzy-wolek et al., 2023]. By doing so, estimators are constructed such that this expected loss function experiences a relative insensitivity to the estimation of nuisance functions. Key examples of EIF-based estimators for heterogenous treatment effects using time-to-event data are causal sur-vival forests (CSFs) [Cui et al., 2023], which handle RC event times, and more recently, the ltrc-R and ltrc-DR learners of [Wang et al., 2024], which handle LTRC event times. All three estimators target the mean difference in a deter-ministic transformation of survival times under different treatments, which includes the conditional mean difference in survival probabilities when the transformation is defined as 1{T > t }. However, they are derived using different approaches. Both CSFs and the ltrc-R learner estimate treatment effect heterogeneity by drawing upon Robinson’s 4A PREPRINT - M ARCH 30, 2026 outcome decomposition [Robinson, 1988], constructing a residual-on-residual regression using the EIF presented by Tsiatis [2006], noting the ltrc-R learner does this in the LTRC setting. Meanwhile, the ltrc-DR learner constructs a loss function using a “one-step” construction [Hines et al., 2022], adding a de-biasing term (which comes from the EIF of the MSE) to the plug-in estimate of the difference in survival probabilities. All three estimators discussed above draw upon EIFs to construct their estimators, and consequently make use of inverse probability weights (IPWs), along with outcome regressions to address imbalances in the covariate distri-bution introduced by treatment assignment and by right censoring and left truncation (in the case of the ltrc-R and ltrc-DR learners). Meanwhile, each estimator ensures that the influence of nuisance parameter estimation (such as for the outcome models/IPWs) is only of second-order, enabling the estimators to achieve oracle efficiency, that is, to perform as well as if the nuisance functions were known, provided that the nuisance estimators converge sufficiently quickly to the true functions [Cui et al., 2023, Wang et al., 2024]. This considered, each estimator’s practical perfor-mance differs. The ltrc-DR learner sometimes yields unbounded estimates of the target function, as the estimator does not mitigate extreme inverse probability of treatment, censoring or truncation weights which can occur when their respective functions near their bounds, i.e., 0 or 1. Further, CSFs and the ltrc-R learner, both of which use a residual-on-residual regression, restrict treatment effect heterogeneity to X ⊆ Z, delivering bias when there is heterogeneity in components of Z that are not in X.In addition to this, CSFs and the ltrc-R and ltrc-DR estimators take different approaches when minimizing their expected loss functions, with CSFs estimating heterogeneity using a forest-based weighting scheme, while the ltrc estimators do not depend on a forest-based structure, but can be run using any ML algorithm that accommodates custom loss functions, i.e, xgboost [Chen and Guestrin, 2016]. This means CSFs are prone to bias when its forest based framework does not suit the data, i.e., when the data is high dimensional or when the covariates are strongly correlated. On the other hand, both ltrc estimators encounter a different issue at this stage, with the weights being possibly negative, which makes them non-interpretable (even when the nuisance functions are correctly bounded). This introduces bias, makes the loss function non-convex (complicating the minimization of the loss), and restricts algorithm choice. The limitations discussed above pose practical challenges for the CSF and ltrc estimators. However, there is also a more fundamental issue affecting all of these methods, in that none of these estimators fully leverage the temporal structure of the data. In order to generate estimates of a target function across multiple time points (i.e. a treatment effect curve), each of these existing learners optimizes the estimates of the difference at each time point in (0 , τ ]
+
+separately. This can lead to non-smooth treatment effect estimates over time, which may not be biologically plausible. We aim to address these issues, presenting an alternative estimation technique, surv-iTMLE, which directly targets the difference in conditional survival probabilities, while also obtaining estimates which are smooth over time and conditional on a subset of covariates, X ⊆ Z.
+
+5 surv-iTMLE 
+
+Our proposal, surv-iTMLE, involves a two step algorithm to estimate (2). The first step constructs de-biased plug-in estimates of the difference in survival probabilities at a series of time points, which are conditional on Z, referred to as pseudo-outcomes. The second step runs a pseudo-outcome regression, obtaining estimates of the difference in survival probabilities which are smooth over time and conditional on X ⊆ Z, i.e, are not restricted to the full set of adjustment variables, Z. This section provides details on these steps for the LTRC setting (Algorithms 1 and 2), and details for the RC setting can be found in Section S8 of the Supplementary Material. 
+
+5.1 Step 1: Generating pseudo-outcomes using iTMLE 
+
+To derive a de-biased estimator of the difference in conditional survival probabilities, we first define our expected loss as the components of the MSE (of θ(t|X)) which depend on θ(t|X), noting that the remaining components do not affect its minimization. 
+
+ψ(P0) = E0
+
+θ(t|X)2 − 2θ(t|X) E0
+
+   P0(T 1 > t |Z) − P0(T 0 > t |Z) X . (3) For a fixed θ(t|X), we write the uncentered EIF of equation (3) in the LTRC setting as: 
+
+ϕ(P0) = θ(t|X)2 − 2θ(t|X) ( S(t|A = 1 , Z, t ≥ Q) − S(t|A = 0 , Z, t ≥ Q)) + 2θ(t|X) 1(t ≥ Q)( A − π(Z)) (1 − π(Z)) π(Z) S(t|A, Z, t ≥ Q)×
+
+5A PREPRINT - M ARCH 30, 2026 
+
+Z
+
+> (0 ,t ]
+
+n
+
+1( ˜T = u, ∆ = 1) − 1(u ≤ ˜T )Λ( du |A, Z, u ≥ Q)
+
+o
+
+S(u|A, Z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A, Q, Z )H(dq |A, Z ) , (4) where S(t|A = a, Z, t ≥ Q) = P ( ˜T > t, ∆ = 1 |A = a, Z, t ≥ Q), a ∈ { 0, 1} are the probabilities of surviving up to time t under each treatment conditional on surviving to the study entry time Q, G(t|A, Q, Z ) = P (C > t |A, Q, Z )
+
+is the probability of being censored after time t, H(t|A, Z ) = P (Q ≤ t|Z) is the probability of entering the study at or before time t, and π(Z) = P (A = 1 |Z) the probability of being treated. The derivation for this EIF can be found in Section S2 in the Supplementary Materials. The EIF in equation (4) includes IPWs for treatment assignment, 1/π (Z), right censoring, 1/G (t|A, Q, Z ), and left truncation, 1/H (t|A, Z ), and consists of two key components: the plug-in loss function, S(t|A = 1 , Z, t ≥
+
+Q) − S(t|A = 0 , Z, t ≥ Q), and a de-biasing term, written in equation (5) below, 
+
+2θ(t|X) 1(t ≥ Q)( A − π(Z)) (1 − π(Z)) π(Z) S(t|A, Z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+n
+
+1( ˜T = u, ∆ = 1) − 1(u ≤ ˜T )Λ( du |A, Z, u ≥ Q)
+
+o
+
+S(u|A, Z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A, Q, Z )H(dq |A, Z ) . (5) The de-biasing term in equation (5) captures the bias introduced by estimating rather than knowing the nuisance parameters. Moreover, the EIF in equation (4) can be used to derive de-biased estimators by constructing pseudo-outcomes. In this paper we present a novel targeted learning approach, combining two existing methods; the EP-learner [van der Laan et al., 2024], which uses iTMLE to estimate heterogeneous treatment effects, and a survival TMLE algorithm, presented by Moore and van der Laan [2009], using a pre-defined grid of times. In general, the goal of targeted learning is to update the plug-in estimates of a function, in our case θ(t|X), such that the sample average of the de-biasing term in equation (5) converges to zero sufficiently quickly, ensuring that it does not impact the overall convergence rate of the expected loss. Typically, this is done in two steps: first, the EIF is used to define a weighted regression; and second, the estimated linear predictor from this model is used to update the plug-in estimates. However, when constructing a targeting process for our estimand, we encounter additional challenges. One of these challenges is that the de-biasing term contains θ(t|X), which is unknown and infinite-dimensional in t and 
+
+X (when any variables in X are continuous). This means that in order to remove bias from the plug-in estimator, the targeting step must set the sample average of infinitely many terms equal to 0. An estimator which presented a solution to this problem was the EP-learner [van der Laan et al., 2024], which overcame this problem in the context of the CATE by introducing a sieve-based targeting procedure, regressing the outcomes against the sieve basis φ(X) in a weighted regression. We draw upon this method, known as iTMLE [Luedtke et al., 2017, Vansteelandt and Morzywołek, 2025, van der Laan et al., 2024], extending it to the time-to-event setting. In the time to event setting, we focus on the targeted learning procedure proposed by Moore and van der Laan [2009] which considers a pre-defined grid of times, {t1, ..., τ }. It updates the survival functions, S(t|A, Z, t ≥ Q),
+
+A ∈ { 0, 1} by first updating the hazard functions, λ(k|A, Z, k ≥ Q), for A ∈ { 0, 1} at each time point up to and including time point of interest, k ∈ { t1, ..., t }. The plug-in hazard estimates, ˆλ(k|A, Z, k ≥ Q) are obtained from plug-in survival function estimates, ˆS(t|A, Z, t ≥ Q)), and this algorithm requires separate targeting models for each 
+
+k ∈ { t1, ..., t }. Further, it must be repeated for each t ∈ { t1, ..., τ }, as the de-biasing term we wish to set to 0 will differ across each time, t. By updating the treatment-specific hazard function estimates first, we can maintain the bounds and monotonicity of the survival functions. Additionally, as we consider discrete pre-defined time intervals, we write the hazards as ˆλ(k|A, Z, k ≥ Q) (rather than in terms of the cumulative hazard/product integral notation), noting that they can be obtained from estimates of the treatment specific survival functions. To adapt this algorithm to our infinite dimensional estimand, we now incorporate a sieve basis in the targeting step. The adapted algorithm incorporating this is summarised in Algorithm 1, which fits a weighted logistic regression (or alternatively linear or log-linear regression - see below) for each k ∈ { t1, ..., t } and t ∈ { t1, ..., τ }, regressing the indicator of having an event during a given interval, 1( ˜T = k, ∆ = 1) , against the sieve basis, φ(X), with the plug-in hazard function estimates, ˆλ(k|A, Z, k ≥ Q), included as an offset, and the weights defined as 
+
+wLT RC (Z, t ) = 
+
+ A
+
+ˆπ(Z) + 1 − A
+
+1 − ˆπ(Z)
+
+ 1(t ≥ Q) ˆS(t|a, Z, t ≥ Q)ˆS(k|a, Z, k ≥ Q) Pkq=t1
+
+ˆG(k − | A, q, Z )ˆλH (q|A, Z ) .
+
+Here, ˆλH (q|A, Z ) represents the hazard of study entry, which can be obtained using ˆH(q|A, Z ), and we write the integral of the censoring/truncation probabilities as a sum over the respective intervals. Once the hazards are updated, these can be used to reconstruct the survival functions, generating updated survival functions S∗(t|A = a, Z ), for 
+
+a ∈ { 0, 1}. By making this subtle change to the survival TMLE algorithm, now using the sieve basis regression, the 6A PREPRINT - M ARCH 30, 2026 model coefficients can now vary by X, and the targeting process (when iterated) will set the sample average of the de-biasing term to 0. This being said, the inclusion of sieves introduces new practical challenges. When defining a sieve basis, it is useful to remember that sieves, by definition, grow with sample size. This means that when used in practice, the sieve basis, φ(X), can grow to be high-dimensional, and hence its inclusion in parametric models can result in model convergence issues. Further, as the event of interest in this setting is binary (and potentially rare, depending on the time grid), logistic regressions can experience further convergence issues. Together, these two issues prevent reliable convergence of the targeting models in this algorithm, and hence we suggest two alterations to the estimation process. Firstly, one can use linear regressions, or log-linear regressions in the targeting steps. Both of these options experience fewer convergence issues than logistic regressions, and in theory achieve the same targeting goal. However, the resulting hazards are no longer guaranteed to respect the bounds [0 , 1] . Secondly, it can be useful to implement each of these regressions using penalization (e.g. LASSO) [Vansteelandt and Morzywołek, 2025] when the sieve is high dimensional. Together, these techniques aid the convergence of the hazard targeting steps, and the resulting updated hazards can be used to construct pseudo-outcomes. Figure 1 presents this algorithm, including the need for cross-fitting. Additionally, as the pseudo-outcomes are obtained using targeted learning, which mitigates the impact of extreme IPWs, the pseudo-outcomes can be less volatile than those generated by one-step methods (e.g., the ltrc-DR learner). 
+
+5.2 Step 2: Generating causal contrast estimates using a pseudo-outcome regression 
+
+We now consider how to obtain treatment effect curves which not only minimize the expected loss function in equation (3), but which are also smooth over time. A simple solution would be to separately regress the pseudo-outcomes at each time, ˆYiT M LE (t), for t ∈ { t1, ..., τ }, against X,
+
+ˆθiT M LE −N aive (t|X) = E
+
+h ˆYiT M LE (t) X
+
+i
+
+for t ∈ { t1, ..., τ }.
+
+However, this would generate non-smooth treatment effect curves over time, similar to those produced by CSFs. For this reason, we present an alternative solution, proposing the use of a pooled regression which allows for the estimates of θ0(t|X) to be estimated jointly across time. It begins by generating a long dataset, where each person contributes one row per time. The outcome is then defined as the incremental change in an individual’s pseudo-outcome since the previous time point, ∆YiT M LE (k) = YiT M LE (j) − YiT M LE (k − 1) , for k ∈ { t1, ..., t }, using the pseudo-outcomes generated in Step 1. We use the incremental changes in the pseudo-outcomes, rather than the pseudo-outcomes themselves in order to dampen correlations between rows. Estimates of θ0(t|X) can then be obtained by regressing ∆YiT M LE (k) against X, the covariates in which treatment effect heterogeneity is of interest, and time ,with time included as a continuous predictor. This produces estimates ∆ˆθiT M LE (k|X) = ˆθ(k|X) − ˆθ(k − 1|X) for 
+
+k ∈ { t1, ..., τ }, which represent the incremental increase in the difference in conditional survival probabilities (given 
+
+X) at each time, and estimates of ˆθiT M LE (t|X) can be obtained by summing these incremental predictions up to time 
+
+t, t ∈ { t1, ..., τ }. This algorithm is summarised in Figure 2, and in Section S3 in the Supplementary Materials, we provide an overview of why this regression can be run on the incremental outcomes, even though it changes the loss function being minimized. 
+
+ˆθiT M LE (t|X) = 
+
+> t
+
+X
+
+> k=t1
+
+∆ˆθiT M LE (k|X).
+
+5.3 Implementation guidance 
+
+The application of surv-iTMLE involves several important user-specified choices that influence the estimation pro-cedure. The first is how to estimate each nuisance function found in equation (4). As seen in Algorithm 1, steps 1-3, cross-fitting is required when estimating the nuisance functions, assuring that independence between the nuisance function estimates and the estimation of the target function is maintained. In Algorithm 1 we achieve this using a 
+
+K-fold cross-fitting procedure. We next consider how each nuisance function can be estimated in the LTRC setting. Both the survival functions, 
+
+S(t|A = a, Z, t ≥ Q), a ∈ { 0, 1}, and the censoring function, G(t|A, Q, Z ), can be estimated using ML algorithms, as long as the algorithms account for LTRC and RC event times respectively (See Section S4 of the Supplementary Materials for a discussion of available options). However, when estimating the truncation probabilities, H(t|A, Z ),or the propensity score, π(Z), additional caution is required. Both functions are defined conditional on observing the full target population, but in practice, we only observe data on those who enter the study prior to having an event, 7A PREPRINT - M ARCH 30, 2026 
+
+Figure 1: surv-iTMLE algorithm - Step 1 - Obtaining pseudo-outcomes. 
+
+T > Q . To address this disparity in populations, one can re-weight the population, up-weighting the subgroups who are likely to have an event prior to truncation. These inverse probability weights, 1/P (T > Q |A, Z ), can be estimated using the same algorithms used to estimate the survival functions and can be used within the truncation/treatment models to address this bias. Once estimated, the truncation probabilities and propensity score can then be estimated using algorithms which handle time-to-event and binary outcomes respectively. Yet as errors in these weights can propagate through to the estimates of H(t|A, Z ) and π(Z), we note this process can slow the rate of convergence of these nuisance estimators, which may impact the overall rate of convergence of the estimator. This issue is discussed by Wang et al. [2024]. 8A PREPRINT - M ARCH 30, 2026 
+
+Figure 2: surv-iTMLE algorithm - Step 2 - Estimating the difference in conditional survival probabilities under two treatments for a given patient. Once the nuisance functions have been estimated, one needs to decide how to define the sieve basis and how to carry out the weighted regressions in the targeting step (Algorithm 1, step 4). Our implementations found in Sections 6 and 7 define the sieve basis using a univariate cosine polynomial basis, as it offers strong approximation guarantees under smoothness assumptions [Zhang and Simon, 2023]. However, as this sieve basis can be high dimensional, we recommend carrying out the targeting step by using penalized regressions, as done by Vansteelandt and Morzywołek [2025]. This can be penalized linear regressions as found in Sections 6 and 7, but could also be penalised logistic or log-linear regressions, depending on the trade-off between maintaining the hazard estimate bounds (i.e. [0 , 1] ) and achieving model convergence. Finally, the Step 2 regression (Algorithm 2) can be performed using any algorithm which handles continuous outcomes. In Section 6, we use the SuperLearner , but to obtain smooth treatment effect curves over time, one may wish to use an algorithm which can capture the level of smoothness expected in that particular setting. In Section 7, we use a generalized additive model (GAM), including factor–smooth interactions between time and X, as they allow treatment effect curves to vary in shape across X values. However, if using GAMs, one must limit the maximum basis dimension for each term, such that the algorithm generates smooth curves which can still depart from strict linearity. In the NSCLC example, a maximum of four degrees of freedom ( K = 4 ) offered flexible but smooth treatment effect curves, however, other algorithm/tuning parameters may be more appropriate in other settings. 
+
+6 Simulations 
+
+6.1 Methods 
+
+We demonstrate the empirical performance of surv-iTMLE and compare it to existing methods across three data gen-erating processes (DGPs). The first DGP is taken from Cui et al. [2023], but with additional left truncation introduced to the event times; the second closely resembles the event/censoring/truncation patterns seen in our NSCLC analysis, and the third DGP provides an example with no treatment effect and high levels of right censoring ( ∼ 50% ). In each of these DGPs, we generate 20 independent uniformly distributed covariates, Z, a binary treatment, A, and generate event and censoring times, T and C, along with two levels of left truncation, Q, allowing ∼ 25% and ∼ 50% of individuals to have an event prior to their truncation time. Individuals with an event time prior to their truncation time are excluded from analyses. Details of the data generating functions are in Section S5 of the Supplementary Material. Using surv-iTMLE, we estimate the conditional survival probabilities under the two treatment levels conditional on all covariates, Z. In each DGP, we review performance across three training sample sizes; n = 800 , 1600 and 2400 ,and for each DGP/sample size combination, 250 simulated datasets are generated. All nuisance models are fit using 10-fold cross-fitting, and the survival, censoring and truncation models in surv-iTMLE are estimated using a local survival stacking (LSS) approach [Wolock et al., 2024] (Section S5 of the Supplementary Materials) which includes variations of glmnet and ranger . Meanwhile, the propensity score and pseudo-outcome regressions are estimated using the SuperLearner (for binary/continuous outcomes respectively). Details of the libraries used for each model are reported in Section S6 of the Supplementary Material. We compare our estimates to those obtained using a T-learner, fit using the same local survival stacking approach; CSFs, fit using the default estimation options in the grf 
+
+package on R; and the ltrc-DR and ltrc-R learners, fit using two nuisance parameter estimation options, (1) local 9A PREPRINT - M ARCH 30, 2026 survival stacking/ SuperLearner , and (2) penalized Cox regressions/generalized boosted regressions, as presented by Wang et al. [2024]. To evaluate estimator performance, we generated a single test dataset (which remains the same across simulations) with n = 10 , 000 individuals per DGP. For each individual in the test dataset, the true difference in conditional survival probabilities between treatments was obtained via Monte Carlo simulation: we generated 1,000,000 survival times under each treatment, estimated survival probabilities at each time point as the proportion of simulated times exceeding that time, and then computed their difference between treatments. Each model was the trained on each of the 250 training datasets, generating estimates of the treatment effect for each individual in the test dataset, given their covariates Z, and at 10 time points. At each time point we obtain the squared differences between the estimated and true effects for each individual, and averaged these squared differences across individuals within a given simulation, taking the square root to give a RMSE. The RMSEs for each time point are are then averaged across the simulations, calculating the mean RMSE at each time point, and also averaged across time points, to calculate the overall mean RMSE. An analogous RC-only simulation study is provided in Section 8.3 of the Supplementary Material. 
+
+6.2 Findings 
+
+Figure 3 shows that surv-iTMLE generally outperformed both the T-learner and CSFs when the mean RMSE was reviewed at each time point individually. The performance of surv-iTMLE and CSFs varies depending on the degree of truncation and censoring which occurs at each time point, whereas the T-learner was less dependent on censor-ing/truncation rates, but generally exhibited poorer performance over time. Moreover, as surv-iTMLE accounts for left truncation, it outperforms CSFs in the early, heavily left truncated time periods (DGP1), with this trend most prominent in settings with high left truncation rates. We also note surv-iTMLE outperformed CSFs and the T-learner across all settings when reviewing the overall mean RMSE with surv-iTMLE obtaining estimates between 5% and 36% lower than CSFs, and between 12% and 46% lower than the T-learner across each of our DGP/sample size com-binations. The largest benefits are seen in settings with high levels of left truncation (See Figure 1 in Section S7 of the Supplementary Materials). Additionally, both ltrc-R and ltrc-DR learners performed poorly, likely due to the gener-ation of negative weights in their estimation process. This was most prominent when left truncation rates were high. For plot readability, we only include the corresponding results in the Supplementary Materials Section S7, Figures 1-5. 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14    
+
+> 0.5 1.0 1.5 2.0
+> Time
+> mean RMSE
+
+DGP 1 (Low LT)    
+
+> 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14
+> 0.25 0.50 0.75 1.00
+> Time
+> mean RMSE
+
+DGP 2 (Low LT)    
+
+> 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14
+> 0.5 1.0 1.5 2.0
+> Time
+> mean RMSE
+
+DGP 3 (Low LT)    
+
+> 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14
+> 0.5 1.0 1.5 2.0
+> Time
+> mean RMSE
+
+DGP 1 (High LT)    
+
+> 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14
+> 0.25 0.50 0.75 1.00
+> Time
+> mean RMSE
+
+DGP 2 (High LT)    
+
+> 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14
+> 0.5 1.0 1.5 2.0
+> Time
+> mean RMSE
+
+DGP 3 (High LT) 
+
+CSF surv−iTMLE (LSS) T−learner (LSS) 
+
+Figure 3: Mean root mean squared error (RMSE) by time point for surv-iTMLE, CSFs and the T-learner when esti-mating the difference in conditional survival probabilities under two treatments using training data with sample size 
+
+n = 2400 , with varying proportions of left truncation (LT). LSS: local survival stacking. 10 A PREPRINT - M ARCH 30, 2026 Figure 4 shows individual estimates of the difference in conditional survival probabilities, corresponding to one randomly chosen individual in one simulated set for each DGP. This illustrates how surv-iTMLE’s estimates more closely track the true curve, providing smoother estimates than those produced by CSFs, the T-learner and the ltrc-R and ltrc-DR learners. This is a consequence of surv-iTMLE’s second step, which estimates the difference jointly across all times, and can be seen for all the individuals in the test dataset (See Figures 3-5 in Section S7 of the Supplementary Materials, which also presents ltrc-R and ltrc-DR learner predictions). In the following section (Section 7), we use GAMs for this step to obtain smooth treatment effect curves. −0.20 −0.10 0.00 0.10 0.20 0.30    
+
+> 0.50 1.00 1.50 2.00
+> Time
+> Effect
+
+DGP 1 (Low LT)    
+
+> −0.20 −0.10 0.00 0.10 0.20 0.30
+> 0.25 0.50 0.75 1.00
+> Time
+> Effect
+
+DGP 2 (Low LT)    
+
+> −0.20 −0.10 0.00 0.10 0.20 0.30
+> 0.50 1.00 1.50 2.00
+> Time
+> Effect
+
+DGP 3 (Low LT)    
+
+> −0.20 −0.10 0.00 0.10 0.20 0.30
+> 0.50 1.00 1.50 2.00
+> Time
+> Effect
+
+DGP 1 (High LT)    
+
+> −0.20 −0.10 0.00 0.10 0.20 0.30
+> 0.25 0.50 0.75 1.00
+> Time
+> Effect
+
+DGP 2 (High LT)    
+
+> −0.20 −0.10 0.00 0.10 0.20 0.30
+> 0.50 1.00 1.50 2.00
+> Time
+> Effect
+
+DGP 3 (High LT) 
+
+CSF surv−iTMLE (LSS) T−learner (LSS) True difference 
+
+Figure 4: Individual estimates of the difference in conditional survival probabilities under two treatments plotted for one individual over time, with estimates obtained by surv-iTMLE, CSFs and the T-learner using training data of samples size n = 2400 .
+
+7 NSCLC analysis 
+
+7.1 Background and Methods 
+
+We now return to our motivating example and illustrate how surv-iTMLE, as well as the T-learner, CSFs and the ltrc-R and ltrc-DR learners can be used to estimate the difference in conditional survival probabilities if patients with NSCLC were to receive an immunotherapy or a chemotherapy. As discussed in Section 2, the treatment strategy considered is treatment initiation (such that the consistency assumption (A4) holds). We focus on treatments initiated within 30 days of a NSCLC diagnosis and explore three years of follow-up for patients. To improve the plausibility of the positivity assumptions, (A1)-(A3), we restrict our target population using criteria outlined in previous immunotherapy trials [Rashdan and Gerber, 2019]; requiring patients be aged over 18 at diagnosis, have advanced NSCLC at the time of diagnosis, and not have an autoimmune disease at time of diagnosis. We also restrict our population to patients who do not have systemic steroid use in the 90 days prior to treatment initiation and further exclude patients who initiate a chemotherapy but have prior immunotherapy use. Under these eligibility criteria, there is a total of 3086 patients, of which 1368 (44%) initiated immunotherapy and 1718 (56%) initiated chemotherapy. We apply each estimator, adjusting for all pre-treatment covariates with less than 30% missingness, which includes demographic and clinical measurements, as well genomic data which is considered to not vary over time (e.g., presence of EGFR and KRAS mutations). A full list of the available pre-treatment covariates can be found in Section S9.1 of the Supplementary Materials. A single dataset with no missing covariate information was obtained by imputing missing values for each covariate with less than 30% missingness. This was obtained using Multiple Imputation by Chained 11 A PREPRINT - M ARCH 30, 2026 Equations. A summary of this process, along with details on how each of these estimators were fit can be found in Sections S9.2 and S9.3 of the Supplementary Materials respectively. The initial estimand of interest is the difference in survival probabilities conditional on the sufficient adjustment set of pre-treatment covariates, Z. This is estimated using all methods. Further, since surv-iTMLE can estimate the difference conditional on a subset X of the sufficient set Z, we target two extra estimands. One conditional on only EGFR mutations, and one conditional on only age, both of which are of clinical interest. Finally, to draw upon the fact surv-iTMLE can obtain smooth treatment effect curves over time, we use a GAM, as described in Section 5.3 to estimate the pseudo-outcome model in surv-iTMLE. 
+
+7.2 Findings 
+
+Figure 5 shows plots of individual treatment effect curves for three randomly chosen example patients, with different gender, genomic and demographic profiles. We see that both surv-iTMLE and CSFs predict a limited response to the immunotherapies over the first 6 months, with immunotherapies offering increased effectiveness relative to chemother-apy over time. On the other hand, the T-learner, which does not directly target the estimand of interest, produces highly non-smooth curves over time in which trends are difficult to detect. Similarly, the curves produced by CSFs and ltrc-R and ltrc-DR learners are non-smooth, while the curves generated by the surv-iTMLE are smooth over time, reflecting more intuitive treatment effect patterns. Results from the ltrc-R and ltrc-DR learners are only presented in Section S10 of the supplementary materials to aid readability. −0.20 −0.15 −0.10 −0.05 0.00 0.05 0.10 0.15 0.20       
+
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Time (Years)
+> Difference in survival probability
+
+Patient 1       
+
+> −0.20 −0.15 −0.10 −0.05 0.00 0.05 0.10 0.15 0.20
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Time (Years)
+> Difference in survival probability
+
+Patient 2       
+
+> −0.20 −0.15 −0.10 −0.05 0.00 0.05 0.10 0.15 0.20
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Time (Years)
+> Difference in survival probability
+
+Patient 3 
+
+surv−iTMLE T−learner CSF 
+
+Figure 5: Individual difference in conditional survival probabilities over time for three example NSCLC patients if they were to initiate immunotherapy/chemotherapy after a NSCLC diagnosis, with treatment effects estimated by surv-iTMLE, CSFs and the T-learner. Figure 6 shows the estimated difference in survival probabilities conditional on only a subset of covariates obtained by surv-iTMLE. On the left panel, the resulting estimates suggest that individuals who have an EGFR mutation tend to benefit less from immunotherapies than those who do not have the mutation (or whose status is unknown). On the right hand panel, we use a heat-map to display the estimated differences conditional on continuous age. Here, we observe that older patients tend to benefit more from receiving immunotherapies over chemotherapies, however this is not necessarily true for very elderly patients, with effectiveness dropping amongst patients aged 85 and above. 
+
+8 Discussion 
+
+In this paper we have shown how the difference in conditional survival probabilities can be estimated using surv-iTMLE, a fully non-parametric estimator which produces bounded and stable treatment effect estimates that are smooth over time. We have shown how it can accommodate both RC and LTRC event times, demonstrated its performance through simulations, and illustrated how it can provide meaningful insights in the NSCLC application. However, we believe further improvements and extensions to both surv-iTMLE, and our comparators are possible. Firstly, when used in the LTRC setting, surv-iTMLE requires additional weights in order to estimate the truncation or propensity score models. These are also required by the ltrc-R and ltrc-DR learners. Orthogonal estimation for these 12 A PREPRINT - M ARCH 30, 2026 −0.05 0.00 0.05 0.10 0.15        
+
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Time (Years)
+> Difference in survival probability
+> EGFR − Positive EGFR − Negative/Unknown
+
+EGFR           
+
+> 35 45 55 65 75 85
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+> Time (Years)
+> Age
+> Difference in Survival
+> −0.10 −0.05 0.00 0.05 0.10
+
+Age 
+
+Figure 6: Estimates from surv-iTMLE of the difference in the survival probabilities if patients were to receive an immunotherapy or a chemotherapy after a NSCLC diagnosis. Left panel: estimates conditional on having an EGFR mutation (binary). Right panel: conditional on age (continuous). nuisance parameters could in principle lead to improved performance of each of these estimators. Secondly, while the use of sieves for infinite-dimensional targeting has been formally studied in other settings [van der Laan et al., 2024], including with the use of lasso [Vansteelandt and Morzywołek, 2025], we did not quantify the resulting approximation error and regularisation bias. Thirdly, we do not present an approach for obtaining measures of uncertainty for surv-iTMLE. This is inherently challenging due to surv-iTMLE’s non-parametric design. Extending the recent work by Zhang et al. [2025] to the time-to-event setting, which uses highly adaptive lasso to provide confidence intervals for infinite dimensional parameters, could be a possible strategy which we leave to further work. In addition, we note that neither the ltrc-R or ltrc-DR learners performed well in our simulation studies (Section S7 of Supplementary Materials). This may be due to the negative weights generated when constructing their loss functions, but further exploration of their performance is needed and proposals that avoid the negative weights would also be of interest. Finally, we highlight that the surv-iTMLE algorithm could be used to estimate treatment specific survival curves, offering TMLE alternatives to the methods presented by Westling et al. [2024] and Morenz et al. [2024]. 
+
+Acknowledgments 
+
+The authors would like to thank Chris Harbron (Roche) for facilitating data access, and for his valuable input re-garding the data structure and scientific problem formulation. This work was supported by the Medical Research Council [grant number MR/N013638/1]. KDO was funded by a Royal Society-Welcome Trust Sir Henry Dale fel-lowship, grant number 218554/Z/19/Z. RHK was funded by UK Research and Innovation (Future Leaders Fellowship MR/X015017/1). SV was supported by Advanced ERC grant ACME (101141305). 
+
+References 
+
+Pawel Morzywolek, Johan Decruyenaere, and Stijn Vansteelandt. On a general class of orthogonal learners for the estimation of heterogeneous treatment effects. arXiv preprint arXiv:2303.12687 , 2023. Yifan Cui, Michael R Kosorok, Erik Sverdrup, Stefan Wager, and Ruoqing Zhu. Estimating heterogeneous treat-ment effects with right-censored data via causal survival forests. Journal of the Royal Statistical Society Series B: Statistical Methodology , 85(2):179–211, 2023. ISSN 1369-7412. Yuyao Wang, Andrew Ying, and Ronghui Xu. Learning treatment effects under covariate dependent left truncation and right censoring. arXiv preprint arXiv:2411.18879 , 2024. Alexander R Luedtke, Oleg Sofrygin, Mark J van der Laan, and Marco Carone. Sequential double robustness in right-censored longitudinal models. arXiv preprint arXiv:1705.02459 , 2017. 13 A PREPRINT - M ARCH 30, 2026 Stijn Vansteelandt and Paweł Morzywołek. Orthogonal prediction of counterfactual outcomes. Journal of Causal Inference , 13(1):20240051, 2025. ISSN 2193-3685. Lars van der Laan, Marco Carone, and Alex Luedtke. Combining t-learning and dr-learning: a framework for oracle-efficient estimation of causal contrasts. arXiv preprint arXiv:2402.01972 , 2024. Chee Khoon Lee, Johnathan Man, Sally Lord, Matthew Links, Val Gebski, Tony Mok, and James Chih-Hsin Yang. Checkpoint inhibitors in metastatic egfr-mutated non–small cell lung cancer—a meta-analysis. Journal of Thoracic Oncology , 12(2):403–407, 2017. ISSN 1556-0864. Flatiron Health. Database characterization guide. https://flatiron.com/database-characterization , 2025. Accessed: January 26, 2026. Garrett M Frampton, Alex Fichtenholtz, Geoff A Otto, Kai Wang, Sean R Downing, Jie He, Michael Schnall-Levin, Jared White, Eric M Sanford, and Peter An. Development and validation of a clinical cancer genomic profiling test based on massively parallel dna sequencing. Nature biotechnology , 31(11):1023–1031, 2013. ISSN 1546-1696. Gaurav Singal, Peter G Miller, Vineeta Agarwala, Gerald Li, Gaurav Kaushik, Daniel Backenroth, Anala Gossai, Garrett M Frampton, Aracelis Z Torres, and Erik M Lehnert. Association of patient characteristics and tumor genomics with clinical outcomes among patients with non–small cell lung cancer using a clinicogenomic database. 
+
+Jama , 321(14):1391–1399, 2019. ISSN 0098-7484. Coren A Milbury, James Creeden, Wai-Ki Yip, David L Smith, Varun Pattani, Kristi Maxwell, Bethany Sawchyn, Ole Gjoerup, Wei Meng, and Joel Skoletsky. Clinical and analytical validation of foundationone® cdx, a comprehensive genomic profiling assay for solid tumors. PloS one , 17(3):e0264138, 2022. ISSN 1932-6203. Donald B Rubin. Causal inference using potential outcomes: Design, modeling, decisions. Journal of the American Statistical Association , 100(469):322–331, 2005. ISSN 0162-1459. Ted Westling, Alex Luedtke, Peter B Gilbert, and Marco Carone. Inference for treatment-specific survival curves using machine learning. Journal of the American Statistical Association , 119(546):1541–1553, 2024. ISSN 0162-1459. Eric R Morenz, Charles J Wolock, and Marco Carone. Debiased machine learning for counterfactual survival func-tionals based on left-truncated right-censored data. arXiv preprint arXiv:2411.09017 , 2024. Jing Qian and Rebecca A Betensky. Assumptions regarding right censoring in the presence of left truncation. Statistics & probability letters , 87:12–17, 2014. ISSN 0167-7152. Richard D Gill and Søren Johansen. A survey of product-integration with a view toward application in survival analysis. The annals of statistics , pages 1501–1555, 1990. ISSN 0090-5364. F´ elicien Le Louedec, Fanny Leenhardt, Cl´ emence Marin, ´ Etienne Chatelut, Alexandre Evrard, and Joseph Ciccolini. Cancer immunotherapy dosing: a pharmacokinetic/pharmacodynamic perspective. Vaccines , 8(4):632, 2020. ISSN 2076-393X. Yizhe Xu, Nikolaos Ignatiadis, Erik Sverdrup, Scott Fleming, Stefan Wager, and Nigam Shah. Treatment heterogeneity with survival outcomes , pages 445–482. Chapman and Hall/CRC, 2023. Victor Chernozhukov, Denis Chetverikov, Mert Demirer, Esther Duflo, Christian Hansen, and Whitney Newey. Dou-ble/debiased/neyman machine learning of treatment effects. American Economic Review , 107(5):261–65, 2017. ISSN 0002-8282. Oliver Hines, Oliver Dukes, Karla Diaz-Ordaz, and Stijn Vansteelandt. Demystifying statistical learning based on efficient influence functions. The American Statistician , pages 1–13, 2022. ISSN 0003-1305. Peter M Robinson. Root-n-consistent semiparametric regression. Econometrica: journal of the Econometric Society ,pages 931–954, 1988. ISSN 0012-9682. Anastasios A Tsiatis. Semiparametric theory and missing data . Springer, 2006. Tianqi Chen and Carlos Guestrin. Xgboost: A scalable tree boosting system. In Proceedings of the 22nd acm sigkdd international conference on knowledge discovery and data mining , pages 785–794, 2016. Kelly L Moore and Mark J van der Laan. Application of time-to-event methods in the assessment of safety in clinical trials , pages 473–500. Chapman and Hall/CRC, 2009. Tianyu Zhang and Noah Simon. Regression in tensor product spaces by the method of sieves. Electronic Journal of Statistics , 17(2):3660–3727, 2023. ISSN 1935-7524. Charles J Wolock, Peter B Gilbert, Noah Simon, and Marco Carone. A framework for leveraging machine learning tools to estimate personalized survival curves. Journal of Computational and Graphical Statistics , 33(3):1098– 1108, 2024. ISSN 1061-8600. 14 A PREPRINT - M ARCH 30, 2026 Sawsan Rashdan and David E Gerber. Immunotherapy for non-small cell lung cancer: from clinical trials to real-world practice. Translational Lung Cancer Research , 8(3):202, 2019. Wenxin Zhang, Junming Shi, Alan Hubbard, and Mark van der Laan. Constructing confidence intervals for infinite-dimensional functional prameters by highly adaptive lasso. arXiv preprint arXiv:2507.10511 , 2025. Sarah F McGough, Devin Incerti, Svetlana Lyalina, Ryan Copping, Balasubramanian Narasimhan, and Robert Tib-shirani. Penalized regression for left-truncated and right-censored survival data. Statistics in Medicine , 40(25): 5487–5500, 2021. ISSN 0277-6715. Sarah F McGough, Svetlana Lyalina, Devin Incerti, Yunru Huang, Stefka Tyanova, Kieran Mace, Chris Harbron, Ryan Copping, Balasubramanian Narasimhan, and Robert Tibshirani. Prognostic pan-cancer and single-cancer models: A large-scale analysis using a real-world clinico-genomic database. medRxiv , page 2023.12. 18.23300166, 2023. 15 A PREPRINT - M ARCH 30, 2026 
+
+S1. Identification - Left truncated, right censored time-to-event data 
+
+We show that our estimand, θ(t|x) is identifiable by first showing that S0(t|A = a, Z = z) = P0(T a > t |Z = z),
+
+a ∈ { 0, 1} is identifiable under (A1)-(A8), extending the equivalent proof provided by Westling et al. [2024] to the LTRC setting. To simplify notation, we write S0(t|A = a, Z = z) = S0(t|a, z ) = P0(T a > t |Z = z), a ∈ { 0, 1}. We then show that this is identifiable using left truncated, right censored time-to-event data under (A1)-(A8) by first writing 
+
+S0(t|a, z ) using product integral notation [Gill and Johansen, 1990]: 
+
+S0(t|a, z ) = R
+
+> (0 ,t ]
+
+{1 − Λ0(du |a, z )}, (1) where Λ0(t|a, z ) = − R 
+
+> (0 ,t ]
+> S0(du |a,z )
+> S0(u−| a,z )
+
+, with S0(u − | a, z ) = P0(T a ≥ u|Z = z). We then show that Λ0(t|a, z ) is identifiable as Λ( t|a, z, t ≥ Q) = R  
+
+> (0 ,t ]
+> F(du |a,z,u ≥Q)
+> R(u−| a,z,u ≥Q)
+
+, where R(u − | a, z, u ≥ Q) = P (u ≤ ˜T |A = a, Z = z, u ≥
+
+Q) and F (u|a, z, u ≥ Q) = P ( ˜T ≤ u, ∆ = 1 |A = a, Z = z, u ≥ Q) are the observable functions. We also note that for notational ease, we write functions of T or C using the distribution P , as they are partially observed. 
+
+Proof. We begin by noting that under assumptions (A1) and (A5), S0(t|a, z ) can be written as: 
+
+S0(t|a, z ) = P0(T a > t |Z = z)= P0(T a > t |A = a, Z = z),
+
+for all t ∈ (0 , τ ] and P0-almost every z. This holds as 1(T a > t ) is a measurable function of T a1(T a ≤ τ ) for t ≤ τ .Additionally, we define G(t|a, q, z ) = P (C > t |A = a, Q = q, Z = z) and H(t|a, z ) = P (Q ≤ t|A = a, Z = z)
+
+and then demonstrate the equivalence between Λ0(t|a, z ) and Λ( t|a, z, u ≥ Q) by re-writing R(t|a, z, t ≥ Q) and 
+
+F (dt |a, z, t ≥ Q) in terms of S0(t|a, z ), G(t|a, q, z ) and H(t|a, z ). Let us begin by considering R(t|a, z, t ≥ Q):
+
+R(t|a, z,t ≥ Q) = P (t ≤ ˜T |A = a, Z = z, t ≥ Q)= P (Q ≤ t, t ≤ T, t ≤ C|A = a, Z = z)
+
+P (t ≥ Q|A = a, Z = z)= P0(Q ≤ t, t ≤ T a, t ≤ C|A = a, Z = z)
+
+P (t ≥ Q|A = a, Z = z) By (A4) 
+
+=
+
+R 
+
+> (0 ,t ]
+
+P0(t ≤ T a, t ≤ C|Q = q, A = a, Z = z)P (Q ∈ dq |A = a, Z = z)
+
+P (t ≥ Q|A = a, Z = z) By (A6) 
+
+=
+
+R 
+
+> (0 ,t ]
+
+P0(t ≤ T a|Q = q, A = a, Z = z)P (t ≤ C|Q = q, A = a, Z = z)P (Q ∈ dq |A = a, Z = z)
+
+P (t ≥ Q|A = a, Z = z)
+
+By (A7) 
+
+=
+
+R 
+
+> (0 ,t ]
+
+P0(t ≤ T a|A = a, Z = z)P (t ≤ C|Q = q, A = a, Z = z)P (Q ∈ dq |A = a, Z = z)
+
+P (t ≥ Q|A = a, Z = z)= S0(t − | a, z )
+
+R 
+
+> (0 ,t ]
+
+G(t − | a, q, z )H(dq |a, z )
+
+P (t ≥ Q|A = a, Z = z)
+
+Next, we consider F (t|a, z, t ≥ Q):
+
+F (t|a, z, t ≥ Q) = P ( ˜T ≤ t, ∆ = 1 |A = a, Z = z, t ≥ Q)= P (T ≤ t, T ≤ C, t ≥ Q|A = a, Z = z)
+
+P (t ≥ Q|A = a, Z = z)=
+
+R
+
+> (0 ,t ]
+
+R
+
+> [u, ∞)
+
+R 
+
+> (0 ,u ]
+
+P (du, dc, dq |A = a, Z = z)
+
+P (t ≥ Q|A = a, Z = z) ,
+
+16 A PREPRINT - M ARCH 30, 2026 where P (u, c, q |A = a, Z = z) is the joint distribution function of T , C and Q given A = a and Z = z. Similarly, under assumptions (A4), (A6) and (A7) we can re-write this in terms of S0(u|a, z ), G(u|a, q, z ) and H(u|a, z ), as 
+
+P (u, c, q |A = a, Z = z) = P (T < u, C < c, Q < q |A = a, Z = z)= P0(T a < u, C < c, Q < q |A = a, Z = z)=
+
+Z
+
+> (0 ,q )
+
+P0(T a < u, C < c |Q = q′, A = a, Z = z)P (Q ∈ dq ′|A = a, Z = z)=
+
+Z
+
+> (0 ,q )
+
+P0(T a < u |Q = q′, A = a, Z = z)P (C < c |Q = q′, A = a, Z = z)P (Q ∈ dq ′|A = a, Z = z)=
+
+Z
+
+> (0 ,q )
+
+P0(T a < u |A = a, Z = z)P (C < c |Q = q′, A = a, Z = z)P (Q ∈ dq ′|A = a, Z = z)= [1 − S0(u − | a, z )] 
+
+Z
+
+> (0 ,q )
+
+[1 − G(c − | a, q ′, z )] H(dq ′|a, z )
+
+We can then use that P (du, dc, dq |A = a, Z = z) = S0(du |a, z )G(dc |a, q, z )H(dq |a, z ), substituting this into our definition of F (t|a, z, t ≥ Q), to give us 
+
+F (t|a, z, t ≥ Q) = 
+
+R
+
+> (0 ,t ]
+
+R
+
+> (0 ,u ]
+
+R 
+
+> [u, ∞)
+
+S0(du |a, z )H(dq |a, z )G(dc |a, q, z )
+
+P (t ≥ Q|A = a, Z = z)=
+
+R 
+
+> (0 ,t ]
+
+S0(du |a, z ) R 
+
+> (0 ,u ]
+
+H(dq |a, z ) R 
+
+> [u, ∞)
+
+G(dc |a, q, z )
+
+P (t ≥ Q|A = a, Z = z)=
+
+R 
+
+> (0 ,t ]
+
+S0(du |a, z ) R 
+
+> (0 ,u ]
+
+H(dq |a, z )[ G(∞| a, q, z ) − G(u − | a, q, z )] 
+
+P (t ≥ Q|A = a, Z = z)= −
+
+R 
+
+> (0 ,t ]
+
+S0(du |a, z ) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+P (t ≥ Q|A = a, Z = z)
+
+Consequently, we can write F (dt |a, z, t ≥ Q) = − S0(dt |a,z ) R   
+
+> (0 ,t ]G(t−| a,q,z )H(dq |a,z )
+> P(t≥Q|A=a,Z =z)
+
+, and under (A2) and (A3) we see 
+
+Λ( t|a, z, t ≥ Q) = 
+
+Z
+
+> (0 ,t ]
+
+F (du |a, z, t ≥ Q)
+
+R(u − | a, z, t ≥ Q) = −
+
+Z
+
+> (0 ,t ]
+
+S0(du |a, z )
+
+S0(u − | a, z ) = Λ 0(t|a, z )
+
+for all t ∈ (0 , τ ], demonstrating that S0(t|a, z ) can be identified as S(t|A = a, Z = z, t ≥ Q) = S(t|a, z, t ≥ Q) = 
+
+R(0 ,t ]{1 − Λ( du |A = 1 , Z, u ≥ Q)} using the observed data. Consequently, θ(t|x) is identifiable as: 
+
+θ(t|x) = E
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z, u ≥ Q)} − R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z, u ≥ Q)} X = x
+
+
+
+for all t ∈ (0 , τ ], completing the proof. 17 A PREPRINT - M ARCH 30, 2026 
+
+S2. EIF derivation - Left truncated, right censored time-to-event data 
+
+Let us consider the following risk function for a given θ(t|X):
+
+ψ(P0) = E0
+
+θ(t|X)2 − 2θ(t|X) E0 [ ( S0(t|A = 1 , Z ) − S0(t|A = 0 , Z )) | X] ,
+
+which under (A1)-(A8) can be written as: 
+
+ψ(P0) = ψ(P )= E
+
+θ(t|X)2 − 2θ(t|X) E
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z, u ≥ Q)} − R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z, u ≥ Q)} X
+
+
+
+= E
+
+E
+
+θ(t|X)2 − 2θ(t|X)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z, u ≥ Q)} − R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z, u ≥ Q)}
+
+ X
+
+
+
+= E
+
+θ(t|X)2 − 2θ(t|X)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z, u ≥ Q)} − R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z, u ≥ Q)}
+
+ .
+
+We can then write the outer expectation as an integral as, 
+
+ψ(P ) = 
+
+Z
+
+f (z)
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z = z, u ≥ Q)}− (4) 
+
+R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z = z, u ≥ Q)}
+
+ dz, 
+
+and derive this EIF for (4) by perturbing P in the direction parameterized via the one-dimensional mixture model 
+
+Ps = s ˜P + (1 − s)P, 
+
+where ˜P is a fixed, deterministic distribution with its support contained in the support of P . By perturbing P in the direction of a point mass at (˜ z, ˜a, ˜c, ˜v, ˜q), we get: 
+
+ψ(Ps) = 
+
+Z
+
+fs(z)
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 1 , Z = z, u ≥ Q)}− 
+
+R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 0 , Z = z, u ≥ Q)}
+
+ dz, 
+
+where, fs(z) = s1˜z (z) + (1 − s)f (z) and Λs(u|a, z, u ≥ Q) = R 
+
+> (0 ,t ]
+> Fs(du |a,z,u ≥Q)
+> Rs(u−| a,z,u ≥Q)
+
+.We then calculate the Gateaux derivative as: 
+
+dΨ( Ps)
+
+ds s=0 
+
+= dds 
+
+Z fs(z)
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 1 , Z = z, u ≥ Q)}− 
+
+R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 0 , Z = z, u ≥ Q)}
+
+ dz s=0 
+
+=
+
+Z dds 
+
+fs(z)
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 1 , Z = z, u ≥ Q)}− 
+
+18 A PREPRINT - M ARCH 30, 2026 
+
+R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 0 , Z = z, u ≥ Q)}
+
+ s=0 
+
+dz 
+
+=
+
+Z
+
+[1˜z (z) − f (z)] 
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z = z, u ≥ Q)}− 
+
+R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z = z, u ≥ Q)}
+
+ +
+
+f (z) dds 
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 1 , Z = z, u ≥ Q)}− 
+
+R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 0 , Z = z, u ≥ Q)}
+
+ s=0 
+
+dz 
+
+=
+
+Z
+
+[1˜z (z) − f (z)] 
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z = z, u ≥ Q)}− 
+
+R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z = z, u ≥ Q)}
+
+ −
+
+2f (z)θ(t|x) dds 
+
+ R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 1 , Z = z, u ≥ Q)} − R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 0 , Z = z, u ≥ Q)}
+
+ s=0 
+
+dz 
+
+By using the chain rule and using Theorem 8 from Gill and Johansen [1990], we can show that, 
+
+dds R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = a, Z = z, u ≥ Q)} s=0 
+
+= −S(t|a, z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+S(u − | a, z, u ≥ Q)
+
+S(u|a, z, u ≥ Q)
+
+dds Λs(du |a, z, u ≥ Q) s=0 
+
+.
+
+We then use our definition of Λs(t|a, z, t ≥ Q) and see 
+
+dds Λs(t|a, z, t ≥ Q) s=0 
+
+= dds 
+
+Z
+
+> (0 ,t ]
+
+Fs(du |a, z, u ≥ Q)Rs(u|a, z, u ≥ Q)−1
+
+> s=0
+
+=
+
+Z
+
+> (0 ,t ]
+
+dds Fs(du |a, z, u ≥ Q) s=0 
+
+R(u|a, z, u ≥ Q)−1−
+
+Z
+
+> (0 ,t ]
+
+F (du |a, z, u ≥ Q)R(u|a, z, u ≥ Q)−2 dds Rs(u|a, z, u ≥ Q) s=0 
+
+.
+
+Hence we have, 
+
+dds Λs(du |a, z, u ≥ Q) s=0 
+
+= 
+
+> dds
+
+Fs(du |a, z, u ≥ Q) s=0 
+
+R(u|a, z, u ≥ Q) −
+
+F (du |a, z, u ≥ Q) dds Rs(u|a, z, u ≥ Q) s=0 
+
+R(u|a, z, u ≥ Q)2 .
+
+Additionally, we have 
+
+dds Fs(u|a, z, u ≥ Q) s=0 
+
+= dds Ps( ˜T ≤ u, ∆ = 1 |A = a, Z = z, u ≥ Q) s=0 
+
+= dds Ps(T ≤ u, C ≤ u, T ≤ C|A = a, Z = z, t ≥ Q) s=0 
+
+= dds Ps(T ≤ u, C ≤ u, T ≤ C, A = a, Z = z, t ≥ Q)
+
+Ps(A = a, Z = z, t ≥ Q) s=0 
+
+19 A PREPRINT - M ARCH 30, 2026 
+
+= 
+
+> dds
+
+Ps(T ≤ u, C ≤ u, T ≤ C, A = a, Z = z, t ≥ Q) s=0 
+
+P (A = a, Z = z, t ≥ Q) − 
+
+> dds
+
+Ps(A = a, Z = z, t ≥ Q) s=0 
+
+P (T ≤ u, C ≤ u, T ≤ C, A = a, Z = z, t ≥ Q)
+
+P (A = a, Z = z, t ≥ Q)2 ,
+
+where 
+
+dds Ps(T ≤ u, C ≤ u, T ≤ C, A = a, Z = z, u ≥ Q) s=0 
+
+= dds 
+
+Z
+
+> (0 ,u ]
+
+Z
+
+> [v, ∞)
+
+Z
+
+> (0 ,u ]
+
+fs(v, c, q, A = a, Z = z)dqdcdv s=0 
+
+=
+
+Z
+
+> (0 ,u ]
+
+Z
+
+> [v, ∞)
+
+Z
+
+> (0 ,u ]
+
+dds fs(v, c, q, A = a, Z = z) s=0 
+
+dqdcdv 
+
+=
+
+Z
+
+> (0 ,u ]
+
+Z
+
+> [v, ∞)
+
+Z
+
+> (0 ,u ]
+
+{1˜v, ˜c, ˜q, ˜a, ˜z (v, c, q, A = a, Z = z) − f (v, c, q, A = a, Z = z)} dqdcdv 
+
+= 1˜v, ˜c, ˜q, ˜a, ˜z (v ≤ u, c ≤ u, v ≤ c, u ≥ q, A = a, Z = z)−
+
+P (T ≤ u, C ≤ u, T ≤ C, A = a, Z = z, u ≥ Q),
+
+and 
+
+dds Ps(A = a, Z = z, u ≥ Q) s=0 = dds 
+
+Z
+
+> (0 ,u ]
+
+fs(q, A = a, Z = z)dq s=0 
+
+=
+
+Z
+
+> (0 ,u ]
+
+dds fs(q, A = a, Z = z) s=0 dq 
+
+=
+
+Z
+
+> (0 ,u ]
+
+{1˜q, ˜a, ˜z (q, A = a, Z = z) − f (q, A = a, Z = z)} dq 
+
+= 1˜q, ˜a, ˜z (u ≥ q, A = a, Z = z) − P (A = a, Z = z, u ≥ Q).
+
+Then by substituting this back into dds Fs(u|a, z, u ≥ Q) s=0 
+
+, we get 
+
+dds Fs(u|a, z, u ≥ Q) s=0 
+
+= 1˜v, ˜c, ˜q, ˜a, ˜z (v ≤ u, c ≤ u, v ≤ c, u ≥ q, A = a, Z = z)
+
+P (A = a, Z = z, u ≥ Q) −
+
+1˜q, ˜a, ˜z (u ≥ Q, A = a, Z = z)P (T ≤ u, C ≤ u, T ≤ C, A = a, Z = z, u ≥ Q)
+
+P (A = a, Z = z, u ≥ Q)2
+
+= 1˜q, ˜a, ˜z (u ≥ Q, A = a, Z = z)
+
+P (A = a, Z = z, u ≥ Q) {1˜v, ˜c(v ≤ u, c ≤ u, v ≤ c)−
+
+P (T ≤ u, C ≤ u, T ≤ C|A = a, Z = z, u ≥ Q)}
+
+= 1˜q, ˜a, ˜z (u ≥ Q, A = a, Z = z)
+
+P (A = a, Z = z, u ≥ Q) {1˜v, ˜c(v ≤ u, v ≤ c) − F (u|a, z, u ≥ Q)} ,
+
+and hence 
+
+dds Fs(du |a, z, u ≥ Q) s=0 
+
+= 1˜q, ˜a, ˜z (u ≥ q, A = a, Z = z)
+
+P (A = a, Z = z, u ≥ Q) {1˜v, ˜c(v = u, v ≤ c) − F (du |a, z, u ≥ Q)} .
+
+We also show that 
+
+dds Rs(u|a, z, u ≥ Q) s=0 
+
+= dds Ps(u ≤ ˜T |A = a, Z = z, u ≥ Q) s=0 
+
+= dds Ps(u ≤ T, u ≤ C|A = a, Z = z, u ≥ Q) s=0 
+
+= dds Ps(u ≤ T, u ≤ C, A = a, Z = z, u ≥ Q)
+
+Ps(A = a, Z = z, u ≥ Q) s=0 
+
+20 A PREPRINT - M ARCH 30, 2026 
+
+= 
+
+> dds
+
+Ps(u ≤ T, u ≤ C, A = a, Z = z, u ≥ Q) s=0 
+
+P (A = a, Z = z, u ≥ Q) − 
+
+> dds
+
+Ps(A = a, Z = z, u ≥ Q) s=0 
+
+P (u ≤ T, u ≤ C, A = a, Z = z, u ≥ Q)
+
+P (A = a, Z = z, u ≥ Q)2 ,
+
+where 
+
+dds Ps(u ≤ T, u ≤ C, A = a, Z = z, u ≥ Q) s=0 
+
+= dds 
+
+Z
+
+> [u, ∞)
+
+Z
+
+> [u, ∞)
+
+Z
+
+> (0 ,u ]
+
+fs(v, c, q, A = a, Z = z)dqdcdv s=0 
+
+=
+
+Z
+
+> [u, ∞)
+
+Z
+
+> [u, ∞)
+
+Z
+
+> (0 ,u ]
+
+dds fs(v, c, q, A = a, Z = z) s=0 
+
+dqdcdv 
+
+=
+
+Z
+
+> [u, ∞)
+
+Z
+
+> [u, ∞)
+
+Z
+
+> (0 ,u ]
+
+{1˜v, ˜c, ˜q, ˜a, ˜z (v, c, q, A = a, Z = z) − f (v, c, q, A = a, Z = z)} dqdcdv 
+
+= 1˜v, ˜c, ˜q, ˜a, ˜z (u ≤ v, u ≤ c, A = a, Z = z, u ≥ q) − P (u ≤ T, u ≤ C, A = a, Z = z, u ≥ Q).
+
+We can then use this to show 
+
+dds Rs(u|a, z, u ≥ Q) s=0 
+
+= 1˜v, ˜c, ˜q, ˜a, ˜z (u ≤ v, u ≤ c, A = a, Z = z, u ≥ q)
+
+P (A = a, Z = z, u ≥ Q) −
+
+1˜q, ˜a, ˜z (u ≥ q, A = a, Z = z)P (u ≤ T, u ≤ C, A = a, Z = z, u ≥ Q)
+
+P (A = a, Z = z, u ≥ Q)2
+
+= 1˜q, ˜a, ˜z (u ≥ q, A = a, Z = z)
+
+P (A = a, Z = z, u ≥ Q) {1˜v, ˜c(u ≤ v, u ≤ c)−
+
+P (Q ≤ u, u ≤ T, u ≤ C|A = a, Z = z, u ≥ Q)}
+
+= 1˜q, ˜a, ˜z (u ≥ q, A = a, Z = z)
+
+P (A = a, Z = z, u ≥ Q) {1˜v, ˜c(u ≤ v, u ≤ c) − R(u|a, z, u ≥ Q)}.
+
+Substituting these into dds Λs(du |a, z, u ≥ Q) s=0 
+
+we get, 
+
+dds Λs(du |a, z, u ≥ Q) s=0 
+
+= 
+
+> dds
+
+Fs(du |a, z, u ≥ Q) s=0 
+
+R(u|a, z, u ≥ Q) −
+
+F (du |a, z, u ≥ Q) dds Rs(u|a, z, u ≥ Q) s=0 
+
+R(u|a, z, u ≥ Q)2
+
+= 1˜q, ˜a, ˜z (u ≥ q, A = a, Z = z)
+
+P (A = a, Z = z, u ≥ Q)R(u|a, z, u ≥ Q)
+
+
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) F (du |a, z, u ≥ Q)
+
+R(u|a, z, u ≥ Q)
+
+
+
+,
+
+21 A PREPRINT - M ARCH 30, 2026 which gives us, 
+
+dds R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = a, Z = z, u ≥ Q)} s=0 
+
+= −S(t|a, z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+S(u − | a, z, u ≥ Q)
+
+S(u|a, z, u ≥ Q)
+
+dds Λs(du |a, z, u ≥ Q) s=0 
+
+= − 1˜q, ˜a, ˜z (t ≥ q, A = a, Z = z)S(t|a, z, t ≥ Q)
+
+P (A = a, Z = z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+S(u − | a, z, u ≥ Q)
+
+S(u|a, z, u ≥ Q)R(u|a, z, u ≥ Q)
+
+
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) F (du |a, z, u ≥ Q)
+
+R(u|a, z, u ≥ Q)
+
+
+
+= − 1˜q, ˜a, ˜z (t ≥ q, A = a, Z = z)S(t|a, z, t ≥ Q)
+
+P (A = a, Z = z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+S(u − | a, z, u ≥ Q)P (u ≥ Q|A = a, Z = z)
+
+S(u|a, z, u ≥ Q)S0(u − | a, z ) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+(
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S0(du |a, z ) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+S0(u − | a, z ) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+)
+
+= − 1˜q, ˜a, ˜z (t ≥ q, A = a, Z = z)S(t|a, z, t ≥ Q)
+
+P (A = a, Z = z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+P (u ≥ Q|A = a, Z = z)
+
+S(u|a, z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+(
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |a, z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+S(u − | a, z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+)
+
+= − 1˜q, ˜a, ˜z (u ≥ q, A = a, Z = z)S(t|a, z, t ≥ Q)P (t ≥ Q|A = a, Z = z)
+
+P (A = a, Z = z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |a,z,u ≥Q)
+
+> S(u−| a,z,u ≥Q)
+
+S(u|a, z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | a, q, z )H(dq |a, z )
+
+Finally, we see 
+
+dΨ( Ps)
+
+ds s=0 
+
+=
+
+Z
+
+[1˜z (z) − f (z)] 
+
+θ(t|x)2 − 2θ(t|x)
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z = z, u ≥ Q)}− 
+
+R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z = z, u ≥ Q)}
+
+ −
+
+2f (z)θ(t|x) dds 
+
+ R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 1 , Z = z, u ≥ Q)} − R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 0 , Z = z, u ≥ Q)}
+
+ s=0 
+
+dz 
+
+= θ(t|˜x)2 − 2θ(t|˜x) ( S(t|A = 1 , ˜z, t ≥ Q) − S(t|A = 0 , ˜z, t ≥ Q)}) − Ψ( P )−
+
+Z
+
+2f (z)θ(t|x) dds 
+
+ R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 1 , Z = z, u ≥ Q)} − R
+
+> (0 ,t ]
+
+{1 − Λs(du |A = 0 , Z = z, u ≥ Q)}
+
+ s=0 
+
+dz 
+
+= θ(t|˜x)2 − 2θ(t|˜x) ( S(t|A = 1 , ˜z, t ≥ Q) − S(t|A = 0 , ˜z, t ≥ Q)}) − Ψ( P )+ 2
+
+Z
+
+θ(t|x)
+
+ 1˜q, ˜a, ˜z (t ≥ q, A = 1 , Z = z)S(t|A = 1 , z, t ≥ Q)P (t ≥ Q|A = 1 , Z = z)
+
+P (A = 1 , t ≥ Q|Z = z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=1 ,z,u ≥Q)
+
+> S(u−| A=1 ,z,u ≥Q)
+
+S(u|A = 1 , z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 1 , q, z )H(dq |A = 1 , z )
+
+ −
+
+22 A PREPRINT - M ARCH 30, 2026 
+
+ 1˜q, ˜a, ˜z (t ≥ q, A = 0 , Z = z)S(t|A = 0 , z, t ≥ Q)P (t ≥ Q|A = 0 , Z = z)
+
+P (A = 0 , t ≥ Q|Z = z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=0 ,z,u ≥Q)
+
+> S(u−| A=0 ,z,u ≥Q)
+
+S(u|A = 0 , z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 0 , q, z )H(dq |A = 0 , z )
+
+ dz 
+
+= θ(t|˜x)2 − 2θ(t|˜x) ( S(t|A = 1 , ˜z, t ≥ Q) − S(t|A = 0 , ˜z, t ≥ Q)}) − Ψ( P )+ 2
+
+Z
+
+θ(t|x)
+
+ 1˜q, ˜a, ˜z (t ≥ q, A = 1 , Z = z)S(t|A = 1 , z, t ≥ Q)P (t ≥ Q|A = 1 , Z = z)
+
+P (t ≥ Q|A = 1 , Z = z)P (A = 1 |Z = z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=1 ,z,u ≥Q)
+
+> S(u−| A=1 ,z,u ≥Q)
+
+S(u|A = 1 , z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 1 , q, z )H(dq |A = 1 , z )
+
+ −
+
+ 1˜q, ˜a, ˜z (t ≥ q, A = 0 , Z = z)S(t|A = 0 , z, t ≥ Q)P (t ≥ Q|A = 0 , Z = z)
+
+P (t ≥ Q|A = 0 , Z = z)P (A = 0 |Z = z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=0 ,z,u ≥Q)
+
+> S(u−| A=0 ,z,u ≥Q)
+
+S(u|A = 0 , z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 0 , q, z )H(dq |A = 0 , z )
+
+ dz 
+
+Using (A4) 
+
+= θ(t|˜x)2 − 2θ(t|˜x) ( S(t|A = 1 , ˜z, t ≥ Q) − S(t|A = 0 , ˜z, t ≥ Q)}) − Ψ( P )+ 2
+
+Z
+
+θ(t|x)
+
+ 1˜q, ˜a, ˜z (t ≥ q, A = 1 , Z = z)S(t|A = 1 , z, t ≥ Q)
+
+P (A = 1 |Z = z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=1 ,z,u ≥Q)
+
+> S(u−| A=1 ,z,u ≥Q)
+
+S(u|A = 1 , z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 1 , q, z )H(dq |A = 1 , z )
+
+ −
+
+ 1˜q, ˜a, ˜z (t ≥ q, A = 0 , Z = z)S(t|A = 0 , z, t ≥ Q)
+
+P (A = 0 |Z = z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=0 ,z,u ≥Q)
+
+> S(u−| A=0 ,z,u ≥Q)
+
+S(u|A = 0 , z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 0 , q, z )H(dq |A = 0 , z )
+
+ dz 
+
+= θ(t|˜x)2 − 2θ(t|˜x) ( S(t|A = 1 , ˜z, t ≥ Q) − S(t|A = 0 , ˜z, t ≥ Q)}) − Ψ( P )+ 2θ(t|˜x)
+
+(
+
+1˜v, ˜q, ˜a(v ≥ q, A = 1) S(t|A = 1 , ˜z, ˜T ≥ Q)
+
+P (A = 1 |Z = ˜ z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=1 ,˜z,u ≥Q)
+
+> S(u−| A=1 ,˜z,u ≥Q)
+
+S(u|A = 1 , ˜z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 1 , ˜q, ˜z)H(dq |A = 1 , ˜z)
+
+ −
+
+ 1˜q, ˜a(t ≥ q, A = 0 , Z = ˜ z)S(t|A = 0 , ˜z, t ≥ Q)
+
+P (A = 0 |Z = ˜ z)
+
+Z
+
+> (0 ,t ]
+
+1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c) S(du |A=0 ,˜z,u ≥Q)
+
+> S(u−| A=0 ,˜z,u ≥Q)
+
+S(u|A = 0 , ˜z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A = 0 , ˜q, ˜z)H(dq |A = 0 , ˜z)
+
+
+
+= θ(t|˜x)2 − 2θ(t|˜x) ( S(t|A = 1 , ˜z, t ≥ Q) − S(t|A = 0 , ˜z, t ≥ Q)}) − Ψ( P )+ 2θ(t|˜x) 1˜q (t ≥ q)( 1˜a(A = 1) − π(˜ z)) S(t|˜a, ˜z, t ≥ Q)(1 − π(˜ z)) π(˜ z)
+
+23 A PREPRINT - M ARCH 30, 2026 
+
+Z
+
+> (0 ,t ]
+
+{1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c)Λ( du |˜a, ˜z, u ≥ Q)}
+
+S(u|˜a, ˜z, u ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | ˜a, ˜q, ˜z)H(dq |˜a, ˜z) ,
+
+where, π(z) = P (A = 1 |Z = z).
+
+S3. EIF for incremental difference MSE 
+
+When carrying out Step 2 of surv-iTMLE, we note that by using ∆YiT M LE (t) as the outcome in the second stage re-gression, the algorithm no longer minimizes our expected loss function, but instead, minimizes the following expected loss function, 
+
+Lsurv −inc (P) = E
+
+ X 
+
+> t∈{ t1,...,τ }
+
+(∆ θ(t|X) − ∆θ0(t|X)) 2
+
+ .
+
+Below we outline how the targeting process used to generate surv-iTMLE’s pseudo-outcomes still succeeds at setting the sample average of the de-biasing term, which arises in the increment-based EIF, to 0. To show that the targeted learning process defined by surv-iTMLE can be used to de-bias estimates of the incre-mental changes in the difference in conditional survival probabilities, we derive the EIF of the expected loss function which the pooled regression minimizes. First, consider times {t0, t 1, ..., t τ −1, τ }, where t0 is time 0, t0 = 0 . Then, define the incremental change in the difference in survival probabilities as ∆θ(t|X) = θ(t|X) − θ(t − 1|X), and let us consider the following MSE which is minimized by the pooled regression: 
+
+Lsurv −inc (P) = E
+
+ X 
+
+> t∈{ t1,...,τ }
+
+(∆ θ(t|X) − ∆θ0(t|X)) 2
+
+ ,
+
+Under assumptions (A1)-(A8), this expected loss function can be written as 
+
+Lsurv −inc (P) = E
+
+ X 
+
+> t∈{ t1,...,τ }
+
+(∆ θ(t|X) − E [{S(t|A = 1 , Z, t ≥ Q) − S(t|A = 0 , Z, t ≥ Q)}− {S(t − 1|A = 1 , Z, t ≥ Q) − S(t − 1|A = 0 , Z, t ≥ Q)}| X]) 2i
+
+,
+
+and as was done in the main text, I consider the components of this expected loss function which depend on ∆θ(t|X),written 
+
+Lsurv −inc (P) = E
+
+ X 
+
+> t∈{ t1,...,τ }
+
+∆θ(t|X)2 − 2∆ θ(t|X) ( {S(t|A = 1 , Z, t ≥ Q) − S(t|A = 0 , Z, t ≥ Q)}− {S(t − 1|A = 1 , Z, t ≥ Q) − S(t − 1|A = 0 , Z, t ≥ Q)})] .
+
+By doing so I can derive this EIF for this expected loss function by perturbing P in the direction parameterized via the one-dimensional mixture model 
+
+Ps = s ˜P + (1 − s)P, 
+
+where ˜P is a fixed, deterministic distribution with its support contained in the support of P . By perturbing P in the direction of a point mass at (˜ z, ˜a, ˜c, ˜v, ˜q), I get: 
+
+Lsurv −inc (Ps) = 
+
+Z
+
+fs(z) X 
+
+> t∈{ t1,...,τ }
+
+∆θ(t|x)2 − 2∆ θ(t|x) ( {Ss(t|A = 1 , Z, t ≥ Q) − Ss(t|A = 0 , Z, t ≥ Q)}− {Ss(t − 1|A = 1 , Z, t ≥ Q) − Ss(t − 1|A = 0 , Z, t ≥ Q)})] dz, 
+
+where, fs(z) = s1˜z (z) + (1 − s)f (z).I then calculate the Gateaux derivative as: 
+
+dL surv −inc (Ps)
+
+ds s=0 
+
+24 A PREPRINT - M ARCH 30, 2026 
+
+= dds 
+
+Z
+
+fs(z) X 
+
+> t∈{ t1,...,τ }
+
+∆θ(t|x)2 − 2∆ θ(t|x) ( {Ss(t|A = 1 Z = z, t ≥ Q) − Ss(t|A = 0 Z = z, t ≥ Q)}− {Ss(t − 1|A = 1 Z = z, t ≥ Q) − Ss(t − 1|A = 0 Z = z, t ≥ Q)})] dz s=0 
+
+= X 
+
+> t∈{ t1,...,τ }
+
+∆θ(t|x)2 − 2∆ θ(t|x) ( {S(t|A = 1 Z = z, t ≥ Q) − S(t|A = 0 Z = z, t ≥ Q)}− {S(t − 1|A = 1 Z = z, t ≥ Q) − S(t − 1|A = 0 Z = z, t ≥ Q)})] − Lsurv −inc (P)+ 
+
+Z
+
+f (z) X 
+
+> t∈{ t1,...,τ }
+
+dds 
+
+∆θ(t|x)2 − 2∆ θ(t|x) ( {Ss(t|A = 1 Z = z, t ≥ Q) − Ss(t|A = 0 Z = z, t ≥ Q)}− {Ss(t − 1|A = 1 Z = z, t ≥ Q) − Ss(t − 1|A = 0 Z = z, t ≥ Q)})] s=0 
+
+dz 
+
+= X 
+
+> t∈{ t1,...,τ }
+
+∆θ(t|x)2 − 2∆ θ(t|x) ( {S(t|A = 1 Z = z, t ≥ Q) − S(t|A = 0 Z = z, t ≥ Q)}− {S(t − 1|A = 1 Z = z, t ≥ Q) − S(t − 1|A = 0 Z = z, t ≥ Q)})] − Lsurv −inc (P)−
+
+Z
+
+f (z) X 
+
+> t∈{ t1,...,τ }
+
+
+
+2∆ θ(t|x) dds ({Ss(t|A = 1 Z = z, t ≥ Q) − Ss(t|A = 0 Z = z, t ≥ Q)}− {Ss(t − 1|A = 1 Z = z, t ≥ Q) − Ss(t − 1|A = 0 Z = z, t ≥ Q)}) s=0 
+
+i
+
+dz 
+
+= X 
+
+> t∈{ t1,...,τ }
+
+∆θ(t|x)2 − 2∆ θ(t|x) ( {S(t|A = 1 Z = z, t ≥ Q) − S(t|A = 0 Z = z, t ≥ Q)}− {S(t − 1|A = 1 Z = z, t ≥ Q) − S(t − 1|A = 0 Z = z, t ≥ Q)})] − Lsurv −inc (P)−
+
+Z
+
+f (z) X 
+
+> t∈{ t1,...,τ }
+
+
+
+2∆ θ(t|x)
+
+ dds {Ss(t|A = 1 Z = z, t ≥ Q) − Ss(t|A = 0 Z = z, t ≥ Q)} s=0 
+
+−
+
+dds {Ss(t − 1|A = 1 Z = z, t ≥ Q) − Ss(t − 1|A = 0 Z = z, t ≥ Q)} s=0 
+
+
+
+dz. 
+
+where, 
+
+Z
+
+f (z) X 
+
+> t∈{ t1,...,τ }
+
+
+
+2∆ θ(t|x)
+
+ dds {Ss(t|A = 1 Z = z, t ≥ Q) − Ss(t|A = 0 Z = z, t ≥ Q)} s=0 
+
+−
+
+dds {Ss(t − 1|A = 1 Z = z, t ≥ Q) − Ss(t − 1|A = 0 Z = z, t ≥ Q)} s=0 
+
+
+
+dz 
+
+= X 
+
+> t∈{ t1,...,τ }
+
+2∆ θ(t|x) (1˜a(A = 1) − π(˜ z)) 1(t ≥ Q)S(t|˜a, ˜z, t ≥ Q)(1 − π(˜ z)) π(˜ z)
+
+Z
+
+> (0 ,t ]
+
+{1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c)Λ( du |˜a, ˜z, t ≥ Q)}
+
+S(u|˜a, ˜z, t ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | ˜a, ˜q, ˜z)H(dq |˜a, ˜z)2∆ θ(t − 1|x) (1˜a(A = 1) − π(˜ z)) 1(t ≥ Q)S(t − 1|˜a, ˜z)(1 − π(˜ z)) π(˜ z)
+
+Z
+
+> (0 ,t −1]
+
+{1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c)Λ( du |˜a, ˜z, t ≥ Q)}
+
+S(u|˜a, ˜z, t ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | ˜a, ˜q, ˜z)H(dq |˜a, ˜z) .
+
+This allows the full EIF to be written as 
+
+dL surv −inc (Ps)
+
+ds s=0 
+
+= X 
+
+> t∈{ t1,...,τ }
+
+∆θ(t|x)2 − 2∆ θ(t|x) ( {S(t|A = 1 Z = z, t ≥ Q) − S(t|A = 0 Z = z, t ≥ Q)}− {S(t − 1|A = 1 Z = z, t ≥ Q) − S(t − 1|A = 0 Z = z, t ≥ Q)})] − Lsurv −inc (P)−
+
+X 
+
+> t∈{ t1,...,τ }
+
+2∆ θ(t|x) (1˜a(A = 1) − π(˜ z)) 1(t ≥ Q)S(t|˜a, ˜z, t ≥ Q)(1 − π(˜ z)) π(˜ z)
+
+Z
+
+> (0 ,t ]
+
+{1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c)Λ( du |˜a, ˜z, t ≥ Q)}
+
+S(u|˜a, ˜z, t ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | ˜a, ˜q, ˜z)H(dq |˜a, ˜z)
+
+25 A PREPRINT - M ARCH 30, 2026 
+
+2∆ θ(t − 1|x) (1˜a(A = 1) − π(˜ z)) 1(t ≥ Q)S(t − 1|˜a, ˜z, t ≥ Q)(1 − π(˜ z)) π(˜ z)
+
+Z
+
+> (0 ,t −1]
+
+{1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c)Λ( du |˜a, ˜z, t ≥ Q)}
+
+S(u|˜a, ˜z, t ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | ˜a, ˜q, ˜z)H(dq |˜a, ˜z) .
+
+From this expected loss function I point out the de-biasing term in this setting is now defined as 
+
+X 
+
+> t∈{ t1,...,τ }
+
+2∆ θ(t|x) (1˜a(A = 1) − π(˜ z)) 1(t ≥ Q)S(t|˜a, ˜z, t ≥ Q)(1 − π(˜ z)) π(˜ z)
+
+Z
+
+> (0 ,t ]
+
+{1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c)Λ( du |˜a, ˜z, t ≥ Q)}
+
+S(u|˜a, ˜z, t ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | ˜a, ˜q, ˜z)H(dq |˜a, ˜z)2∆ θ(t − 1|x) (1˜a(A = 1) − π(˜ z)) 1(t ≥ Q)S(t − 1|˜a, ˜z, t ≥ Q)(1 − π(˜ z)) π(˜ z)
+
+Z
+
+> (0 ,t −1]
+
+{1˜v, ˜c(v = u, v ≤ c) − 1˜v, ˜c(u ≤ v, u ≤ c)Λ( du |˜a, ˜z, t ≥ Q)}
+
+S(u|˜a, ˜z, t ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | ˜a, ˜q, ˜z)H(dq |˜a, ˜z) .
+
+When constructing a targeted learning based estimator, the objective is to set the sample average of this de-biasing term to 0. However, I note that the de-biasing in the above equation is simply a sum over t of the de-biasing terms which were defined by surv-iTMLE in the main text, now defined below. 
+
+2θ(t|X) (A − π(Z)) (1 − π(Z)) π(Z) 1(t ≥ Q)S(t|A, Z, t ≥ Q)
+
+Z
+
+> (0 ,t ]
+
+n
+
+1( ˜T = u, ∆ = 1) − 1(u ≤ ˜T )Λ( du |A, Z, t ≥ Q)
+
+o
+
+S(u|A, Z, t ≥ Q) R 
+
+> (0 ,u ]
+
+G(u − | A, Q, Z )H(dq |A, Z ) .
+
+Consequently, as surv-iTMLE works to set the de-biasing term above to 0 for all t ∈ { t1, ..., τ }, that same targeting process could be used to de-bias the estimates of the incremental changes in the difference in conditional survival probabilities. However, I note that in the de-biasing terms, the estimand which is conditional on X are different, defined as ∆θ(t|X) in the incremental case, and defined as θ(t|X) in orginal setting. Even so, this is not a problem for surv-iTMLE as it’s sieve approximation is invariant to the specific function, but simply allows the updating step to produce updates which are conditional on X.26 A PREPRINT - M ARCH 30, 2026 
+
+S4. Machine learning algorithm use for time-to-event data 
+
+When estimating the survival probabilities using left truncated, or right censored event times, a range of estimation options exist. Estimation options which handle left truncated and right censored event times include individual ML algorithms, such as an adaptive Cox lasso [McGough et al., 2021], or ensemble approaches, such as the survival stacking options provided by Wolock et al. [2024]. Meanwhile, a wider array of estimation options are available when event times are only right censored, with alternative ensemble learners available, such as the survSuperLearner 
+
+[Westling et al., 2024]. In this work, for computational efficiency reasons we utilize a “local” survival stacking approach which breaks down the survival problem down into a series of binary outcome problems, generating estimates of the hazard at each time interval, then using these to obtain survival estimates. We utilize the SuperLearner , an ensemble learner to estimate the binary outcome problems within this approach. This said, we highlight that “global” survival stacking, which jointly models the entire time horizon using a single meta-learner may offer improved stability and performance [Wolock et al., 2024], but its existing implementation requires significant computing time, and hence was deemed infeasible for our analyses. 
+
+S5. LTRC simulation study DGP specifications 
+
+The LTRC simulation study was designed by drawing upon simulation studies from previous papers in this area, in-cluding design features from Cui et al. [2023] and Morenz et al. [2024]. In each DGP, we generated 20 covariates, 
+
+Z = {Z1, ..., Z 20 }, uniformly, Z ∼ Unif (0 , 1) 20 , and treatment was generated using the propensity score π(Z);
+
+A|Z ∼ Bernoulli (π(Z)) , with π(Z) = (1 + β(Z1; 2 , 4)) /4, where β(.; a, b ) is the density function of a Beta distribu-tion with shape parameters a and b. Event times, T , were generated for each DGP using either an accelerated failure time model (DGP1), or a Cox proportional hazards model (DG2 and DGP3). Event times for DGP1 were obtained from the following accelerated failure time model, 
+
+log (T ) = −1.85 − (0 .8( Z1 < 0.5)) + (0 .7( Z1/22 )) + (0 .2Z3) + 
+
+
+
+0.7 − (0 .4( Z1 < 0.5)) − (0 .4( Z1/22 )) 
+
+
+
+A + ϵT
+
+where ϵT ∼ N (0 , 1) . Meanwhile, event times for DGP2 and DGP3 were obtained by Cox models, with λ(t|A, Z )
+
+defined as: 
+
+λ(t|A, Z ) = λ0(t)exp [0 .25 + (0 .5( Z1/31 )) − ((1 .5((0 .5 − Z2)3)) − (0 .4( Z1/23 ))) A], λ 0(t) = 12 t−1/2 (DGP2 )
+
+and 
+
+λ(t|A, Z ) = λ0(t)exp [−0.75 − ((0 .75 − Z1)3) + (0 .3( Z1/22 )) + (0 .2Z3)] , λ 0(t) = 2 t (DGP3 ).
+
+For each DGP, two levels of left truncation were introduced. Truncation times, Q, were generated by defining 
+
+Q = U · Qmax , where U is a Beta random variable with parameters a and b, and Qmax is the maximum length a truncation time can take. All three DGPs define a = 2 +  2Z21 + Z2 A + ϵa, where ϵa ∼ N (0 , 0.1) , and define 
+
+b = 15 + Z32 + 0 .5( Z3 > 0.5) + ϵb, where ϵb ∼ N (0 , 0.5) . We note here that all errors are independent of the previously introduced variables. Differing levels of truncation are then achieved by varying Qmax , with DGP1 defining 
+
+Qmax = 0 .8 and 2; DGP2 defining Qmax = 0 .1 and 0.6; while DGP3 defines Qmax = 4 and Qmax = 7 . Follow-up time horizons for DGP1-DGP3 were defined as 2, 1, and 2 respectively. Censoring times for each DGP were generated as C = Q + D, where D was generated using a Cox model in DG1, define as: 
+
+λ(t|A, Z ) = λ0(t)exp [−1.75 − (0 .5( Z1/22 )) + (0 .2Z3) + 
+
+
+
+1.15 + (0 .5( Z1 < 0.5)) − (0 .3( Z1/22 )) 
+
+
+
+A],
+
+with λ0(t) = 2 t, or using accelerated failure time models, define as follows for DGP2 and DGP3 respectively: 
+
+log (T ) = −0.75 − (1 .5(0 .5 − Z1)3) + (0 .5( Z1/22 )) + (0 .3Z3) + 
+
+
+
+0.2 − ((0 .5 − Z1)3) − (0 .4 ∗ (Z1/22 )) 
+
+
+
+A + ϵC ,
+
+and 
+
+log (T ) = 0 .25 + 
+
+
+
+0.2 − (((0 .5 − Z1)3)) − (0 .8( Z1/22 )) + (0 .6X3) 
+
+
+
+A + ϵC ,
+
+where ϵC ∼ N (0 , 1) . Using these measurements, the observed event times ˜T were calculated as ˜T = min {T, C },with an indicator of being observed in the study defined as 1{T > C }. Finally, ground truth for the difference in conditional survival probabilities was obtained by simulating 1,000,000 event times for each person in the test dataset, under each exposure. These times were then used to identify the survival probability for each person at each time, conditional on all of the baseline covariates Z and over the follow-up horizon under each exposure. 27 A PREPRINT - M ARCH 30, 2026 
+
+S6. Algorithm libraries for Local survival stacking, SuperLearner and xgboost models 
+
+Table 1: Super learner algorithm libraries used for binary outcome models (including those in local survival stacking (LSS) algorithms) 
+
+Algorithm Tuning parameters 
+
+Mean (SL.mean) .Linear model (SL.glm) .LASSO/Elastic net (SL.glmnet with logit link) nlambda = (50,100,250) alpha = (0.5,1) useMin = (False,True) Random forest (SL.ranger) mtry = (3,5) min.node.size = (10,20) sample.fraction = (0.2,0.4,0.6) Table 2: Super learner algorithm libraries used for continuous outcome models 
+
+Algorithm Tuning parameters 
+
+Mean (SL.mean) .Linear model (SL.lm) .LASSO/Elastic net (SL.glmnet with identity link) nlambda = (50,100,250) alpha = (0.5,1) useMin = (False,True) Random forest (SL.ranger) mtry = (3,5) min.node.size = (10,20) sample.fraction = (0.2,0.4,0.6) When using XGBoost for the final minimization problem in the ltrc-R and ltrc-DR learners, the cross-validated func-tion found at https://github.com/wangyuyao98/truncAC was used, with maximum numbers of trees set to 500 and num-ber of search rounds of the tuning parameters set to 5. This implementation can be found at https://github.com/Matt-Pryce/surv-iTMLE. 28 A PREPRINT - M ARCH 30, 2026 
+
+S7. Additional LTRC simulation study results 
+
+Table 3: Left truncated and right censored (LTRC) simulation study - Difference in survival probabilities - Mean root mean squared error (RMSE) for the T-learner, CSFs and surv-iTMLE by sample size DGP  Truncation  N T-learner  CSFs  surv-iTMLE  ltrc-R  ltrc-DR level  LSS/SuperLearner  pcox/gbm  LSS/SuperLearner  pcox/gbm 1 ∼ 25%  800  0.091  0.060  0.057  0.118  0.099  0.138  0.201 1600  0.082  0.054  0.049  0.100  0.087  0.114  0.138 2400  0.079  0.051  0.043  0.091  0.082  0.104  0.115 
+
+> ∼ 50%  800  0.101  0.083  0.068  0.145  0.103  0.161  0.253 1600  0.087  0.080  0.056  0.129  0.096  0.141  0.178 2400  0.084  0.078  0.052  0.128  0.091  0.138  0.144 2 ∼ 25%  800  0.083  0.066  0.061  0.160  0.138  0.199  0.257 1600  0.068  0.056  0.050  0.150  0.137  0.176  0.199 2400  0.064  0.052  0.045  0.143  0.136  0.162  0.174
+> ∼ 50%  800  0.109  0.091  0.083  0.224  0.192  0.253  0.348 1600  0.093  0.083  0.073  0.216  0.200  0.231  0.274 2400  0.086  0.078  0.067  0.208  0.201  0.217  0.244 3 ∼ 25%  800  0.071  0.062  0.049  0.174  0.141  0.192  0.282 1600  0.059  0.057  0.040  0.147  0.132  0.157  0.199 2400  0.053  0.052  0.035  0.133  0.120  0.141  0.167
+> ∼ 50%  800  0.076  0.074  0.066  0.229  0.152  0.234  0.342 1600  0.063  0.072  0.049  0.210  0.146  0.208  0.248 2400  0.056  0.065  0.042  0.197  0.139  0.195  0.212
+> DGP = Data generating process; N = Training sample size; CSFs = Causal Survival Forests; LSS = Local Survival Stacking; pcox = penalized cox regression; gbm = gradient boosting machine.
+
+29 A PREPRINT - M ARCH 30, 2026 Table 4: Left truncated and right censored (LTRC) simulation study - Data generating process 1 (N=2400) - Difference in survival probabilities - Mean root mean squared error (RMSE) by time for the T-learner, CSFs and surv-iTMLE DGP  Truncation  N Time  T-learner  CSFs  surv-iTMLE  ltrc-R  ltrc-DR level  LSS/SuperLearner  pcox/gbm  LSS/SuperLearner  pcox/gbm 1 ∼ 25%  2400  0.1  0.074  0.055  0.049  0.177  0.146  0.187  0.201 0.25  0.111  0.092  0.069  0.129  0.128  0.139  0.167 0.5  0.106  0.067  0.062  0.091  0.092  0.107  0.127 0.75  0.086  0.049  0.045  0.073  0.071  0.090  0.104 1.0  0.073  0.040  0.032  0.061  0.056  0.082  0.091 1.25  0.064  0.033  0.025  0.053  0.047  0.074  0.078 1.5  0.062  0.027  0.020  0.047  0.039  0.067  0.066 1.75  0.059  0.024  0.020  0.041  0.033  0.059  0.051 2.0  0.059  0.019  0.021  0.026  0.026  0.026  0.026 
+
+> ∼ 50%  2400  0.1  0.079  0.057  0.061  0.233  0.172  0.237  0.259 0.25  0.114  0.103  0.088  0.246  0.146  0.257  0.231 0.5  0.109  0.130  0.071  0.115  0.091  0.130  0.146 0.75  0.090  0.098  0.054  0.070  0.069  0.092  0.112 1.0  0.078  0.075  0.040  0.058  0.055  0.079  0.095 1.25  0.070  0.057  0.031  0.051  0.045  0.072  0.079 1.5  0.068  0.046  0.025  0.044  0.038  0.065  0.068 1.75  0.066  0.038  0.022  0.035  0.032  0.056  0.059 2.0  0.066  0.023  0.022  0.027  0.026  0.026  0.026
+> DGP = Data generating process; N = Training sample size; CSFs = Causal Survival Forests; LSS = Local Survival Stacking; pcox = penalized cox regression; gbm = gradient boosting machine.
+
+30 A PREPRINT - M ARCH 30, 2026 Table 5: Left truncated and right censored (LTRC) simulation study - Data generating process 2 (N=2400) - Difference in survival probabilities - Mean root mean squared error (RMSE) by time for the T-learner, CSFs and surv-iTMLE DGP  Truncation  N Time  T-learner  CSFs  surv-iTMLE  ltrc-R  ltrc-DR level  LSS/SuperLearner  pcox/gbm  LSS/SuperLearner  pcox/gbm 2 ∼ 25%  2400  0.1  0.068  0.064  0.055  0.206  0.218  0.211  0.248 0.2  0.070  0.054  0.051  0.181  0.185  0.193  0.216 0.3  0.069  0.049  0.048  0.161  0.158  0.179  0.195 0.4  0.066  0.047  0.046  0.151  0.137  0.171  0.185 0.5  0.065  0.045  0.043  0.137  0.120  0.164  0.174 0.6  0.063  0.043  0.042  0.130  0.108  0.157  0.161 0.7  0.061  0.042  0.040  0.118  0.097  0.151  0.150 0.8  0.060  0.041  0.039  0.109  0.087  0.142  0.137 0.9  0.060  0.041  0.037  0.100  0.079  0.127  0.115 1 0.060  0.071  0.036  0.070  0.070  0.070  0.070 
+
+> ∼ 50%  2400  0.1  0.091  0.129  0.118  0.361  0.356  0.346  0.391 0.2  0.094  0.114  0.088  0.280  0.291  0.280  0.333 0.3  0.093  0.083  0.067  0.235  0.240  0.238  0.282 0.4  0.089  0.067  0.059  0.205  0.199  0.217  0.251 0.5  0.087  0.058  0.054  0.186  0.168  0.203  0.223 0.6  0.085  0.053  0.051  0.166  0.144  0.189  0.205 0.7  0.083  0.050  0.048  0.149  0.123  0.176  0.185 0.8  0.081  0.049  0.047  0.137  0.106  0.166  0.163 0.9  0.079  0.048  0.045  0.117  0.091  0.147  0.141 1 0.078  0.068  0.045  0.070  0.070  0.070  0.070
+> DGP = Data generating process; N = Training sample size; CSFs = Causal Survival Forests; LSS = Local Survival Stacking; pcox = penalized cox regression; gbm = gradient boosting machine.
+
+31 A PREPRINT - M ARCH 30, 2026 Table 6: Left truncated and right censored (LTRC) simulation study - Data generating process 3 (N=2400) - Difference in survival probabilities - Mean root mean squared error (RMSE) by time for the T-learner, CSFs and surv-iTMLE DGP  Truncation  N Time  T-learner  CSFs  surv-iTMLE  ltrc-R  ltrc-DR level  LSS/SuperLearner  pcox/gbm  LSS/SuperLearner  pcox/gbm 3 ∼ 25%  2400  0.2  0.052  0.002  0.005  0.094  0.055  0.109  0.081 0.4  0.052  0.014  0.014  0.157  0.116  0.152  0.159 0.6  0.053  0.038  0.032  0.180  0.141  0.175  0.188 0.8  0.052  0.062  0.046  0.169  0.149  0.171  0.198 1.0  0.052  0.075  0.045  0.150  0.147  0.158  0.198 1.2  0.053  0.074  0.039  0.137  0.141  0.149  0.190 1.4  0.053  0.065  0.035  0.125  0.129  0.141  0.182 1.6  0.053  0.053  0.032  0.112  0.115  0.133  0.169 1.8  0.053  0.041  0.030  0.086  0.090  0.117  0.154 2.0  0.053  0.018  0.029  0.000  0.000  0.000  0.002 
+
+> ∼ 50%  2400  0.2  0.056  0.002  0.012  0.148  0.056  0.151  0.103 0.4  0.056  0.008  0.011  0.232  0.134  0.216  0.191 0.6  0.057  0.026  0.029  0.286  0.171  0.270  0.247 0.8  0.056  0.051  0.051  0.287  0.187  0.274  0.268 1.0  0.056  0.076  0.060  0.247  0.179  0.242  0.260 1.2  0.056  0.094  0.053  0.191  0.165  0.193  0.245 1.4  0.056  0.097  0.045  0.143  0.142  0.154  0.223 1.6  0.056  0.087  0.037  0.107  0.107  0.131  0.199 1.8  0.056  0.069  0.034  0.071  0.072  0.105  0.170 2.0  0.056  0.021  0.033  0.000  0.000  0.000  0.001
+> DGP = Data generating process; N = Training sample size; CSFs = Causal Survival Forests; LSS = Local Survival Stacking; pcox = penalized cox regression; gbm = gradient boosting machine.
+
+32 A PREPRINT - M ARCH 30, 2026 0.05 0.10 0.15 0.20 0.25   
+
+> 800 1600 2400
+
+Sample size 
+
+> mean RMSE
+
+DGP 1 (Low LT)   
+
+> 0.05 0.10 0.15 0.20 0.25
+> 800 1600 2400
+
+Sample size 
+
+> mean RMSE
+
+DGP 2 (Low LT)   
+
+> 0.05 0.10 0.15 0.20 0.25
+> 800 1600 2400
+
+Sample size 
+
+> mean RMSE
+
+DGP 3 (Low LT)   
+
+> 0.05 0.10 0.15 0.20 0.25
+> 800 1600 2400
+
+Sample size 
+
+> mean RMSE
+
+DGP 1 (High LT)   
+
+> 0.05 0.10 0.15 0.20 0.25
+> 800 1600 2400
+
+Sample size 
+
+> mean RMSE
+
+DGP 2 (High LT)   
+
+> 0.05 0.10 0.15 0.20 0.25
+> 800 1600 2400
+
+Sample size 
+
+> mean RMSE
+
+DGP 3 (High LT) 
+
+surv−iTMLE (LSS) 
+
+ltrc−R (LSS) 
+
+T−learner (LSS) 
+
+ltrc−DR (LSS) 
+
+CSF 
+
+Figure 7: Overall mean root mean squared error (RMSE) by sample size for surv-iTMLE, CSFs, the T-learner and the ltrc R and DR learners when estimating the difference in conditional survival probabilities between two treatments. 33 A PREPRINT - M ARCH 30, 2026 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35    
+
+> 0.5 1.0 1.5 2.0
+
+Time 
+
+> mean RMSE
+
+DGP 1 (Low LT)    
+
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35
+> 0.25 0.50 0.75 1.00
+
+Time 
+
+> mean RMSE
+
+DGP 2 (Low LT)    
+
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35
+> 0.5 1.0 1.5 2.0
+
+Time 
+
+> mean RMSE
+
+DGP 3 (Low LT)    
+
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35
+> 0.5 1.0 1.5 2.0
+
+Time 
+
+> mean RMSE
+
+DGP 1 (High LT)    
+
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35
+> 0.25 0.50 0.75 1.00
+
+Time 
+
+> mean RMSE
+
+DGP 2 (High LT)    
+
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35
+> 0.5 1.0 1.5 2.0
+
+Time 
+
+> mean RMSE
+
+DGP 3 (High LT) 
+
+surv−iTMLE (LSS) 
+
+ltrc−R (LSS) 
+
+T−learner (LSS) 
+
+ltrc−DR (LSS) 
+
+CSF 
+
+Figure 8: Mean root mean squared error (RMSE) by time point for surv-iTMLE, CSFs, the T-learner and the ltrc R and DR learners when estimating the difference in conditional survival probabilities between two treatments using training data with sample size N=2400. 34 A PREPRINT - M ARCH 30, 2026 −0.40 −0.20 0.00 0.20 0.40 0.60    
+
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+Low LT, ID=1    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+Low LT, ID=2    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+Low LT, ID=3    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+High LT, ID=1    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+High LT, ID=2    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+High LT, ID=3 
+
+surv−iTMLE (LSS) 
+
+ltrc−R (LSS) 
+
+T−learner (LSS) 
+
+ltrc−DR (LSS) 
+
+CSF 
+
+True difference 
+
+Figure 9: Grid of individual estimates for the difference in conditional survival probabilities between two treatments plotted over time for data generating process 1 , with estimates obtained by surv-iTMLE, CSFs, the T-learner and the ltrc R and DR learners using training data of samples size N=2400. 35 A PREPRINT - M ARCH 30, 2026 −0.40 −0.20 0.00 0.20 0.40 0.60  
+
+> 0.50 1.00
+
+Time 
+
+> Effect
+
+Low LT, ID=1  
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00
+
+Time 
+
+> Effect
+
+Low LT, ID=2  
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00
+
+Time 
+
+> Effect
+
+Low LT, ID=3  
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00
+
+Time 
+
+> Effect
+
+High LT, ID=1  
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00
+
+Time 
+
+> Effect
+
+High LT, ID=2  
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00
+
+Time 
+
+> Effect
+
+High LT, ID=3 
+
+surv−iTMLE (LSS) 
+
+ltrc−R (LSS) 
+
+T−learner (LSS) 
+
+ltrc−DR (LSS) 
+
+CSF 
+
+True difference 
+
+Figure 10: Grid of individual estimates for the difference in conditional survival probabilities between two treatments plotted over time for data generating process 2 , with estimates obtained by surv-iTMLE, CSFs, the T-learner and the ltrc R and DR learners using training data of samples size N=2400. 36 A PREPRINT - M ARCH 30, 2026 −0.40 −0.20 0.00 0.20 0.40 0.60    
+
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+Low LT, ID=1    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+Low LT, ID=2    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+Low LT, ID=3    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+High LT, ID=1    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+High LT, ID=2    
+
+> −0.40 −0.20 0.00 0.20 0.40 0.60
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+High LT, ID=3 
+
+surv−iTMLE (LSS) 
+
+ltrc−R (LSS) 
+
+T−learner (LSS) 
+
+ltrc−DR (LSS) 
+
+CSF 
+
+True difference 
+
+Figure 11: Grid of individual estimates for the difference in conditional survival probabilities between two treatments plotted over time for data generating process 3 , with estimates obtained by surv-iTMLE, CSFs, the T-learner and the ltrc R and DR learners using training data of samples size N=2400. 37 A PREPRINT - M ARCH 30, 2026 
+
+S8. Right censored time-to-event data - Identification, Algorithm and Simulations 
+
+S8.1. Identification 
+
+When event times are right censored but not left truncated, a reduced set of identification assumptions are required. In this setting, five assumptions are required, positivity assumptions (A1)-(A2), a consistency assumption (A3) and conditional exchangeabilty assumptions (A4)-(A5): (A1) P (A = a|Z) > 0, P -almost surely (A2) P (τ ≤ C|Z) > 0, P0-almost surely (A3) When A = a, T = T a.(A4) T aI(T a ≤ τ ) ⊥⊥ A|Z
+
+(A5) T aI(T a ≤ τ ) ⊥⊥ CI (C ≤ τ )|A = a, Z 
+
+Under (A1)-(A5), and using the product integral notation of Gill and Johansen [1990] we write our estimand in terms of observable data functions as: 
+
+θ(t|x) = E
+
+ R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 1 , Z )} − R
+
+> (0 ,t ]
+
+{1 − Λ( du |A = 0 , Z )} X = x
+
+ ,
+
+where Λ( t|a, z ) = R  
+
+> (0 ,t ]
+> F(du |a,z )
+> R(u−| a,z )
+
+, for a ∈ { 0, 1}, R(u − | a, z ) = P (u ≤ ˜T |A = a, Z = z), and F (u|a, z ) = P ( ˜T ≤
+
+u, ∆ = 1 |A = a, Z = z). The identification proof in this setting is provided by Westling et al. [2024] in Section F of their supplementary material. 
+
+S8.2. surv-iTMLE algorithm 
+
+As the RC setting is a special case of the LTRC setting, where Q = 0 for each individual, surv-iTMLE can still be used in this setting. When this is the case, Algorithms 1 and 2 still follow the same structure, but no longer require truncation weights (i.e., H(t|A, Z ) = 1 for all t ∈ (0 , τ ] for all individuals). We provide code for the implementation of surv-iTMLE, in both the RC and LTRC settings at https://github.com/Matt-Pryce/surv-iTMLE. 
+
+S8.3. Simulation study S8.3.1. Design 
+
+To demonstrate surv-iTMLE’s finite sample performance in the RC setting, we run a simulation study, comparing it to CSFs and the T-learner across the same three DGPs outlined in Section 6 of the main text, each with no left truncation introduced to the event times. The simulation study design is identical to that found in Section 6 of the main text, with a few key exceptions. Firstly, when fitting surv-iTMLE or the T-learner, we fit the time-to-event nuisance functions (i.e., the event and censoring models) using two different estimation techniques. The first being the same local survival stacking approach seen in the LTRC simulation study, and the second being an alternative survival ensemble, survSuperLearner [Westling et al., 2024]. By doing so, we can explore how choice of estimator for the nuisance functions impact model performance. Additionally, we note that the CSFs were designed specifically for this setting, and our first DGP comes from their paper. 38 A PREPRINT - M ARCH 30, 2026 
+
+S8.3.2. Findings 
+
+Across each of the DGPs, both surv-iTMLE and CSFs consistently outperformed the T-learner, with each of these esti-mators providing comparable results. This can be seen for the difference in conditional survival probabilities in Figure 10. The performance between CSFs and surv-iTMLE fit using local survival stacking for its time-to-event nuisance functions can also be seen to be similar over time (See Figure 11). Meanwhile, surv-iTMLE fit using survSuper-Learner for these same nuisance functions performed best in DGP1, where the event/censoring times were generated using AFT/Cox models respectively, but struggled in DGP2 and DGP 3, where the approaches used to generate the event and censoring times were reversed. As a result, it seems that surv-iTMLE fit using local survival stacking for its time-to-event nuisance functions provides more consistent results, likely as this approach offers more flexibility when estimating the time-to-event curves. Finally, we note that the same smoothness properties discussed in the LTRC sim-ulation study were observed, with surv-iTMLE present smoother treatment effect curves which closely track the truth (See Figure 8 in Section S8.3.3). 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.10 0.11   
+
+> 800 1600 2400
+> Sample size
+> mean RMSE
+
+DGP 1   
+
+> 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.10 0.11
+> 800 1600 2400
+> Sample size
+> mean RMSE
+
+DGP 2   
+
+> 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.10 0.11
+> 800 1600 2400
+> Sample size
+> mean RMSE
+
+DGP 3 
+
+surv−iTMLE (LSS) 
+
+surv−iTMLE (survSL) 
+
+T−learner (LSS) 
+
+T−learner (survSL) 
+
+CSF 
+
+Figure 12: Overall mean root mean squared error (RMSE) by sample size for surv-iTMLE, CSFs and the T-learner when estimating the difference in conditional survival probabilities between two treatments. 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14    
+
+> 0.5 1.0 1.5 2.0
+> Time
+> mean RMSE
+
+DGP 1  
+
+> 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14
+> 0.5 1.0
+> Time
+> mean RMSE
+
+DGP 2    
+
+> 0.00 0.02 0.04 0.06 0.08 0.10 0.12 0.14
+> 0.5 1.0 1.5 2.0
+> Time
+> mean RMSE
+
+DGP 3 
+
+surv−iTMLE (LSS) 
+
+surv−iTMLE (survSL) 
+
+T−learner (LSS) 
+
+T−learner (survSL) 
+
+CSF 
+
+Figure 13: Mean root mean squared error (RMSE) by time point for surv-iTMLE, CSFs and the T-learner when estimating the difference in conditional survival probabilities between two treatments using training data with sample size N=2400. 39 A PREPRINT - M ARCH 30, 2026 
+
+S8.3.3. Additional results −0.20 −0.10 0.00 0.10 0.20 0.30    
+
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+DGP 1, ID=1    
+
+> −0.20 −0.10 0.00 0.10 0.20 0.30
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+DGP 1, ID=2    
+
+> −0.20 −0.10 0.00 0.10 0.20 0.30
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+DGP 1, ID=3    
+
+> −0.30 −0.20 −0.10 0.00
+> 0.25 0.50 0.75 1.00
+
+Time 
+
+> Effect
+
+DGP 2, ID=1    
+
+> −0.30 −0.20 −0.10 0.00
+> 0.25 0.50 0.75 1.00
+
+Time 
+
+> Effect
+
+DGP 2, ID=2    
+
+> −0.30 −0.20 −0.10 0.00
+> 0.25 0.50 0.75 1.00
+
+Time 
+
+> Effect
+
+DGP 2, ID=3    
+
+> −0.15 −0.10 −0.05 0.00 0.05 0.10
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+DGP 3, ID=1    
+
+> −0.15 −0.10 −0.05 0.00 0.05 0.10
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+DGP 3, ID=2    
+
+> −0.15 −0.10 −0.05 0.00 0.05 0.10
+> 0.50 1.00 1.50 2.00
+
+Time 
+
+> Effect
+
+DGP 3, ID=3 
+
+surv−iTMLE (LSS) 
+
+surv−iTMLE (survSL) 
+
+T−learner (LSS) 
+
+T−learner (survSL) 
+
+CSF 
+
+True difference 
+
+Figure 14: Grid of individual estimates for the difference in conditional survival probabilities between two treatments plotted over time with estimates obtained by surv-iTMLE, CSFs and the T-learner using training data of samples size N=2400. 40 A PREPRINT - M ARCH 30, 2026 Table 7: Right censored (RC) simulation study - Difference in survival probabilities - Mean root mean squared error (RMSE) for each learner by sample size DGP N T-learner CSFs surv-iTMLE LSS survSL LSS survSL 1 800 0.090 0.101 0.051 0.059 0.044 
+
+1600 0.085 0.096 0.043 0.049 0.036 
+
+2400 0.083 0.092 0.038 0.042 0.032 
+
+2 800 0.069 0.089 0.056 0.051 0.055 1600 0.060 0.084 0.049 0.043 0.056 2400 0.058 0.080 0.046 0.038 0.054 3 800 0.062 0.085 0.043 0.040 0.060 1600 0.049 0.078 0.033 0.031 0.058 2400 0.044 0.074 0.029 0.028 0.057 
+
+> DGP = Data generating process; N = Training sample size; CSFs = Causal Survival Forests; LSS = Local Survival Stacking; survSL = Survival SuperLearner.
+
+41 A PREPRINT - M ARCH 30, 2026 Table 8: Right censored (RC) simulation study - Difference in survival probabilities - Mean root mean squared error (RMSE) by time for each learner DGP N time T-learner CSFs surv-iTMLE LSS survSL LSS survSL 1 2400 0.1 0.078 0.088 0.044 0.053 0.036 
+
+0.25 0.114 0.118 0.068 0.068 0.051 
+
+0.5 0.110 0.113 0.049 0.053 0.042 
+
+0.75 0.090 0.097 0.037 0.038 0.032 
+
+1.0 0.077 0.086 0.031 0.029 0.025 
+
+1.25 0.069 0.080 0.026 0.026 0.022 
+
+1.5 0.067 0.080 0.022 0.023 0.020 
+
+1.75 0.064 0.078 0.020 0.025 0.020 
+
+2.0 0.064 0.078 0.016 0.025 0.019 2 2400 0.1 0.061 0.083 0.046 0.044 0.077 0.2 0.063 0.085 0.046 0.043 0.056 0.3 0.062 0.084 0.044 0.042 0.043 0.4 0.059 0.081 0.043 0.040 0.042 0.6 0.058 0.080 0.041 0.038 0.046 0.6 0.056 0.079 0.039 0.037 0.049 0.7 0.055 0.078 0.038 0.035 0.051 0.8 0.055 0.077 0.037 0.034 0.053 0.9 0.055 0.077 0.035 0.033 0.053 1.0 0.055 0.077 0.072 0.031 0.052 3 2400 0.2 0.044 0.074 0.005 0.002 0.001 
+
+0.4 0.044 0.074 0.009 0.006 0.039 0.6 0.044 0.074 0.018 0.014 0.057 0.8 0.044 0.074 0.025 0.021 0.056 1.0 0.044 0.074 0.031 0.028 0.045 1.2 0.044 0.074 0.035 0.032 0.034 1.4 0.044 0.074 0.037 0.034 0.038 1.6 0.044 0.074 0.037 0.035 0.053 1.8 0.044 0.074 0.036 0.034 0.067 2.0 0.044 0.074 0.032 0.032 0.077 
+
+> DGP = Data generating process; N = Training sample size; CSFs = Causal Survival Forests; LSS = Local Survival Stacking; survSL = Survival SuperLearner.
+
+42 A PREPRINT - M ARCH 30, 2026 
+
+S9. NSCLC analysis - Additional model fitting information 
+
+S9.1. Covariate adjustment sets 
+
+When using the CGDB, a wide array of information is available for each patient, including information on their demographic factors, their health, their disease severity, and results from a range of lab/genomic tests. In this analysis, covariates which had < 30% missingness were included in the adjustment sets, and genomic information was limited to biomarkers which had > 50 positive mutations identified. A complete list of the covariate information which was assess for these criteria is provided in Table 9, and a complete list of covariate information that met these criteria is provided in Table 10. Table 9: Covariates which were assessed for use in the clinico-genomic database (CGDB) Group Covariates Demographic Age at time of treatment, Race, Gender, Smoking history Health/Disease BMI, Body weight, Body height, Heart rate, Systolic blood pressure, Diastolic blood pressure, ECOG at time of treatment, Time from diagnosis to treatment, COPD prior to diagnosis, Diabetes prior to diagnosis Lab Hemoglobin, Urea nitrogen, Alkaline Phosphatase, Alanine Aminotransferase, Aspartate Aminotransferase, Calcium, Creatinine, Total protein, Bilirubin, Albumin, Hematocrit, Glucose, Platelet count, Lymphocyte count, Monocyte count, Neutrophil count Genomic EGFR mutation, BRAF mutation, KRAS mutation, HER2/ERBB2 mutation, MET mutation, ROS1 fusion/rearrangement, ALK fusion/rearrangement PDL1 expression level, RET fusion/rearrangement, NTRK1 fusion/rearrangement NTRK2 fusion/rearrangement, NTRK3 fusion/rearrangement 43 A PREPRINT - M ARCH 30, 2026 Table 10: Covariate which had sufficient available data from the clinico-genomic database (CGDB) Group Covariates Demographic Age at time of treatment, Race, Gender, Smoking history Health/Disease Body weight, Body height, ECOG at time of treatment, Time from diagnosis to treatment, COPD prior to diagnosis, Diabetes prior to diagnosis Lab Hemoglobin, Urea nitrogen, Alkaline Phosphatase, Alanine Aminotransferase, Aspartate Aminotransferase, Calcium, Creatinine, Total protein, Bilirubin, Albumin, Hematocrit, Glucose, Platelet count, Lymphocyte count, Monocyte count, Neutrophil count Genomic EGFR mutation, KRAS mutation When using these covariates to estimate treatment effect heterogeneity, the sets of covariates which were used within each learner/model can be seen in Table 11, noting that information which came from genomic testing was not used within the truncation/treatment models as these would not have been available to inform these decisions. Table 11: Covariate adjustment sets for each learner/model Learner Model Covariates surv-iTMLE Outcome All Censoring All Truncation All except EGFR mutation and KRAS mutation Treatment All except EGFR mutation and KRAS mutation Pseudo-outcome (1) All and time, including interactions between each predictor and time (2) EGFR mutation, time and interactions between the two (3) Age at time of treatment, time and interactions between the two CSFs . All T-learner Outcome All 
+
+S9.2. Imputation procedure 
+
+In this study, covariates with less than 30% missingness were used in the adjustment sets, as done by McGough et al. [2023]. The covariates which had missing values were: Race, ECOG, body mass index (BMI), Body weight, Hemoglobin, Urea nitrogen, Alkaline Phosphatase, Alanine Aminotransferase, Aspartate Aminotransferase, Calcium, Creatinine, Total protein, Bilirubin, Albumin, Hematocrit, Glucose, Platelet count, Lymphocyte count, Monocyte count, Neutrophil count. For race, missing values were coded at ”Unknown”, while for EGFR and KRAS mutations, missing values were categorized along with Negative test results. For the remaining covariates, multiple imputation by chained equations (MICE) was used to impute the missing values. We used the default options within the MICE package in R, using predictive mean modelling to impute continuos variables, and logistic regressions to impute binary variables. All available covariates were used as predictors within these prediction models. 
+
+S9.3. ML estimation techniques used to implement surv-iTMLE, CSFs, the T-learner and the ltrc learners 
+
+When estimating surv-iTMLE and the T-learner in our NSCLC analysis, local survival stacking approaches were taken to estimate the outcome functions, with the SuperLearner used to estimate the binary outcome problems within these. This same approach was taken for censoring and truncation functions found in surv-iTMLE. The libraries defined for these binary outcomes problems can be found in Table 12. The propensity score in surv-iTMLE was estimated using the SuperLearner , with the same library as used as in the local survival stacking models. For the pseudo-outcome regression within surv-iTMLE, a generalized additive model (GAM) was used, including factor–smooth interactions between time and each variable in X, setting the the maximum basis dimension for each term to a maximum of four degrees of freedom ( K = 4 ), producing smooth treatment effect curves over time. CSF were then fit using the default 44 A PREPRINT - M ARCH 30, 2026 options in the grf package in R, and the ltrc learners fit using local survival stacking for the outcome, censoring and truncation models, while the super learner and cross-validated xgboost was used to estimate the propensity and final minimization respectively. Finally, we note that a 10-fold cross-fitting approach was used for the nuisance function estimation in each surv-iTMLE variation and for the ltrc learners. Table 12: Super learner algorithm libraries used for binary outcome models (including those in local survival stacking (LSS) algorithms) 
+
+Algorithm Tuning parameters 
+
+Mean (SL.mean) .Linear model (SL.glm) .LASSO/Elastic net (SL.glmnet with logit link) nlambda = (50,100,250) alpha = (0.5,1) useMin = (False,True) Random forest (SL.ranger) mtry = (3,5) min.node.size = (10,20) sample.fraction = (0.2,0.4,0.6) Generalized additive models degrees of freedom = (2,3,4,5) 45 A PREPRINT - M ARCH 30, 2026 
+
+S10. NSCLC analysis results with ltrc learners −0.4 −0.3 −0.2 −0.1 0.0 0.1 0.2 0.3 0.4       
+
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+
+Time (Years) 
+
+> Difference in survival probability
+
+Patient 1       
+
+> −0.4 −0.3 −0.2 −0.1 0.0 0.1 0.2 0.3 0.4
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+
+Time (Years) 
+
+> Difference in survival probability
+
+Patient 2       
+
+> −0.4 −0.3 −0.2 −0.1 0.0 0.1 0.2 0.3 0.4
+> 0.0 0.5 1.0 1.5 2.0 2.5 3.0
+
+Time (Years) 
+
+> Difference in survival probability
+
+Patient 3 
+
+surv−iTMLE T−learner CSF ltrc−R ltrc−DR 
+
+Figure 15: Individual difference in conditional survival probabilities over time for three example NSCLC patients if they were to initiate immunotherapy/chemotherapy after a NSCLC diagnosis, with treatment effects estimated by surv-iTMLE, CSFs, the T-learner and the ltrc DR and R learners. 46

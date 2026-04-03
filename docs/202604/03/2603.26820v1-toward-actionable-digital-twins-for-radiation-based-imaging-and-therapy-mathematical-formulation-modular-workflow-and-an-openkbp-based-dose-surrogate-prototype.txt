@@ -1,0 +1,465 @@
+Title: Toward Actionable Digital Twins for Radiation-Based Imaging and Therapy: Mathematical Formulation, Modular Workflow, and an OpenKBP-Based Dose-Surrogate Prototype
+
+URL Source: https://arxiv.org/pdf/2603.26820v1
+
+Published Time: Tue, 31 Mar 2026 00:05:57 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+> IEEE Transactions on Radiation and Plasma Medical Sciences , VOL. XX, NO. X, MONTH 2026 1
+
+# Toward Actionable Digital Twins for Radiation-Based Imaging and Therapy: Mathematical Formulation, Modular Workflow, and an OpenKBP-Based Dose-Surrogate Prototype 
+
+Hsin-Hsiung Huang, Member, IEEE, and Bulent Soykan, Member, IEEE 
+
+Abstract —Digital twins for radiation-based imaging and ther-apy are most useful when they assimilate patient data, quantify predictive uncertainty, and support clinically constrained deci-sions. This paper presents a modular framework for actionable digital twins in radiation-based imaging and therapy and instanti-ates its reproducible open-data component using the Open-access Knowledge-Based Planning (OpenKBP) benchmark. The frame-work couples PatientData, Model, Solver, Calibration, and Deci-sion modules and formalizes latent-state updating, uncertainty propagation, and chance-constrained action selection. As an initial implementation, we build a GPU-ready PyTorch/MONAI reimplementation of the OpenKBP starter pipeline: an 11-channel, 19.2M-parameter 3D U-Net trained with a masked loss over the feasible region and equipped with Monte Carlo dropout for voxel-wise epistemic uncertainty. To emulate the update loop on a static benchmark, we introduce decoder-only proxy recalibration and illustrate uncertainty-aware virtual-therapy evaluation using DVH-based and biological utilities. A complete three-fraction loop including recalibration, Monte Carlo inference, and spatial optimization executes in 10.3 s. On the 100-patient test set, the model achieved mean dose and DVH scores of 2.65 and 1.82 Gy, respectively, with 0.58 s mean inference time per patient. The OpenKBP case study thus serves as a reproducible test bed for dose prediction, uncertainty propagation, and proxy closed-loop adaptation, while future institutional studies will address longitudinal calibration with delivered-dose logs and repeat imaging. 
+
+Index Terms —Digital twin, adaptive radiation therapy, external-beam radiotherapy, knowledge-based planning, dose prediction 
+
+I. I NTRODUCTION 
+
+The idea of a digital twin emerged in aerospace and engi-neered systems as a virtual counterpart that remains linked to its physical system through data, modeling, and predic-tion [1]. In medicine, the concept is especially compelling because patient care already generates a rich digital record of images, treatment plans, delivery logs, and clinical outcomes. Radiation-based imaging and therapy are particularly well suited to this paradigm because they combine repeated mea-surement, model-based prediction, and decisions that must be 
+
+This work did not involve human subjects or animals in its research. H.-H. Huang was supported in part by the U.S. National Science Foundation under Grants DMS-1924792 and DMS-2318925. Hsin-Hsiung Huang is with the School of Data, Mathematical, and Statisti-cal Sciences, University of Central Florida, Orlando, FL 32816 USA (e-mail: hsin.huang@ucf.edu). Bulent Soykan is with the Institute for Simulation and Training, University of Central Florida, Orlando, FL 32826 USA (e-mail: Bulent.Soykan@ucf.edu). 
+
+revised under strict safety constraints. In this setting, a useful digital twin is not merely a static simulator. It must assimilate new patient information over time, represent uncertainty in its predictions, and support actions such as plan evaluation, adaptation, or treatment selection. Radiation oncology already provides two ingredients needed for such systems. First, deep learning has advanced dose prediction and knowledge-based planning, with the Open-access Knowledge-Based Planning (OpenKBP) AAPM Grand Challenge providing a standardized benchmark for volumetric dose surrogates and DVH-based evaluation [2], [3]. Second, digital-twin thinking has matured in oncology and medical imaging, including recent patient-specific forecasting frame-works and MRI-based response models [4], [5]. Together, these developments suggest a timely opportunity to connect reproducible AI-based dose modeling with the updating and decision logic expected of an actionable digital twin. That connection remains incomplete. Most published dose-prediction models are still one-shot feed-forward predictors. They estimate a reference dose distribution from anatomy and structure masks, but they do not explicitly maintain a patient state, incorporate new observations during treatment, or express uncertainty in a way that can guide decisions. A clinically meaningful radiation-therapy digital twin therefore requires more than predictive accuracy alone. It requires a formal updating mechanism, uncertainty propagation from voxels to clinically interpretable summaries, and a decision layer that can compare candidate actions under safety and deliverability constraints. Open datasets are indispensable for reproducibility, yet they rarely contain the longitudinal mea-surements needed for a full bidirectional clinical twin. This pa-per addresses that tension by using OpenKBP for reproducible dose-surrogate development, uncertainty-aware evaluation, and proxy sequential updating, while reserving true longitudinal validation for future institutional studies with delivered-dose logs and repeat imaging. Within that scope, we develop an actionable digital-twin framework organized around PatientData, Model, Solver, Cal-ibration, and Decision. The open-data implementation uses an OpenKBP-style 3D U-Net trained with a masked loss over the feasible region, stochastic inference through Monte Carlo dropout for voxel-wise epistemic uncertainty, and a proxy sequential calibration step based on decoder-only transfer learning. These components are coupled to a virtual-therapy  
+
+> arXiv:2603.26820v1 [eess.IV] 26 Mar 2026 IEEE Transactions on Radiation and Plasma Medical Sciences , VOL. XX, NO. X, MONTH 2026 2
+
+decision module that evaluates candidate actions using DVH-based summaries and uncertainty-aware biological utilities. The result is both a mathematical formulation of an action-able digital twin and a reproducible prototype showing how uncertainty and updating can be embedded in a benchmark dose-prediction workflow. II. B ACKGROUND AND RELATED WORK 
+
+A. Updateable patient models and modular twins 
+
+Across engineering and biomedical settings, digital twins are virtual counterparts linked to their physical systems through data assimilation, prediction, and decision support [1]. In oncology, recent examples span MRI-based patient-specific digital twins for chemotherapy optimization [4] and modular frameworks such as TumorTwin [5]. These lines of work col-lectively motivate the present focus on updating, uncertainty-aware prediction, and actionability. 
+
+B. Radiation-therapy surrogates and open benchmarks 
+
+OpenKBP enables fair comparison of dose-prediction meth-ods for knowledge-based planning using standardized voxel-wise and DVH-based metrics [2], [3]. Attention-aware 3D U-Net variants have also been evaluated on the benchmark and show that architectural refinements can improve emphasis on clinically relevant anatomy in head-and-neck IMRT dose prediction [6]. Our work builds on this benchmark tradition but moves beyond static prediction by integrating uncertainty, proxy recalibration, and a decision layer. III. M ODEL OF AN ACTIONABLE DIGITAL TWIN 
+
+A. Latent state, observations, and updating 
+
+Let xt denote the latent patient state at time t, including anatomy, targets and organs-at-risk, accumulated dose sum-maries, and latent response or toxicity parameters. Let yt
+
+denote observations, including CT or CBCT, delivered dose logs, biomarkers, and outcomes, and let ut denote clinical actions such as plan parameters, adaptation triggers, and imaging schedules. A generic state-space model is 
+
+xt+1 = f (xt, u t; θ) + wt, (1) 
+
+yt = h(xt; ϕ) + vt, (2) where θ denotes transition or calibration parameters, ϕ denotes observation-model parameters, and wt and vt represent process and observation uncertainty. For notational simplicity, we treat 
+
+ϕ as fixed or pre-specified during online updating and maintain the belief state over (xt, θ ). Accordingly, 
+
+bt(x, θ ) ≜ p(xt = x, θ t = θ | y1: t, u 1: t−1; ϕ). (3) The Bayesian filtering update is 
+
+bt(xt, θ ) ∝ p(yt | xt; ϕ)
+
+×
+
+Z
+
+p(xt | xt−1, u t−1; θ) bt−1(xt−1, θ ) dx t−1.
+
+(4) In practice, (4) can be approximated by ensemble, particle, or maximum a posteriori (MAP) updates. A generic MAP calibration step is 
+
+(ˆ xt, ˆθt) = arg min  
+
+> x,θ
+
+∥yt − h(x; ϕ)∥2Σ−1
+
+> v
+
++ ∥x − f (ˆ xt−1, u t−1; θ)∥2Σ−1
+
+> w
+
++ R(θ), (5) where Σv and Σw are error covariances and R(θ) encodes priors or stability. 
+
+B. Dose surrogate, uncertainty, and DVH metrics 
+
+For radiation therapy, the predictive target is the 3D dose distribution d(r) over voxels r. Let It denote the planning CT and let St denote ROI masks. A dose surrogate is defined as 
+
+ˆdt = gψ (It, S t), (6) where ψ denotes neural-network parameters. For OpenKBP, 
+
+gψ is trained to predict the reference plan dose using the masked objective 
+
+ψ⋆ = arg min 
+
+> ψN
+
+X
+
+> i=1
+
+Mi ⊙  gψ (Ii, S i) − di
+
+ 
+
+> 1
+
+, (7) where Mi is the feasible dose mask [2], [3]. Predictive uncertainty is approximated by stochastic inference, 
+
+ˆd(k) 
+
+> t
+
+= gψ (It, S t; ξk), k = 1 , . . . , K, (8) with predictive mean and voxel-wise variance 
+
+¯dt = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+ˆd(k) 
+
+> t
+
+, (9) 
+
+σ2 
+
+> t
+
+(r) = 1
+
+K − 1
+
+> K
+
+X
+
+> k=1
+
+ ˆd(k) 
+
+> t
+
+(r) − ¯dt(r)
+
+2
+
+, (10) where Monte Carlo dropout serves as an efficient approximate Bayesian mechanism for epistemic uncertainty extraction [7]. Let Ωr denote the voxel set for ROI r and let m(d) collect DVH-derived metrics. The benchmark-aligned dose and DVH scores are 
+
+Sdose ( ˆd, d ) = 1
+
+|Ω|
+
+X
+
+> r∈Ω
+
+ˆd(r) − d(r) , (11) 
+
+SDVH ( ˆd, d ) = 1
+
+L
+
+> L
+
+X
+
+> ℓ=1
+
+Mℓ( ˆd) − M ℓ(d) , (12) where Mℓ enumerates the benchmark DVH summaries [2]. 
+
+C. Uncertainty-aware decision-making 
+
+At decision time t, the digital twin recommends an action by solving 
+
+u⋆t = arg min 
+
+> u∈U t
+
+Ebt [C(xt, u )] 
+
+s.t. Pbt (gj (xt, u ) ≤ 0) ≥ 1 − αj , ∀j, (13) where C(·) captures coverage-sparing tradeoffs, gj (·) are safety and deliverability constraints, and αj are acceptable IEEE Transactions on Radiation and Plasma Medical Sciences , VOL. XX, NO. X, MONTH 2026 3
+
+TABLE I MODULE MAPPING FROM A MODULAR DIGITAL TWIN WORKFLOW TO RADIATION -BASED IMAGING AND THERAPY .
+
+Module Radiation-based imaging and therapy instan-tiation 
+
+PatientData Harmonized imaging, structures, plan goals, dose distributions, delivered logs, metadata, and outcomes. Model Hybrid physics and learned models, including dose surrogate, accumulated dose, response, and toxicity models. Solver Forward prediction for dose and downstream summaries, with sensitivities when needed for calibration and decision. Calibration Sequential updating using new measurements, implemented as inverse problems or filtering as in (4)-(5). Decision Constrained protocol selection using predictive distributions, utilities, and safety constraints as in (13)-(14). 
+
+violation probabilities. Using samples from (8), the decision problem can be approximated as 
+
+u⋆t ≈ arg min 
+
+> u∈U t
+
+1
+
+K
+
+> K
+
+X
+
+> k=1
+
+C
+
+
+
+m( ˆd(k,u ) 
+
+> t
+
+)
+
+
+
+s.t. 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+1
+
+h
+
+gj ( ˆd(k,u ) 
+
+> t
+
+) ≤ 0
+
+i
+
+≥ 1 − αj . (14) For OpenKBP, u may be instantiated as a plan-library selector, a spatial modulation mask, or a proxy adaptation used for virtual-therapy evaluation. IV. M ODULAR ARCHITECTURE AND ALGORITHM 
+
+A. Modules, architecture, and workflow 
+
+Table I maps a modular digital twin workflow to radiation-based imaging and therapy, and Fig. 1 shows the corresponding closed-loop architecture. The separation between PatientData, Model, Solver, Calibration, and Decision mirrors TumorTwin’s modular philosophy while focusing on RT objects, DVH-aware objectives, and benchmark-aligned evaluation [5]. Algorithm 1 summarizes the hybrid-data workflow, sep-arating reproducible open-benchmark training from patient-specific updating and decision-making. The structure is moti-vated by modular digital-twin workflows such as TumorTwin but is instantiated here for radiation-therapy dose prediction and uncertainty-aware adaptation [5]. 
+
+B. Positioning relative to prior work 
+
+Table II compares the present radiation-therapy prototype with TumorTwin at the framework level. Relative to Tu-morTwin, the novelty here is the coupling of a modular digital-twin philosophy with an explicit dose-surrogate component trained and evaluated on OpenKBP using standardized dose and DVH metrics. Relative to stand-alone dose-prediction pipelines, the novelty lies in embedding the surrogate inside an updateable loop with calibration, uncertainty propagation, and an explicit decision module. The evaluation strategy is also distinct: open benchmarking anchors reproducible model development, whereas future institutional cohorts will test  
+
+> Clinical system patient + delivery
+> Ingest + harmonize imaging, RT objects, logs
+> PatientData digital thread + provenance
+> Twin model physics + learned
+> Solver forward prediction + sensitivities
+> Predictive distribution dose, DVH, risk + UQ
+> Decision utility + constraints
+> Action ut
+> plan, adapt, schedule
+> QA + clinician review validation checks
+> Calibration update / inverse fit
+
+Fig. 1. Actionable digital twin architecture for radiation-based imaging and therapy. Measurements update PatientData, calibration updates model state or parameters, the solver produces predictive distributions with uncertainty, and the decision module selects constrained actions for the clinical system. 
+
+Algorithm 1 Hybrid-data actionable digital twin workflow 
+
+1: Input: open benchmark data Dopen , patient measurements {yt}, candidate actions Ut, constraints gj , violation levels αj , stochastic sample size K.2: Build PatientData objects for Dopen and train the dose surrogate by minimizing (7); validate with (11)-(12). 3: Initialize patient-specific PatientData and belief b0(x, θ ).4: for t = 1 , 2, . . . , T do 
+
+5: Update PatientData with new measurement yt.6: Calibrate via approximate filtering (4) or MAP updating (5). 7: Generate K stochastic dose samples using (8) and compute uncertainty via (10). 8: Compute DVH summaries and evaluate candidate actions with sample-based chance constraints (14). 9: Select u⋆t , deliver it, and log the resulting summaries for the next update. 10: end for 
+
+11: Output: updated beliefs, predictive distributions, selected actions, and constraint-satisfaction statistics. 
+
+delivered-dose assimilation and translational actionability un-der longitudinal observation streams. V. O PEN BENCHMARK CASE STUDY AND RESULTS 
+
+A. Configuration and study design 
+
+For OpenKBP, PatientData contains CT, ROI masks, the feasible dose mask, voxel dimensions, and the reference dose distribution. The implemented surrogate is a PyTorch/MONAI IEEE Transactions on Radiation and Plasma Medical Sciences , VOL. XX, NO. X, MONTH 2026 4                            
+
+> TABLE II FRAMEWORK -LEVEL COMPARISON BETWEEN TUMOR TWIN AND THE PROPOSED RADIATION -THERAPY DIGITAL -TWIN (RT-DT) PROTOTYPE .
+> Aspect TumorTwin Proposed RT-DT prototype
+> Primary domain General oncology digital twins with mecha-nistic tumor-growth and response models External-beam radiation therapy with CT/ROI-driven volumetric dose-surrogate modeling Primary observations Longitudinal imaging and tumor-response measurements Planning CT, structure masks, feasible dose mask, reference plan dose, and proxy fraction-level dose summaries Calibration target Patient-specific mechanistic parameters and latent tumor state Dose-surrogate state or parameters via proxy sequen-tial calibration, with encoder freezing and decoder adaptation Decision output Alternative-treatment forecasting and opti-mization Uncertainty-aware plan selection or spatial modulation under RT-specific constraints Time horizon Medium- to long-term response forecasting Short-term fractionated adaptation and dose-evaluation loop Computational pro-file Numerical solvers, gradients, and model-based calibration Rapid deep-learning inference with Monte Carlo dropout and lightweight transfer-learning updates Primary evaluation Demonstration workflows and response fore-casting Dose score, DVH score, uncertainty-aware DVHs, and proxy adaptation trajectories
+
+reimplementation of the OpenKBP starter framework, config-ured as an 11-channel 3D U-Net with approximately 19.2M trainable parameters. The design preserves the starter bench-mark’s masked-loss formulation while upgrading the pipeline for uncertainty-aware inference. Specifically, dropout is re-tained in the bottleneck and decoder at test time so that re-peated stochastic forward passes produce the ensemble in (8)-(10) [7]. Attention-aware 3D U-Net models remain relevant literature comparators and future extensions, but they are not the primary implemented architecture reported here [6]. Because OpenKBP does not include delivered-dose logs or repeat imaging, sequential updating is emulated through a lightweight proxy update: the encoder is frozen to preserve anatomy-dependent features, while the decoder is adapted to dose-related summary measurements that mimic early-fraction QA signals. The decision module ranks candidate proxy ac-tions such as spatial masks or constrained scaling perturbations using the schematic biological utility TCP − λ NTCP − γ U t,where Ut is an uncertainty penalty derived from σ(x) or an ROI-aggregated summary. The primary comparisons are deterministic versus stochastic prediction, static versus proxy-recalibrated prediction, and risk-neutral versus uncertainty-penalized decision policies. Benchmark-aligned evaluation is based on the standardized dose and DVH scores, supplemented by runtime, uncertainty-aware DVHs, and illustrative decision-trajectory summaries. Consistent with TG-166, TCP/NTCP are used here as comparative utilities rather than calibrated clinical outcome probabilities [8]. 
+
+B. Implementation stability and benchmark performance 
+
+The current implementation verifies that the proposed in-frastructure is operational and numerically stable. In a de-liberate overfitting and bounds-validation test, the masked L1 training objective decreased substantially from an initial value of approximately 28.5 Gy, confirming correct data loading, feasible-mask handling, and gradient propagation through the 3D dose-surrogate pipeline. At untrained initializa-tion, the network produced nonnegative outputs in the range 
+
+[0 .000 , 3.034] Gy, indicating well-behaved initialization be-fore full training. In addition, a complete three-fraction proxy             
+
+> TABLE III COHORT -WIDE OPEN KBP TEST -SET BENCHMARK METRICS FOR THE PRESENT MODEL (100 PATIENTS ).
+> Metric Mean Std. dev.
+> Dose score [Gy] 2.65 0.42 DVH score [Gy] 1.82 0.55 Inference time / patient [s] 0.58 0.05
+
+virtual-therapy loop, including sequential decoder calibration, Monte Carlo inference, and spatial optimization, executed in 10.3 s on the current hardware configuration. Together, these results establish a functioning end-to-end platform for controlled uncertainty-aware inference and proxy adaptation experiments. Following full convergence on the GPU cluster, cohort-wide performance was evaluated on the 100-patient OpenKBP test set. As summarized in Table III, the model achieved mean dose and DVH scores of 2.65 ± 0.42 Gy and 1.82 ± 0.55 Gy, respectively, with mean inference time 0.58 ± 0.05 s per pa-tient. These values indicate that the present surrogate attains a practical baseline level of benchmark accuracy while enabling the stochastic inference and proxy recalibration capabilities required by the broader digital-twin formulation. 
+
+C. Spatial and DVH uncertainty diagnostics 
+
+Figure 2 shows a representative axial slice from case pt 289 with the reference dose, predictive mean dose, absolute error, and voxel-wise epistemic uncertainty estimated by Monte Carlo dropout. The visualization localizes deviations near steep dose gradients and target/OAR interfaces, which are regions of practical importance in radiotherapy dose-prediction studies [2], [7]. In the current exported slice, the uncertainty values are very small, so the uncertainty panel should be interpreted as a qualitative diagnostic of the reporting pipeline rather than as a standalone calibration result. The underlying uncertainty quantity is nonnegative by definition, even though the plotting routine uses a symmetric color scale. To connect voxel-wise uncertainty to clinically interpreted plan summaries, the predictive ensemble is propagated to ROI-level DVHs, yielding pointwise 95% predictive intervals for IEEE Transactions on Radiation and Plasma Medical Sciences , VOL. XX, NO. X, MONTH 2026 50 20 40 60 80 100 120                       
+
+> Voxel Index (x)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> 120
+> Voxel Index (y)
+> Ground Truth Dose
+> PTV
+> OAR
+> 020 40 60 80 100 120
+> Voxel Index (x)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> 120
+> Voxel Index (y)
+> Predicted Mean Dose (x)
+> 020 40 60 80 100 120
+> Voxel Index (x)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> 120
+> Voxel Index (y)
+> Absolute Error | (x) - Truth|
+> 020 40 60 80 100 120
+> Voxel Index (x)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> 120
+> Voxel Index (y)
+> Max Dose: 60.9 Gy
+> Max Error: 60.9 Gy
+> Max Uncertainty: 0.000 Gy
+> Epistemic Uncertainty (x)
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Dose [Gy]
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Dose [Gy]
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Error [Gy]
+> 0
+> 2
+> 4
+> 6
+> 8
+> Uncertainty [Gy]
+> 1e 5
+> Spatial Dose Distribution and Uncertainty Maps - pt_289
+
+Fig. 2. Representative axial slice for OpenKBP case pt 289: reference dose, predicted mean dose μ(x), absolute error |μ(x)−d(x)|, and voxel-wise epistemic uncertainty σ(x) estimated by Monte Carlo dropout. 0 10 20 30 40 50 60 70 
+
+> Dose [Gy]
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Fractional Volume [%]
+> Shaded regions: 95% confidence intervals
+> from Monte Carlo Dropout (50 samples)
+> demonstrating epistemic uncertainty
+> 20 Gy
+> 40 Gy
+> 60 Gy
+> Uncertainty-Aware Dose-Volume Histogram - pt_289
+> PTV (Target) (Ground Truth)
+> PTV (Target) (Predicted)
+> PTV (Target) (95% CI)
+> Brainstem (OAR) (Ground Truth)
+> Brainstem (OAR) (Predicted)
+> Brainstem (OAR) (95% CI)
+> Spinal Cord (OAR) (Ground Truth)
+> Spinal Cord (OAR) (Predicted)
+> Spinal Cord (OAR) (95% CI)
+> Right Parotid (OAR) (Ground Truth)
+> Right Parotid (OAR) (Predicted)
+> Right Parotid (OAR) (95% CI)
+
+Fig. 3. Uncertainty-aware DVHs for case pt 289. Solid curves denote reference DVHs, dashed curves denote predictive-mean DVHs, and shaded regions indicate pointwise 95% predictive intervals from the Monte Carlo dropout ensemble. 
+
+the PTV and representative OARs, as shown in Fig. 3. This presentation is consistent with radiotherapy practice, where DVH-based summaries remain central to plan evaluation and uncertainty in dose should be reflected in downstream plan-quality metrics rather than reported only at the voxel level [8], [9]. For the illustrated case, the DVH bands are narrow, which is consistent with the low voxel-wise Monte Carlo dropout spread observed in Fig. 2. At the same time, the gap between reference and predicted DVH curves highlights that uncertainty width and predictive accuracy are distinct properties; narrow predictive intervals do not by themselves guarantee accurate dose reconstruction. 
+
+D. Illustrative proxy adaptation trajectory 
+
+Because OpenKBP is a static planning benchmark and does not provide repeat imaging or delivered-dose logs, fraction-by-fraction adaptation is demonstrated through a proxy virtual-therapy experiment rather than a clinically validated longitu-dinal cohort analysis. Figure 4 illustrates the intended closed-loop behavior of the framework after a simulated anatomical shift at fraction 10. Following the shift, the uncertainty proxy rises and the decision module triggers recalibration and proxy adaptation. In the illustrated run, the updates reduce epistemic uncertainty but do not fully return the surrogate NTCP trajec-tory below the nominal 15% reference line by the end of the course. This is worth reporting directly because it shows both the promise and the present limitation of the current action set: the framework can react to rising uncertainty and worsening projected risk, but the present proxy controller should still be interpreted as a proof of concept rather than a clinically validated adaptive strategy [8]. VI. D ISCUSSION 
+
+The central claim of this paper is that a useful digital twin for radiation-based imaging and therapy must do more than predict dose accurately. It must connect prediction, uncertainty, updating, and decision-making within a single framework. By separating PatientData, Model, Solver, Calibration, and Deci-sion, the proposed architecture makes it possible to improve individual components without losing the logic of the overall closed loop. The OpenKBP case study shows both the value and the present boundary of this approach. On one hand, the pro-totype provides a reproducible open-data implementation of uncertainty-aware dose prediction, proxy recalibration, and virtual-therapy evaluation. On the other hand, OpenKBP re-mains a static planning benchmark, so the calibration loop demonstrated here is necessarily an approximation rather than a direct replay of adaptive treatment using delivered-dose logs and repeat imaging. The present manuscript therefore does not claim a fully validated clinical digital twin. Instead, it offers a concrete pathway by which a benchmark dose-surrogate workflow can be extended toward a genuinely actionable digital-twin framework. Several limitations follow from that scope. The sequen-tial update step is a proxy mechanism based on decoder-only transfer learning rather than a full longitudinal update driven by on-treatment observations. Monte Carlo dropout provides a practical estimate of epistemic uncertainty, but it does not resolve the broader problem of calibration under anatomical change or distribution shift. TCP/NTCP are used as comparative utilities for ranking candidate actions, not as calibrated clinical outcome probabilities for this dataset. Future work should therefore proceed along two directions: IEEE Transactions on Radiation and Plasma Medical Sciences , VOL. XX, NO. X, MONTH 2026 60 5 10 15 20 25 30        
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Probability [%]
+> Adaptive Digital Twin:
+> Anatomical shift at fraction 10
+> Uncertainty increases after shift
+> Adaptations triggered by safety margin
+> State calibration reduces uncertainty
+> TCP/NTCP Evolution with Adaptive Re-planning
+> TCP
+> NTCP
+> NTCP Threshold (15%)
+> Anatomical Shift
+> Adaptations (5)
+> 0510 15 20 25 30
+> Fraction Number
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> 12
+> Uncertainty [%]
+> Final TCP: 4.7%
+> Final NTCP: 19.9%
+> Adaptations: 5
+> Epistemic Uncertainty (x) Evolution
+> Epistemic Uncertainty
+> Anatomical Shift
+> Adaptations (5)
+
+Virtual Therapy Adaptation Trajectory - Digital Twin Framework 
+
+Fig. 4. Illustrative proxy virtual-therapy adaptation trajectory. Top: surrogate TCP and NTCP objectives across 30 fractions with a simulated anatomical shift at fraction 10. Bottom: corresponding evolution of the epistemic uncertainty summary σ(x). The example demonstrates the response of the calibration and decision modules in a proxy experiment; it is not intended as a validated estimate of clinical outcome probabilities. 
+
+stronger technical evaluation on the open benchmark, includ-ing broader ablations and stronger uncertainty diagnostics, and translational validation on institutional longitudinal cohorts with delivered-dose logs, repeat imaging, and outcome-linked recalibration. VII. C ONCLUSION 
+
+This paper presented an actionable digital-twin framework for radiation-based imaging and therapy together with a repro-ducible OpenKBP-based prototype. The formulation combines a volumetric dose surrogate, Monte Carlo-dropout uncertainty quantification, proxy sequential recalibration, and constrained decision logic within a single modular workflow. In this way, it shows how an open benchmark for dose prediction can be extended toward the core requirements of a digital twin: updating, uncertainty awareness, and actionability. The present results, including cohort-wide OpenKBP benchmark evaluation, should still be interpreted at the level of a re-producible prototype rather than a completed clinical system, but they provide a technically grounded foundation for future institutional studies of adaptive and individualized radiation therapy. ACKNOWLEDGMENT 
+
+All authors declare that they have no known conflicts of interest in terms of competing financial interests or personal relationships that could have had an influence or are relevant to the work reported in this paper. REFERENCES [1] E. H. Glaessgen and D. S. Stargel, “The digital twin paradigm for future NASA and U.S. air force vehicles,” in 53rd AIAA/ASME/ASCE/AHS/ASC Structures, Structural Dynamics and Materials Conference , 2012. [2] A. Babier, B. Zhang, R. Mahmood, K. L. Moore, T. G. Purdie, A. L. McNiven, and T. C. Y. Chan, “OpenKBP: The open-access knowledge-based planning grand challenge and dataset,” Medical Physics , vol. 48, no. 9, pp. 5549–5561, 2021. [3] A. Babier and contributors, “ababier/open-kbp: Develop dose prediction models for knowledge-based planning in radiotherapy,” GitHub repository, 2026, accessed Mar. 14, 2026. [Online]. Available: https://github.com/ababier/open-kbp [4] C. Wu, E. A. B. F. Lima, C. E. Stowers, Z. Xu, C. Yam, J. B. Son, J. Ma, G. M. Rauch, and T. E. Yankeelov, “MRI-based digital twins to improve treatment response of breast cancer by optimizing neoadjuvant chemotherapy regimens,” npj Digital Medicine , vol. 8, no. 1, p. 195, 2025. [5] M. Kapteyn, A. Chaudhuri, E. A. B. F. Lima, G. Pash, R. Bravo, K. Willcox, T. E. Yankeelov, and D. A. Hormuth II, “TumorTwin: A python framework for patient-specific digital twins in oncology,” arXiv preprint arXiv:2505.00670, 2025. [Online]. Available: https: //arxiv.org/abs/2505.00670 IEEE Transactions on Radiation and Plasma Medical Sciences , VOL. XX, NO. X, MONTH 2026 7
+
+[6] A. F. I. Osman and N. M. Tamam, “Attention-aware 3d U-Net convolu-tional neural network for knowledge-based planning 3d dose distribution prediction of head-and-neck cancer,” Journal of Applied Clinical Medical Physics , vol. 23, no. 7, p. e13630, 2022. [7] Y. Gal and Z. Ghahramani, “Dropout as a bayesian approximation: Representing model uncertainty in deep learning,” in Proceedings of the 33rd International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 48. PMLR, 2016, pp. 1050–1059. [8] X. A. Li, M. Alber, J. O. Deasy, A. Jackson, K.-W. K. Jee, L. B. Marks, M. K. Martel, C. Mayo, V. Moiseenko, A. E. Nahum, A. Niemierko, V. A. Semenenko, and E. D. Yorke, “The use and qa of biologically related models for treatment planning: Short report of the TG-166 of the therapy physics committee of the AAPM,” Medical Physics , vol. 39, no. 3, pp. 1386–1409, 2012. [9] N. Wahl, P. Hennig, H.-P. Wieser, and M. Bangert, “Analytical proba-bilistic modeling of dose-volume histograms,” Medical Physics , vol. 47, no. 10, pp. 5260–5273, 2020.
