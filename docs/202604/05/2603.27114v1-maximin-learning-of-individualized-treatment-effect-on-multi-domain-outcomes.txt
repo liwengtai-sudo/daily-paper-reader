@@ -1,0 +1,841 @@
+Title: Maximin Learning of Individualized Treatment Effect on Multi-Domain Outcomes
+
+URL Source: https://arxiv.org/pdf/2603.27114v1
+
+Published Time: Tue, 31 Mar 2026 00:26:42 GMT
+
+Number of Pages: 38
+
+Markdown Content:
+# Maximin Learning of Individualized Treatment Effect on Multi-Domain Outcomes 
+
+## Yuying Lu ∗1, Wenbo Fei ∗1, Yuanjia Wang †1, and Molei Liu ‡2,3 1Department of Biostatistics, Columbia Mailman School of Public Health. 
+
+2Department of Biostatistics, Peking University Health Science Center. 
+
+3Beijing International Center for Mathematical Research, Peking University. 
+
+Abstract 
+
+Precision mental health requires treatment decisions that account for heterogeneous symptoms reflecting multiple clinical domains. However, existing methods for estimating individualized treatment effects (ITE) rely on a single summary outcome or a specific set of observed symptoms or measures, which are sensitive to symptom selection and limit generalizability to unmeasured yet clinically relevant domains. We propose DRIFT, a new maximin framework for estimating robust ITEs from high-dimensional item-level data by leveraging latent factor representations and adversarial learning. DRIFT learns latent constructs via generalized factor analysis, then constructs an anchored on-target uncertainty set that extrapolates beyond the observed measures to approximate the broader hyper-population of potential outcomes. By optimizing worst-case performance over this uncertainty set, DRIFT yields ITEs that are robust to underrepresented or unmeasured domains. We further show that DRIFT is invariant to admissible reparameterizations of the latent factors and admits a closed-form maximin solution, with theoretical guarantees for identification and convergence. In analyses of a randomized controlled trial for major depressive disorder (EMBARC), DRIFT demonstrates superior performance and improved generalizability to external multi-domain outcomes, including side effects and self-reported symptoms not used during training. 
+
+Keywords: Precision medicine; Adversarial learning; Item response data; Latent factor model; Mental disorders. 
+
+> ∗
+
+Lu and Fei contributed equally to this work. 
+
+> †
+
+Correspondence: yw2016@cumc.columbia.edu 
+
+> ‡
+
+Correspondence: moleiliu@bjmu.edu.cn 
+
+1
+
+> arXiv:2603.27114v1 [cs.LG] 28 Mar 2026
+
+# 1 Introduction 
+
+## 1.1 Background 
+
+Mental disorders pose challenges for precision medicine due to symptom heterogeneity and variability in patient responses. Unlike physical illnesses, often defined by clear biomarkers and objective measurements, the diagnosis of mental disorders relies on a broad spectrum of subjective symptoms, encompassing mental, cognitive, and somatic factors (Insel and Cuthbert, 2015). For instance, Major Depressive Disorder (MDD) is diagnosed based on nine core symptoms, which can manifest in over 200 distinct combinations. These diverse symptom profiles, often complicated by comorbidities, make the development of precise therapeutic strategies challenging and contribute to the low success rate of first-line treatments, with less than 50% of patients achieving remission (Gartlehner et al., 2011; McGrath et al., 2020). One barrier to improving treatment outcomes is the standard practice of relying on a single clinical summary to guide treatment decision-making. In mental health, treatment effects often vary across different symptom dimensions, sometimes presenting opposite effects on distinct domains (Maj et al., 2020). For example, Selective Serotonin Reuptake Inhibitors (SSRIs) effectively alleviate core depressive symptoms but are also associated with side effects such as sleep disturbances (Ferguson, 2001). Similarly, while antipsychotic medications may reduce hallucinations in schizophrenia, they frequently cause metabolic side effects, including significant weight gain and increased diabetes risk (Ballard and Zarate Jr, 2020). Antipsychotic medications, which may reduce hallucinations and delusions in schizophrenia, frequently cause metabolic side effects, including significant weight gain and increased diabetes risk (Tschoner et al., 2007; Marino et al., 2015). Relying on a single summary outcome for treatment decision-making may improve one symptom domain but harm another. Thus, it is essential to obtain reliable, generalizable estimates of the treatment effect across multiple 2outcome domains and latent factors to enable individualized, effective care in mental health. 
+
+## 1.2 Related Literature 
+
+Statistical methodology for estimating Individualized Treatment Effects (ITE) has advanced significantly with the development of machine learning approaches such as causal trees (Athey and Imbens, 2016), causal forests (Wager and Athey, 2018), and meta-learners (Künzel et al., 2019; Nie and Wager, 2021; Curth and Van der Schaar, 2021; Kennedy, 2023a). However, these methods predominantly focus on a single scalar outcome, which is insufficient for the multifaceted nature of mental disorders. While multivariate regression can incorporate multiple observed outcomes, high-dimensional and subjective symptom data in psychiatry are more effectively modeled using latent variable models and factor analysis (Moustaki and Knott, 2000; Muthén, 2002). In this context, Item Response Theory (IRT) and generalized factor models are widely used to identify underlying constructs from categorical symptoms (Embretson and Steven, 2000; Reise and Waller, 2009), with recent advances extending these to high-dimensional settings via joint maximum likelihood estimation (Chen et al., 2019; Zhang et al., 2020). To inform treatment decision-making with multi-domain outcomes, existing approaches often aggregate sub-domain outcomes into a single global measure using fixed weights. For instance, recent works have proposed preference-sensitive aggregation (Butler et al., 2018; Luckett et al., 2021) or composite outcomes (Chen et al., 2020, 2021) to learn individualized treatment rules. Also, Nwankwo et al. (2024) proposed a reduced-rank multi-objective policy learning method leveraging low-dimensional representations of the outcomes. However, these approaches assume a fixed aggregation function, thereby ignoring unobserved or infrequently observed outcomes that could yield a “worst-case” ITE. This is a critical limitation in risk-sensitive clinical settings, calling for more generalizable methods (Cinelli et al., 2025). 3This challenge relates to the growing literature on maximin effects and distributionally robust learning (DROL), which seeks to optimize performance under the worst-case shift in data distribution (Meinshausen and Bühlmann, 2015; Sagawa et al., 2019; Wang et al., 2023, e.g.). While such adversarial learning frameworks have been applied to ITE and policy learning to address heterogeneity across data sources (Shi et al., 2018; Zhang et al., 2024), they have not been adapted to balance trade-offs across latent symptom domains. These methods optimize over the convex hull of multiple observed outcomes, which is often overly conservative and, more importantly, problematic if the measured symptoms are a “biased” subset of the full symptom spectrum. By restricting optimization to observed items, this strategy fails to generalize to unmeasured but relevant domains that exist within the full “hyper-population” of symptoms (see Section 2.5). 
+
+## 1.3 Our Contribution 
+
+To address the limitations of using a single outcome for treatment optimization in mental health, we propose the multi-Domain Robust estimation of Individualized and Factorized Treatment effect (DRIFT) framework. This approach leverages generalized factor analysis to identify latent disease constructs from multi-dimensional symptom data and constructs an “on-target” set of clinically plausible outcomes anchored by a Global Evaluation Outcome (GEO). By optimizing the worst-case predictive performance across this set, DRIFT ensures that the estimated treatment effects are stable and balanced across diverse symptom domains. Our main contributions can be summarized as follows. 
+
+Novel Framework: We propose a maximin learning framework that extrapolates the GEO-anchored uncertainty set in latent space to account for unmeasured or underrepresented clinical symptoms. Unlike standard group maximin regression methods deterministically restricted to the empirical convex hull of observed symptom outcomes, this GEO-guided 4extrapolation renders the solution distributionally robust to variability in observed symptom coverage. It also yields a more generalizable ITE estimate by recovering the full spectrum of potential symptoms, thereby protecting DRIFT against failures within clinical domains underrepresented in the observed data. 
+
+Convenient Estimation Procedures with Theoretical Guarantees: We provide a computationally efficient, three-step algorithm for identifying the optimal treatment effect estimator. We establish that our maximin problem admits a closed-form solution and prove the consistency of the resulting estimator. Crucially, we show that our estimator is not affected by the inherent non-identifiability of latent factor models, remaining invariant to their rotational indeterminacy. 
+
+Enhanced Clinical Generalizability in Real World: We demonstrate the practical utility of DRIFT through an analysis of the EMBARC (Trivedi et al., 2016) randomized controlled trial for Major Depressive Disorder (MDD). Our results show that DRIFT achieves superior generalizability to external multi-domain outcomes (e.g., side effects and self-reported symptoms) not used during model training, highlighting its potential to prevent the neglect of critical clinical factors. 
+
+## 1.4 Outline of the Paper 
+
+We introduce the key concepts and set up the DRIFT framework in Section 2. Based on this, we develop an estimation method for our proposal in Section 3 and justify its theoretical properties in Section 4. In Section 5, we conduct extensive simulation studies to evaluate the finite-sample performance of DRIFT and compare it with existing approaches. In Section 6, we apply DRIFT to analyze the real-world data collected from a clinical trial studying the treatment effect heterogeneity of Sertraline on major depressive disorder (MDD). In Section 7, we conclude the paper with a discussion. Technical proofs of the theoretical results and 5additional numeric results are provided in the Supplementary Material. 
+
+# 2 Conceptual Framework 
+
+## 2.1 Problem formulation 
+
+Let X = ( X1, · · · , X p) denote baseline covariates and treatment effect moderators of the outcomes to be introduced next. Suppose K latent factors underlie a subject’s overall mental health status. Let Z(a) = ( Z(a)1 , . . . , Z (a) 
+
+> K
+
+) denote the potential outcomes of these latent factors after receiving treatment A = a ∈ { 0, 1}, where Z(a) 
+
+> k
+
+∈ R, k = 1 , . . . , K represents the kth latent variable. Let Y(a) = ( Y (a)1 , . . . , Y (a) 
+
+> J
+
+) denote the potential outcomes of the observed multi-domain symptom measures after receiving treatment a, where Y (a) 
+
+> j
+
+represents the jth symptom and it can be discrete or continuous. While the latent factors are not explicitly observed, each measured symptom, e.g., item responses from the Hamilton Rating Scale for Depression (HAM-D), is a partial manifestation of the subject’s underlying latent states, e.g., depression severity, general anxiety level, and psychotic propensity. Typically, the total number of observed outcomes J is much larger than the number of latent factors K.We assume that (C.1) measurement conditional independence : Y(a) is independent of 
+
+(A, X) conditional on Z(a); and (C.2) measurement invariance : the conditional distributions of Y(1) | Z(1) and Y(0) | Z(0) are the same. (C.1) implies that baseline covariates X and treatment A affect the observed outcomes Y only through the latent factors in Z. (C.1) and (C.2) are commonly used on item response data from clinical studies of mental health (Harman, 1976; Lohr, 2002; Chen et al., 2021). Additionally, we assume (C.3) randomized treatment assignment : A ⊥ (X, Z(0) , Z(1) , Y(0) , Y(1) ); and (C.4) stable unit treatment value assumption (SUTVA) : Y = Y(a) and Z = Z(a) when A = a. (C.3) could be replaced by the weaker no unmeasured confounding assumption (Z(a), Y(a)) ⊥ A | X in observational studies 6(see Section 3.4). We introduce the following generalized factor model where Y (a)1 , . . . , Y (a)
+
+> J
+
+are conditionally independent given Z(a) and satisfy that for a ∈ { 0, 1},
+
+E[Y (a) 
+
+> j
+
+|Z(a) = z] = g−1 
+
+> j
+
+(z⊤αj − ζj ). (1) Here, each Y (a) 
+
+> j
+
+is associated with a linear function of the latent factors Z(a) through the coefficient αj ∈ RK , the intercept ζj ∈ R and some known link function gj (·) that monotonically increases. Also, assume the potential outcomes of the latent factors Z(a) follow that: 
+
+Z(a) = f (a)(X) + ϵ(a), (2) where the vector function f (a) = ( f (a)1 , . . . , f (a) 
+
+> K
+
+) encodes the treatment response models of 
+
+Z(a), and ϵ(a) are random components being mean-zero and independent of X.
+
+## 2.2 Factorized outcomes and ITE 
+
+We define the class of latent factor representations as H := {z 7 → γ⊤z − ζ | γ ∈ RK , ζ ∈ R},which contains all linear functions of the K-dimensional latent factors. For any observed clinical symptom Y , we define its best latent representation in H, denoted by ϕY (z), as the minimizer of the population expected loss: 
+
+ϕY (z) := γ⊤ 
+
+> Y
+
+z − ζY = arg min 
+
+> ϕ∈H
+
+EℓY (Y, ϕ (Z)) .
+
+The loss function ℓY (y, u ) is assumed to be convex with respect to u and specified based on the type of outcomes: for continuous Y , we use the squared error ℓY (y, u ) = ( y − u)2; for binary Y , we use the negative log-likelihood ℓY (y, u ) = −yu + log (1 + exp (u)) . We further provide the choice of the link and loss functions for ordinal item responses with multiple 7categories in Appendix. Under assumptions (C.1) through (C.4) and the factor model (1) for each observed item Yj , these choices ensure that ϕYj (z) = gj (E[Yj | Z = z]) = z⊤αj − ζj ,with the link gj (u) = u for continuous Yj and gj (u) = log {u/ (1 − u)} for binary Yj .To quantify the deviation of any candidate linear representation ϕ(z) from a specific outcome Y , we define the excess loss as 
+
+dY (ϕ) = E [ℓY (Y, ϕ (Z))] − E [ℓY (Y, ϕ Y (Z))] . (3) This non-negative metric serves as a distance measure and will be used to construct a set of clinically plausible outcomes to be defined later. For binary Y , dY (ϕ) is equivalent to the expectation of the Kullback–Leibler (KL) divergence between the Bernoulli distributions with success probabilities expit( ϕY (Z)) and expit( ϕ(Z)) where expit( u) = eu/(1 + eu).In application fields like psychiatry and psychology, the ITE on any factorized outcome 
+
+ϕ(Z) for a subject with baseline covariates x is typically defined as: 
+
+τϕ(x) : = E ϕ(Z(1) ) − ϕ(Z(0) ) | X = x = γ⊤
+
+
+
+f (1) (x) − f (0) (x)
+
+
+
+, (4) with f (a)(x) = EZ(a) | X = x. In this work, we consider a linear model for the treatment effect f (a)(X) = Λ(a)X, Λ(a) ∈ RK×p. The framework readily extends to nonlinear models. To ensure that the weights in model (4) are clinically interpretable, we leverage a one-dimensional Global Evaluation Outcome (GEO), denoted by O, that captures the overall effectiveness of an intervention. For example, the Clinical Global Impression (CGI) Scale is routinely collected in mental health studies (Busner and Targum, 2007), used as the GEO to assess overall improvement of a patient. When O is observed or well-defined by domain 8knowledge, we define the factorized GEO representation as: 
+
+ϕGEO (z) := γ⊤
+
+> GEO
+
+z − ζGEO = arg min 
+
+> ϕ∈H
+
+E ℓO
+
+ O, ϕ (Z) , (5) and the corresponding ITE function as τϕGEO (x) = EϕGEO (Z(1) ) − ϕGEO (Z(0) ) | X = x. In the absence of such a GEO, we propose a minimax strategy to obtain ϕGEO as the “center” of the observed responses Yj ’s (see Section 3.2). 
+
+## 2.3 On-target set of factorized outcomes 
+
+In precision mental health, accounting for symptoms and outcomes across multiple domains is crucial to guide treatment decisions. Overlooking an important domain can lead to suboptimal or ineffective decisions. Although the GEO-oriented factorized representation ϕGEO and ITE function τϕGEO are clinically informative, they remain tied to specific observed outcomes, thus lack generalizability to capture the full spectrum of multi-domain outcomes in mental disorders. Therefore, it is essential to maintain a robust and balanced characterization of the ITE across a diverse array of outcomes represented by latent factors Z. For this purpose, we introduce a key concept called the on-target set of representation: 
+
+Φ( δ) = {ϕ | dO(ϕ) ≤ δ, ϕ ∈ H} , (6) where dO(·) denotes the excess loss for the GEO response as defined in (3) (replacing Y with 
+
+O), and δ ≥ 0 is a radius parameter controlling the allowable deviation in representing GEO among the candidate representations included in Φ( δ). Each factorized outcome ϕ(Z), with 
+
+ϕ ∈ Φ( δ), constitutes a clinically meaningful aggregation of the underlying latent factors, anchored by ϕGEO (Z) yet distinct from it. A small δ restricts consideration to outcomes very similar to ϕGEO (Z) while a larger δ allows a broader range of factorized outcomes. 9Correspondingly, we define the set of aggregation weights associated with ϕ ∈ Φ( δ) as: 
+
+Γ( δ) = 
+
+
+
+γ min  
+
+> ζ∈R
+
+{dO(ϕ) | ϕ : z 7 → γ⊤z − ζ} ≤ δ, γ ∈ RK
+
+
+
+. (7) When δ = 0 , the uncertainty set collapses to a single clinical anchor (GEO), simplifying the approach to a classical estimator that considers a fixed weight γGEO (Figure 1a). As δ
+
+increases, the set expands to a latent neighborhood surrounding the GEO. Clinically, this expanded “on-target” set captures a comprehensive spectrum of relevant outcomes that may be unmeasured or underrepresented in the observed Y1, . . . , Y J , such as individual symptoms reported in HAM-D or burden of side effects (Figure 1b). Further geometric interpretations of GEO-anchored extrapolation are provided in Section 2.5 and our real-world study. 
+
+## 2.4 Maximin framework 
+
+We now introduce a novel maximin framework for estimating ITE that achieves stable, bal-anced predictive performance across a range of symptom representations in Φ( δ). This enables a generalizable evaluation of treatment effects and more reliable treatment recommendations. For any factorized representation ϕ(z) = γ⊤z − ζ and a learner τ (x) belonging to some prespecified model space F, we introduce the reward function 
+
+Rϕ (τ ) := E
+
+h ϕ(Z(1) ) − ϕ(Z(0) )2 −  ϕ(Z(1) ) − ϕ(Z(0) ) − τ (X)2i
+
+=E
+
+h τϕ(X)2 −  τϕ(X) − τ (X)2i
+
+.
+
+This quantity measures how much of the variation in the ITE function τϕ(x) (defined in (4) )is captured by the candidate estimator τ (x). A higher value of Rϕ (τ ) indicates that τ (x)
+
+better predicts ITE on the factorized outcome ϕ(Z). To obtain a robust characterization of 10 (a) Geometry of aggregation weights in the latent space ( Z1, Z 2). {αi}3 
+
+> i=1
+
+(observed), {αi}5 
+
+> i=4
+
+(un-observed) loading vectors representing the specific multi-domain outcomes. The pink quadrangle is the convex hull of the observed outcomes, over which standard maximin methods optimize. It yields the “observed-only” solution γobs . γGEO (or-ange arrow)is the GEO aggregation weight, serv-ing as the clinical anchor. Γ( δ) (shaded ellipses) denotes the robust “on-target” uncertainty sets with radius δ, encompassing weights close to γGEO .
+
+γDRIFT denotes the optimal weight of DRIFT es-timator, which balances performance over Γ( δ)
+
+rather than only the observed hull. ... 
+
+... 
+
+> Factor 2
+> Factor 1
+> .
+> GEO
+> mood
+> anxiety
+> insomnia
+> suicidal
+> ideation
+> loss
+> interest
+> agitation
+> retardation
+> feel guilty
+> memory
+> loss weight
+> loss
+> On-target
+> set
+
+(b) Clinical Interpretation of the On-Target Set: Mapping of the geometric uncertainty set to clinical domains. GEO (Center): The global improvement measure (e.g., CGI). On-target set of outcomes (Blue Circle): The set of clinically plausible out-comes extrapolated from the GEO. Unlike the sparse observed data, this set captures unmeasured but relevant domains residing in the GEO’s latent neighborhood, ensur-ing the treatment effect is robust to these overlooked factors. 
+
+Figure 1: Illustration of the DRIFT Framework and Concepts. the ITE over all on-target factorized representations in Φ( δ) defined in (6) , we propose a maximin optimization to obtain the estimator that maximizes the worst-case reward Rϕ (τ ):
+
+τ ∗ := arg max  
+
+> τ∈F
+
+min  
+
+> ϕ∈Φ( δ)
+
+Rϕ (τ ) , (8) which we call the multi-Domain Robust estimator of the Individualized and Factorized Treatment effect (DRIFT). This formulation is an adversarial learning problem that pursues a balance (Nash equilibrium) between the ITE function τ and the representation ϕ. At this equilibrium, the solution τ ∗ achieves a stable prediction performance over all representations in Φ( δ) in the sense that it maximizes the worst-case ITE prediction performance. We will 11 also demonstrate in Proposition 1 that optimizing the worst-case reward Rϕ (τ ) leads to the optimal individualized treatment regime for the outcome ϕ(Z) under certain conditions. Leveraging Sion’s Minimax Theorem (Sion, 1958), Theorem 1 establishes that problem (8) has an explicit-form solution formed as a weighted combination of the latent-factor-wise ITE functions τk : k ∈ [K] := f (1)  
+
+> k
+
+− f (0)  
+
+> k
+
+: k ∈ [K] .
+
+Theorem 1 (Identification) Suppose the function class F is convex with τk ∈ F for 
+
+k ∈ [K], then τ ∗ defined in (8) is identified as: 
+
+τ ∗(x) = 
+
+> K
+
+X
+
+> k=1
+
+γ∗ 
+
+> k
+
+τk(x) with γ∗ = arg min 
+
+> γ∈Γ( δ)
+
+γ⊤Ξγ, (9) 
+
+where Ξk,l = E[τk(X)τl(X)] for k, l ∈ [K].
+
+Theorem 1 implies a straightforward way to compute the maximin ITE function τ ∗. In particular, when the ITE function τk for each latent factor Zk is available, one only needs to solve the quadratic programming problem in (9) to obtain the optimal adversarial weights 
+
+γ∗. The final estimator is then formed by linearly aggregating τk’s. This result shares a similar spirit with the group maximin regression (Meinshausen and Bühlmann, 2015) aiming to combine models from multiple sources through adversarial learning, with its solution being some convex combination of the source-specific models. Interestingly, the strategy of linearly aggregating informative latent factors has been widely used to address multi-domain outcomes in areas such as mental health (Qiu et al., 2018). An advantage of such linear ITE functions is that they provide a straightforward interpretation, with the linear weights quantifying the relative contributions of the latent factors to the aggregated model. Also, it facilitates easy implementation of decision rules in clinical practice. 
+
+Remark 1 In our framework, it is essential to define the on-target set Φ( δ) in (8) using the low-dimensional representation Z instead of applying linear combinations directly to the 
+
+12 original outcomes Y . First, the original outcomes may have different distributional types and scales, whereas the GEO-guided on-target factorized outcome subspace {ϕ(Z) | ϕ ∈ Φ( δ)} is free of these issues because it is invariant to any scaling or rotation of Z (Proposition 2). Second, using Z effectively overcomes the high-dimensionality and measurement noise of Y .
+
+## 2.5 Geometric interpretation of GEO-anchored extrapolation 
+
+In clinical practice, the full spectrum of potential symptoms constitutes a “hyper-population” of outcomes, whereas any given study collects only a subset determined by its design. As a concrete example, in the clinical trial of major depressive disorder (MDD; Section 6), mania-related symptoms (e.g., feeling unusually euphoric or energized, talking more than usual, having a flood of exciting ideas) are not represented in the Hamilton Depression Rating Scale (HAM-D), a primary outcome in many MDD studies. As a result, ITE estimators based only on observed outcomes may overlook underrepresented domains and be sensitive to the particular symptoms included in the study. Interestingly, DRIFT overcomes these limitations through the GEO-anchored extrapolation strategy. The geometric interpretation involves two main aspects: 
+
+The GEO-anchored set Γ( δ) reduces algorithmic sensitivity: Group maximin methods (Meinshausen and Bühlmann, 2015) were originally developed for regression on a common outcome across multiple data sources. In analogy to this strategy, under our setting, the “observed-only” maximin approach ( Obs Maximin ) constrains its uncertainty set to the convex hull of aggregation weights for all the observed factorized outcomes (pink triangle in Figure 1a). It yields an estimator γobs that could be highly sensitive to a subset of outcomes from the hyper-population measured in some specific study. In contrast, DRIFT optimizes over a GEO-anchored robust region Γ( δ) that recovers the “hyper-population” of outcomes. As illustrated in Figure 1a, introducing unobserved weights (e.g., α4 and α5) can significantly 13 reshape the convex hull of the observed outcomes’ representation while only mildly perturbing 
+
+Γ( δ), yielding a more stable solution γDRIFT .
+
+Extrapolation enhances generalizability: Confined to the convex hull of observed outcomes, the observed-only method generalizes poorly to underrepresented or unmeasured clinical outcomes. For instance, if observed symptoms preferentially load on latent factor 
+
+Z2 over Z1 (Figure 1a), the resulting ITE estimators overlook treatment effects operating through Z1. Consequently, it fails to detect beneficial effects on unmeasured symptoms or adverse side effects hidden within underrepresented latent dimensions. DRIFT mitigates these failures by extrapolating to the larger and more comprehensive “hyper-population”, thereby accounting for plausible outcomes in underrepresented domains. This yields a more generalizable characterization of treatment effects. We validate this advantage empirically in the HAM-D study (Section 6), where the observed-only method suffers from failures in the underrepresented mania domain, whereas DRIFT maintains robustness. We also note that defining the uncertainty set via the excess loss dO ensures that our ITE estimator is invariant to the rotational indeterminacy of the latent factors Z. The uncertainty set of the Obs Maximin method is defined strictly on the coordinates of estimated loadings of the observed items, which may require more assumptions, e.g. the varimax criterion (Kaiser, 1958), to ensure proper interpretation and identification. Free from this issue, DRIFT remains well-defined even when the “true” underlying Z is not identifiable (see Proposition 2). 
+
+# 3 Estimation Method 
+
+## 3.1 Generalized factor analysis 
+
+Suppose that for subject i ∈ { 1, . . . , N }, we observe baseline covariates xi = ( xi1, . . . , x ip ) ∈
+
+Rp, received treatment ai ∈ { 0, 1} and multi-domain outcomes yi = ( yi1, . . . , y iJ ) ∈ RJ .14 Denote the unobserved latent factors as zi = ( zi1, . . . , z iK ) ∈ RK . In (10), we introduce the constrained joint maximum likelihood estimation (CJMLE) approach (Chen et al., 2019): 
+
+bzi, bαj , bζj : i ∈ [N ], j ∈ [J] = arg min  
+
+> zi,αj,ζ j
+> J
+
+X
+
+> j=1
+> N
+
+X
+
+> i=1
+
+ℓYj (yij , α⊤ 
+
+> j
+
+zi − ζj ),s.t. 1 + ∥zi∥2 ≤ C2, ζ2 
+
+> j
+
++ ∥αj ∥2 ≤ C2, ∀i ∈ [N ], j ∈ [J], (10) where {ℓYj (·, ·) : j ∈ [J]} are loss functions for the observed outcomes Yj ’s as defined in Section 2.2 and C > 0 is a pre-specified regularization parameter, set as 5√K in our numerical studies. In practice, the latent space dimension K can be chosen based on expert knowledge or information criterion. To optimize (10), we adopt the alternating minimization procedure described in Appendix, with the constrained optimization problem handled by projected gradient descent. With the observed (xi, a i) and the latent factors bzi estimated by (10), we then learn 
+
+bf (a)
+
+= ( bf (a)1 , . . . , bf (a) 
+
+> K
+
+) ( a ∈ { 0, 1}) as estimates of the treatment response functions defined in (2). This is a standard regression problem, where both traditional methods (e.g., linear regression) and machine learning methods (i.e., neural networks) can be used. Because the latent bzi’s are only identifiable up to an invertible rotation and a constant shift, bf (a)
+
+(and, accordingly, bτk = bf (1)  
+
+> k
+
+− bf (0)  
+
+> k
+
+) can be consistent with f (a) in (2) (and τk = f (1)  
+
+> k
+
+− f (0)  
+
+> k
+
+) up to corresponding reparameterizations. Consequently, the empirical estimators bzi and bτk can be directly used to solve the downstream maximin problem (see Proposition 2). 
+
+## 3.2 Constructing the on-target set 
+
+Construction of the on-target set Γ( δ) requires specifying the GEO representation ϕGEO ∈ H 
+
+and selecting the radius parameter δ. The representation ϕGEO serves as the “center” of Γ( δ).Let oi denote the GEO of subject i. When the GEO is available in the data, we solve the 15 empirical version of (5) to obtain bϕGEO (z) = bγ⊤
+
+> GEO
+
+z − bζGEO as an estimate of ϕGEO (z).When GEO is unobserved, we propose to learn bϕGEO as the center of the observed outcomes’ representations bϕYj (z) = bα⊤ 
+
+> j
+
+z − bζj : j ∈ [J] . Specifically, we solve the minimax problem: 
+
+bϕGEO = arg min 
+
+> ϕ∈H
+
+max 
+
+> j∈[J]
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+ ϕ(bzi) − bϕYj (bzi)2, (11) which minimizes the largest distance to the factors of all observed outcomes to find their center. For this problem, one can again invoke Sion’s Minimax Theorem (Sion, 1958) to derive an explicit-form solution (see Theorem 1). Note that problem (11) coincides with the group min-max regret framework proposed by Mo et al. (2024). However, an important difference is that we use the solution of (11) as an anchor, or center, for constructing the on-target uncertainty set rather than using it as the final estimator. The radius parameter δ determines the size of the uncertainty set for the maximin problem (8). If δ is too small, the on-target set may become overly restrictive, limiting the generalizability of DRIFT to those outcomes nearly identical to the GEO. Conversely, if δ is too large, the set may include outcomes that are not clinically meaningful or relevant, leading to overly conservative solutions. To achieve a balanced trade-off, we recommend setting the radius parameter as δ† = min 
+
+n
+
+max j∈[J] bdO(bϕYj ), 0.95 min ζ∈R bdO(ζ)
+
+o
+
+, where 
+
+bdO(ϕ) := 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+h
+
+ℓO(oi, ϕ (bzi)) − ℓO(oi, bϕGEO (bzi)) 
+
+i
+
+denotes the empirical excess loss operator of the GEO O as defined in (3). Note that even without the observation of O, one can still compute bdO with bϕGEO obtained by (11) because 
+
+O can be replaced by its conditional expectation specified by bϕGEO (Z) under the generalized factor model. This threshold δ† is selected to be large enough to encompass the observed 16 factorized outcomes, thereby addressing the limited observed symptom coverage illustrated in Section 2.5. In addition, δ† is bounded by 0.95 min ζ∈R bdO(ζ) to ensure that our robust estimator does not degenerate to a null model. The on-target set for aggregation weights of the factorized outcomes is constructed as bΓ(δ†), where bΓ(δ) denotes the empirical on-target set obtained from (7) by replacing dO with its empirical estimate bdO.
+
+## 3.3 Maximin estimation 
+
+We now combine the components from the previous sections to compute the DRIFT estimator. Our goal is to empirically estimate the maximin-optimal ITE function τ ∗ defined in (8), which achieves robust performance on the data-driven on-target set. Following Theorem 1, we solve the quadratic optimization problem: 
+
+bγ = arg min 
+
+> γ∈bΓ( δ)
+
+γ⊤ bΞγ, where bΞ = ( bΞk,l )K×K , bΞk,l = N −1
+
+> N
+
+X
+
+> i=1
+
+bτk (xi) bτl (xi) , (12) and derive the final estimator for τ ∗ as bτ (x) = PKk=1 bγk bτk(x). In practice, the radius parameter 
+
+δ used in (12) is recommended as δ† introduced in Section 3.2. The complete procedure for obtaining the DRIFT estimator is outlined in Algorithm 1. 
+
+Algorithm 1 Empirical estimation procedures for DRIFT.  
+
+> 1:
+
+Input : Data {xi, yi, o i}Ni=1 and latent dimension K. 
+
+> 2:
+
+Step 1: Solve (10) (with C = 5 √K) to obtain latent factors {bzi}Ni=1 and ITE estimators 
+
+{bτk}Kk=1 . 
+
+> 3:
+
+Step 2: Obtain bγGEO , bζGEO , δ † as described in Section 3.2.  
+
+> 4:
+
+Step 3: Solve bγ according to (12) with δ = δ†. 
+
+> 5:
+
+Output : bτ (x) = PKk=1 bγk bτk(x).The DRIFT estimator also yields an individualized treatment rule (ITR), bπ(x) := I{bτ (x) >
+
+0}, which assigns treatment whenever our distributionally robust predictor for the effect is positive. As shown in Proposition 1, this decision rule corresponds to the optimal regime 17 under the maximin criterion for centered Gaussian covariates X and linear f (a), a = 0 , 1.
+
+Proposition 1 Suppose X follows a centered Gaussian distribution, then we have 
+
+τ ∗ ∈ arg max  
+
+> τ∈F
+
+min  
+
+> γ∈Γ( δ)
+
+E γ⊤(Z(1) − Z(0) ) · I (τ (X) > 0)  ,
+
+where F is the linear function class. That is, the decision rule induced by the DRIFT estimator (i.e., I (τ ∗(x) > 0)) corresponds to the optimal Individualized Treatment Rule (ITR) that maximizes the worst-case expected reward over the on-target (uncertainty) set. 
+
+The optimal ITR characterized in Proposition 1 shares underlying technical similarities with the Maximin Projection Learning (MPL) framework proposed by Shi et al. (2018), particularly in utilizing a Gaussian design to establish a theoretical equivalence that facilitates the study of the estimator. 
+
+## 3.4 Observational Studies 
+
+In real-world applications, treatment assignments are often non-randomized. To properly adjust for confounding and estimate treatment effects in such observational settings, one could employ a two-stage doubly robust procedure (DR-Learner) adapted from (Kennedy, 2023b). After obtaining latent estimators {bzi}Ni=1 in Section 3.1, we randomly divided the set of N observations D := {xi, a i, bzi}Ni=1 evenly into two disjoint sets D1, D2 with an equal size 
+
+[N/ 2] . Then we apply the DR-Learner method as follows: 
+
+Stage 1: Nuisance training: Construct estimates of two nuisance functions using D1: (i) 
+
+bs of the propensity scores s, where s(x) = P(A = 1 | X = x); (ii) (bf (0) 
+
+, bf (1) 
+
+) of the latent outcome regression functions (f (0) , f (1) ).18 Stage 2: Pseudo-outcome regression: Construct the latent pseudo-outcome: 
+
+bφ(Z) = A − bs(X)
+
+bs(X)[1 − bs(X)] 
+
+Z − f (A)(X) + bf (1) 
+
+− bf (0) 
+
+(13) and regress it on covariates X in the holdout sample D2, yielding bτ dr (x) = bE[ bφ(Z) | X = x].The k-th element bτdr,k (x) is then used as the factor-wise treatment effect estimation, which serves as the input of (12) for computing the final maximin estimator. 
+
+# 4 Theoretical Properties 
+
+Let ∥M∥F =  P Ni=1 
+
+PJj=1 M 2 
+
+> ij
+> 1/2
+
+be the Frobenius norm of a matrix M ∈ RN ×J and denote the smallest and largest eigenvalues of a squared matrix Ξ as λmin (Ξ), λ max (Ξ), respectively. We use ∥u∥2 to denote the ℓ2-norm of vector u. For positive sequences a(n), b (n), use 
+
+a(n) ≲ b(n) when there exists some universal constant c ≥ 0 such that a(n) ≤ cb (n) for all 
+
+n ≥ 1, and a(n) ≲P b(n) for a(n) ≲ b(n) with the probability approaching one. 
+
+## 4.1 Identifiability 
+
+Before proceeding, we address the identification issue caused by the latent factor Z in the generalized factor model (1) . Note that model (1) is invariant under any affine transfor-mations of Z. Consequently, the unobserved Z is identifiable only up to an admissible reparameterization ˜Z = QZ + μ, where Q ∈ RK×K is invertible and μ ∈ RK . Despite the non-identifiability of Z, the core components of our framework remain intrinsic to the data and invariant to the choice of latent representation. Specifically, it is straightforward to verify that for any admissible reparameterization ˜Z, the induced optimal factorized outcome for any given response Y , including GEO, is identical to ϕY (Z) obtained with the original Z. This invariance of the optimal factorized outcomes guarantees that the proposed maximin ITE 19 estimator is well-defined, as formally stated in Proposition 2. 
+
+Proposition 2 (Invariance of DRIFT to Latent Reparameterization) Let ˜Z = QZ +
+
+μ be any admissible reparameterization of Z. For any ϕ ∈ H , any response Y and any radius 
+
+δ ≥ 0, we define the induced quantities as ˜Rϕ, ˜ϕY , ˜dY and ˜Φ (δ) by replacing Z with ˜Z in their respective definitions. The resulting DRIFT function ˜τ ∗ := arg max τ ∈F min γ∈˜Γ( δ) ˜Rϕ(τ ) is identical to the original τ ∗ in (8) with the same radius δ. Notably, setting δ = 0 establishes the invariance of the ITE for the GEO. 
+
+## 4.2 Estimation Consistency 
+
+We now establish the convergence of the ITE estimator proposed in Section 3.3 under an asymptotic regime in which both the number of subjects N and the number of items J
+
+diverge ( N, J → ∞ ), while the latent dimension K remains fixed. We further assume that the treatment and control sample sizes N1 and N0 satisfy min {N1, N 0} ≍ N . Let U∗ =[z1 · · · zN ]⊤ ∈ RN ×K denote the matrix of true latent factors, and W∗ = [ α1 · · · αJ ]⊤ ∈ RJ×K
+
+represent the loading matrix, with the intercept vector ζ∗ = ( ζ1, . . . , ζ J ) ∈ RJ . Denote 
+
+( bU, cW, bζ) as the corresponding solution to the empirical problem (10). Suppose the treatment effect model (2) admits a linear form: f (a)(X) = Λ(a)X, Λ(a) ∈
+
+RK×p for a = 0 , 1. Let B∗ = [ β1 · · · βK ] := ( Λ(1) − Λ(0) )⊤ ∈ Rp×K denote the matrix of the true factor-wise linear effect parameters. Then, the factor-wise ITE function is given by τk(x) = f (1)  
+
+> k
+
+(x) − f (0)  
+
+> k
+
+(x) = β⊤ 
+
+> k
+
+x, for k ∈ [K]. We let bB = [ bβ1 · · · bβK ] ∈ Rp×K denote the estimator of B∗ obtained by linearly regressing the recovered latent outcomes bU on the covariates. Although this analysis primarily addresses the linear case, extensions to non-linear ITE models are feasible. We rely on some regularity and non-singularity assumptions to guarantee the convergence of bU, cW and bB, up to some invertible rotation and scaling. 20 Assumption 1 The generalized factor model is correctly specified in problem (10) , i.e., the true model parameters and latent factors satisfy that p1 + ∥zi∥22 ≤ C, ∀i ∈ [N ] and 
+
+q
+
+ζ2 
+
+> j
+
++ ∥αj ∥22 ≤ C, ∀j ∈ [J], where C is the boundary of the feasible set used in (10) .
+
+Assumption 2 There exist constants L, B > 0 such that for all j ∈ [J] and y in the domain of Yj , (i) Strong convexity and smoothness: B−1 ≤ ∂2ℓYj (y, ϕ )/∂ϕ 2 ≤ B, ∀ϕ ∈ [−C2, C 2]; (ii) Lipschitz continuity: |∂ℓ Yj (y, ϕ )/∂ϕ | ≤ L, ∀ϕ ∈ [−C2, C 2].
+
+Assumption 3 For any response Y ∈ { Y1, · · · , Y J , O } and ϕ ∈ [−C2, C 2], the centered loss process LY (ϕ) := ℓY (Y, ϕ ) − E[ℓY (Y, ϕ )] satisfies either (i) or (ii): (i) Boundedness: |L Y (ϕ)| ≤ B′ for some constant B′ > 0;(ii) Sub-exponential: There exist ν, α > 0 such that E[eλLY (ϕ)] ≤ eλ2ν2/2 for all |λ| < 1/α .
+
+Assumption 4 There exist some constant σ > 0 such that for a ∈ { 0, 1}, λmin 
+
+ Z(a)(Z(a))⊤ ≥
+
+σ−1, λmin 
+
+ J−1W∗⊤ W∗ ≥ σ−1, σ−1 ≤ λmin (Σ) ≤ λmax (Σ) ≤ σ, λmax 
+
+ E[ϵ(a)(ϵ(a))⊤] ≤ σ,where Σ := E[XX ⊤] denotes the second-moment of the covariates X and ϵ(a) is the noise term in model (2) .
+
+Assumption 1 guarantees that the estimator from the constrained optimization problem (10) is well-specified. Assumption 2 imposes regularity conditions on the ordinal loss, ensuring it is well-behaved for optimization. Meanwhile, Assumption 3 controls the noise level in the observed responses. Collectively, these three assumptions ensure that the estimated factorized outcome matrix, cM = bUcW⊤ − 1N bζ⊤
+
+, is consistent with the true matrix, M∗ =
+
+U∗W∗⊤ − 1N ζ∗⊤ , in terms of the Frobenius norm. Assumption 4 includes a non-degeneracy condition requiring strictly positive lower bounds on the eigenvalues of the latent covariance and weight matrices. This prevents the latent factor model from collapsing and guarantees that each loading weight retains sufficient information as the dimension J of the items grows. 21 Also, Assumption 4 requires non-singular covariates X and bounded noise variance, both of which are standard conditions for linear regression. Based on these assumptions, Lemma 1 establishes that bU, cW and bB consistently recover the true latent factors, the weighting matrix of the generalized factor model (1), and the factor-wise linear model coefficients. This recovery holds in a standard sense, up to an invertible scaled rotation. 
+
+Lemma 1 Let bUc = ( IN − P1) bU and U∗ 
+
+> c
+
+= ( IN − P1)U∗ denote the centered latent factor matrices, where P1 = 1 
+
+> N
+
+1N 1⊤ 
+
+> N
+
+. Under Assumptions 1-4, when N, J → ∞ , we have 
+
+min 
+
+> Q∈O K
+
+1
+
+J ∥cWQ − W∗∥2 
+
+> F
+
++ min 
+
+> Q∈O K
+
+1
+
+N ∥ bUcQ − U∗ 
+
+> c
+
+∥2 
+
+> F
+
++ min 
+
+> Q∈O K
+
+∥ bBQ − B∗∥2 
+
+> F
+
+≲P
+
+rN + JN J ,
+
+where OK = {Q | Q ∈ RK×K , det Q̸ = 0 }.
+
+Assumption 5 It is satisfied that λmin (Ξ) > 0 where Ξk,l := E[τk(X)τl(X)] for k, l ∈ [K].
+
+While Ξ defined in (9) is inherently positive semi-definite, Assumption 5 requires strict positive definiteness to control the uncertainty introduced by estimating Ξ, and hence bound the error of the solution to our maximin problem. Ridge regularization could be potentially used to enforce the well-posedness of Ξ in the presence of the singularity (Guo, 2024). In Theorem 2, we establish the convergence of the proposed DRIFT estimator. 
+
+Theorem 2 Suppose Assumptions 1-5 hold. For a given radius δ > 0, let τ ∗(x) = β∗⊤ x
+
+be the true maximin ITE over the uncertainty set Γ( δ), and bτ (x) = bβ⊤
+
+x be the estimator constructed using bU over the uncertainty set bΓ( δ). Then we have: 
+
+∥bβ − β∗∥2 ≲P
+
+p ˜E · max 
+
+np ˜E, 1
+
+√δ
+
+o
+
+, as N, J → ∞ ,
+
+where ˜E = ( N +JN J )1/4 + ( 1 
+
+> N
+
+)1/2.
+
+22 Theorem 2 shows that the convergence rate of our empirical estimator bτ (x) can be decomposed into two components: the first term captures the estimation error of the linear coefficient matrix B∗. The second term accounts for the additional uncertainty in estimating the optimal aggregation weights γ, arising from the empirical approximation of Ξ and the on-target set Γ( δ). This result distinguishes our theory from previous work on maximin regression (e.g., Meinshausen and Bühlmann (2015); Guo (2024)) by resolving the challenge posed by estimating the on-target set Γ( δ). Our explicit control of the estimation error for this set is essential for the consistency of the maximin ITE estimator. Moreover, this theoretical guarantee is not limited to linear parametric models. When more flexible machine learning methods are used to fit factorized outcomes in high-dimensional settings, similar convergence results can also be obtained (Wang et al., 2023). 
+
+# 5 Simulation Study 
+
+## 5.1 Experiment Setup 
+
+We conduct numerical experiments to evaluate the finite-sample performance of the proposed estimator. For each subject i ∈ [N ] we generate the baseline covariate vector xi ∈ R5, where 
+
+xi, 1:4 ∼ N (0, I4) and xi, 5 ≡ 1 represents the intercept term. The randomized treatment assignment follows a Bernoulli design with P (ai = 1) = 0 .5. The potential latent factors (K = 3 ) follow a linear model: z(a) 
+
+> i
+
+= Λ(a)xi + ϵ(a), where ϵ(a) ∼ N (0, IK ) and Λ(a) are fixed matrices. The realized factor is zi = aiz(1)  
+
+> i
+
++ (1 − ai)z(0)  
+
+> i
+
+.The binary GEO is generated as oi ∼ Bernoulli (expit (γ⊤
+
+> GEO
+
+zi)) with γGEO = (1 , 1, 1) ⊤.We simulate J = 30 binary responses Yij using Eq (1). To introduce controlled heterogeneity, 23 the outcome loadings αj ’s are drawn from a hyper-population centered around γGEO :
+
+αj = γGEO + r∥γGEO ∥2 Rj vj , Rj ∼ Beta(5 , 1.5) , ∥vj ∥2 = 1 . (14) Here, vj follows a von Mises-Fisher (vMF) distribution on the unit sphere with concentration parameter σv > 0 around the mean direction γGEO /∥γGEO ∥2. The scalar r bounds the maximum relative ℓ2 deviation of αj from γGEO . Together, r and σv explicitly govern the dispersion of the loading vectors, controlling the similarity between the J outcomes and GEO. In the following analysis, we fix the sample sizes N = 300 and evaluate the robustness of 
+
+DRIFT to settings with different degrees of (i) variance within the hyper-population and (ii) observed-outcome underrepresentation. The effect of sample size on estimator stability is studied separately in Appendix. In each setting, we estimate the ITE using the observed data 
+
+{(xi, yi, a i, o i)}Ni=1 and compare the following methods: (1) Original GEO : ITE for the GEO is learned through an R-learner (Nie and Wager, 2020) on the log-odds scale; (2) Factorized GEO : ITE is learned through the combination of latent factors guided by the GEO; (3) 
+
+DRIFT : maximin ITE estimator from the proposed framework by applying Algorithm 1 with {oi}Ni=1 observed; (4) DRIFT_N : same as DRIFT with {oi}Ni=1 unobserved. (5) Obs Maximin : (only for observed-outcome underrepresentation setting) “observed-only” maximin ITE estimator over the convex hull of observed factorized outcomes. To assess generalizability, we evaluate each method on T = 1 , 000 external outcomes {˚Yt}Tt=1 
+
+independently sampled from the hyper-population. For each t, ˚Yt follows the generalized factor model in (1) , with loading vector ˚αt drawn i.i.d. from the same distribution as the in-sample item loadings {αj }Jj=1 . For a subject with covariates x, the true ITE for ˚Yt is 
+
+˚τt(x) = ˚α⊤
+
+> t
+
+ Λ(1) −Λ(0) x. We summarize performance using the worst-case prediction accuracy 
+
+ACC min := min t∈[T ] ACC t, and correlation Cor min := min t∈[T ] Cor t between the predicted and 24 true ITEs across external outcomes, where ACC t = 1
+
+> N
+
+PNi=1 Isign  bτ (xi) = sign  ˚τt(xi) ,
+
+and Cor t is the empirical correlation between bτ (xi) and ˚τt(xi). For each setting, we repeat the simulation 100 times and report the worst-case metrics ( ACC min , Cor min ) for each method. 
+
+## 5.2 Robustness to Variation of the Outcome Representation 
+
+To mimic different degrees of variance within the hyper-population of the outcome rep-resentations (14) , we fix the concentration at σv = 1 while varying deviation magnitude 
+
+r ∈ { 0.6, 1, 1.5}. Each time, we draw the loading vectors for observed outcomes ( αj ’s) and the external outcomes ( ˚αt’s) i.i.d. from the hyper-population with the same r. We repeat the simulation 100 times for each r, and report the worst-case performance metrics in Figure 2. The results show that the worst-case ACC and Cor decrease across all methods as r in-creases. This trend is expected, since a larger r allows for greater divergence among symptom outcomes, introducing additional uncertainty into ITE prediction. Across r ∈ { 0.6, 1, 1.5},
+
+DRIFT achieves consistently higher ACC min and substantially less negative Cor min than 
+
+Original GEO and Factorized GEO in average, indicating superior ability to exploit the hyper-population structure for worst-case optimization even with increased outcome hetero-geneity. For example, when r = 1 , DRIFT achieves a mean ACC min of 0.420 , outperforming 
+
+Original GEO and Factorized GEO by 154 .5% and 156 .1% , respectively. Meanwhile, in terms of mean Cor min , DRIFT exceeds Original GEO and Factorized GEO by 58 .3% and 58 .1% .Notably, DRIFT_N performs comparably to DRIFT in each setting, suggesting that our proposed framework remains effective even without observed GEO and is practically applicable. However, DRIFT_N shows larger variance in both metrics than DRIFT , reflecting the added uncertainty from estimating GEO to construct the on-target set. In Appendix, we also numerically justify our choice δ = δ† for Γ( δ). Evaluating DRIFT across δ ∈{0.2δ†, 0.5δ†, δ †, 1.5δ†}, the worst-case performance ( ACC min and Cor min ) peaks at δ† and 25 0.0 0.2 0.4 0.6 0.6 1 1.5   
+
+> r
+> ACC min
+> -1.00 -0.75 -0.50 -0.25 0.00 0.6 11.5
+> r
+> Cor  min
+> Method
+> Original GEO Factorized GEO DRIFT DRIFT_N
+
+Figure 2: Boxplots of ACC min (left) and Cor min (right) for the predicted individual treatment effects (ITEs) over 100 replications. In each replication, J = 30 observed responses and 
+
+T = 1000 external responses are sampled from the loading hyper-population with fixed concentration σv = 1 , while the deviation magnitude varies as r ∈ { 0.6, 1, 1.5}. The subject sample size is fixed at N = 300 .decreases for larger value. This suggests δ† optimally balances capturing relevant external information and excluding uninformative ones that could reduce GEO’s guidance. 
+
+## 5.3 Robustness to Underrepresentation in Observed Outcomes 
+
+As discussed in Section 2.5, Obs Maximin can be unstable when the observed outcomes provide only partial coverage of the “hyper-population”, especially when the loading vectors 
+
+αj are concentrated in a restricted region (Figure 1a). In contrast, DRIFT is designed to adapt to such under-coverage. To illustrate this advantage, we generate the observed-outcome loadings αj from (14) with r = 0 .6 and larger concentration parameters σv ∈ { 2, 4, 8}, which restricts αj to a narrower cone around the mean direction. The external outcomes used for evaluation are sampled from the hyper-population with scalar r = 0 .6 and concentration fixed at σv = 1 . We compare our proposed method ( DRIFT and DRIFT_N ) with Original GEO , Obs Maximin , and Factorized GEO using ACC min and Cor min over 100 replications. Figure 3 shows that Original GEO and Factorized GEO are essentially insensitive to 
+
+σv, but their worst-case performance remains poor because they do not explicitly account for on-target outcome uncertainty. Obs Maximin attains comparatively strong ACC min and 26 0.1 0.2 0.3 0.4 0.5 2 4 8  
+
+> σvACC min
+> -1.00 -0.75 -0.50 -0.25 0.00 248
+> σvCor  min
+> Method
+> Original GEO Factorized GEO Obs Maximin DRIFT DRIFT_N
+
+Figure 3: Boxplots of ACC min (left) and Cor min (right) for predicted ITEs over 100 replications. We fix sample size N = 300 and scalar r = 0 .6. The J = 30 observed-response loadings are generated with concentration at σv ∈ { 2, 4, 8}, while T = 1000 external responses are sampled from the hyper-population with σv = 1 .
+
+Cor min when σv is small, deteriorates sharply as σv increases, indicating its sensitivity to mismatch between the observed outcomes and the evaluation hyper-population. In contrast, 
+
+DRIFT and DRIFT_N exhibit substantially slower deterioration with increasing σv and achieve the best worst-case performance overall, demonstrating robustness when the observed outcomes are underrepresenting the hyper-population. 
+
+# 6 Application to EMBARC 
+
+## 6.1 Background of the Study 
+
+We applied DRIFT to a randomized controlled trial of major depressive disorder (MDD), EMBARC (Trivedi et al., 2016), to assess its real-world performance. Participants were randomly assigned to receive either sertraline ( A = 1 ) or placebo ( A = 0 ). The Clinical Global Improvement (CGI) scale assessed at the end of treatment was used as the GEO to guide the construction of the on-target factorized outcome set. Individual items in the Hamilton Depression Rating Scale (HAM-D) (Hamilton, 1960), a clinician-administered depression assessment, were used as the manifest outcomes Y to learn latent factors Z. To enhance learning efficiency and maintain sample balance, items with few endorsements and 27 inconsistent collection procedures were excluded (van Borkulo et al., 2015; Chekroud et al., 2017), and sparse categories were combined. Electroencephalogram (EEG) measures of brain activity related to antidepressant response were also incorporated to improve the estimation performance on the latent factors (Yang et al., 2024). Because the excess loss for constructing the on-target set is defined for binary GEO, including representations of continuous EEG outcomes would lead to scale incompatibility. Therefore, we construct the on-target set using only HAM-D items and use EEG measures only to improve latent factor estimation. Given that prior studies identified 2–4 latent factors for depression (Van Dorn et al., 2016; van Loo et al., 2012; Sunderland et al., 2013; Chen et al., 2021), we fit the factor model with 4 latent domains. Covariates X include age, sex, Flanker Interference Accuracy score (indicating cognitive control), and inferred baseline latent domains. After excluding participants with missing measures, 168 subjects were included in the analysis, of whom 75 received sertraline. We compared our method with three alternatives: Original GEO , Factorized GEO and Obs Maximin (see Section 5). Because Obs Maximin suffers from latent factor non-identifiability, we applied an oblique promax rotation (Hendrickson and White, 1964) to the loading matrix and used the rotated structure as the factor estimates for fair comparison. It also improves clinical interpretability by allowing each rotated factor to better reflect distinct, clinically meaningful domains. To assess generalizability, we assessed the prediction accuracy (ACC in Section 5) of each method on external outcomes not used in training. These external outcomes include (i) the self-reported 17-item Concise Associated Symptom Tracking (CAST) scale, a validated instrument for quantifying depression-related symptoms by probing experiences such as anxiety, sleep disturbances, restlessness, and shifts in mood and energy (Minhajuddin et al., 2020), and (ii) the self-rated Frequency, Intensity, and Burden of Side Effects Rating (FIBSER) scale, which measures medication side effects (Wisniewski et al., 2006). Because these outcomes differ clinically from the training responses, performance on them reflects 28 out-of-distribution generalizability. 
+
+## 6.2 Evaluation of ITE Estimation 
+
+Table 1 summarizes selected results of prediction accuracy on external outcomes for all four methods. For 17 CAST items, we compute ACC for each item and report four lowest-ranked items (ranked by ACC). For FIBSER self-rated side effects, we report ACC for every item (Frequency, Intensity, and Interference). The findings can be summarized as two key points: 
+
+Protection against domain-specific failures: Relying on a single outcome limits both the Original and Factorized GEO , causing concentrated failure clusters in the mania domain (CAST 7, 2, 17 , 8, ranked from lowest to fourth-lowest in ACC). Using the maximin strategy, 
+
+Obs Maximin partially mitigates these domain-specific issues by improving ACC on the two worst items (CAST 7, 2) and shifting the fourth lowest-ranked item to the anxiety domain (CAST 6). Nevertheless, by extrapolating to a broader range of symptoms, DRIFT achieves a more balanced performance across symptom domains, effectively avoiding systematic domain-specific degradation. First, it improves ACC on the two most challenging mania items (CAST 
+
+2, 7) by over 23 .8% compared to the other three alternatives (ACC of DRIFT : ≥ 0.343 , ACC of others: ≤ 0.277 ). Furthermore, the four lowest-ranked items of DRIFT are no longer dominated by the mania domain, with the third and fourth lowest-ranked items shifting to the anxiety-related items CAST 6 and 15 .Robust prediction in the mania domain is particularly important when evaluating the treatment effect of sertraline for MDD. In this context, a substantial increase in mania-related scores may be a safety concern, rather than as part of the intended therapeutic benefit of sertraline. An ITE estimator that performs poorly in this domain risks failing to identify patients vulnerable to antidepressant-induced manic symptoms, leading to unsafe clinical recommendations. By GEO-anchored extrapolation, DRIFT prevents recommending 29 CAST self-reported symptoms FIBSER self-rated side effects Method 1st 2nd 3rd 4th Frequency Intensity Interference Original 0.066 0.108 0.367 0.482 0.060 0.120 0.000 Factorized GEO 0.102 0.145 0.392 0.494 0.084 0.133 0.036 Obs Maximin 0.271 0.277 0.488 0.494 0.241 0.265 0.217 DRIFT 0.343 0.361 0.476 0.482 0.319 0.307 0.307 
+
+Table 1: Prediction accuracy (ACC) on external outcomes across items. For CAST, we list the four lowest-ranked items out of 17 ( 1st to 4th): CAST 7, 2, 17 , 8 for Original GEO and 
+
+Factorized GEO , CAST 7, 2, 17 , 6 for Obs Maximin and CAST 2, 7, 6, 15 for DRIFT . Notably, CAST 7, 2, 17 , 8 are mania-related, while CAST 6, 15 are anxiety-related items. For FIBSER, we report the ACC for each of the three items (Frequency, Intensity, and Interference). The best ACC and any comparable results within a 0.02 margin are highlighted in bold for each column. treatments that alleviate depressive symptoms at the cost of triggering treatment-emergent mania, ensuring safer personalized decisions. 
+
+Generalization to side effects: DRIFT demonstrates stronger generalizability to side effect items in FIBSER (ACC: 0.307 –0.319 ), exceeding the two GEO-based baselines by more than 131% (ACC: ≤ 0.133 ) and the Obs Maximin baseline by over 15 .8% (ACC: 
+
+0.217 –0.265 ). This pattern suggests that DRIFT is not only better at detecting the presence of adverse effects, but also more capable of identifying whether those adverse effects are frequent, severe, and disruptive enough to undermine adherence, all of which are key drivers of treatment discontinuation in clinical practice. By anticipating side effects, DRIFT addresses the narrow focus of standard MDD outcomes on core symptoms alone, and reduces the risk of recommending treatments that are effective but poorly tolerated. In the subsequent section, we introduce the geometric visualization of the observed-outcome space and the solution of methods under comparison. This could offer deeper insight into the mechanisms driving the improvements of our approach over other methods. 30 6.3 Geometric Visualization and Interpretation 
+
+To interpret the learned domains, we visualize the promax-rotated loading matrix with symptom-wise max-absolute scaling in Figure 4a, which highlights each factor’s relative contribution to HAM-D symptoms. Factor 1 reflects a core depression domain, with strong loadings on depressed mood, guilt, loss of interest, and somatic anxiety. Sleep disturbances are split into two components: Factor 2 captures sleep-onset problems (initial insomnia), whereas Factor 3 captures sleep-maintenance difficulties (middle and late insomnia). Factor 4 represents a severe psychopathology and anxiety domain, marked by pronounced loadings on suicide, psychic anxiety, agitation, and retardation, consistent with a high-risk profile of acute distress. Together, these latent factors summarize diverse mental-health domains spanning psychological, somatic, and cognitive symptoms (Posner et al., 2005; Van Dorn et al., 2016). Depressed Mood     
+
+> Suicide
+> Psychic Anxiety
+> Somatic Anxiety
+> Initial Insomnia
+> Middle Insomnia
+> Late Insomnia
+> Loss of Interests
+> Agitation
+> Retardation
+> Hypochondriasis
+> Guilt Feeling
+> Libido
+> Factor 1
+> Factor 2
+> Factor 3
+> Factor 4
+> value −1 −0.5 00.5 1
+
+(a) Heatmap of promax-rotated pat-tern loadings with symptom-wise max-absolute scaling. The value represents the relative contribution of each factor to individual clinical outcomes. HAM -D Item FIBERS CAST GEO Obs Maximin DRIFT         
+
+> -1.0 -0.5 0.0 0.5 1.0
+> Cosine Similarity to 𝛾 !"# [cos( θ)]
+> 0.0
+> 0.5
+> 1.0
+> Orthogonal  Component [ sin( θ)]
+> Origin (0)
+
+(b) Cosine similarity (to γGEO ) of estimated load-ing parameters αj ’s for observed HAM-D items, 
+
+˚αt’s for external evaluation outcomes from FIBERS and CAST, the aggregation weight estimates γobs ,
+
+γDRIFT .
+
+Figure 4: Loading Analysis: Latent Domain Interpretation and Geometric Decomposition Furthermore, Figure 4b geometric summary of the estimated loading vectors for the observed HAM-D items and the external outcomes from FIBERS and CAST, together with the aggregation directions corresponding to Factorized GEO , Obs Maximin , and DRIFT .31 The figure is shown in angular coordinates relative to the GEO direction: the x-axis gives the cosine similarity between each vector and γGEO , and the y-axis gives the corresponding orthogonal component through the sine value. Among the observed outcomes, those with large positive cosine value projections (e.g., depressed mood [HAM-D 1], guilt feeling [HAM-D 12]) are strongly aligned with the GEO direction, indicating that they largely move together with the GEO. In contrast, outcomes with significant orthogonal deviation (e.g., initial insomnia [HAM-D 5], libido [HAM-D 13]) capture complementary variation that is not well explained by the GEO alone. The discrepancy is more pronounced for the external outcomes. As shown in Figure 4b, the side-effect outcomes (FIBERS 1-3) are substantially more orthogonal to GEO, whereas several mania-related outcomes (CAST 2, 7, 8, 17) lie on the negative-cosine side, indicating strong geometric misalignment with the GEO direction. This pattern suggests that the external outcomes contain clinically relevant variation that is largely underrepresented in the observed HAM-D subset, which in turn helps explain why ITE estimation based only on the GEO performs poorly for these domains. This geometric interpretation highlights the advantage of DRIFT . As shown in Figure 4b, whereas Obs Maximin remains concentrated around the observed outcomes (blue arrows) and thus inherits their representational limitations, DRIFT accounts for a broader range of symptom variation and better captures boundary information. Consequently, it yields an estimate with improved generalizability to underrepresented domains. 
+
+# 7 Discussion 
+
+The proposed DRIFT framework offers a principled approach to learning robust ITE across multiple outcome domains, with broad potential applications in precision medicine. Several extensions could further enhance its utility. First, replacing the explained-variance reward 32 function with an absolute-deviance criterion may reduce conservative estimates for small γ
+
+values and improve robustness to outliers. Second, the current linear treatment response model for latent factors could be relaxed to incorporate nonlinear CATE models such as spline regressions, or causal forests (Wager and Athey, 2018). Finally, addressing missing data in the items is an important extension. Multiple imputation or matrix completion (Davenport et al., 2014; Chen et al., 2019) can be incorporated. Another key extension is to directly derive individualized treatment rules (ITRs), using policy learning or value function optimization (Chen et al., 2021) to guide treatment strategies. Finally, expanding the framework to handle multiple treatments, including combination therapies or sequential, multiple assignment randomized trials (SMART) (Lei et al., 2012), would offer the ability to estimate dynamic treatment regimens. 
+
+# References 
+
+Athey, S. and Imbens, G. (2016). Recursive partitioning for heterogeneous causal effects. 
+
+Proceedings of the National Academy of Sciences , 113(27):7353–7360. Ballard, E. D. and Zarate Jr, C. A. (2020). The role of dissociation in ketamine’s antidepressant effects. Nature communications , 11(1):6431. Busner, J. and Targum, S. D. (2007). The clinical global impressions scale: applying a research tool in clinical practice. Psychiatry (edgmont) , 4(7):28. Butler, E. L., Laber, E. B., Davis, S. M., and Kosorok, M. R. (2018). Incorporating patient preferences into estimation of optimal individualized treatment rules. Biometrics ,74(1):18–26. Chekroud, A. M., Gueorguieva, R., Krumholz, H. M., Trivedi, M. H., Krystal, J. H., and McCarthy, G. (2017). Reevaluating the efficacy and predictability of antidepressant 33 treatments: a symptom clustering approach. JAMA psychiatry , 74(4):370–378. Chen, Y., Li, X., and Zhang, S. (2019). Joint maximum likelihood estimation for high-dimensional exploratory item factor analysis. Psychometrika , 84:124–146. Chen, Y., Zeng, D., and Wang, Y. (2021). Learning individualized treatment rules for multiple-domain latent outcomes. Journal of the American Statistical Association , 116(533):269–282. Chen, Y., Zeng, D., Xu, T., and Wang, Y. (2020). Representation learning for integrating multi-domain outcomes to optimize individualized treatment. Advances in Neural Information Processing Systems , 33:17976–17986. Cinelli, C., Feller, A., Imbens, G., Kennedy, E., Magliacane, S., and Zubizarreta, J. (2025). Challenges in statistics: A dozen challenges in causality and causal inference. Curth, A. and Van der Schaar, M. (2021). Nonparametric estimation of heterogeneous treatment effects: From theory to learning algorithms. In International Conference on Artificial Intelligence and Statistics , pages 1810–1818. PMLR. Davenport, M. A., Plan, Y., Van Den Berg, E., and Wootters, M. (2014). 1-bit matrix completion. Information and Inference: A Journal of the IMA , 3(3):189–223. Embretson, S. E. and Steven, P. (2000). Item response theory for psychologists . Lawrence Erlbaum Associates Publishers. Ferguson, J. M. (2001). Ssri antidepressant medications: adverse effects and tolerability. 
+
+Primary care companion to the Journal of clinical psychiatry , 3(1):22. Gartlehner, G., Hansen, R. A., Morgan, L. C., Thaler, K., Lux, L., Van Noord, M., Mager, U., Thieda, P., Gaynes, B. N., Wilkins, T., et al. (2011). Comparative benefits and harms of second-generation antidepressants for treating major depressive disorder: an updated meta-analysis. Annals of Internal Medicine , 155(11):772–785. Guo, Z. (2024). Statistical inference for maximin effects: Identifying stable associations across multiple studies. Journal of the American Statistical Association , 119(547):1968–1984. 34 Hamilton, M. (1960). A rating scale for depression. Journal of Neurology, Neurosurgery, and Psychiatry , 23(1):56. Harman, H. H. (1976). Modern Factor Analysis . University of Chicago Press. Hendrickson, A. E. and White, P. O. (1964). Promax: A quick method for rotation to oblique simple structure. British Journal of Statistical Psychology , 17:65–70. Insel, T. R. and Cuthbert, B. N. (2015). Brain disorders? precisely. Science , 348(6234):499– 500. Kaiser, H. F. (1958). The varimax criterion for analytic rotation in factor analysis. Psy-chometrika , 23(3):187–200. Kennedy, E. H. (2023a). Towards optimal doubly robust estimation of heterogeneous causal effects. Electronic Journal of Statistics , 17(2):3008–3049. Kennedy, E. H. (2023b). Towards optimal doubly robust estimation of heterogeneous causal effects. Künzel, S. R., Sekhon, J. S., Bickel, P. J., and Yu, B. (2019). Metalearners for estimating heterogeneous treatment effects using machine learning. Proceedings of the national academy of sciences , 116(10):4156–4165. Lei, H., Nahum-Shani, I., Lynch, K., Oslin, D., and Murphy, S. A. (2012). A" smart" design for building individualized treatment sequences. Annual review of clinical psychology ,8(1):21–48. Lohr, K. N. (2002). Assessing health status and quality-of-life instruments: attributes and review criteria. Quality of Life Research , 11(3):193–205. Luckett, D. J., Laber, E. B., Kim, S., and Kosorok, M. R. (2021). Estimation and optimization of composite outcomes. Journal of Machine Learning Research , 22(167):1–40. Maj, M., Stein, D. J., Parker, G., Zimmerman, M., Fava, G. A., De Hert, M., Demyttenaere, K., McIntyre, R. S., Widiger, T., and Wittchen, H.-U. (2020). The clinical characterization 35 of the adult patient with depression aimed at personalization of management. World Psychiatry , 19(3):269–293. Marino, L., Nossel, I., Choi, J. C., Nuechterlein, K., Wang, Y., Essock, S., Bennett, M., McNamara, K., Mendon, S., and Dixon, L. (2015). The raise connection program for early psychosis: secondary outcomes and mediators and moderators of improvement. The Journal of nervous and mental disease , 203(5):365–371. McGrath, J. J., Lim, C., Plana-Ripoll, O., Holtz, Y., Agerbo, E., Momen, N., Mortensen, P., Pedersen, C., Abdulmalik, J., Aguilar-Gaxiola, S., et al. (2020). Comorbidity within mental disorders: a comprehensive analysis based on 145 990 survey respondents from 27 countries. Epidemiology and Psychiatric Sciences , 29:e153. Meinshausen, N. and Bühlmann, P. (2015). Maximin effects in inhomogeneous large-scale data. The Annals of Statistics , 43(4):1801–1830. Minhajuddin, A., Jha, M. K., Fatt, C. C., and Trivedi, M. H. (2020). Psychometric properties of the concise associated symptom tracking scale and validation of clinical utility in the embarc study. Psychiatric Research and Clinical Practice , 2(1):10–18. Mo, W., Tang, W., Xue, S., Liu, Y., and Zhu, J. (2024). Minimax regret learning for data with heterogeneous subgroups. arXiv preprint arXiv:2405.01709 .Moustaki, I. and Knott, M. (2000). Generalized latent trait models. Psychometrika , 65:391– 411. Muthén, B. O. (2002). Beyond sem: General latent variable modeling. Behaviormetrika ,29(1):81–117. Nie, X. and Wager, S. (2020). Quasi-oracle estimation of heterogeneous treatment effects. 
+
+Biometrika , 108(2):299–319. Nie, X. and Wager, S. (2021). Quasi-oracle estimation of heterogeneous treatment effects. 
+
+Biometrika , 108(2):299–319. 36 Nwankwo, E., Jordan, M. I., and Zhou, A. (2024). Reduced-rank multi-objective policy learning and optimization. arXiv preprint arXiv:2404.18490 .Posner, J., Russell, J. A., and Peterson, B. S. (2005). The circumplex model of affect: An integrative approach to affective neuroscience, cognitive development, and psychopathology. 
+
+Development and psychopathology , 17(3):715–734. Qiu, X., Zeng, D., and Wang, Y. (2018). Estimation and evaluation of linear individualized treatment rules to guarantee performance. Biometrics , 74(2):517–528. Reise, S. P. and Waller, N. G. (2009). Item response theory and clinical measurement. Annual review of clinical psychology , 5(1):27–48. Sagawa, S., Koh, P. W., Hashimoto, T. B., and Liang, P. (2019). Distributionally robust neural networks for group shifts: On the importance of regularization for worst-case generalization. arXiv preprint arXiv:1911.08731 .Shi, C., Song, R., Lu, W., and Fu, B. (2018). Maximin projection learning for optimal treatment decision with heterogeneous individualized treatment effects. Journal of the Royal Statistical Society Series B: Statistical Methodology , 80(4):681–702. Sion, M. (1958). On general minimax theorems. Pacific Journal of Mathematics , 8(1):171–176. Sunderland, M., Carragher, N., Wong, N., and Andrews, G. (2013). Factor mixture analysis of DSM-IV symptoms of major depression in a treatment seeking clinical population. 
+
+Comprehensive Psychiatry , 54(5):474–483. Trivedi, M. H., McGrath, P. J., Fava, M., Parsey, R. V., Kurian, B. T., Phillips, M. L., et al. (2016). Establishing moderators and biosignatures of antidepressant response in clinical care (EMBARC): rationale and design. Journal of Psychiatric Research , 78:11–23. Tschoner, A., Engl, J., Laimer, M., Kaser, S., Rettenbacher, M., Fleischhacker, W., Patsch, J., and Ebenbichler, C. (2007). Metabolic side effects of antipsychotic medication. International journal of clinical practice , 61(8):1356–1370. 37 van Borkulo, C., Boschloo, L., Borsboom, D., Penninx, B. W., Waldorp, L. J., and Schoevers, R. A. (2015). Association of symptom network structure with the course of depression. 
+
+JAMA Psychiatry , 72(12):1219–1226. Van Dorn, R. A., Desmarais, S. L., Grimm, K. J., Tueller, S. J., Johnson, K. L., Sellers, B. G., and Swartz, M. S. (2016). The latent structure of psychiatric symptoms across mental disorders as measured with the PANSS and BPRS-18. Psychiatry Research , 245:83–90. van Loo, H. M., de Jonge, P., Romeijn, J.-W., Kessler, R. C., and Schoevers, R. A. (2012). Data-driven subtypes of major depressive disorder: a systematic review. BioMed Central Medicine , 10(1):1–12. Wager, S. and Athey, S. (2018). Estimation and inference of heterogeneous treatment effects using random forests. Journal of the American Statistical Association , 113(523):1228–1242. Wang, Z., Bühlmann, P., and Guo, Z. (2023). Distributionally robust machine learning with multi-source data. arXiv preprint arXiv:2309.02211 .Wisniewski, S. R., Rush, A. J., Balasubramani, G., Trivedi, M. H., Nierenberg, A. A., Investigators, S. D., et al. (2006). Self-rated global measure of the frequency, intensity, and burden of side effects. Journal of Psychiatric Practice ®, 12(2):71–79. Yang, B., Guo, X., Loh, J. M., Wang, Q., and Wang, Y. (2024). Learning optimal biomarker-guided treatment policy for chronic disorders. Statistics in Medicine .Zhang, H., Chen, Y., and Li, X. (2020). A note on exploratory item factor analysis by singular value decomposition. Psychometrika , 85(2):358–372. Zhang, Y., Huang, M., and Imai, K. (2024). Minimax regret estimation for generalizing heterogeneous treatment effects with multisite data. arXiv preprint arXiv:2412.11136 .38

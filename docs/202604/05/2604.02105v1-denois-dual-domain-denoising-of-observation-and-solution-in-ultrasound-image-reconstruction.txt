@@ -1,0 +1,366 @@
+Title: DenOiS: Dual-Domain Denoising of Observation and Solution in Ultrasound Image Reconstruction
+
+URL Source: https://arxiv.org/pdf/2604.02105v1
+
+Published Time: Fri, 03 Apr 2026 01:14:30 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+## DenOiS: Dual-Domain Denoising of Observation and Solution in Ultrasound Image Reconstruction 
+
+Can Deniz Bezek, Orcun Goksel 
+
+Department of Information Technology, Uppsala University, Sweden 
+
+Abstract. Medical imaging aims to recover underlying tissue proper-ties, using inexact (simplified/linearized) imaging models and often from inaccurate and incomplete measurements. Analytical reconstruction meth-ods rely on hand-crafted regularization, sensitive to noise assumptions and parameter tuning. Among deep learning alternatives, plug-and-play (PnP) approaches learn regularization while incorporating imaging physics during inference, outperforming purely data-driven methods. The perfor-mance of all these approaches, however, still strongly depends on mea-surement quality and imaging model accuracy. In this work, we propose 
+
+DenOiS , a framework that denoises both input observations and resulting solution in their respective domains. It consists of an observation refine-ment strategy that corrects degraded measurements while compensating for imaging model simplifications, and a diffusion-based PnP reconstruc-tion approach that remains robust under missing measurements. DenOiS enables generalization to real data from training only in simulations, re-sulting in high-fidelity image reconstruction with noisy observations and inexact imaging models. We demonstrate this for speed-of-sound imaging as a challenging setting of quantitative ultrasound image reconstruction. 
+
+Keywords: Model-based reconstruction · Plug-and-play · Diffusion 
+
+1 Introduction 
+
+Medical imaging aim to recover tissue properties from sensor readings/observations, e.g., k-space measurements in magnetic resonance imaging (MRI), sinograms in X-ray computed tomography (CT), and phase shifts in quantitative ultrasound (US). These measurements are often incomplete or noisy due to several factors such as limited acquisition time in MRI and US, radiation dose constraints in CT, limited aperture/angle in US and CT, or low signal-to-noise ratio in US. Image reconstruction is hence typically ill-posed and solved as an inverse problem with hand-crafted regularization, either directly [7] or iteratively [20]. These methods are sensitive to noise assumptions and initialization, require careful parameter tuning, and commonly based on simplified and linearized physical models. Deep learning (DL) methods have emerged as powerful alternatives for med-ical image reconstruction [16]. Some methods learn a direct mapping from mea-surements to images [33, 5] (cf. Fig. 1(a)), which often generalize poorly. Other  
+
+> arXiv:2604.02105v1 [eess.IV] 2 Apr 2026 2Bezek & Goksel
+
+approaches use DL to denoise measurements before applying an analytical recon-struction [8] (cf. Fig. 1(b)) or to denoise output analytical reconstructions [12] (cf. Fig. 1(c)). However, by not integrating the imaging model with DL, such dis-joint strategies degrade under distribution shifts and missing measurements [16]. Hybrid approaches, instead, aim to incorporate the imaging model into a learned reconstruction process. Unrolling-based methods unfold iterative opti-mization algorithms, e.g., the alternating direction method of multipliers (ADMM), into neural network layers to learn parameterized regularization and norms [24, 1, 9, 2, 27]. Plug-and-play (PnP) methods alternate between a data-consistency step and a pre-trained denoiser [28, 30] (cf. Fig. 1(d)). Recently diffusion mod-els have shown promise as such denoising priors [14, 34]. Importantly, unlike unrolling approaches with embedded imaging models, PnP methods with an explicit consistency step allow modifying the model at inference time, e.g., for differing undersampling masks in MRI or missing measurements in US. In this work, we propose Dual-Domain Denoising of Observation and Solution (DenOiS ), with the following main contributions: 1) With a derivation showing that measurement (observation) corruption being dependent on the underly-ing unknown image, we propose a refinement strategy to correct observations, to compensate for simplified/linearized imaging models, to reduce noise, and to impaint missing (undersampled) readings. 2) We develop a diffusion-model based PnP approach that remains robust under missing measurements. 3) Combining the two, we propose a reconstruction framework that generalizes well from sim-ulations to real data, demonstrated on in-vivo data with state-of-the-art results. 
+
+2 Methods 
+
+2.1 Model-based Image Reconstruction and Denoising Diffusion 
+
+A generalized imaging model can be written in discretized form as A( x)x = b,where x ∈ RNxNy denotes the unknown image, b ∈ RNuNv represents measure-ments/observations, and A( x) ∈ RNuNv ×NxNy is the imaging operator based on physics while often depending also on the underlying tissue (e.g., scattering in CT and refractions in US) hence leading to a nonlinear problem. For practical solutions, most imaging approaches approximate this with a linearized, constant imaging model A′ based on simplified imaging physics; e.g., integral operator / Radon transform in CT or Fourier transform (with possible undersampling) in MRI. Additionally, in practice, only noisy and potentially incomplete measure-ments/observations b′ can be made, e.g., b′ = m(b) + η, where m(·) denotes a masking/undersampling operator and η represents noise. Analytical reconstruc-tion is then posed as a regularized inverse problem: 
+
+x⋆ = arg min  
+
+> x
+
+∥A′x − b′∥pp + λΦ( x), (1) where λ controlling the strength of regularization Φ( ·). An effective strategy for solving (1) is to decouple its data-consistency and regularization terms, which DenOiS: Dual-Domain Denoising of Observation and Solution 3
+
+half-quadratic splitting does by introducing an auxiliary variable z and relaxing 
+
+x=z as a quadratic penalty to solve alternatingly [26]: 
+
+x⋆ = arg min  
+
+> x,z
+
+∥A′x − b′∥pp + λΦ( z) + ν∥x − z∥22 (2) 
+
+zt = arg min  
+
+> z
+
+λΦ( z) + νt∥xt−1 − z∥22 (3a) 
+
+xt = arg min  
+
+> x
+
+∥A′x − b′∥pp + νt∥x − zt∥22 (3b) Given the coupling between (3a) and (3b), approximate solutions are often suffi-cient before iterating. The data-consistency subproblem (3b) then typically uses a few iterations of a gradient-based method, e.g., conjugate-gradient for p=2. In PnP, (3a) is solved as Gaussian denoising at noise level pλ/ (2 νt). Diffusion models address this naturally by sampling from the posterior at the given noise step [14, 34], outperforming CNN-based denoisers [31, 32]. 
+
+2.2 Measurement Refinement 
+
+Even with the best computational techniques, solving (1) with inaccurate ob-servations b′ and an inexact model A′ can only find an x′=x⋆ that satisfies 
+
+A′x′ = b′, which can be far from the true solution x. We aim to find x with the physical knowledge in A′, by casting approximation errors as learned alterations based on priors identified as follows. An inexact imaging operator strongly affects any reconstruction [15, 4]. Let δA( x) be the nonlinear error due to simplifying the operator as A′. Then, the ideal imaging model can be written as: 
+
+A( x) x = b ⇒ (A ′ + δA( x)) x = b ⇒ A′x = b − δA( x) x , (4) which manifests the need for image-dependent correction to observations. To recover ideal b from b′, one has to invert the measurement degradation operator, e.g., denoise and inpaint as b = m−1(b′ − η), or in a general form use some 
+
+refinement f as b = f (b′). Lacking the knowledge on true image x, we advance by approximating the right side of (4) with its known estimate x′, leading to: 
+
+A′x = f (b′) − δA( x) x ⇒ A′x ≈ f (b′) − δA( x′) x′ (5) 
+
+2.3 DenOiS: Dual-Domain Denoising of Observations and Solution 
+
+We propose an iterative dual-domain denoising framework that alternates be-tween a measurement refinement network and a DL-based reconstruction mod-ule. Given the above remarks, the refinement process aims to correct non-ideal measurements b′ as a function of noisy/incomplete measurements b′ and an approximate (e.g., initial) reconstruction x′. To make the refinement task domain-consistent, we project x′ into the measurement domain as A′x′ using its corresponding imaging model. By also providing any auxiliary prior infor-mation P about the data collection or preprocessing processes (e.g., mask-ing/undersampling masks) that may facilitate denoising, we define the the re-finement network as b = M(b′, A′x′, P). For reconstruction, we use a diffusion-based PnP framework that iteratively denoises a noisy reconstruction xT at 4 Bezek & Goksel Measurements 
+
+> Reconstruction
+
+a
+
+> Measurements
+
+Analytical 
+
+solution 
+
+> Reconstruction
+> Measurements
+
+b
+
+> Reconstruction
+
+Analytical 
+
+solution 
+
+> Reconstruction
+> Measurements
+
+c
+
+> Measurements
+
+Data 
+
+consistency 
+
+> Reconstruction
+
+d
+
+Data Consistency 
+
+> Reconstruction
+
+Measurements 
+
+Prior info 
+
+Initial recon 
+
+> Corrected
+> measurements
+
+: Reconstruction -aware measurement refiner : Conditional -diffusion based image reconstruction 
+
+Analytically generate 
+
+conditional priors 
+
+e
+
+> Analytical Solutions
+
+Gaussian noise 
+
+Noisy input 
+
+image 
+
+> Diffusion Denoising
+> Data Consistency
+
+…+
+
+Reconstruction 
+
+proposal 
+
+…
+
+> Diffusion Denoising
+> Data Consistency
+> Diffusion Denoising
+> Forward Model
+
+Prior info 
+
+…
+
+Final 
+
+reconstruction 
+
+f
+
+Acquired 
+
+data 
+
+Corrected 
+
+meas urements  
+
+> <latexit sha1_base64="J186KKFX+eTVRzJsHImp+A2xcKg=">AAAB8nicbVDLSgMxFM3UV62vqks3wSK4KjMi1WVRFy4r2AdMh5JJM21oJhmSO0IZ+hluXCji1q9x59+YaWehrQcCh3PuJeeeMBHcgOt+O6W19Y3NrfJ2ZWd3b/+genjUMSrVlLWpEkr3QmKY4JK1gYNgvUQzEoeCdcPJbe53n5g2XMlHmCYsiMlI8ohTAlby+zGBMSUiu5sNqjW37s6BV4lXkBoq0BpUv/pDRdOYSaCCGON7bgJBRjRwKtis0k8NSwidkBHzLZUkZibI5pFn+MwqQxwpbZ8EPFd/b2QkNmYah3Yyj2iWvVz8z/NTiK6DjMskBSbp4qMoFRgUzu/HQ64ZBTG1hFDNbVZMx0QTCralii3BWz55lXQu6l6j3ni4rDVvijrK6ASdonPkoSvURPeohdqIIoWe0St6c8B5cd6dj8VoySl2jtEfOJ8/eG+RZQ==</latexit>
+
+D
+
+Fig. 1. Deep learning approaches in image reconstruction (a) without using the imaging model, (b,c) using it disjointly, and (d) jointly with data consistency in a plug-and-play (PnP) framework. (e) Our proposed iterative dual-domain denoising framework (DenOiS), alternating between observation and solution domain refinement. (f) Illus-tration on an ultrasound application for speed-of-sound imaging from incomplete and noisy observations with an inexact model. 
+
+initial noise temperature T to noise-free x0. To help with the updates we pro-vide sample (approximate) precomputed reconstructions {x′
+
+S } as conditioning inputs to the diffusion model. We also provide the measurements b (when not available, b′ instead) to the PnP framework for data-consistency to be checked regularly via (3b) alternating with denoising diffusion. Denoting these alternat-ing PnP operations by D, reconstruction is performed via x0 = D(xT , b, {x′
+
+S }).
+
+The resulting x0 can be re-input to M, iterating the overall scheme. Conventional diffusion models for image generation from scratch typically start at the highest noise level with pure Gaussian noise. In image translation and reconstruction, nevertheless, an initial estimate can be taken as the starting point. We use solution proposals {x′
+
+S } as good initialization candidates, which improved results in preliminary tests. To preserve the noise expectancy of the denoiser, we add Gaussian noise on such initialization to obtain xT to begin the reverse denoising process. We also obtained more robust results by prioritizing denoising with multiple ( K) consecutive denoising steps before enforcing a data-consistency step. The overall framework is illustrated in Fig. 1(e). 
+
+2.4 Application to Quantitative US: Speed-of-Sound Imaging 
+
+We demonstrate our method on quantitative US via imaging speed-of-sound (SoS). This is based on an inverse problem relating phase-shifts observed be-tween pairs of transmissions from pulse-echo US to the underlying SoS distri-DenOiS: Dual-Domain Denoising of Observation and Solution 5
+
+bution. Although a simplified imaging operator A′ is often built via ray-tracing in a limited-angle CT framework [27], actual wave propagation A( x) involves content x dependent dispersion and refraction as confounders to the assumed wave paths [13]. SoS is an emerging quantitative US biomarker, complementary to B-mode and elastography, for assessing tissue composition / pathology, e.g., hepatic steatosis [11], breast cancer [21], breast density [3], muscles [29]. To evaluate the proposed method, we performed simulations and acquisitions using a 5 MHz, 0.3 mm pitch, 128-element linear transducer with nine linearly-spaced transmits, yielding eight displacement observations b′ for SoS estimation. Reconstructions were performed on 64 ×64 grid with a pixel size of 0.6 mm. 
+
+Synthetic data (S). We analytically generated observations using a simplified ray-tracing based imaging, model based on 10 4 synthetically-generated ground-truths x of quasi-random shapes and SoS distributions in range [1400,1650] m/s. To prevent bias towards expected inclusions and edges, some x were relatively homogeneous and 50% were blurred with random Gaussian kernels. To emu-late discretization errors, we used a twice higher-resolution imaging model AH
+
+for the forward simulation b←AHx, while the reconstructions and learning only had access to a lower-resolution (simplified) version A′ on the intended grid size of 64 ×64. Complex in-silico data (C). Wave-propagation wise realistic acous-tic simulations were conducted on a 37.5 μm grid with the k-Wave toolbox [25]. Simulations based on 620 quasi-random shapes as above were employed in train-ing the evaluated models (C 1), while additional 30 well-structured circular and rectangular shapes (C 2) provided a test set with a distinct distribution. Both in-cluded positive and negative SoS contrast. Real data. Data from four phantom inclusions with manufacturer-reported SoS values as well as in-vivo data from a breast cancer patient with ductal carcinoma were collected. Preprocessing. We beamformed the in-vivo data with 1475 m/s as the literature-reported average breast SoS, and the in-silico and phantom data with 1510 m/s. Phase-shift were estimated using normalized cross-correlation followed by sub-sampling. 
+
+2.5 Implementation Reconstruction Module. Our reconstruction module, denoted by RD, consists of initial solution generation followed by diffusion-based reconstruction. We used two conditional inputs {x′ 
+
+> S
+
+} as analytical ℓ1- and ℓ2-based solutions of (1) with total-variation regularization of relative weight 0.1 for the imaging operator been SVD-normalized. For the diffusion model, we use a U-Net backbone [14, 6] with four resolution levels with scaling factors (1,2,2,2) and an initial feature-channel size of 64. A linear noise schedule ( T =200) is used, and the model is trained with classifier-free guidance (condition dropout rate of 0.2). The model is pre-trained on dataset S for 400 epochs (learning rate 10 -3 →10 -5 , L2 loss, Adam optimizer) and fine-tuned on C 1, to incorporate wave-based errors of the inexact model. 
+
+Measurement Refinement Network ( M). We test two denoisers: a stan-dard U-Net ( MU) and a diffusion model ( MD). MU uses four resolution levels. 
+
+MD follows the RD, with an additional level of resolution to accommodate 128 ×128 measurement data. Conditional inputs are replaced by the measured 6 Bezek & Goksel 
+
+displacements and the prior information, which includes (a) triangular aperture (undersampling) masks indicating the fixed valid measurement areas, (b) low-correlation masks indicating measurements below tracking SNR, and (c) directiv-ity masks hinting at angular- and depth-dependent expected variation. Treating each image-displacements pair of C 1 as a sample (i.e., 4960 samples in total), we trained the models for 400 epochs (learning rate 10 −4 → 10 −6, L1 loss, Adam) to convert observed displacements b′ to model-consistent targets A′x.
+
+Inference RD. Data consistency is enforced using the conjugate gradient method, with measurements scaled prior to inference to operate directly on the normal-ized images in the diffusion model. For in-silico data, the initial noise level ( T0)was set to 15, with data consistency applied every K=5 denoising steps. For real data, we use T0=50 and K=10, due to higher noise level and larger imaging model mismatch. Denoising is performed using DDIM sampling [22], which can succeed in few reverse steps when conditionals are informative. 
+
+Inference MD. With the conditional input being relatively weaker due to miss-ing measurements, we initialized from pure noise ( T0=200) and used DDPM [10], which can produce high-fidelity samples given many denoising steps. Our imple-mentation on the SoS imaging application is illustrated in Fig. 1(f). 
+
+3 Results 
+
+Metrics: RMSE (root mean squared error) when groundtruth is available. SoS contrast (∆c ) as ˜μa−˜μb with ˜μ the median SoS in a tissue region. It is clinically relevant, e.g., for assessing lesions against potentially varying backgrounds (for evaluation we used the half-cm margin surrounding any lesion). ACE (abso-lute contrast error) |∆c rec −∆c gt | assesses error in contrast when groundtruth is available. gCNR (generalized contrast-to-noise ratio) [17] assesses detectability. 
+
+Compared Methods: We compare with two analytical baselines with TV regu-larization using an ℓ2-norm ( L2-TV) and ℓ1-norm ( L1-TV) as in [19, 23]. We also compare with two state-of-the-art DL-based methods, for which we used official public implementations training them with our data and pretraining/finetuning approach: Unet [5] is a recent approach to convert displacements directly to an SoS reconstruction via standard Unet [18]. To ensure fair comparisons, we per-formed extensive hyperparameter tuning. Dolce [14] is a diffusion-based PnP, that conditions on a single solution, initializes from noise, and alternates each denoising step with data-consistency. We conditioned its denoiser on L2-TV re-construction. Ablations. For measurement denoising, we ablate A′x′ and P
+
+to test contributions from (5) and observation priors. To evaluate diffusion for reconstruction, we also compare to a simple Unet as R within our DenOiS frame-work, denoted as Unet( MU) trained with corrected measurements. 
+
+In-silico results (Table 1). Measurement refinement improves RMSE and ACE for analytical reconstructions. Despite numerous training and parameter tun-ing efforts, the best direct Unet [5] model could only find some average SoS value without any inclusion contrast (yielding low RMSE but high ACE), and is excluded from the subsequent tabular results as it degraded even further. DenOiS: Dual-Domain Denoising of Observation and Solution 7
+
+Table 1. In-silico results on (C 2) reporting RMSE (ACE). Gray marks baseline con-figurations. Rows are observation and columns are reconstruction approaches.                                 
+
+> Input L2-TV L1-TV Unet [5] Dolce [14] Unet( MU)RD
+> b′11.95 (36.25) 10.39 (32.37) 10.73 (42.31) 6.75 (15.73) 43.35 (37.27) 6.78 (18.31)
+> MU(b′)8.45 (32.23) 8.13 (30.43) 34.82 (42.27) 10.15 (14.46) 7.01 (21.22) 7.21 (14.35)
+> MU(b′,P)8.36 (31.39) 7.70 (27.35) 34.23 (42.27) 10.42 (17.56) 6.70 (19.38) 7.21 (12.28)
+> MU(b′,P,A′x′)8.26 (30.12) 8.04 (28.19) 34.20 (42.27) 11.78 (27.42) 7.10 (24.10) 7.55 (11.53)
+> MD(b′)9.44 (31.04) 9.11 (28.87) 34.95 (42.27) 11.86 (22.65) 6.97 (18.04) 8.29 (13.16)
+> MD(b′,P)8.58 (30.32) 8.27 (28.23) 34.33 (42.27) 10.97 (23.62) 6.34 (16.58) 7.43 (11.67)
+> MD(b′,P,A′x′)8.24 (29.69) 8.13 (28.85) 34.37 (42.27) 11.89 (28.04) 7.23 (24.26) 7.59 (12.33)
+
+DOLCE achieved low RMSE in-silico, though benefiting little from measure-ment refinement. Our DenOiS framework substantially improves reconstruction quality, with Unet( MU) achieving low RMSE and ACE and the proposed diffu-sion reconstruction module RD further improving ACE. 
+
+Phantom results (Table 2). With a large domain shift to realistic data and noise, the results change drastically, to advantage the denoising methods. Mea-surement refinement improves results for all, particularly when A′x′ is pro-vided (see ACE reductions). Proposed RD outperforms both Dolce [14] and Unet( MU), especially in terms of ACE. This highlights the improved gener-alizability of diffusion-based PnP over direct Unet projection. Based on both metrics, we identify two best variants of DenOiS as RD with MU(b′, P, A′x′)
+
+and MD(b′, P, A′x′) abbreviated respectively as RD(MU) and RD(MD) in the sample reconstructions in Fig. 2(a). 
+
+In-vivo Results (Fig. 2). DenOiS successfully reconstructs an SoS inclusion at the location matching the clinical annotation, while baseline methods fail on in-vivo data (Fig. 2(b)). While the acquired measurements are noisy and par-tially missing, our refinement module MD(b′, P, A′x′) refines them successfully (cf. Fig. 2(c)), facilitating the resulting reconstructions. 
+
+Table 2. Real phantom data results reporting RMSE (ACE). Values within half a standard deviation of the best results 9.79 ±5.54 (13.48 ±4.0) are highlighted. Gray marks baseline configurations. 
+
+Input L2-TV L1-TV Dolce [14] Unet( MU) RD
+
+b′ 18.04 (37.56) 21.94 (28.01) 14.13 (28.80) 34.36 (29.96) 13.71 (16.34) 
+
+MU(b′) 13.60 (38.41) 13.60 (38.25) 10.87 (35.83) 14.14 (42.10) 10.26 (24.45) 
+
+MU(b′, P) 13.12 (38.93) 13.18 (38.74) 11.22 (38.25) 14.94 (40.60) 10.61 (23.85) 
+
+MU(b′, P, A′x′) 13.93 (34.32) 13.94 (33.21) 12.11 (31.47) 13.49 (30.80) 10.62 (15.09) 
+
+MD(b′) 12.95 (36.27) 12.88 (35.81) 11.69 (35.18) 14.69 (39.52) 10.04 (21.98) 
+
+MD(b′, P) 14.01 (34.90) 13.99 (34.78) 10.51 (30.31) 16.50 (40.03) 9.79 (20.18) 
+
+MD(b′, P, A′x′) 14.78 (32.78) 14.76 (32.37) 14.19 (30.72) 16.94 (30.22) 11.72 ( 13.48 )8 Bezek & Goksel 16.4 (46.0) 28.0 (18.4) 16.8 (61.6) 9.7 (15.3) 11.1 (13.1) 
+
+17.5 (28.3) 17.8 (26.1) 13.0 (32.8) 9.1 (9.6) 10.4 (8.6) 
+
+1560 
+
+1500 
+
+1440 
+
+[m/s] 
+
+15.2 (48.0) 12.0 (47.0) 11.7 (50.0) 7.0 (17.7) 7.4 (19.7) 
+
+9.4 (33.9) 7.5 (25.2) 8.9 (49.9) 6.0 ( 0.2 ) 6.0 (7.4) 
+
+GT / 
+
+B-mode 
+
+12.4 (27.0) 
+
+11.1 (6.5) 
+
+7.8 (22.0) 
+
+7.7 (26.9) 
+
+> In -silico Phantom
+
+13.9 (44.7) 
+
+11.2 (26.5) 
+
+10.2 (46.6) 
+
+4.1 (1.3 )
+
+Baselines DenOiS (Ours) (a) Baselines 
+
+B-Mode 
+
+2.73 / 0.43 
+
+1.89 / 0.55 
+
+120 
+
+0
+
+-120 
+
+[ns] 
+
+0
+
+-30 
+
+-60 
+
+[dB] 
+
+-0.05/ 0.21 
+
+1.15 / 0.28 
+
+25.22/ 0.80 
+
+27.13 / 0.81 
+
+Ours (b) 
+
+> Observation 1  Observation 2
+
+Acquired Corrected 
+
+1480 
+
+1445 
+
+-1410 
+
+[m/s] 
+
+(c) <latexit sha1_base64="frne+a/2bzHGGHUt2rd5cw3A8Ck=">AAACMnicbVDLSgMxFM34rPU16tJNsIgKUmZE1KWvhS6ECvYBbSmZNNOGZh4kd6QlzDe58UsEF7pQxK0fYTpW8XUgcHLuudx7jxcLrsBxHqyx8YnJqencTH52bn5h0V5arqgokZSVaSQiWfOIYoKHrAwcBKvFkpHAE6zq9U6G9eo1k4pH4RUMYtYMSCfkPqcEjNSyzxsBgS4lQl+kLd0A1gd9mqabmez52ks3tr8spXQbZx8Z6KN0A3+a+oZvteyCU3Qy4L/EHZECGqHUsu8a7YgmAQuBCqJU3XViaGoigVPB0nwjUSwmtEc6rG5oSAKmmjo7OcXrRmljP5LmhYAz9XuHJoFSg8AzzuGS6ndtKP5XqyfgHzQ1D+MEWEg/BvmJwBDhYX64zSWjIAaGECq52RXTLpGEgkk5b0Jwf5/8l1R2iu5ece9yt3B4PIojh1bRGtpELtpHh+gMlVAZUXSD7tETerZurUfrxXr9sI5Zo54V9APW2zso2as/</latexit> 
+
+MD(b0, P, A0x0)
+
+Fig. 2. (a) Sample reconstructions for C 2 and phantom data, with RMSE (ACE) values reported. (b) An in-vivo breast cancer example reporting ∆c / gCNR. (c) Corrections of two acquired observations with different MD variants. 
+
+4 Discussion and Conclusion 
+
+Pixel-wise in-vivo groundtruth of tissue properties is unattainable without dicing a subject. Hence, image reconstruction requires training from in-silico data with two large domain-gaps: physics-wise to real data and complexity-wise to in-vivo heterogeneity. Learning direct mapping b′→x implicitly encodes the training data distribution, thus often failing to generalize, as also seen in our experiments. The proposed DenOiS framework enables generalization from in-silico training to real data by jointly denoising observations and reconstructions in their respective domains while also leveraging a physics-based imaging model. For measurement refinement, our principled derivation of errors motivated the need for projected reconstructions A′x′ as a prior, which was validated experimentally as demon-strated in Tables 1 and 2 and Figure 2(c). Comparison with state-of-the-art demonstrates the benefits of our proposed multi-conditioning, initialization, and inference strategies. DenOiS can be extended to other imaging problems with missing/noisy measurements, e.g., MRI undersampling/motion-corruption, CT sparse-view/low-dose/beam-hardening, and PET low photon-count. DenOiS: Dual-Domain Denoising of Observation and Solution 9
+
+References 
+
+1. Adler, J., Öktem, O.: Learned primal-dual reconstruction. IEEE Trans. Med. Imag-ing 37 (6), 1322–1332 (2018) 2. Aggarwal, H.K., Mani, M.P., Jacob, M.: MoDL: Model-based deep learning archi-tecture for inverse problems. IEEE Trans. Med. Imaging 38 (2), 394–405 (2018) 3. Bezek, C.D., Farkas, M., Schweizer, D., Kubik-Huch, R.A., Goksel, O.: Breast density assessment via quantitative sound-speed measurement using conventional ultrasound transducers. European Radiology 35 (3), 1490–1501 (2025) 4. Bezek, C.D., Haas, M., Rau, R., Goksel, O.: Learning the imaging model of speed-of-sound reconstruction via a convolutional formulation. IEEE Trans. Med. Imag-ing 44 (9), 3600–3609 (2025) 5. Chen, H., Han, A.: Robust deep learning for pulse-echo speed of sound imaging via time-shift maps. IEEE Trans. Med. Imaging 45 (2), 463–476 (2026) 6. Dhariwal, P., Nichol, A.: Diffusion models beat GANs on image synthesis. Advances in Neural Information Processing Systems (NeurIPS) 34 , 8780–8794 (2021) 7. Feldkamp, L.A., Davis, L.C., Kress, J.W.: Practical cone-beam algorithm. J. Opt. Soc. Am. A 1(6), 612–619 (1984) 8. Ghani, M.U., Karl, W.C.: Fast enhanced ct metal artifact reduction using data domain deep learning. IEEE Trans. Comput. Imaging. 6, 181–193 (2019) 9. Hammernik, K., Klatzer, T., Kobler, E., Recht, M.P., Sodickson, D.K., Pock, T., Knoll, F.: Learning a variational network for reconstruction of accelerated MRI data. Magn. Reson. Med. 79 (6), 3055–3071 (2018) 10. Ho, J., Jain, A., Abbeel, P.: Denoising diffusion probabilistic models. Advances in Neural Information Processing Systems (NeurIPS) 33 , 6840–6851 (2020) 11. Imbault, M., Faccinetto, A., Osmanski, B.F., Tissier, A., Deffieux, T., Gennisson, J.L., Vilgrain, V., Tanter, M.: Robust sound speed estimation for ultrasound-based hepatic steatosis assessment. Phys. Med. Biol. 62 (9), 3582–3598 (2017) 12. Jin, K.H., McCann, M.T., Froustey, E., Unser, M.: Deep convolutional neural net-work for inverse problems in imaging. IEEE Trans. Image Process. 26 (9), 4509– 4522 (2017) 13. Li, C., Duric, N., Littrup, P., Huang, L.: In vivo breast sound-speed imaging with ultrasound tomography. Ultrasound Med. Biol. 35 (10), 1615–1628 (2009) 14. Liu, J., Anirudh, R., Thiagarajan, J.J., He, S., Mohan, K.A., Kamilov, U.S., Kim, H.: DOLCE: A model-based probabilistic diffusion framework for limited-angle CT reconstruction. In: IEEE International Conference on Computer Vision (ICCV). pp. 10498–10508 (2023) 15. Lunz, S., Hauptmann, A., Tarvainen, T., Schonlieb, C.B., Arridge, S.: On learned operator correction in inverse problems. SIAM J. Imaging Sci. 14 (1), 92–127 (2021) 16. Ravishankar, S., Ye, J.C., Fessler, J.A.: Image reconstruction: From sparsity to data-adaptive methods and machine learning. Proc. IEEE 108 (1), 86–109 (2019) 17. Rodriguez-Molares, A., Rindal, O.M.H., D’hooge, J., Måsøy, S.E., Austeng, A., Bell, M.A.L., Torp, H.: The generalized contrast-to-noise ratio: A formal definition for lesion detectability. IEEE Trans. Ultrason. Ferroelectr. Freq. Control 67 (4), 745–759 (2020) 18. Ronneberger, O., Fischer, P., Brox, T.: U-Net: Convolutional networks for biomedi-cal image segmentation. In: International Conference on Medical Image Computing and Computer-assisted Intervention (MICCAI). pp. 234–241 (2015) 19. Sanabria, S.J., Ozkan, E., Rominger, M., Goksel, O.: Spatial domain reconstruction for imaging speed-of-sound with pulse-echo ultrasound: simulation and in vivo study. Phys. Med. Biol. 63 (21), 215015 (2018) 10 Bezek & Goksel 20. Sauer, K., Bouman, C.: A local update strategy for iterative reconstruction from projections. IEEE Trans. Signal Process. 41 (2), 534–548 (2002) 21. Schweizer, D., Farkas, M., Bezek, C.D., Potempa, A., Leo, C., Kubik-Huch, R.A., Goksel, O.: Pulse-echo imaging of breast speed of sound as a potential biomarker for breast cancer. Ultrasound Med. Biol. 51 (10), 1831–1839 (2025) 22. Song, J., Meng, C., Ermon, S.: Denoising diffusion implicit models. International Conference on Learning Representations (ICLR) (2021) 23. Stähli, P., Kuriakose, M., Frenz, M., Jaeger, M.: Improved forward model for quan-titative pulse-echo speed-of-sound imaging. Ultrasonics 108 , 106168 (2020) 24. Sun, J., Li, H., Xu, Z., et al.: Deep ADMM-Net for compressive sensing MRI. Advances in Neural Information Processing Systems (NeurIPS) 29 (2016) 25. Treeby, B.E., Cox, B.T.: k-Wave: MATLAB toolbox for the simulation and recon-struction of photoacoustic wave fields. J. Biomed. Optics 15 (2), 021314–021314 (2010) 26. Venkatakrishnan, S.V., Bouman, C.A., Wohlberg, B.: Plug-and-play priors for model based reconstruction. In: IEEE Global Conference on Signal and Information Processing (GlobalSIP). pp. 945–948 (2013) 27. Vishnevskiy, V., Rau, R., Goksel, O.: Deep variational networks with exponential weighting for learning computed tomography. In: International Conference on Med-ical Image Computing and Computer-assisted Intervention (MICCAI). pp. 310–318 (2019) 28. Wu, D., Kim, K., El Fakhri, G., Li, Q.: Iterative low-dose CT reconstruction with priors trained by artificial neural network. IEEE Trans. Med. Imaging 36 (12), 2479–2486 (2017) 29. Xiao, D., de la Torre, P., El Nasr, M.S., Chee, A.J., Mourtzakis, M., Yu, A.C.: Live pulse-echo speed-of-sound estimation for quality assessment of large muscles in humans. Ultrasound Med. Biol. 51 (11), 1925–1935 (2025) 30. Zhang, K., Li, Y., Zuo, W., Zhang, L., Van Gool, L., Timofte, R.: Plug-and-play image restoration with deep denoiser prior. IEEE Trans. Pattern Anal. Mach. Intell. 
+
+44 (10), 6360–6376 (2021) 31. Zhang, K., Zuo, W., Chen, Y., Meng, D., Zhang, L.: Beyond a Gaussian denoiser: Residual learning of deep CNN for image denoising. IEEE Trans. Image Process. 
+
+26 (7), 3142–3155 (2017) 32. Zhang, K., Zuo, W., Gu, S., Zhang, L.: Learning deep CNN denoiser prior for image restoration. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR). pp. 3929–3938 (2017) 33. Zhu, B., Liu, J.Z., Cauley, S.F., Rosen, B.R., Rosen, M.S.: Image reconstruction by domain-transform manifold learning. Nature 555 (7697), 487–492 (2018) 34. Zhu, Y., Zhang, K., Liang, J., Cao, J., Wen, B., Timofte, R., Van Gool, L.: De-noising diffusion models for plug-and-play image restoration. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR). pp. 1219–1229 (2023)
