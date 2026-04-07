@@ -1,0 +1,279 @@
+Title: MRI-to-CT synthesis using drifting models
+
+URL Source: https://arxiv.org/pdf/2603.28498v1
+
+Published Time: Tue, 31 Mar 2026 02:11:28 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# MRI-TO -CT SYNTHESIS USING DRIFTING MODELS 
+
+Qing Lyu, Jeremy Hudson, Chirstopher T. Whitlow 
+
+Department of Radiology and Biomedical Imaging Yale School of Medicine New Haven, CT 
+
+{qing.lyu, jeremy.hudson, christopher.whitlow}@yale.edu 
+
+Jianxu Wang, Ge Wang 
+
+Department of Biomedical Engineering Rensselaer Polytechnic Institute Troy, NY 
+
+{wangj68, wangg6}@email 
+
+ABSTRACT 
+
+Accurate MRI-to-CT synthesis could enable MR-only pelvic workflows by providing CT-like images with bone details while avoiding additional ionizing radiation. In this work, we investigate recently proposed drifting models for synthesizing pelvis CT images from MRI and benchmark them against convolutional neural networks (UNet, VAE), a generative adversarial network (WGAN-GP), a physics-inspired probabilistic model (PPFM), and diffusion-based methods (FastDDPM, DDIM, DDPM). Experiments are performed on two complementary datasets: Gold Atlas Male Pelvis and the SynthRAD2023 pelvis subset. Image fidelity and structural consistency are evaluated with SSIM, PSNR, and RMSE, complemented by qualitative assessment of anatomically critical regions such as cortical bone and pelvic soft-tissue interfaces. Across both datasets, the proposed drifting model achieves high SSIM and PSNR and low RMSE, surpassing strong diffusion baselines and conventional CNN-, VAE-, GAN-, and PPFM-based methods. Visual inspection shows sharper cortical bone edges, improved depiction of sacral and femoral head geometry, and reduced artifacts or over-smoothing, particularly at bone–air–soft tissue boundaries. Moreover, the drifting model attains these gains with one-step inference and inference times on the order of milliseconds, yielding a more favorable accuracy–efficiency trade-off than iterative diffusion sampling while remaining competitive in image quality. These findings suggest that drifting models are a promising direction for fast, high-quality pelvic synthetic CT generation from MRI and warrant further investigation for downstream applications such as MRI-only radiotherapy planning and PET/MR attenuation correction. 
+
+Keywords Medical Image Synthesis · Drifting Models · Computed Tomography · Magnetic Resonance Imaging ·
+
+Artificial Intelligence 
+
+1 Introduction 
+
+Medical imaging often requires both Computed Tomography (CT) and Magenetic Resonance Imaging (MRI) modalities for comprehensive clinical assessment—CT provides Hounsfield unit (HU) electron density information essential for radiotherapy dose calculation, while MRI offers superior soft-tissue contrast for tumor delineation and diagnosis. Acquiring both modalities increases cost, radiation exposure, and introduces misalignment between scans [ 1, 2, 3]. In addition, CT acquisition may be constrained by practical factors such as equipment availability and maintenance burden, leading to variability in access and leaving some clinical or research cohorts without CT coverage [ 4, 5]. These limitations, together with the relative rarity of high-quality paired and well-registered CT–MRI datasets, make CT synthesis from MRI clinically important because it can provide CT-like quantitative surrogates for CT-dependent tasks (e.g., attenuation correction and MRI-only radiotherapy workflows) when CT is unavailable or undesirable [6, 7] 
+
+> arXiv:2603.28498v1 [eess.IV] 30 Mar 2026
+
+Running Title for Header Cross-modality synthesis—generating one modality from the other—has been a major research direction, but existing approaches face notable limitations [ 7 , 8 , 9 , 10 ]. Early strategies include atlas-based registration and patch-based learning, while more recent deep learning solutions span supervised convolutional neural networks (e.g., U-Net variants) and generative modeling frameworks [ 11 , 12 , 13 , 14 , 15 , 16 ]. Generative approaches such as VAEs and GANs can improve realism and sharpness but may suffer from blurring (VAEs) or training instability and hallucinated structures (GANs), especially near bone–air–soft tissue interfaces [ 17 , 18 , 19 , 20 , 21 , 22 , 23 , 24 , 25 , 26 , 27 ]. Diffusion models have shown strong fidelity and robustness, yet their iterative sampling can impose substantial inference-time costs that limit clinical practicality, motivating interest in faster generative alternatives [28, 29, 30]. Drifting models are a recent family of generative methods that learn a continuous “drift” (vector-field) dynamics to transform a simple source distribution into the target image distribution, making them naturally suited to conditional synthesis tasks such as MRI-to-CT by learning how an input-conditioned representation should evolve toward a CT-like output [ 31 ]. Compared with diffusion models, drifting models can be implemented with fewer integration steps and therefore offer faster inference in practice while targeting comparable perceptual fidelity. Relative to GAN-based synthesis, which may be sensitive to training instability and can produce visually plausible yet unfaithful structures, drifting models provide an appealing balance between realism and controllability for anatomy-preserving medical translation. In this study, we investigate recently emerged drifting models for pelvic MRI-to-CT synthesis and compare them against representative baselines including convolutional neural network (CNN), variational autoencoder (VAE), GAN, and diffusion models. We conduct experiments on two datasets—SynthRAD2023 and Gold Atlas Male Pelvis—and evaluate performance using structural similarity index (SSIM) and peak signal-to-noise ratio (PSNR), alongside qualitative assessment in anatomically critical regions. Our key contributions are: (1) modification of original drifting models and adding MRI as conditions for controllable CT synthesis, (2) a systematic benchmark of drifting models against established synthesis families on two complementary pelvic datasets, and (3) evidence that drifting models can achieve high-quality synthetic CT generation with notably fast inference, offering a favorable accuracy–efficiency trade-off for downstream use. 
+
+2 Related Studies 
+
+2.1 Atlas/registration-based CT synthesis approaches 
+
+Early sCT pipelines typically rely on aligning one or more atlas MR–CT pairs to a target MRI and then fusing the warped CTs into a pseudo-CT; these methods are conceptually appealing because they encode prior anatomical correspondences, but they can be sensitive to registration quality and population mismatch. Uh et al. is a representative early study in this vein, demonstrating the feasibility of MRI-based radiotherapy treatment planning by generating pseudo-CT via atlas registration and then assessing its suitability for dose calculation [ 12 ]. Extending the atlas concept toward PET/MR workflows, Burgos et al. focus on head-and-neck attenuation correction and describe an iterative multi-atlas strategy, underscoring that reliable pseudo-CT generation is also critical when CT is unavailable for attenuation mapping in PET/MR [ 13 ]. Building directly on multi-atlas synthesis for radiotherapy, Guerreiro et al. evaluate a multi-atlas sCT approach for MRI-only treatment planning in head-and-neck and prostate cases, comparing it to a bulk-density assignment alternative and showing that multi-atlas synthesis can achieve clinically small dose differences while improving automatic bone delineation [ 11 ]. In parallel, Roy et al. highlight a complementary perspective: rather than treating synthesis only as the final deliverable, they use image synthesis to enable improved MR-to-CT brain registration, illustrating how synthesis can reduce multimodal mismatch during alignment [ 15 ]. Lee et al. further refine the atlas pipeline by combining multi-atlas fusion with patch-based refinement, aiming to correct local details that global registration-and-fusion may miss [16]. 
+
+2.2 VAE/GAN-based approaches 
+
+As CT synthesis shifted from atlas/registration pipelines to generative modeling, VAE- and GAN-based approaches became prominent because they enable direct MRI-to-CT image translation with substantially faster inference and improved representation power. In broad terms, VAE-based methods emphasize stable optimization and anatomically faithful reconstructions through probabilistic latent representations, whereas GAN-based methods tend to deliver sharper, more realistic-looking CT textures but often require additional constraints to mitigate hallucinations and preserve geometry in unpaired or weakly paired training. On the VAE side, Iyer et al. propose an MRI-to-CT synthesis framework for pediatric cranial imaging built on a VAE. They further incorporate cranial suture segmentations as an auxiliary supervised signal, and report high structural similarity for sCT along with strong skull and suture segmentation performance on an in-house pediatric dataset [17]. 2Running Title for Header On the GAN side, much of the progress is driven by adding explicit mechanisms to improve structural reliability under imperfect pairing. Lei et al. introduce dense cycle-consistent GANs for MRI-only sCT generation, using cycle-consistency to reduce dependence on strictly paired datasets while encouraging anatomically plausible translation [ 20 ]. Yang et al. extend this line with a structure-constrained CycleGAN by adding a structure-consistency loss based on the modality-independent neighborhood descriptor, explicitly targeting geometric distortions that can arise in unconstrained CycleGAN mappings [ 24 ]. For head-and-neck radiotherapy, Liu et al. present a multi-cycle GAN that strengthens cyclic constraints to stabilize learning and better preserve anatomy in this challenging region [ 27 ]. In thoracic imaging, Matsuo et al. develop an unsupervised attention-based framework for chest MRI to CT translation, reflecting the need for stronger guidance when motion and low-signal regions make structure preservation difficult [ 25 ]. Gong et al. 
+
+further push constraint design with cycleSimulationGAN, combining channel-wise attention with structural-similarity constraints—including a contour mutual information loss—to improve detail recovery and structural retention for unpaired head-and-neck MR-to-CT synthesis [26]. Several works also emphasize clinical readiness and evaluation beyond image similarity. Wang et al. apply GAN-based MRI-to-CT generation for intracranial tumor radiotherapy planning, illustrating a clinically oriented deployment focused on planning feasibility [ 21 ]. Hsu et al. study sCT generation for MRI-guided adaptive radiotherapy in prostate cancer, where models must produce reliable sCT repeatedly as anatomy evolves over the treatment course [ 22 ]. Lemus et al. 
+
+reinforce that clinical acceptance should be assessed with task-based endpoints—such as dose metrics, DVH agreement, and gamma analysis—rather than relying solely on pixel-wise similarity [ 23 ]. Finally, Skandarani et al. provide an empirical study of GANs for medical image synthesis, offering practical insight into GAN behavior and common evaluation pitfalls that are important when interpreting and comparing GAN-based sCT pipelines [19]. 
+
+2.3 Diffusion-based approaches 
+
+Diffusion-based synthesis replaces one-shot generation with a learned conditional denoising process, which often improves fidelity and reduces some GAN-specific failure modes at the cost of iterative sampling. Lyu and Wang explores MRI-to-CT conversion using diffusion and score-matching models, representing an early effort to apply diffusion-based models to CT synthesis [ 30 ]. Pan et al. presents an approach using a 3D transformer-based denoising diffusion model with a Gaussian forward noise process on CT and a reverse denoising process conditioned on MRI, reporting improved image metrics and dosimetric agreement with generation in minutes [ 28 ]. Özbey et al. proposes unsupervised medical image translation with adversarial diffusion models, using a conditional diffusion translation mechanism plus adversarial/cycle-style constraints to enable unpaired cross-modal translation while accelerating sampling through larger reverse steps [ 29 ]. Li et al. proposes FDDM, an unsupervised MR →CT translation method that separates anatomy conversion from appearance generation and uses frequency-decoupled diffusion with dual reverse paths for low/high frequency components, reporting improved fidelity and anatomical accuracy on brain and pelvis MR →CT translation benchmarks [18]. 
+
+3 Methodology 
+
+3.1 Dataset 3.1.1 Gold Atlas Male Pelvis Dataset 
+
+The Gold Atlas Male Pelvis Dataset is a public pelvic MRI-CT dataset comprising 19 male patients, where each case includes a planning CT, a T1-weighted MRI, a T2-weighted MRI, and a deformably registered CT volume [ 32 ]. The data were acquired at three Swedish radiotherapy departments using site-specific clinical protocols and different scanners, which makes the dataset suitable for validating cross-site MRI-to-CT synthesis methods. For CT, the reported scanners were Siemens Somatom Definition AS+, Toshiba Aquilion, and Siemens Emotion 6, with slice thicknesses of 3.0, 2.0, and 2.5 mm , respectively, and in-plane pixel sizes of approximately 0.98 × 0.98, 1.0 × 1.0, and 0.98 × 0.98 
+
+mm 2. For MRI, the dataset includes both T1-weighted and T2-weighted acquisitions; the T1-weighted scans were acquired with slice thicknesses of 3.0, 2.0, and 2.5 mm and in-plane pixel sizes ranging from 0.875 × 0.875 to 1.1 ×
+
+1.1 mm 2, while the T2-weighted scans used 2.5 mm slice thickness and in-plane pixel sizes from 0.875 × 0.875 to 1.1 
+
+× 1.1 mm 2. The original dataset article reports site-specific acquisition settings rather than a single common image matrix for all subjects, reflecting the heterogeneous multi-center design. 
+
+3.1.2 SynthRAD2023 Dataset 
+
+SynthRAD2023 is a large multi-center benchmark for synthetic CT generation in radiotherapy, containing 540 paired MRI-CT sets and 540 paired cone beam CT-CT sets across brain and pelvis anatomies [ 33 ]. In this work, we use the MRI-to-CT pelvis subset (Task 1 pelvis), which contains 270 paired MRI-CT scans. This subset was collected from 3Running Title for Header two centers: Center A acquired pelvic MRI scans on Philips Ingenia 1.5T/3.0T systems using 3D T1-weighted spoiled gradient echo imaging, with in-plane pixel spacing between 0.94 and 1.14 mm , rows ranging from 400 to 528, and columns ranging from 103 to 528; Center C acquired scans on Siemens MAGNETOM Avanto, Skyra, and Vida 3T systems using 3D T2-weighted SPACE imaging, with in-plane pixel spacing between 1.17 and 1.30 mm and matrix size 288 × 384. The paired CT scans were reconstructed at 512 × 512 in-plane size, with pixel spacing of 0.77-1.37 mm at Center A and 0.98-1.17 mm at Center C, and slice thicknesses of 1.5 to 3.0 mm and 2.0 to 3.0 mm , respectively. 
+
+3.2 Image preprocessing 
+
+All MRI and CT volumes were first resampled to an isotropic spatial resolution of 1 × 1 × 1 mm 3. After resampling, each slice was centrally cropped or zero padded to ensure a uniform in-plane image size of 512 × 512. This step standardizes the field of view across subjects and simplifies mini-batch training. Finally, intensity normalization was performed independently for each scan so that inter-subject intensity scale variations were reduced before network training. Let x denote an input volume and T (·) the preprocessing operator; then the final network input can be written as 
+
+xprep = T (x), (1) where T (·) includes isotropic resampling, central cropping or zero padding, and per-scan intensity normalization. 
+
+3.3 Drifting Model 
+
+Drifting models reformulate generative modeling as a train-time distribution evolution problem rather than an iterative test-time denoising process. Instead of progressively refining a noisy sample during inference, the model learns during optimization how the generator distribution should move toward the target data distribution. As a result, the transport process is absorbed into training, while inference remains a one-step mapping from MRI to synthetic CT [31]. Let m denote an MRI input, c the corresponding target CT, and ϵ ∼ p(ϵ) random noise. A conditional generator fθ
+
+produces a synthetic CT ˆc based on conditional image m and noise ϵ
+
+ˆc = fθ (m, ϵ ). (2) In the spirit of drifting models, adapted from the paper’s unconditional pushforward formulation, the proposed conditional output distribution qθ (· | m) is expressed as follows 
+
+qθ (· | m) = [ fθ (m, ·)] # p(ϵ). (3) To simplify the drifting formulation, we compute the drifting loss directly in the image domain rather than in a learned feature space. Let ˆc denote a generated CT image, let c+ denote a real CT sample from the target distribution, and let 
+
+c− denote a generated CT sample from the current model distribution. The drifting field is therefore defined directly on image intensities, so the generator is trained to move each synthesized CT toward nearby real CT images while repelling it from other generated CT images. This follows the original raw-space drifting formulation, but is adapted here to conditional MRI-to-CT synthesis. For a generated sample ˆc, the general drifting field is written as 
+
+Vp,q (ˆ c) = Ec+∼p(·| m)Ec−∼q(·| m)
+
+K(ˆ c, c +, c −) . (4) where K(·, ·, ·) is a kernel-like function describing interactions among three sample points. The drift field in drifting models is built from attraction toward data samples and repulsion from generated samples, with anti-symmetry ensuring zero drift at equilibrium when the two distributions match: 
+
+V+ 
+
+> p
+
+(ˆ c) = 1
+
+Zp(ˆ c) Ec+∼p(·| m)
+
+k(ˆ c, c +)( c+ − ˆc) , (5) 
+
+V− 
+
+> q
+
+(ˆ c) = 1
+
+Zq (ˆ c) Ec−∼q(·| m)
+
+k(ˆ c, c −)( c− − ˆc) , (6) where the normalization factors are 
+
+Zp(ˆ c) = Ec+∼p(·| m)
+
+k(ˆ c, c +) , Zq (ˆ c) = Ec−∼q(·| m)
+
+k(ˆ c, c −) . (7) 
+
+k(·, ·) is the pairwise similarity kernel 
+
+k(a, b ) = exp( − 1
+
+τ ∥a − b∥2). (8) 4Running Title for Header The final drifting field is defined as 
+
+Vp,q (ˆ c) = V+ 
+
+> p
+
+(ˆ c) − V− 
+
+> q
+
+(ˆ c). (9) At equilibrium state, the generator output should satisfy the fixed-point relation 
+
+fˆθ (m, ϵ ) = fˆθ (m, ϵ ) + Vp,q ˆθ
+
+ fˆθ (m, ϵ ) . (10) This motivates the training-time update 
+
+fθi+1 (m, ϵ ) ← fθi (m, ϵ ) + Vp,q θi (fθi (m, ϵ )) . (11) We convert this update rule into the drifting loss 
+
+Ldrift = Em,ϵ 
+
+h
+
+∥fθ (m, ϵ ) − sg( fθ (m, ϵ ) + Vp,q θ (fθ (m, ϵ ))) ∥22
+
+i
+
+, (12) where sg( ·) denotes the stop-gradient operator. For paired MRI-to-CT synthesis, an additional voxel-level reconstruction term can be included to preserve anatomical correspondence: 
+
+Ltotal = λdrift Ldrift + λ1 ∥ˆc − c∥1 , (13) where λdrift and λ1 control the balance between distribution-level drifting and voxel-wise fidelity. 
+
+3.4 Implementation Details 
+
+We split both Gold Atlas and SynthRAD2023 datasets based on 70%/10%/20% rule to create training, validation, and testing subsets, respectively. The conditional generation in the drifting model is a UNet-like model. For drifting loss computation, 16 positive and negative samples are created by randomly cropping 64 × 64 patches from real image and generated images, respectively. In (13) , λdrif t and λ1 are empirically set to 1 and 10, respectively. Adam optimizer is used and the learning rate is set to 0.0001. The training loss is recorded and monitored during the training process. When the training loss does not decrease more than 1% for the most recent 20 epochs, the early stop triggers and the training model is saved for the later inference. All experiments are conducted using Pytorch via a single Nvidia H200 GPU. 
+
+4 Results 
+
+To ensure a fair comparison, we benchmark the proposed MRI -conditioned drifting model against a diverse set of representative baselines, including convolutional encoder–decoder architectures (UNet, VAE) [ 34 , 35 ], an adversar-ial model (WGAN -GP) [ 36 ], a physics - inspired probabilistic framework (PPFM) [ 37 ], and several diffusion - based approaches (FastDDPM, DDIM, DDPM) [ 38 , 39 , 40 ]. All models are implemented with a comparable number of trainable parameters and similar backbone capacity, so that performance differences primarily reflect the underlying generative mechanism and conditioning strategy rather than model size. DDPM inference is based on a 1000-step denoising, while DDIM and fastDDPM is implemented via a 20-step sampling. PPFM inference results are made by a 18-step sampling process. 
+
+4.1 Results on Gold Atlas Male Pelvis dataset 
+
+On the Gold Atlas dataset, the proposed drifting model outperforms all competing methods except DDPM in terms of SSIM, PSNR, and RMSE. Quantitatively, it attains high SSIM and PSNR and low RMSE, surpassing the diffusion-based models such as FastDDPM, PPFM, and DDIM, as well as non -diffusion methods such as UNet, VAE, and WGAN - GP. The only exception is DDPM, which obtains the highest SSIM and PSNR and the lowest RMSE. Visually, Figure 1 shows that the proposed drifting model better preserves fine pelvic structures and soft -tissue boundaries, with clearer organ details and reduced over -smoothing compared with UNet/VAE and fewer noise - induced artifacts than WGAN -GP and PPFM. Compared with other diffusion models, drifting produces sharper cortical bone edges and more accurate Hounsfield unit transitions, which align more closely with the reference CT. A representative example in Figure 1 illustrates these trends: UNet and VAE yield overly smooth bone–soft - tissue transitions, WGAN -GP introduces artifacts that hinder image quality, and DDIM/PPFM/fastDDPM produce good results with clear tissue boundary but lower image quality when comparing with DDPM. Among all approaches, DDPM demonstrates the best ability to clearly demonstrate bone details and tissue boundary. As for the proposed drifting model, it can bring about comparable results with DDIM/fastDDPM and present clear tissue boundary and bone structure. Table 1 presented quantitative comparison of synthetic CT from different approaches. It can be found that the proposed drifting model slightly overcome DDIM and fastDDPM but not as good as DDPM. 5Running Title for Header T2 MRI         
+
+> SSIM: 0.81, PSNR: 29.01
+> Unet
+> SSIM: 0.81, PSNR: 28.77
+> VAE
+> SSIM: 0.81, PSNR: 29.31
+> WGAN-GP
+> SSIM: 0.82, PSNR: 29.83
+> DDPM
+> SSIM: 0.80, PSNR: 28.93
+> DDIM
+> SSIM: 0.78, PSNR: 26.96
+> PPFM
+> SSIM: 0.80, PSNR: 29.27
+> fastDDPM
+> SSIM: 0.83, PSNR: 30.28
+> Drifting CT
+> SSIM: 0.87, PSNR: 30.32 SSIM: 0.88, PSNR: 30.24 SSIM: 0.88, PSNR: 30.11 SSIM: 0.92, PSNR: 31.97 SSIM: 0.87, PSNR: 30.56 SSIM: 0.78, PSNR: 28.29 SSIM: 0.87, PSNR: 30.84 SSIM: 0.92, PSNR: 31.53
+
+Figure 1: Comparison of CT synthesize results from different methods on Gold Atlas Dataset. Table 1: Quantitative comparison of various methods Gold Atlas SynthRAD2023 SSIM PSNR RMSE SSIM PSNR RMSE UNet 0.835 ± 0.030 29.53 ± 1.44 0.041 ± 0.003 0.935 ± 0.012 28.74 ± 1.68 0.040 ± 0.017 VAE 0.840 ± 0.039 29.26 ± 1.74 0.043 ± 0.003 0.931 ± 0.013 29.29 ± 1.87 0.043 ± 0.012 WGAN-GP 0.853 ± 0.035 29.64 ± 1.01 0.045 ± 0.002 0.909 ± 0.007 27.68 ± 1.69 0.045 ± 0.021 PPFM 0.823 ± 0.054 27.08 ± 2.25 0.084 ± 0.019 0.871 ± 0.028 27.18 ± 2.05 0.048 ± 0.023 FastDDPM 0.865 ± 0.041 30.58 ± 1.38 0.039 ± 0.003 0.948 ± 0.015 29.83 ± 1.75 0.033 ± 0.010 DDIM 0.854 ± 0.042 30.13 ± 1.42 0.042 ± 0.004 0.946 ± 0.021 30.12 ± 1.64 0.035 ± 0.013 DDPM 0.889 ± 0.045 31.34 ± 1.64 0.031 ± 0.003 0.969 ± 0.012 31.51 ± 1.84 0.024 ± 0.008 
+
+Drifting 0.869 ± 0.043 30.56 ± 1.23 0.035 ± 0.002 0.948 ± 0.009 30.82 ± 1.69 0.030 ± 0.011 
+
+4.2 Inference speed comparison 
+
+Figure 2 summarizes the trade - off between inference time and image quality for all competing methods on the Gold Atlas dataset. The proposed drifting model achieves one of the lowest inference times (on the order of ms) while simultaneously obtaining the highest SSIM and PSNR, forming the most favorable position in both “time vs SSIM” and “time vs PSNR” plots. DDPM reaches competitive SSIM/PSNR but requires longer sampling, shifting it toward slower inference, whereas DDIM and FastDDPM reduce runtime at the cost of noticeable drops in SSIM and PSNR. Conventional generative baselines such as VAE and WGAN -GP do not close the quality gap to drifting despite similar or higher computational cost. 
+
+4.3 Results on SynthRAD2023 dataset 
+
+On the more diverse SynthRAD2023 dataset, the proposed drifting model again yields superior quantitative performance, achieving high SSIM and PSNR with low RMSE. Compared to UNet, VAE, WGAN - GP, and PPFM, drifting substantially improves structural fidelity and intensity accuracy, and it further improves over DDIM and FastDDPM despite their strong baseline performance. Qualitative examples in Figure 3 show that drifting better captures pelvic bone geometry 6Running Title for Header 10 2 10 3 10 4 
+
+> time (ms)
+> 0.82
+> 0.83
+> 0.84
+> 0.85
+> 0.86
+> 0.87
+> 0.88
+> 0.89
+> SSIM
+> Drifting
+> DDPM
+> DDIM WGAN-GP
+> VAE
+> UNet
+> PPFM
+> FastDDPM
+> (a)
+
+Inference time vs SSIM    
+
+> 10 210 310 4
+> time (ms)
+> 27
+> 28
+> 29
+> 30
+> 31
+> PSNR (dB)
+> Drifting
+> DDPM
+> DDIM
+> WGAN-GP
+> VAE
+> UNet
+> PPFM
+> FastDDPM
+> (b)
+
+Inference time vs PSNR 
+
+Figure 2: Comparison of result image quality versus inference time. and soft -tissue contrast under varying anatomies and acquisition conditions, whereas competing methods either over-smooth high-contrast regions or introduce spurious texture in low-dose areas. Figure 3 also demonstrates that the drifting model maintains robust performance across different patients, with consistent depiction of sacral curvature, femoral heads, and rectal filling patterns that closely match the ground -truth CT. Even in challenging cases with atypical positioning or metallic implants, drifting introduces fewer streaks and unnatural intensity transitions than GAN - based and other diffusion baselines, supporting its generalizability beyond the controlled Gold Atlas cohort. 
+
+4.4 Investigation on model uncertainty 
+
+Although inference diversity can be adjusted by method-specific sampling parameters such as temperature in (8) for the drifting model or σt in DDPM-based methods, we believe that uncertainty investigation remains necessary. A controllable diversity parameter does not by itself explain how sensitive a model is to stochastic perturbations under a fixed inference configuration, whereas repeated-sampling analysis directly measures the variability of the generated result for the same MRI input. Therefore, in this study, we evaluate epistemic uncertainty using pixel-wise standard deviation maps obtained from 20 repeated samplings with different random noises, as shown in Figure 4. Under this unified protocol, the standard deviation map serves as a practical indicator of sampling stability: a lower and more spatially confined variance implies that the model is less sensitive to random initialization and thus more reliable at inference time. Figure 4 presents qualitative comparisons of model uncertainty for two representative cases. Across the compared methods, the standard deviation maps reveal clear differences in the spatial distribution. PPFM exhibits broader highlighted regions with a relatively elevated global uncertainty level, indicating stronger sensitivity to stochastic sampling, whereas DDPM shows a comparatively more constrained pattern but still retains noticeable uncertainty in several structures. In comparison, the proposed drifting model shows a distinct uncertainty pattern relative to the baseline methods. Its standard deviation map highlights fewer or more localized regions, suggesting improved control of sampling variability and more stable inference behavior under repeated random initialization. 
+
+5 Discussion 
+
+In this work, we systematically evaluated a conditional drifting model for pelvic MRI-to-CT synthesis on two comple-mentary public datasets, Gold Atlas and SynthRAD2023, and compared it against convolutional, variational, adversarial, and diffusion-based baselines. Across both cohorts, the drifting model consistently achieved competitive or superior image quality as measured by SSIM, PSNR, and RMSE, while also delivering fast inference times on the order of milliseconds per slice. These results indicate that drifting-based generative modeling provides a favorable balance 7Running Title for Header T2 MRI         
+
+> SSIM: 0.91, PSNR: 27.04
+> UNet
+> SSIM: 0.91, PSNR: 28.57
+> VAE
+> SSIM: 0.89, PSNR: 25.90
+> WGAN-GP
+> SSIM: 0.86, PSNR: 26.09
+> PPFM
+> SSIM: 0.92, PSNR: 29.77
+> DDIM
+> SSIM: 0.94, PSNR: 30.11
+> DDPM
+> SSIM: 0.93, PSNR: 30.44
+> fastDDPM
+> SSIM: 0.94, PSNR: 30.42
+> Drifting CT
+> SSIM: 0.92, PSNR: 29.58 SSIM: 0.93, PSNR: 30.53 SSIM: 0.89, PSNR: 28.24 SSIM: 0.85, PSNR: 28.04 SSIM: 0.92, PSNR: 30.57 SSIM: 0.95, PSNR: 32.37 SSIM: 0.93, PSNR: 31.16 SSIM: 0.94, PSNR: 31.32
+
+Figure 3: Comparison of CT synthesize results from different methods on SynthRAD2023 Dataset. CT DDPM DDIM PPFM fastDDPM Drifting 
+
+Figure 4: Pixel-vise standard deviation map based on 20 sampling results for each comparing approach. between fidelity and computational efficiency, which is particularly relevant for time-sensitive radiotherapy workflows where multiple synthetic CT volumes may need to be generated repeatedly over a treatment course. An important observation from our experiments is that the drifting model preserves pelvic bone geometry and soft-tissue boundaries more faithfully than CNN, VAE, and GAN baselines, which either tended toward over-smoothing or introduced artifacts in high-contrast regions. On Gold Atlas, qualitative inspection showed sharper cortical bone edges, clearer rectal wall delineation, and fewer checkerboard or noise-like patterns than WGAN-GP and PPFM, aligning with the superior SSIM/PSNR and lower RMSE reported for the drifting model. On the more heterogeneous SynthRAD2023 pelvis subset, the drifting model remained robust across patients and acquisition protocols, maintaining accurate depiction of sacrum curvature, femoral heads, and rectal filling patterns even in challenging cases with atypical positioning or metallic implants. Together, these findings suggest that the attraction–repulsion mechanism in drifting 8Running Title for Header models can improve structural consistency at anatomy-critical interfaces compared with purely voxel-wise or adversarial objectives. Compared with diffusion-based methods, the proposed approach occupies an interesting point in the design space. Prior diffusion models for MRI-to-CT synthesis have demonstrated high fidelity and strong dosimetric agreement, but at the cost of iterative sampling that can require seconds to minutes per volume. In our study, DDPM achieved strong SSIM and PSNR but incurred substantially higher inference time, whereas accelerated variants such as DDIM and FastDDPM narrowed the runtime gap at the expense of noticeable drops in image quality. By contrast, the drifting model internalizes the transport dynamics into training, allowing one-step inference conditioned on MRI while still matching or surpassing diffusion baselines in both similarity metrics and qualitative sharpness. This accuracy–efficiency trade-off suggests that drifting models may serve as a pragmatic alternative when clinical throughput is a primary constraint, for example in MRI-only planning or adaptive radiotherapy scenarios where same-session sCT generation is desirable. Our results should also be interpreted in the context of broader work on MRI-to-CT synthesis and generative medical imaging. Traditional atlas-based and registration-driven methods encode anatomical priors but can be brittle to registration errors and population mismatch, particularly in multi-center settings such as SynthRAD2023. VAE- and GAN-based frameworks have improved realism and flexibility but often require sophisticated structural constraints and careful training to avoid blurring or hallucinated structures. Recent diffusion approaches mitigate some GAN failure modes and provide strong baselines, but practicality can be an issue for integration into routine clinical pipelines. The drifting framework, operating directly in image space with a kernel-based attraction–repulsion field, offers an alternative that is simple to condition on MRI, yields deterministic one-step mapping at test time, and empirically reduces the tendency toward over-smoothing or texture artifacts around bone–air–soft tissue interfaces. These characteristics make drifting models a promising candidate to complement, rather than replace, existing generative paradigms in synthetic CT research. Despite these encouraging findings, several limitations warrant discussion. First, our experiments are restricted to pelvic MRI-to-CT synthesis and rely solely on image similarity metrics (SSIM, PSNR, RMSE) and qualitative anatomical assessment, without explicit evaluation on downstream clinical tasks such as dose calculation, DVH agreement, or attenuation correction performance. Prior work has emphasized that task-based endpoints are critical for judging clinical readiness; thus, future studies should integrate radiotherapy planning and PET/MR attenuation experiments to quantify the dosimetric and functional impact of drifting-based sCT. Second, we focused on paired supervised training and did not explore unpaired or semi-supervised regimes, which are highly relevant given the scarcity of well-registered MRI–CT pairs and the availability of large unpaired datasets. Extending drifting models to unpaired translation, potentially by combining them with cycle or structural consistency constraints, could further broaden their applicability. Third, our implementation uses a relatively standard UNet-like backbone and a simple image-domain drifting field with a fixed Gaussian kernel and globally chosen loss weights. It is plausible that more expressive architectures (e.g., transformer or hybrid CNN–transformer backbones) or adaptive, spatially varying kernels could further enhance performance, particularly in regions with complex anatomy or large intensity heterogeneity. Additionally, we did not perform an extensive hyperparameter search across all baselines; while we attempted to match model capacity and training protocols, some performance differences may partly reflect implementation details or optimization choices. Finally, all experiments were conducted on a single high-end GPU, and we did not systematically analyze memory consumption, scalability to 3D or 4D (time-resolved) volumes, or behavior under domain shifts such as different scanners, sequences, or institutions beyond those included in the two public datasets. Future work will therefore include several directions. From a methodological perspective, incorporating anatomy-aware or frequency-decoupled losses into the drifting field, as well as exploring multi-modal conditioning (e.g., joint T1/T2, or MRI plus prior segmentations), may improve fine-detail reconstruction and robustness across varying acquisition protocols. From an evaluation standpoint, we plan to conduct comprehensive task-based studies in radiotherapy planning and PET/MR attenuation, including comparisons of dose metrics, gamma analysis, and clinical acceptability ratings between drifting-based sCT and ground-truth CT. Finally, extending the proposed framework beyond the pelvis to other anatomies such as brain, head-and-neck, and thorax, and assessing its performance under domain adaptation scenarios, will be essential to understand how well drifting models generalize in realistic multi-center clinical settings. 
+
+6 Conclusion 
+
+We presented a conditional drifting model for pelvic MRI-to-CT synthesis and benchmarked it against convolutional, variational, adversarial, and diffusion-based approaches on the Gold Atlas Male Pelvis and SynthRAD2023 pelvis datasets. Across both cohorts, the drifting model achieved consistently high SSIM and PSNR together with low RMSE, while preserving fine pelvic bone structures and soft-tissue boundaries with fewer artifacts than competing 9Running Title for Header methods. Compared with diffusion-based baselines, the proposed approach offers a more favorable accuracy–efficiency trade-off, attaining comparable or superior image quality with substantially reduced inference time through one-step generation. These properties make drifting models attractive for integration into time-critical MR-only workflows, including radiotherapy planning and attenuation correction, where reliable and fast synthetic CT generation is required. Future work will extend this framework to additional anatomies and task-based evaluations, and investigate unpaired training and architecture refinements to further enhance robustness and clinical readiness. 
+
+References 
+
+[1] Norbert J Pelc. Recent and future directions in ct imaging. Annals of biomedical engineering , 42(2):260–268, 2014. [2] Carlo Liguori, Giulia Frauenfelder, Carlo Massaroni, Paola Saccomandi, Francesco Giurazza, Francesca Pitocco, Riccardo Marano, and Emiliano Schena. Emerging clinical applications of computed tomography. Medical Devices: Evidence and Research , pages 265–278, 2015. [3] David J Brenner and Eric J Hall. Computed tomography—an increasing source of radiation exposure. New England journal of medicine , 357(22):2277–2284, 2007. [4] Guy Frija, Ivana Blaži´ c, Donald P Frush, Monika Hierath, Michael Kawooya, Lluis Donoso-Bach, and Boris Brkljaˇ ci´ c. How to improve access to medical imaging in low-and middle-income countries? EClinicalMedicine ,38, 2021. [5] Benjamin T Burdorf. Comparing magnetic resonance imaging and computed tomography machine accessibility among urban and rural county hospitals. Journal of Public Health Research , 11(1):jphr–2021, 2022. [6] Zakaria Shams Siam, Md Younus Akon, Israt Jahan Munmun, Abdullah Al-Amin, Md Abdus Salam, and Ishtiak Al Mamoon. A paired ct and mri dataset for advanced medical imaging applications. Data in Brief , 61:111768, 2025. [7] Jens M Edmund and Tufve Nyholm. A review of substitute ct generation for mri-only radiation therapy. Radiation Oncology , 12(1):28, 2017. [8] Mohamed A Bahloul, Saima Jabeen, Sara Benoumhani, Habib Abdulmohsen Alsaleh, Zehor Belkhatir, and Areej Al-Wabil. Advancements in synthetic ct generation from mri: A review of techniques, and trends in radiation therapy planning. Journal of Applied Clinical Medical Physics , 25(11):e14499, 2024. [9] Sanuwani Dayarathna, Kh Tohidul Islam, Sergio Uribe, Guang Yang, Munawar Hayat, and Zhaolin Chen. Deep learning based synthesis of mri, ct and pet: Review and analysis. Medical image analysis , 92:103046, 2024. [10] Mahmoud Ibrahim, Yasmina Al Khalil, Sina Amirrajab, Chang Sun, Marcel Breeuwer, Josien Pluim, Bart Elen, Gökhan Ertaylan, and Michel Dumontier. Generative ai for synthetic data across multiple medical modalities: A systematic review of recent developments and challenges. Computers in biology and medicine , 189:109834, 2025. [11] F Guerreiro, Ninon Burgos, A Dunlop, K Wong, I Petkar, C Nutting, K Harrington, S Bhide, K Newbold, D Dearnaley, et al. Evaluation of a multi-atlas ct synthesis approach for mri-only radiotherapy treatment planning. 
+
+Physica Medica , 35:7–17, 2017. [12] Jinsoo Uh, Thomas E Merchant, Yimei Li, Xingyu Li, and Chiaho Hua. Mri-based treatment planning with pseudo ct generated through atlas registration. Medical physics , 41(5):051711, 2014. [13] Ninon Burgos, M Jorge Cardoso, Marc Modat, Shonit Punwani, David Atkinson, Simon R Arridge, Brian F Hutton, and Sébastien Ourselin. Ct synthesis in the head & neck region for pet/mr attenuation correction: an iterative multi-atlas approach. EJNMMI physics , 2(Suppl 1):A31, 2015. [14] Yasheng Chen and Hongyu An. Attenuation correction of pet/mr imaging. Magnetic Resonance Imaging Clinics ,25(2):245–255, 2017. [15] Snehashis Roy, Aaron Carass, Amod Jog, Jerry L Prince, and Junghoon Lee. Mr to ct registration of brains using image synthesis. In Proceedings of SPIE , volume 9034, pages spie–org, 2014. [16] Junghoon Lee, Aaron Carass, Amod Jog, Can Zhao, and Jerry L Prince. Multi-atlas-based ct synthesis from conventional mri with patch-based refinement for mri-based radiotherapy planning. In Medical Imaging 2017: Image Processing , volume 10133, pages 434–439. SPIE, 2017. [17] Krithika Iyer, Austin Tapp, Athelia Paulli, Gabrielle Dickerson, Syed Muhammad Anwar, Natasha Lepore, and Marius George Linguraru. Mri-to-ct synthesis with cranial suture segmentations using a variational autoencoder framework. arXiv preprint arXiv:2512.23894 , 2025. 10 Running Title for Header [18] Yunxiang Li, Hua-Chieh Shao, Xiaoxue Qian, and You Zhang. Fddm: unsupervised medical image translation with a frequency-decoupled diffusion model. Machine Learning: Science and Technology , 6(2):025007, apr 2025. [19] Youssef Skandarani, Pierre-Marc Jodoin, and Alain Lalande. Gans for medical image synthesis: An empirical study. Journal of Imaging , 9(3):69, 2023. [20] Yang Lei, Joseph Harms, Tonghe Wang, Yingzi Liu, Hui-Kuo Shu, Ashesh B Jani, Walter J Curran, Hui Mao, Tian Liu, and Xiaofeng Yang. Mri-only based synthetic ct generation using dense cycle consistent generative adversarial networks. Medical physics , 46(8):3565–3581, 2019. [21] Chun-Chieh Wang, Pei-Huan Wu, Gigin Lin, Yen-Ling Huang, Yu-Chun Lin, Yi-Peng Chang, and Jun-Cheng Weng. Magnetic resonance-based synthetic computed tomography using generative adversarial networks for intracranial tumor radiotherapy treatment planning. Journal of personalized medicine , 12(3):361, 2022. [22] Shu-Hui Hsu, Zhaohui Han, Jonathan E Leeman, Yue-Houng Hu, Raymond H Mak, and Atchar Sudhyadhom. Synthetic ct generation for mri-guided adaptive radiotherapy in prostate cancer. Frontiers in Oncology , 12:969463, 2022. [23] Olga M Dona Lemus, Yi-Fang Wang, Fiona Li, Sachin Jambawalikar, David P Horowitz, Yuanguang Xu, and Cheng-Shie Wuu. Dosimetric assessment of patient dose calculation on a deep learning-based synthesized computed tomography image for adaptive radiotherapy. Journal of Applied Clinical Medical Physics , 23(7):e13595, 2022. [24] Heran Yang, Jian Sun, Aaron Carass, Can Zhao, Junghoon Lee, Jerry L Prince, and Zongben Xu. Unsupervised mr-to-ct synthesis using structure-constrained cyclegan. IEEE transactions on medical imaging , 39(12):4249–4261, 2020. [25] Hidetoshi Matsuo, Mizuho Nishio, Munenobu Nogami, Feibi Zeng, Takako Kurimoto, Sandeep Kaushik, Florian Wiesinger, Atsushi K Kono, and Takamichi Murakami. Unsupervised-learning-based method for chest mri– ct transformation using structure constrained unsupervised generative attention networks. Scientific reports ,12(1):11090, 2022. [26] Changfei Gong, Yuling Huang, Mingming Luo, Shunxiang Cao, Xiaochang Gong, Shenggou Ding, Xingxing Yuan, Wenheng Zheng, and Yun Zhang. Channel-wise attention enhanced and structural similarity constrained cyclegan for effective synthetic ct generation from head and neck mri images. Radiation Oncology , 19(1):37, 2024. [27] Yanxia Liu, Anni Chen, Hongyu Shi, Sijuan Huang, Wanjia Zheng, Zhiqiang Liu, Qin Zhang, and Xin Yang. Ct synthesis from mri using multi-cycle gan for head-and-neck radiation therapy. Computerized medical imaging and graphics , 91:101953, 2021. [28] Shaoyan Pan, Elham Abouei, Jacob Wynne, Chih-Wei Chang, Tonghe Wang, Richard LJ Qiu, Yuheng Li, Junbo Peng, Justin Roper, Pretesh Patel, et al. Synthetic ct generation from mri using 3d transformer-based denoising diffusion model. Medical Physics , 51(4):2538–2548, 2024. [29] Muzaffer Özbey, Onat Dalmaz, Salman UH Dar, Hasan A Bedel, ¸ Saban Özturk, Alper Güngör, and Tolga Cukur. Unsupervised medical image translation with adversarial diffusion models. IEEE Transactions on Medical Imaging , 42(12):3524–3539, 2023. [30] Qing Lyu and Ge Wang. Conversion between ct and mri images using diffusion and score-matching models. arXiv preprint arXiv:2209.12104 , 2022. [31] Mingyang Deng, He Li, Tianhong Li, Yilun Du, and Kaiming He. Generative modeling via drifting. arXiv preprint arXiv:2602.04770 , 2026. [32] Tufve Nyholm, Stina Svensson, Sebastian Andersson, Joakim Jonsson, Maja Sohlin, Christian Gustafsson, Elisabeth Kjellén, Ludvig P. Muren, Hans von der Maase, Jinyi Wang, Sofie Ceberg, and Adalsteinn Gunnlaugsson. Mr and ct data with multiobserver delineations of organs in the pelvic area – part of the gold atlas project. Medical Physics , 45(3):1295–1300, 2018. [33] Adrian Thummerer, Erik van der Bijl, Arthur Galapon Jr, Joost J. C. Verhoeff, Johannes A. Langendijk, Stefan Both, Cornelis A. T. van den Berg, and Matteo Maspero. Synthrad2023 grand challenge dataset: Generating synthetic ct for radiotherapy. Medical Physics , 50(7):4664–4674, 2023. [34] Olaf Ronneberger, Philipp Fischer, and Thomas Brox. U-Net: Convolutional Networks for Biomedical Image Segmentation. arXiv e-prints , page arXiv:1505.04597, May 2015. [35] Diederik P Kingma and Max Welling. Auto-Encoding Variational Bayes. arXiv e-prints , page arXiv:1312.6114, December 2013. 11 Running Title for Header [36] Ishaan Gulrajani, Faruk Ahmed, Martin Arjovsky, Vincent Dumoulin, and Aaron C Courville. Improved training of wasserstein gans. In Advances in neural information processing systems , volume 30, 2017. [37] Dennis Hein, Staffan Holmin, Timothy Szczykutowicz, Jonathan S. Maltz, Mats Danielsson, Ge Wang, and Mats Persson. PPFM: Image Denoising in Photon-Counting CT Using Single-Step Posterior Sampling Poisson Flow Generative Models. IEEE Transactions on Radiation and Plasma Medical Sciences , 8(7):788–799, January 2024. [38] Hongxu Jiang, Muhammad Imran, Teng Zhang, Yuyin Zhou, Muxuan Liang, Kuang Gong, and Wei Shao. Fast-DDPM: Fast Denoising Diffusion Probabilistic Models for Medical Image-to-Image Generation. arXiv e-prints ,page arXiv:2405.14802, May 2024. [39] Jiaming Song, Chenlin Meng, and Stefano Ermon. Denoising Diffusion Implicit Models. arXiv e-prints , page arXiv:2010.02502, October 2020. [40] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising Diffusion Probabilistic Models. arXiv e-prints , page arXiv:2006.11239, June 2020. 12

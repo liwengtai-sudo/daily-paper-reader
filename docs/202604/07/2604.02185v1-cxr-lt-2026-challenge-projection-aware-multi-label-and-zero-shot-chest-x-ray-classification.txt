@@ -1,0 +1,150 @@
+Title: CXR-LT 2026 Challenge: Projection-Aware Multi-Label and Zero-Shot Chest X-Ray Classification
+
+URL Source: https://arxiv.org/pdf/2604.02185v1
+
+Published Time: Fri, 03 Apr 2026 01:08:08 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+## CXR-LT 2026 CHALLENGE: PROJECTION-AWARE MULTI-LABEL AND ZERO-SHOT CHEST X-RAY CLASSIFICATION 
+
+## Juno Cho 1†, Dohui Kim 2†, Mingeon Kim 1†, Hyunseo Jang 3†, Chang Sun Lee 4, Jong Chul Ye 4∗ 
+
+> 1
+
+## KAIST, Daejeon, South Korea  
+
+> 2
+
+## GIST, Gwangju, South Korea  
+
+> 3
+
+## Korea University, Seoul, South Korea  
+
+> 4
+
+## KAIST Graduate School of AI (GSAI), Seoul, South Korea 
+
+ABSTRACT 
+
+This challenge tackles multi-label classification for known chest X-ray (CXR) lesions and zero-shot classification for un-seen ones. To handle diverse CXR projections, we integrate projection-specific models via a classification network into a unified framework. For zero-shot classification (Task 2), we extend CheXzero with a novel dual-branch architecture that combines contrastive learning, Asymmetric Loss (ASL), and LLM-generated descriptive prompts. This effectively miti-gates severe long-tail imbalances and maximizes zero-shot generalization. Additionally, strong data and test-time aug-mentations (TTA) ensure robustness across both tasks. 
+
+Index Terms — Projection-Aware, Zero-Shot Classifica-tion, CLIP, Asymmetric Loss, Descriptive Prompt, Ensemble 
+
+1. INTRODUCTION 
+
+The CXR-LT 2026 Challenge [1] addresses severe long-tailed data distributions and annotation scarcity in real-world CXR diagnosis through two interconnected tasks. Task 1 
+
+targets multi-label classification for 30 known lesions, where we mitigate class imbalances using a projection-aware rout-ing network paired with robust ensembling. For Task 2 ,which demands zero-shot classification for six entirely un-seen diseases without explicit supervision, our contributions are threefold: (1) a dual-branch framework integrating global semantic alignment with ASL for fine-grained discrimina-tion; (2) medical concept enrichment via LLM-based prompt ensembling; and (3) a strict proxy validation strategy to guar-antee leak-free out-of-distribution (OOD) generalization.     
+
+> †Equal contribution. ∗Corresponding author. Work conducted dur-ing the KAIRI internship at KAIST. Dohui Kim graduated from GIST (Feb. 2026). Accepted to the IEEE International Symposium on Biomedical Imaging (ISBI) 2026 CXR-LT Challenge. ©2026 IEEE. Personal use of this mate-rial is permitted. Permission from IEEE must be obtained for all other uses, in any current or future media, including reprinting/republishing this mate-rial for advertising or promotional purposes, creating new collective works, for resale or redistribution to servers or lists, or reuse of any copyrighted component of this work in other works.
+
+2. RELATED WORKS 
+
+Deep learning for CXR classification has evolved from con-volutional networks to transformer-based models. CNNs such as DenseNet [2], EfficientNet [3], and ConvNeXt [4, 5] re-main widely used for multi-label tasks due to strong induc-tive biases. Transformer variants including ViT [6], CaiT [7], and Swin Transformer [8, 9] capture long-range dependencies via self-attention and perform well on high-resolution medi-cal images. In CXR analysis, CheXNet [10] demonstrated large-scale multi-label disease detection on ChestX-ray14, while CheX-pert [11] addressed label uncertainty. Subsequent works mitigate class imbalance and weak supervision in long-tailed datasets using attention mechanisms or region-aware pooling such as PCAM [12, 13]. Zero-shot classification enables recognition of unseen diseases without additional annotations. CLIP [14] and its medical adaptation CheXzero [15] align images and text in a shared embedding space for zero-shot inference. However, contrastive learning is sensitive to severe class imbalance in medical data. Asymmetric Loss (ASL) [16] mitigates this issue, while recent studies leverage Large Language Models (LLMs) to generate descriptive prompts [17, 18] for improved zero-shot generalization under domain shifts. 
+
+3. METHODS 3.1. Task 1: Multi-label Classification 
+
+Training data were split by projection into AP/PA and Lateral (L) subsets, specializing models on each view. An Efficient-Net Router predicts the projection and forwards the image to the corresponding ensemble to produce 30-dimensional log-its (Fig. 1). Each projection branch is an ensemble of three architectures: • PCAM : ConvNeXt-v2 serves as a CNN encoder fol-lowed by PCAM pooling [12], which generates label-wise heatmaps to guide attention. Using only a 1×1 convolu-tion encourages discriminative representations. 
+
+> arXiv:2604.02185v1 [cs.CV] 2 Apr 2026
+
+Fig. 1 . Multi-label classification diagram. • CAIT : ConvNeXt-v2 is first pre-trained with the PCAM framework and then frozen. CaiT is applied to the pro-jected CNN features, leveraging transformer modeling on semantically summarized feature vectors as motivated by [13]. The final CLS token is mapped to logits via a linear layer. • SWIN : Swin Transformer employs hierarchical self-attention within shifted windows, reducing the quadratic cost of global attention. Its locality-preserving design and scalability to high-resolution inputs make it suitable for CXR lesion detection. Data were split 9:1 for training and validation. Strong aug-mentations (horizontal flip, rotation, translation, scaling) were applied during training. Model selection was based on mAP, mAUC, and BCE loss on the augmented valida-tion set. TTA (horizontal flip) was used to average logits, and final ensemble coefficients were determined via grid search at the logit level. 
+
+3.2. Task 2: Zero-Shot Classification 
+
+3.2.1. Dual-Branch Hybrid Architecture 
+
+We propose a dual-branch architecture (Fig. 2) consisting of a Contrastive Loss branch and an Asymmetric Loss branch: • Contrastive Loss Branch: Learns global alignment be-tween images and label-synthesized reports, providing a representation baseline for zero-shot recognition. • Asymmetric Loss (ASL) Branch: Introduced to mitigate the sensitivity of contrastive learning to severe data imbal-ance. The total loss is defined as 
+
+Ltotal = Lcon + αLASL (1) 
+
+LASL = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+(
+
+−(1 − pk)γ+ log( pk) if yk = 1 
+
+−(pk)γ− log(1 − pk) if yk = 0 (2) where α balances the two losses, K = 30 , yk ∈ { 0, 1}
+
+is the ground-truth label and pk the predicted probability for class k. γ− and γ+ are focusing parameters; setting 
+
+γ− > γ + suppresses easy negatives and emphasizes hard positives, improving sensitivity for rare classes. 
+
+3.2.2. Description-Based Prompting & OOD Inference Strat-egy 
+
+We used LLM-generated clinical descriptions instead of sim-ple class names. This encouraged the text encoder to capture fine-grained pathology semantics (e.g., “diffuse decreased bone density” for Osteopenia) and strengthened cross-modal alignment. • Training Phase – Dynamic Shuffling: For multi-label samples, descriptions were concatenated and randomly shuffled to prevent lexical overfitting and promote seman-tic understanding. • Inference Phase – Hybrid Prompting for OOD Gen-eralization: At inference, we used both class names and descriptive prompts. The description-based train-ing induces a semantically structured embedding space, enabling alignment with unseen OOD prompts without explicit supervision. Prompt ensembling and TTA were further applied for robustness. 
+
+Fig. 2 . Dual-Branch Hybrid Architecture. 
+
+4. EXPERIMENTS 4.1. Task 1: Multi-Label Classification 
+
+To minimize distortion, images were zero-padded and resized to 512 × 512 (uint16) preserving aspect ratios. We applied random augmentations including horizontal flip ( p = 0 .5), rotation ( ±20 ◦), scaling ( [0 .9, 1.1] ), translation ( ≤ 5% ), and CLAHE ( p = 0.3). The Swinv2-tiny and ConvNeXt-v2-tiny backbones were initialized with ImageNet pre-trained weights, using standard normalization for 3-channel inputs. 
+
+4.2. Task 2: Zero-Shot Classification 
+
+For Task 2, both the image and text encoders were initialized with CheXzero [15] weights and fine-tuned on in-distribution CXRs (resized to 224 × 224 ). The model was optimized us-ing AdamW (learning rate 10 −6, weight decay 0.01), a cosine annealing scheduler ( Tmax = 7 ), and EMA (decay=0.999). Lacking target OOD labels, we adopted a leak-free 3-fold proxy validation strategy. We designated 6 of the 30 labels as proxy unseen classes, removing their samples during training to prevent data leakage. The model, trained on the remain-ing 24 classes, was evaluated via AP on three held-out proxy groups: Group A (Structural Anomalies & Devices) for fine-grained deformations, Group B (High Prevalence Diseases) for baseline stability, and Group C (Critical & Rare Condi-tions) to assess resilience against catastrophic forgetting in long-tail distributions. 
+
+5. RESULTS 5.1. Task 1: Multi-Label Classification 
+
+Table 1 summarizes the performance of projection-aware and mixed-projection models. Ensemble weights were deter-mined by grid search using validation metrics. All L models showed lower performance than their AP/PA counterparts. The EfficientNet-B0 router achieved 98.65% validation accuracy, and the integrated routing framework obtained an mAP of 0.39456 on the entire validation set. The optimal en-semble weights were PCAM : SWIN : CAIT = 0 .40 : 0 .40 : 0.20 for AP/PA and 0.45 : 0 .45 : 0 .10 for L. Despite routing and ensembling, the framework is com-putationally efficient, requiring ∼77 ms/image in inference. In the router ablation study, models trained on mixed pro-jections showed notable performance improvements. Table 1 reports the results evaluated separately on each projec-tion. Although L projections remained more challenging than AP/PA, consistent gains in both projections suggest comple-mentary learning across projections. Also, we evaluated cross-dataset generalization on the external MIMIC dataset [19] with 7 overlapping labels. The projection-aware model achieved mAP of 0.1960 (AP/PA) and 0.1243 (L), while the mixed model achieved 0.2063 and 0.1210, respectively. Although the mixed model slightly outperformed on AP/PA, the projection-aware framework showed better ro-bustness on Lateral projections. We hypothesize that mixed training, while leveraging shared features, is biased toward the dominant AP/PA distribution, degrading performance on the minority L view. In contrast, the routing framework preserves view-specific features by isolating Lateral repre-sentations. This suggests that projection-aware routing better maintains robustness across projections, supporting its effec-tiveness for generalization to unseen test distributions. 
+
+Table 1 . Validation results of projection-aware and mixed-projection models.                                                                       
+
+> Setting Proj Model mAP BCE mAUC mECE
+> Projection aware AP/PA PCAM 0.4011 0.0871 0.9117 0.0067 SWIN 0.4028 0.0866 0.9104 0.0052 CAIT 0.3925 0.0868 0.9051 0.0067 Ensemble 0.4185 0.0841 0.9182 0.0045
+> LPCAM 0.3336 0.1061 0.8681 0.0111 SWIN 0.3045 0.1051 0.8621 0.0099 CAIT 0.1601 0.1318 0.7591 0.0101 Ensemble 0.3586 0.1028 0.8753 0.0087
+> Mixed AP/PA PCAM 0.4283 0.0866 0.9092 0.0069 SWIN 0.3954 0.0862 0.9111 0.0073 CAIT 0.3945 0.0872 0.9070 0.0058 Ensemble 0.4433 0.0835 0.9161 0.0058
+> LPCAM 0.3642 0.1027 0.8553 0.0089 SWIN 0.3654 0.1018 0.8569 0.0105 CAIT 0.3592 0.1045 0.8518 0.0075 Ensemble 0.3985 0.0989 0.8650 0.0054
+
+5.2. Task 2: Zero-Shot Classification 
+
+Table 2 shows the impact of label quality and ASL on OOD performance. Fine-tuning with either all generated labels or strictly physician-verified labels yielded identical overall per-formance increases. Building upon this filtered dataset, we evaluated the proposed Dual-Branch architecture with ASL. Setting α = 1 .5 achieved the best overall average mAP of 0.3391, demonstrating consistent improvements across the proxy groups, particularly in structural anomaly detection. Figure 3 illustrates the validation trajectory on Group A. While standard fine-tuning ( α = 0 ) shows limited gain, ASL (α = 1 , 1.5) significantly boosts performance. To evaluate calibration, we analyzed the Expected Cali-bration Error (ECE) at the checkpoints yielding the highest zero-shot mAP for each proxy set. Results show that ASL (α = 1 .5) effectively enhances reliability, reducing the av-erage ECE across the three proxy groups from 0.2902 (base-line, α = 0 ) to 0.2417. Regarding computational and re-source efficiency, our framework is highly feasible for clinical use. The ViT-B/32 backbone maintains a lightweight foot-print, and the ASL branch adds zero inference overhead as it is utilized exclusively during training. Baseline inference takes ∼17 ms per image on a single NVIDIA RTX 2080 Ti GPU. Pre-computing multiple LLM prompt embeddings for the prompt ensemble adds negligible delay, totaling ∼18 ms. Even fully deployed with TTA, latency is only 27 ms, ensur-ing rapid clinical diagnosis. Table 2 . Impact of data quality and Asymmetric Loss (ASL) on zero-shot mAP. (FT: Standard Fine-Tuning, α = 0 )                              
+
+> Method Group A Group B Group C Avg.
+> Baseline (Zero-shot) 0.2635 0.3790 0.3134 0.3186 FT (All Labels) 0.2680 0.3852 0.3126 0.3219 FT (Physician Only) 0.2707 0.3852 0.3098 0.3219
+> Dual-Branch ( α= 1 .5)0.2882 0.4139 0.3151 0.3391
+> 1234567
+> 0.26
+> 0.27
+> 0.28
+> 0.29
+> 0.3
+> Training Epochs
+> mAP Score
+> Baseline
+> α= 0
+> α= 1 .0
+> α= 1 .5
+
+Fig. 3 . Validation mAP on Proxy Group A. ASL ( α = 1 .5)consistently outperforms α = 0 and the baseline. 
+
+6. CONCLUSION 
+
+We proposed a robust framework for long-tailed and zero-shot CXR classification. In Task 1, projection-aware routing and ensemble strategy effectively mitigated class imbalances, achieving test mAP of 0.4827, mAUC of 0.9186 and F1 of 0.3162, demonstrating the potential for further improve-ment through mixed-projection modeling. In Task 2, the proposed dual-branch architecture, combining Asymmet-ric Loss (ASL) with LLM-generated descriptive prompts, demonstrated strong zero-shot generalization with test mAP of 0.3106, AUC of 0.6705, and F1 of 0.2025. Evaluated on the official hidden test set, these results took 2nd place in both tasks at the ISBI 2026 CXR-LT Challenge. 
+
+Compliance with Ethical Standards: This study retrospec-tively used de-identified data from the CXR-LT Challenge. Access was granted per the Terms of Use; ethical approval was waived as the public dataset lacks identifiable personal information. 
+
+Acknowledgments: 
+
+This research was supported by the Institute of Informa-tion & Communications Technology Planning & Evaluation (IITP) grant funded by the Korea government (MSIT) (RS-2025-02304967, AI Star Fellowship (KAIST)). The authors declare no conflicts of interest. 
+
+7. REFERENCES 
+
+[1] Hexin Dong et al., “Overview of the cxr-lt 2026 chal-lenge: Multi-center long-tailed and zero shot chest x-ray classification,” arXiv preprint arXiv:2602.22092 , 2026. [2] Gao Huang et al., “Densely connected convolutional networks,” in CVPR , 2017. [3] Mingxing Tan and Quoc V. Le, “EfficientNet: Rethink-ing model scaling for convolutional neural networks,” in 
+
+ICML , 2019. [4] Zhuang Liu et al., “A ConvNet for the 2020s,” in CVPR ,2022. [5] Sanghyun Woo et al., “ConvNeXt V2: Co-designing and scaling ConvNets with masked autoencoders,” in 
+
+CVPR , 2023. [6] Alexey Dosovitskiy et al., “An image is worth 16x16 words: Transformers for image recognition at scale,” in 
+
+ICLR , 2021. [7] Hugo Touvron et al., “Going deeper with image trans-formers,” in ICCV , 2021. [8] Ze Liu et al., “Swin transformer: Hierarchical vision transformer using shifted windows,” in ICCV , 2021. [9] Ze Liu et al., “Swin transformer V2: Scaling up capacity and resolution,” in CVPR , 2022. [10] Pranav Rajpurkar et al., “Chexnet: Radiologist-level pneumonia detection on chest x-rays with deep learn-ing,” arXiv preprint arXiv:1711.05225 , 2017. [11] Jeremy Irvin et al., “Chexpert: A large chest radiograph dataset with uncertainty labels and expert comparison,” in AAAI , 2019. [12] Wenwu Ye et al., “Weakly supervised lesion localiza-tion with probabilistic-cam pooling,” arXiv preprint arXiv:2005.14480 , 2020. [13] Sangjoon Park et al., “Multi-task vision transformer using low-level chest x-ray feature corpus for covid-19 diagnosis and severity quantification,” Medical Image Analysis , 2022. [14] Alec Radford et al., “Learning transferable visual mod-els from natural language supervision,” in ICML , 2021. [15] Ekin Tiu et al., “Expert-level detection of patholo-gies from unannotated chest X-ray images via self-supervised learning,” Nature Biomedical Engineering ,2022. [16] Tal Ridnik et al., “Asymmetric loss for multi-label clas-sification,” in ICCV , 2021. [17] Sarah Pratt et al., “What does a platypus look like? gen-erating customized prompts for zero-shot image classi-fication,” in ICLR , 2023. [18] Ahmad Koleilat et al., “BiomedCoOp: Learning to prompt for biomedical vision-language models,” arXiv preprint arXiv:2411.15232 , 2024. [19] Alistair Johnson et al., “Mimic-cxr-jpg: Chest radio-graphs with structured labels,” PhysioNet , 2019.

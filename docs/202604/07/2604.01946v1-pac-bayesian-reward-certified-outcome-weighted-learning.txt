@@ -1,0 +1,3732 @@
+Title: PAC-Bayesian Reward-Certified Outcome Weighted Learning
+
+URL Source: https://arxiv.org/pdf/2604.01946v1
+
+Published Time: Fri, 03 Apr 2026 00:51:44 GMT
+
+Number of Pages: 59
+
+Markdown Content:
+# PAC-Bayesian Reward-Certified Outcome Weighted Learning 
+
+## Yuya Ishikawa 1,2, † and Shu Tamano 3,4,* 1Department of Clinical Biostatistics, Graduate School of Medical and Dental Sciences, Institute of Science Tokyo, 1-5-45 Yushima, Bunkyo-ku, Tokyo, 113-8510, Japan 
+
+> 2
+
+Biostatistics Division, Center for Research Administration and Support, National Cancer Center, 5-1-1 Tsukiji, Chuo-ku, Tokyo 104-0045, Japan 
+
+> 3
+
+Department Multidisciplinary Sciences, Graduate School of Arts and Sciences, The University of Tokyo, 3-8-1 Komaba, Meguro-Ku, Tokyo 153-8902, Japan 
+
+> 4
+
+Department of Epidemiology, National Institute of Infectious Diseases, Japan Institute for Health Security, 1-23-1 Toyama, Shinjuku-Ku, Tokyo 162-0052, Japan 
+
+> †
+
+E-mail: yuishik2.ncc.go.jp 
+
+> *
+
+E-mail: tamano-shu212@g.ecc.u-tokyo.ac.jp 
+
+Abstract 
+
+Estimating optimal individualized treatment rules (ITRs) via outcome weighted learning (OWL) often relies on observed rewards that are noisy or optimistic prox-ies for the true latent utility. Ignoring this reward uncertainty leads to the selec-tion of policies with inflated apparent performance, yet existing OWL frameworks lack the finite-sample guarantees required to systematically embed such uncer-tainty into the learning objective. To address this issue, we propose PAC-Bayesian Reward-Certified Outcome Weighted Learning (PROWL). Given a one-sided uncer-tainty certificate, PROWL constructs a conservative reward and a strictly policy-dependent lower bound on the true expected value. Theoretically, we prove an exact certified reduction that transforms robust policy learning into a unified, split-free cost-sensitive classification task. This formulation enables the derivation of a nonasymptotic PAC-Bayes lower bound for randomized ITRs, where we estab-lish that the optimal posterior maximizing this bound is exactly characterized by a general Bayes update. To overcome the learning-rate selection problem inherent in generalized Bayesian inference, we introduce a fully automated, bounds-based calibration procedure, coupled with a Fisher-consistent certified hinge surrogate for efficient optimization. Our experiments demonstrate that PROWL achieves im-provements in estimating robust, high-value treatment regimes under severe reward uncertainty compared to standard methods for ITR estimation. 
+
+Keywords: Causal inference, General Bayesian inference, Gibbs posterior, Optimal treat-ment regimes, Precision medicine, Temperature tuning 1
+
+> arXiv:2604.01946v1 [cs.LG] 2 Apr 2026
+
+# 1 Introduction 
+
+## 1.1 Background 
+
+Individualized treatment rules (ITRs), also called optimal treatment regimes or statis-tical treatment rules, provide a formal framework for personalized medicine by mapping patient covariates to treatment assignments. They are particularly useful when treat-ment effects are heterogeneous and tailored decisions can improve clinical outcomes. The modern literature combines the causal formulation of treatment regimes developed in biostatistics (Murphy, 2003; Robins, 2004; Moodie et al., 2007) with decision-theoretic treatment-rule analysis in econometrics (Manski, 2004; Hirano and Porter, 2009). As em-phasized by Kosorok and Laber (2019), estimating optimal ITRs is often more crucial than merely assessing population average treatment effects whenever interventions are tailored to covariate information. As reviewed by Lipkovich et al. (2024), modern treat-ment effect heterogeneity analysis is increasingly oriented toward individualized treatment recommendations, subgroup identification, and treatment regime estimation in clinical trials and observational studies. Under standard identification conditions rooted in the potential-outcome framework (Robins, 1986; Robins et al., 2000), a primary goal is to estimate a rule that maximizes its value, namely the expected utility or outcome that would be observed if the rule were deployed in the target population. A broad distinction in this literature is between indirect and direct approaches. Indi-rect methods estimate conditional mean outcomes or treatment contrasts and then derive a treatment rule by plug-in optimization; representative examples include Q-learning, A-learning, and related regression-based procedures (Qian and Murphy, 2011; Zhang et al., 2012b; Schulte et al., 2014). Direct methods, in contrast, target the value criterion more explicitly, often by reducing policy learning to classification or empirical welfare maxi-mization (Manski, 2004; Zhang et al., 2012a; Zhao et al., 2012; Kitagawa and Tetenov, 2018; Athey and Wager, 2021). From this perspective, single-stage ITR estimation can be viewed as a special case of offline policy learning or contextual bandits, with treatments as actions and clinical outcomes as rewards (Hirano and Porter, 2009; Sakhi et al., 2023; Gouverneur et al., 2025). Among direct methods, outcome weighted learning (OWL) is particularly attractive because it converts value maximization into a weighted classification problem (Zhao et al., 2012). Under standard causal assumptions, the value of an ITR admits an inverse-probability-weighted representation, and OWL exploits this representation by assigning classification penalties to treatment assignments associated with better observed out-comes. This reduction enables the use of large-margin classifiers such as support vector machines for policy learning. Since it directly targets a clinically relevant value crite-rion while remaining algorithmically compatible with statistical learning tools, OWL has become one of the most visible templates for direct treatment-regime estimation. The original framework has since been extended in several directions, including sparse pe-nalization (Song et al., 2015), residual weighting (Zhou et al., 2017), augmentation and multistage learning (Zhao et al., 2015; Liu et al., 2018), robust loss design (Fu et al., 2019), personalized dose finding (Chen et al., 2016), treatment selection under composite outcomes such as effectiveness and cost (Xu et al., 2022), tree-based rules (Zhu et al., 2017), ordinal and multicategory treatments (Chen et al., 2018; Zhang et al., 2020; Ma et al., 2023), and Bayesian formulations that quantify uncertainty in the learned rule (Freeman and Yazzourh, 2024). These developments confirm OWL as a versatile and durable foundation for personalized treatment learning. 2In practice, however, the observed reward is often only a proxy for the utility that decision makers truly care about. This discrepancy may arise from measurement error, surrogate endpoints, delayed outcomes, or preference-based aggregation of multiple out-comes into a single scalar reward. The issue is not merely that the reward is noisy; rather, the reward may be systematically optimistic relative to the latent utility that should de-fine the policy objective. For example, the choice of utility construction can materially affect the estimated rule in cost-effectiveness analysis (Xu et al., 2022), and patient pref-erences can alter the optimal treatment even when the observed clinical outcomes are identical (Butler et al., 2018). If such reward uncertainty is ignored, direct optimization of the observed reward can select policies whose apparent performance is inflated relative to their true value. Moreover, this distortion is inherently policy-dependent: two rules with similar nominal values may differ substantially in the extent to which they place treatment recommendations in regions where the observed reward is a poor proxy for the latent utility. While existing OWL variants improve robustness to outliers, efficiency, or computational stability, they still largely treat the observed reward as the absolute target quantity to be optimized (Zhou et al., 2017; Liu et al., 2018; Fu et al., 2019; Freeman and Yazzourh, 2024). Despite its practical and conceptual importance, the OWL literature contains little finite-sample theory for handling reward uncertainty in a way that directly informs how the rule should be learned. Consequently, reward uncertainty should not be treated as a nuisance affecting only point estimation; it must enter the learning problem itself. To address this issue, we propose PAC-Bayesian Reward-Certified Outcome Weighted Learning (PROWL). We introduce a latent true reward R∗ and assume that the data provide an observable one-sided uncertainty certificate U such that R∗ ≥ R − U almost surely. This induces a conservative reward R = ( R − U )+ and, consequently, a policy-dependent lower bound on the true value. Within this framework, our contributions are fourfold: (i) we derive an exact certified reduction that converts reward-certified policy learning into a weighted classification problem; (ii) we establish a PAC-Bayes finite-sample lower bound on the unobserved target value over a joint policy–nuisance space, enabling split-free learning; (iii) we prove that the posterior exactly maximizing this bound takes the form of a general Bayes update; and (iv) we develop a fully data-driven criterion for tuning the learning rate, along with a practical hinge-based surrogate posterior. By incorporating the certificate directly into the learning objective, PROWL robustly targets the rule whose latent value can be most strongly certified from finite samples. 
+
+## 1.2 Related Work 
+
+Our proposed framework builds upon and connects two major theoretical domains: PAC-Bayes theory and general Bayes inference. PAC-Bayes theory provides nonasymptotic guarantees for randomized predictors by balancing empirical performance with a Kullback–Leibler complexity penalty relative to a prior (McAllester, 1998; Seeger, 2003; McAllester, 2003; Maurer, 2004; Catoni, 2007; Rodr´ ıguez-G´ alvez et al., 2024). Originally developed for supervised learning, PAC-Bayes tools have recently proven useful for offline decision problems such as contextual ban-dits and offline policy learning (Sakhi et al., 2023; Gouverneur et al., 2025). However, the existing PAC-Bayes policy-learning literature does not address the setting in which the reward entering the value function is itself uncertain, nor does it exploit the exact weighted-classification reduction that makes OWL attractive for ITR estimation. 3Furthermore, our theoretical results intersect with the literature on general Bayes updating. The framework of Bissiri et al. (2016) shows that coherent posterior updating can be based directly on a loss function, yielding a Gibbs or generalized Bayesian posterior. This perspective is especially appealing when the policy objective is defined through a value or risk rather than through a fully specified likelihood, and it has motivated a growing literature on model-robust Bayesian learning and misspecification-aware updating (Holmes and Walker, 2017; Gr¨ unwald and van Ommen, 2017; Lyddon et al., 2019; Miller and Dunson, 2019). A persistent challenge in that literature is the choice of learning rate, which controls the trade-off between prior information and empirical loss (see also Syring and Martin (2019); Wu and Martin (2023); Altamirano et al. (2023); Tamano and Tomo (2025)). By contrast, our analysis shows that, in reward-certified OWL, the generalized posterior arises as the exact optimizer of a PAC-Bayes lower bound on the latent policy value. This provides a finite-sample, decision-theoretic derivation of a general Bayes update rather than a purely axiomatic or heuristic one. 
+
+## 1.3 Organization of the Article 
+
+The rest of this paper is organized as follows. In Section 2, we introduce the causal framework for ITRs, formalize reward uncertainty using one-sided certificates, and define the surrogate objective. In Section 3, we derive the PAC-Bayes lower bound, establish its equivalence to a general Bayes update, and present a practical surrogate implemen-tation with data-driven learning rate calibration. In Section 4, we examine numerical experiments. In Section 5, we apply the proposed method to actual data. In Section 6, we conclude this paper with a discussion of implications, limitations, and future work. Finally, the appendices contain detailed technical proofs and extended configurations for the experiments. 
+
+# 2 Preliminaries 
+
+## 2.1 Problem Setup 
+
+Let (Ω , F, P) be a probability space. We observe the data Z = ( X, A, R ), where 
+
+X ∈ X ⊂ Rp denotes the covariates, A ∈ {− 1, 1} is the assigned treatment, and 
+
+R ∈ [0 , 1] is a proxy reward. The target reward R∗ ∈ [0 , 1] is assumed to be unob-served. The policy-learning sample Z1: n = {(Xi, A i, R i)}ni=1 consists of independent and identically distributed (i.i.d.) draws, which are embedded in an underlying i.i.d. sequence 
+
+{(Xi, A i, R i, R ∗ 
+
+> i
+
+)}ni=1 . For a ∈ {− 1, 1}, let Ra and ( R∗)a denote the potential proxy and target rewards, respectively. For a measurable ITR d : X → {− 1, 1}, we define the coun-terfactual rewards under the regime as Rd := Rd(X) and ( R∗)d := ( R∗)d(X), with their corresponding expected values given by V (d) := E[Rd] and V ∗(d) := E[( R∗)d]. 
+
+Assumption 1 (Identification and positivity) . For each a ∈ {− 1, 1}, R = Ra and R∗ =(R∗)a almost surely on {A = a}. Furthermore, we assume conditional ignorability and strict overlap: 
+
+{R1, R −1, (R∗)1, (R∗)−1} ⊥ ⊥ A | X, π(a | x) := P(A = a | X = x) ≥ ε
+
+for all (x, a ) ∈ X × {− 1, 1} and some constant ε ∈ (0 , 1/2] .
+
+4Under Assumption 1, standard inverse-probability weighting yields the identification results: 
+
+V (d) = E
+
+"
+
+R1{A = d(X)}
+
+π(A | X)
+
+#
+
+, V ∗(d) = E
+
+"
+
+R∗1{A = d(X)}
+
+π(A | X)
+
+#
+
+.
+
+We utilize these identities throughout this paper and defer their standard proof to Ap-pendix A.1. 
+
+## 2.2 Reward Uncertainty 
+
+Assumption 2 (One-sided reward certificate) . There exists a measurable function U :
+
+X × {− 1, 1} × [0 , 1] → [0 , 1] such that R∗ ≥ R − U (X, A, R ) almost surely. 
+
+We define the certified lower reward as R := ( R − U )+ and its corresponding certified value as 
+
+VR(d) := E
+
+"
+
+R1{A = d(X)}
+
+π(A | X)
+
+#
+
+.
+
+Since R∗ ≥ R almost surely, the true value of any policy is strictly bounded below by its certified value, i.e., V ∗(d) ≥ VR(d). If U ≤ R almost surely, then R = R − U and the relationship simplifies to 
+
+V ∗(d) ≥ V (d) − E
+
+"
+
+U 1{A = d(X)}
+
+π(A | X)
+
+#
+
+.
+
+Consequently, reward uncertainty alters the ranking of policies only when the induced penalty is policy-dependent; this occurs, for instance, through treatment-specific certifi-cates or active clipping in R = ( R − U )+.
+
+## 2.3 Policy Class 
+
+Let ( A, H) be a measurable nuisance-parameter space, and let νa : X × A → [0 , 1] be a jointly measurable function for each a ∈ {− 1, 1}. For any α ∈ A , we denote 
+
+νa,α (x) := νa(x, α ). Similarly, let ( B, G) be a measurable policy-parameter space, and let f : X ×B → R be jointly measurable. For β ∈ B , we define fβ (x) := f (x; β), dβ (x) := sgn {fβ (x)}, adopting the convention sgn(0) = 1. For a generic measurable score g, we write dg(x) := sgn {g(x)}.We collect both the policy and nuisance parameters into a joint parameter space Θ := 
+
+B × A .A key structural advantage of our theoretical framework is its split-free nature: the nuisance parameter α is learned jointly with the policy parameter β using the exact same policy-learning sample. This property is fundamentally structural rather than algorithmic: because the certified value identity introduced below is exact for every measurable α,PAC-Bayes bounds can be applied directly on the joint space Θ, provided that the prior is specified independently of Z1: n.
+
+# 3 Proposed Method 
+
+In this section, we introduce our primary methodological framework and its corre-sponding estimator, which is PAC-Bayesian Reward-Certified Outcome Weighted Learn-ing (PROWL). To clearly distinguish between our structural theory and the practical 5estimator, we develop PROWL progressively. First, we establish an exact certified value representation that translates the robust policy learning problem into a unified, cost-sensitive classification task (Section 3.1). Leveraging this split-free reduction, we construct a nonasymptotic PAC-Bayes lower bound on the unobserved target value. We demon-strate that the optimal posterior distribution maximizing this bound inherently takes the form of a general Bayes update; this posterior, and its induced Gibbs policy, constitutes the foundational PROWL estimator (Section 3.2). Finally, we bridge the gap to practi-cal implementation by providing an automated, bound-based procedure for learning-rate selection and introducing a computationally efficient surrogate posterior (Section 3.3). 
+
+## 3.1 Certified Value Representation 
+
+For a ∈ {− 1, 1} and α ∈ A , we define the doubly robust-style score Γαa (Z) = νa,α (X) + 1{A = a}
+
+π(a | X) {R − νa,α (X)}, (1) and, for a measurable ITR d, we define Γαd (Z) = X
+
+> a∈{− 1,1}
+
+1{d(X) = a}Γαa (Z). (2) We then construct the certified advantage, the induced pseudo-label, and the absolute weight as follows: 
+
+Dα(Z) := Γ α 
+
+> 1
+
+(Z) − Γα
+
+> −1
+
+(Z), Yα(Z) := sgn {Dα(Z)}, Wα(Z) := |Dα(Z)|. (3) For each fixed α ∈ A , let Rα
+
+> 01
+
+(d) := E[Wα(Z)1{Yα(Z)̸ = d(X)}] be the weighted 0-1 risk, and define C♯α := 2 −1E[Γ α 
+
+> 1
+
+(Z) + Γ α
+
+> −1
+
+(Z) + Wα(Z)]. We also define μa(x) := E[R | X =
+
+x, A = a] for a ∈ {− 1, 1}.
+
+Theorem 1 (Exact certified reduction) . For every measurable ITR d and every α ∈ A ,
+
+VR(d) = E[Γ αd (Z)] = C♯α − R α
+
+> 01
+
+(d).
+
+Consequently, for each fixed α, maximizing VR(d) over a measurable d is strictly equivalent to minimizing Rα
+
+> 01
+
+(d). Moreover, any Bayes rule for VR takes the form 
+
+d∗
+
+> R
+
+(x) ∈ arg max 
+
+> a∈{− 1,1}
+
+μa(x).
+
+See Appendix B.1 for the proof. Theorem 1 demonstrates that maximizing the certified lower bound is structurally equivalent to solving a cost-sensitive classification problem, which allows nuisance parameter learning to be seamlessly absorbed into the joint param-eter optimization without the need for computationally expensive sample splitting. The first equality in Theorem 1 represents the split-free identity crucial to our PAC-Bayes development; it holds exactly for every α, allowing nuisance learning to be subsumed within the joint parameter θ = ( β, α ). The second equality provides the exact signed classification reduction for a fixed choice of nuisance parameter. While we defer the discussion of special cases (certified OWL, certified RWL, and arm-specific augmentation) to Appendix A.2, we explicitly establish the conditional variance calculations that theoretically motivate our optimal nuisance design below. For a ∈{− 1, 1}, let σ2
+
+> a
+
+(x) := Var( R | X = x, A = a) and pa(x) := π(a | x). 6Proposition 2 (Conditional moments and variance-optimal nuisance choices) . Fix α ∈A. The following statements hold for PX -almost every x ∈ X .(i) For each a ∈ {− 1, 1},
+
+E[Γ αa (Z) | X = x] = μa(x),
+
+Var(Γ αa (Z) | X = x) = σ2
+
+> a
+
+(x)
+
+pa(x) + 1 − pa(x)
+
+pa(x) {μa(x) − νa,α (x)}2. (4) 
+
+Consequently, the conditional variance of Γαa (Z) is uniquely minimized at x by se-lecting νa,α (x) = μa(x).(ii) Writing p(x) := π(1 | x) and q(x) := π(−1 | x) = 1 − p(x), we have 
+
+E[Dα(Z) | X = x] = μ1(x) − μ−1(x), (5) 
+
+and 
+
+Var( Dα(Z) | X = x)= σ21 (x)
+
+p(x) + σ2
+
+> −1
+
+(x)
+
+q(x) +
+
+q(x){μ1(x) − ν1,α (x)} + p(x){μ−1(x) − ν−1,α (x)}2
+
+p(x)q(x) . (6) 
+
+Therefore, the conditional variance of Dα(Z) is minimized at x by any choice of nuisance pair satisfying the linear constraint 
+
+q(x)ν1,α (x) + p(x)ν−1,α (x) = q(x)μ1(x) + p(x)μ−1(x). (7) 
+
+(iii) Restricted to the treatment-free subclass ν1,α = ν−1,α = mα, the unique minimizer of the conditional variance is 
+
+m†(x) = q(x)μ1(x) + p(x)μ−1(x). (8) 
+
+In the context of balanced randomization, where p(x) = q(x) = 1 /2, this expression elegantly simplifies to 
+
+m†(x) = E[R | X = x]. (9) See Appendix B.2 for the proof. Proposition 2 provides the theoretical foundation for optimal nuisance parameter design, showing that setting the nuisance functions to the conditional expected certified rewards uniquely minimizes the conditional variance of the certified score, thereby maximizing statistical efficiency. 
+
+## 3.2 PAC-Bayes Bound and General Bayes Update 
+
+Let Π 0 ∈ P (Θ) be a prior distribution that is independent of the policy-learning sample Z1: n. For any θ = ( β, α ) ∈ Θ, define the empirical certified value as ˆVR,n (dθ) := 
+
+n−1 Pni=1 Γαdβ (Zi). For a posterior Q ≪ Π0, let dQ denote the Gibbs policy that draws ˜θ = ( ˜β, ˜α) ∼ Q and deploys the rule d˜β . Its expected target value and empirical certified value are given by V ∗(dQ) := Eθ∼Q[V ∗(dβ )] and ˆVR,n (dQ) := Eθ∼Q[ ˆVR,n (dθ)], respectively. By Theorem 1, ˆVR,n (dθ) is an unbiased estimator of VR(dβ ) for every fixed θ.Set cε := ε−1, Kε := 2 ε−1 − 1, and define the certified value loss as ℓval (θ; Z) := (cε − Γαdβ (Z)) /K ε. Since Γ αdβ (Z) ∈ [1 − ε−1, ε −1], the loss ℓval (θ; Z) naturally takes values within the range [0 , 1]. 7Theorem 3 (PAC-Bayes lower bound and exact general Bayes update) . Fix δ ∈ (0 , 1) 
+
+and η > 0. With probability at least 1 − δ, the inequality 
+
+V ∗(dQ) ≥ ˆVR,n (dQ) − Kε
+
+(
+
+KL( Q∥Π0) + log(1 /δ )
+
+ηn + η
+
+8
+
+)
+
+holds simultaneously for all posteriors Q ≪ Π0.For a fixed learning rate η, the right-hand side of this bound is uniquely maximized by the posterior 
+
+ˆQPROWL ,val  
+
+> η
+
+(d θ) ∝ exp 
+
+(
+
+−η
+
+> n
+
+X
+
+> i=1
+
+ℓval (θ; Zi)
+
+)
+
+Π0(d θ) ∝ exp 
+
+(
+
+ηn Kε
+
+ˆVR,n (dθ)
+
+)
+
+Π0(d θ).
+
+See Appendix B.3 for the proof. Theorem 3 reveals that rigorously bounding the tar-get reward uncertainty strictly yields a general Bayes update, providing strong theoretical justification that optimizing the nonasymptotic PAC-Bayes lower bound intrinsically re-covers the outcome-weighted learning objective. Theorem 3 establishes an exact general Bayes update (Bissiri et al., 2016) over the joint space Θ. This forms our central conceptual result: maximizing a nonasymptotic PAC-Bayes lower bound on the unobserved target value exactly yields a mathematically principled general Bayes posterior. Furthermore, Theorem 1 demonstrates that, conditional on a fixed nuisance parameter 
+
+α, the β-dependent component of the empirical loss is exactly K−1
+
+> ε
+
+Pni=1 Wα,i 1{Yα,i ̸ =
+
+dβ (Xi)}, up to an α-dependent additive constant. Consequently, the induced update for the policy parameter exactly mirrors the certified advantage-weighted OWL general Bayes update, conditional on α.
+
+## 3.3 Learning-rate Selection and Practical Computation 
+
+To optimally tune the learning rate with respect to the value function, we define ˆLval ,n (Q) := cε − ˆVR,n (dQ)
+
+Kε
+
+, ξ(n) := exp 
+
+ 112 n
+
+rπn 
+
+2 + 2 ,
+
+and cn,δ (Q) := (KL( Q∥Π0) + log {ξ(n)/δ })/n . For a temperature scale γ > 0, let LCB val 
+
+> n,δ
+
+(Q; γ) := cε − Kε
+
+1 − exp {− cn,δ (Q) − γ ˆLval ,n (Q)}
+
+1 − exp( −γ) .
+
+Proposition 4 (Exact-value certification and temperature selection) . With probability at least 1 − δ, the bound 
+
+V ∗(dQ) ≥ LCB val 
+
+> n,δ
+
+(Q; γ)
+
+holds simultaneously for all posteriors Q ≪ Π0 and all γ > 0. For a fixed γ, the unique maximizer of the mapping Q 7 → LCB val 
+
+> n,δ
+
+(Q; γ) is ˆQPROWL ,val  
+
+> γ
+
+. Hence, for any finite grid 
+
+Tn ⊂ (0 , ∞),
+
+ˆγ ∈ arg max 
+
+> γ∈T n
+
+LCB val 
+
+> n,δ
+
+  ˆQPROWL ,val  
+
+> γ
+
+; γ
+
+guarantees that 
+
+V ∗(d ˆQPROWL ,val ˆγ
+
+) ≥ max 
+
+> γ∈T n
+
+LCB val 
+
+> n,δ
+
+  ˆQPROWL ,val  
+
+> γ
+
+; γ.
+
+8See Appendix B.4 for the proof. Proposition 4 establishes that the learning rate can be safely and automatically tuned by maximizing a fully observable empirical lower confidence bound, thereby entirely circumventing the hyperparameter selection issues that typically plague standard general Bayes methods. For practical computation, we employ a smooth surrogate posterior family over the same joint space Θ. Define the certified hinge loss as ℓh(θ; Z) := Wα(Z)(1 −Yα(Z)fβ (X)) +
+
+for θ = ( β, α ) ∈ Θ, and construct the corresponding practical posterior: ˆQPROWL ,h 
+
+> λ
+
+(d θ) ∝ exp 
+
+(
+
+−λ
+
+> n
+
+X
+
+> i=1
+
+ℓh(θ; Zi)
+
+)
+
+Π0(d θ), λ > 0.
+
+This specific family is designed for computational feasibility rather than exact inference: while it may not strictly maximize the theoretical PAC-Bayes bound detailed in Theo-rem 3, it can be rigorously evaluated using the exact-value certificate provided in Propo-sition 4. If the prior density follows π0(β, α ) ∝ exp {− λ0J(β, α )}, then the Maximum a Posteriori (MAP) estimator under ˆQPROWL ,h 
+
+> λ
+
+efficiently solves min 
+
+> (β,α )∈Θ
+
+(
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓh(θ; Zi) + λ0
+
+λn J(β, α )
+
+)
+
+.
+
+While we defer the standard variational characterization of ˆQPROWL ,h 
+
+> λ
+
+to Appendix A.3, we establish the theoretical soundness of the certified hinge loss below. For a measurable score 
+
+g : X → R, define the exact certified hinge risk as Rα 
+
+> h
+
+(g) := E[Wα(Z){1 − Yα(Z)g(X)}+]. 
+
+Proposition 5 (Fisher consistency and excess-risk domination of the certified hinge loss) .
+
+Fix α ∈ A and define the following quantities for PX -almost every x:
+
+uα(x) := EWα(Z)1{Yα(Z) = 1 } | X = x, vα(x) := EWα(Z)1{Yα(Z) = −1} | X = x.
+
+Then the following properties hold: (i) For PX -almost every x, uα(x) − vα(x) = μ1(x) − μ−1(x).(ii) Define the optimal measurable score as 
+
+g†
+
+> α
+
+(x) := 
+
+
+
+1, uα(x) > v α(x),
+
+−1, uα(x) < v α(x),
+
+0, uα(x) = vα(x).
+
+This score g† 
+
+> α
+
+universally minimizes Rα 
+
+> h
+
+(g) across all measurable choices of g, and the induced classification rule dg† 
+
+> α
+
+remains Bayes-optimal for the certified value VR.Equivalently, the certified hinge loss is Fisher-consistent with respect to the certified value-maximization objective. (iii) For every measurable score g, the excess value is strictly upper-bounded by the excess hinge risk: 
+
+VR(d∗
+
+> R
+
+) − VR(dg) ≤ R α 
+
+> h
+
+(g) − inf  
+
+> h
+
+Rα 
+
+> h
+
+(h), (10) 
+
+where the infimum is taken over all measurable scores h : X → R.
+
+9See Appendix B.5 for the proof. Proposition 5 reveals that the certified hinge loss serves as a Fisher-consistent surrogate for the unobserved target value, guaranteeing that optimizing this convex surrogate inherently maximizes the exact certified lower value. 
+
+Corollary 6 (Posterior-family exact-value selection) . Let Qn = { ˆQλ : λ ∈ Λn} be any finite, data-dependent family of posteriors satisfying ˆQλ ≪ Π0 almost surely for every 
+
+λ ∈ Λn. Then, on the high-probability event defined in Proposition 4, we have 
+
+V ∗(d ˆQλ ) ≥ LCB val 
+
+> n,δ
+
+( ˆQλ; γ) for all (λ, γ ) ∈ Λn × T n.
+
+Consequently, any chosen maximizer (ˆλ, ˆγ) ∈ arg max (λ,γ )∈Λn×T n LCB val 
+
+> n,δ
+
+( ˆQλ; γ) rigorously satisfies 
+
+V ∗(d ˆQˆλ
+
+) ≥ max 
+
+> (λ,γ )∈Λn×T n
+
+LCB val 
+
+> n,δ
+
+( ˆQλ; γ).
+
+See Appendix B.6 for the proof. Corollary 6 ensures that our automated tuning strategy remains robust and theoretically sound even when the optimization search space is restricted to a discrete, computationally tractable grid of practical surrogate posteriors. 
+
+## 3.4 Learned Certificates via Auxiliary Calibration 
+
+While the core theory treats U as a known, valid certificate, a more practical approach when U must be actively learned is to calibrate it using an auxiliary sample that is completely independent of Z1: n. Let Dcal  
+
+> m
+
+denote such an auxiliary sample, and let ˆU =
+
+AU (Dcal  
+
+> m
+
+) be the estimated certificate. 
+
+Corollary 7 (Learned certificates via auxiliary calibration) . Suppose there exists an event 
+
+Ecert ∈ σ(Dcal  
+
+> m
+
+) with P(Ecert ) ≥ 1−αcert such that, conditional on Ecert , the learned function 
+
+ˆU is measurable, bounded in [0 , 1] , and satisfies R∗ ≥ R − ˆU (X, A, R ) almost surely under the policy-learning distribution. Then, conditionally on Dcal  
+
+> m
+
+and Ecert , all preceding theoretical results hold seamlessly by simply substituting U with ˆU and R with R ˆU := (R − ˆU )+. In particular, every 1 − δ PAC-Bayes bound established above translates to a valid joint-probability guarantee with a confidence level of at least (1 − αcert )(1 − δ).
+
+See Appendix B.7 for the proof. Corollary 7 demonstrates that our theoretical frame-work effortlessly scales to realistic scenarios where the exact bounds are unknown, allowing researchers to plug in data-driven certificates without compromising the integrity of the rigorous PAC-Bayes guarantees. 
+
+# 4 Numerical Experiments 
+
+## 4.1 Experimental Setup 
+
+We evaluate the proposed method using two complementary synthetic benchmarks for single-stage ITR learning, characterized by a proxy reward R, an unobserved target reward R∗, and an oracle one-sided reward certificate. For each arm a ∈ {− 1, 1}, the simulator specifies a base certificate envelope U0,a (x) and defines, at an uncertainty level 
+
+ρ ≥ 0, 
+
+Uρ,a (x) = min {ρ U 0,a (x), ¯ua}, Ra = ( Ra − Uρ,a (X)) +.
+
+10 Thus, the parameter ρ controls the severity of the reward uncertainty while preserving its underlying spatial structure. We employ oracle certificates throughout the synthetic study to ensure that any performance discrepancies purely reflect differences in policy learning capabilities rather than certificate-estimation errors. In these setups, the true logging propensity is assumed to be known to the learner. Scenario 1 utilizes balanced randomization, whereas Scenario 2 employs a covariate-dependent logging propensity to emulate non-uniform clinical allocation. Unless otherwise stated, all configurations are averaged over 30 Monte Carlo replications and evaluated on an independent test sample of size 10 ,000. Scenario 1 serves as a deliberately benign baseline. Characterized by a linear treat-ment boundary and policy-invariant reward uncertainty, it represents an environment where standard ITR estimators should naturally excel. Its primary role is diagnostic: determining whether robust certification introduces an unnecessary performance penalty (robustness cost) in a simple, well-specified setting. Conversely, Scenario 2 is constructed to be substantially more challenging and real-istic. It incorporates correlated clinical and biomarker covariates, non-linear outcome surfaces, a genuinely beneficial treated subgroup confined to a moderate-risk clinical win-dow, and treatment-specific proxy optimism concentrated in clinically vulnerable regions. In this environment, directly optimizing the proxy reward can materially conflict with optimizing the latent target reward, perfectly encapsulating the regime that motivates the development of PROWL. We conduct two primary sets of experiments: a ρ-sweep and an N -sweep. In the 
+
+ρ-sweep, we fix the sample size at N = 200 and vary the uncertainty level 
+
+ρ ∈ { 0, 0.25 , 0.5, 0.75 , 1.0, 1.25 , 1.5, 1.75 , 2.0}.
+
+In the N -sweep, we fix ρ = 1 .5 and vary the sample size N ∈ { 100 , 200 , 500 , 1000 , 2000 }.To isolate the fundamental effect of reward certification from function-class mismatches, the main benchmark utilizes a shared, scenario-specific score class across all methods: a standardized linear score with an intercept in Scenario 1, and a commonly enriched clinical basis in Scenario 2. All exact data-generating formulas, nuisance specifications, and hyperparameter tuning details are deferred to Appendix C.1. 
+
+## 4.2 Baselines 
+
+We benchmark PROWL against five established methods: (i) Standard OWL (Zhao et al., 2012), the canonical direct outcome-weighted classification approach; (ii) Residual Weighted Learning (RWL) (Zhou et al., 2017), which utilizes treatment-free residualiza-tion to stabilize weights; (iii) Q-learning (Qian and Murphy, 2011; Schulte et al., 2014), a standard regression-based indirect method; (iv) Policy Tree (Sverdrup et al., 2020), which provides an interpretable empirical-welfare benchmark; and (v) PROWL ( U = 0), an ablation of our proposed method that retains the PAC-Bayesian learning machinery but removes the reward certification by setting R = R. We refer to our full proposed method simply as PROWL. For OWL, RWL, Q-learning, and Policy Tree, we report outcomes under two distinct reward families. The R-family trains each method using the raw proxy reward R. The R-family substitutes R with the certified reward R = ( R − U )+ while keeping the respective learning algorithms otherwise unchanged. Comparing the methods against the R-family isolates the overall cost of ignoring reward uncertainty. Conversely, the comparison against 11 the R-family provides a more stringent test, evaluating whether PROWL’s performance gains stem from its principled PAC-Bayesian learning mechanism rather than merely from a naive substitution of R with the conservative surrogate R.
+
+## 4.3 Evaluation Metrics 
+
+Let d∗ ∈ arg max d V ∗(d) and d∗ 
+
+> R
+
+∈ arg max d VR(d) denote the oracle policies for the latent target value and the certified lower value, respectively. For any learned rule ˆd, we report: TargetRegret( ˆd) = V ∗(d∗) − V ∗( ˆd),
+
+and RobustRegret( ˆd) = VR(d∗
+
+> R
+
+) − VR( ˆd).
+
+Target regret captures the latent scientific decision problem defined by R∗, making it the primary metric of substantive interest. In contrast, robust regret assesses the certified lower-value objective explicitly optimized by PROWL, quantifying the certifiable utility left uncaptured by the learned policy. For both metrics, lower values indicate superior performance. Across all simulations, these regrets are computed on the independent test sample utilizing the true oracle conditional means from the simulator, rather than relying on noisy realized test outcomes. 
+
+## 4.4 Results 
+
+Figures 1–4 summarize the primary comparisons. In each figure, the left panel plots target regret against the R-family baselines, while the right panel plots robust regret against the R-family baselines. Complementary cross-family panels are provided in Ap-pendix Figures 7–10. Additionally, certificate diagnostics and a split-free ablation study are detailed in Appendix C.2. Figure 1 presents the results for Scenario 1 across varying uncertainty levels ( ρ). As anticipated for a benign, policy-invariant environment, the best-performing methods are practically indistinguishable. Although standard OWL and Policy Tree exhibit lower efficiency, PROWL closely matches the performance of Q-learning and RWL throughout the entire sweep. This confirms that in a well-specified regime where standard methods already excel, incorporating reward certification does not impose a noticeable performance penalty. Figure 2 details the ρ-sweep results for Scenario 2, where the comparative differences become substantial. As ρ increases, the regret of the classical baselines rises correspond-ingly, with the uncertified PROWL ( U = 0) ablation exhibiting the most significant deterioration. In stark contrast, PROWL consistently maintains low target and robust re-grets. The right panel is particularly revealing: even when compared against the R-family plug-in baselines, PROWL achieves noticeably superior performance at high uncertainty levels, showing the clearest separation around ρ = 2 .0. This underscores that PROWL’s empirical advantage derives from its core PAC-Bayesian learning principles rather than a simple substitution of R with R.Figure 3 illustrates the N -sweep for Scenario 1. As the sample size increases, all meth-ods naturally improve, and the performance gap among the leading estimators narrows. While standard OWL and Policy Tree remain comparatively weaker, PROWL consistently tracks the top performers (Q-learning and RWL). This reinforces the qualitative takeaway 12 0.0 0.5 1.0 1.5 2.0      
+
+> 𝜌
+> 0.0000
+> 0.0025
+> 0.0050
+> 0.0075
+> 0.0100
+> 0.0125
+> 0.0150
+> 0.0175
+> Target Regret ( 𝑅  family)
+> 0.00.51.01.52.0
+> 𝜌
+> 0.0000
+> 0.0025
+> 0.0050
+> 0.0075
+> 0.0100
+> 0.0125
+> 0.0150
+> 0.0175
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 1: Performance comparison across varying uncertainty levels ( ρ) for Scenario 1. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. from the ρ-sweep: PROWL remains highly competitive with established methods even in simple, well-specified scenarios. Figure 4 reports the N -sweep for Scenario 2. While regret universally decreases as N
+
+grows, PROWL consistently ranks as the best or near-best estimator across all sample sizes, achieving the lowest overall regrets. This robust performance is evident in both the latent target and the certified objectives, holding up even against stronger R-family baselines. As detailed in Appendix C.2, these conclusions remain intact across the comple-mentary metrics: although utilizing R instead of R improves classical methods, PROWL yields further substantial gains. The additional certificate diagnostics and the split-free ablation study provided in the appendix further corroborate that PROWL ’s efficacy is fundamentally rooted in learning directly against the reward certificate. 
+
+# 5 Actual Data Experiments 
+
+We next evaluate PROWL on deidentified data from the Electronic Alerts for Acute Kidney Injury (AKI) Amelioration study, using the public ELAIA-1 release, which also underlies the secondary analysis of Huang and Wang (2025). This experiment is designed to address a different question from those explored in Section 4. Our goal is not to deter-mine whether blanket alerting was beneficial on average, but rather to ascertain whether a clinically sensible, selective alerting rule can be learned when the utility itself is com-posite and preference-sensitive. In this setting, a successful method should achieve high certified utility and avoid deterioration on the trial’s primary hard-outcome composite, doing so without generating an unnecessarily aggressive alerting policy. 13 0.0 0.5 1.0 1.5 2.0      
+
+> 𝜌
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Target Regret ( 𝑅  family)
+> 0.00.51.01.52.0
+> 𝜌
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 2: Performance comparison across varying uncertainty levels ( ρ) for Scenario 2. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. 
+
+## 5.1 Dataset Information 
+
+Each row of the ELAIA-1 release corresponds to a hospitalized patient with AKI who was individually randomized to receive either an electronic AKI alert or usual care. We encode the treatment as 
+
+Ai =
+
+(
+
+1, if alert i = 1 ,
+
+−1, if alert i = 0 .
+
+Because treatment assignment relies on patient-level simple randomization, we use the known propensity π(A = 1 | X) = π(A = −1 | X) = 1 /2 throughout both training and evaluation, rather than estimating it from the data. Our primary policy covariate set comprises exclusively pre-randomization information. These encompass hospital and admission context, demographics, AKI timing variables, renal-function markers, laboratory measurements, and vital signs at randomization, co-morbidity indicators, recent medication or exposure history, and alert-burden variables. We explicitly exclude post-randomization process variables, event-time variables, utiliza-tion and cost summaries, and the leakage-prone max stage field. Within each training split, continuous variables are median-imputed and standardized with missingness indica-tors added as necessary; categorical and binary variables are mode-imputed; and hospital affiliation is encoded via six one-hot indicators. The fitted preprocessing map is then applied without modification to the held-out evaluation fold. Additional variable-level details are deferred to Appendix D. To model the uncertain hard-clinical utility, we define for patient iGi =
+
+
+
+1 − death14 i, 1 − dialysis14 i, 1 − aki progression14 i
+
+⊤
+
+∈ { 0, 1}3.
+
+Our nominal proxy reward is Ri = w⊤ 
+
+> 0
+
+Gi, with w0 = (0 .60 , 0.25 , 0.15) ⊤, which prioritizes survival, followed by dialysis avoidance, and finally the avoidance of AKI progression. To 14 100 200 500 1000 2000       
+
+> 𝑁
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> Target Regret ( 𝑅  family)
+> 100 200 500 1000 2000
+> 𝑁
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 3: Performance comparison across varying sample sizes ( N ) for Scenario 1. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. encode preference uncertainty within these weights, we define the uncertainty set 
+
+Wρ =
+
+(
+
+w ∈ R3+ :
+
+> 3
+
+X
+
+> j=1
+
+wj = 1 , |wj − w0j | ≤ ρ∆j
+
+)
+
+, ∆ = (0 .10 , 0.05 , 0.05) ⊤,
+
+with ρ = 1 in the main analysis. The certified lower reward is then defined at the patient level as Ri = min w∈W ρ w⊤Gi, which constitutes a trivial three-dimensional linear program, and the induced one-sided certificate is Ui = Ri − Ri. As an external clinical anchor aligned with the original trial endpoint, we also evaluate the composite-free reward 
+
+Rcomp  
+
+> i
+
+= 1 − composite outcome i.
+
+## 5.2 Baselines 
+
+Our primary comparison evaluates two blanket rules (Never alert and Always alert), three classical learners trained on the nominal reward R, the same three learners trained on the certified reward R, the uncertified ablation PROWL ( U = 0), and PROWL itself. Specifically, the adaptive baselines are OWL, Q-learning, and RWL alongside their R-plugins. The two reward families serve complementary purposes: comparison against the 
+
+R-family quantifies the cost of entirely ignoring reward uncertainty, whereas comparison against the R-family isolates whether any performance gain stems merely from plugging a conservative reward into an otherwise standard learner. For comparability, all adaptive learners employ linear policy scores in the main analy-sis. OWL, Q-learning, and RWL are tuned via three-fold cross-validation over the penalty grid {10 −3, 10 −2, 10 −1, 1}, utilizing the fold-held-out augmented IPW (AIPW) value for the corresponding reward variant. PROWL adopts the same policy class but couples it with arm-specific ridge nuisance regressions and data-driven temperature selection over 15 100 200 500 1000 2000       
+
+> 𝑁
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Target Regret ( 𝑅  family)
+> 100 200 500 1000 2000
+> 𝑁
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 4: Performance comparison across varying sample sizes ( N ) for Scenario 1. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. 
+
+η, γ ∈ { 1/8, 1/4, 1/2, 1, 2, 4, 8}, optimized via the exact-value lower confidence bound de-scribed in Section 3.3. In the main text, we deploy PROWL and PROWL ( U = 0) via the deterministic mean-rule induced by the fitted posterior; Appendix D compares this approach with MAP and Gibbs deployment strategies. We intentionally omit PolicyTree from the primary actual-data comparison. This omission is not conceptual; tree-based rules are already evaluated in the synthetic ex-periments; but rather computational and inferential. The central empirical question is whether reward certification improves policy learning within a common score-based regime class. By contrast, PolicyTree optimizes over a fundamentally different hypothesis class and relies on an exact exhaustive tree search, whose amortized runtime for a depth-k
+
+tree is on the order of O(P kN k(log N + D) + P N log N ), where P is the feature dimen-sion, N is the number of distinct training observations, and D is the number of actions (Sverdrup et al., 2020). With 30 repeated hospital-stratified splits, two reward families, and a high-dimensional EHR covariate set, this exhaustive search becomes the dominant computational bottleneck. We therefore reserve tree-based comparisons for the synthetic benchmarks, where they remain both informative and computationally tractable. 
+
+## 5.3 Evaluation Metrics 
+
+All actual-data results are derived from 30 repeated 70 /30 train/test splits, stratified by hospital and treatment arm. For any reward Y ∈ [0 , 1] and learned policy d, we estimate the held-out value using the AIPW estimator: ˆVAIPW (d; Y ) = 1
+
+ntest 
+
+X
+
+> i∈test
+
+"
+
+ˆμd(Xi)(Xi) + 1{Ai = d(Xi)}
+
+1/2 {Yi − ˆμAi (Xi)}
+
+#
+
+,
+
+16 where ˆ μa(x) represents an arm-specific outcome regression estimated on the training fold, and the propensity is fixed at the known randomized value of 1 /2. We report three primary value criteria: the certified value ˆVR, the nominal value ˆVR,and the composite-free value ˆVcomp computed from Rcomp = 1 − composite outcome . The first metric strictly aligns with the PROWL objective, the second quantifies performance under the nominal proxy utility, and the third anchors the learned rule to the original trial’s hard-outcome composite. In the main text, we additionally report the estimated 14-day mortality risk and the alert rate: ˆpalert = 1
+
+ntest 
+
+X
+
+> i∈test
+
+1{d(Xi) = 1 }.
+
+Appendix D further decomposes the hard-outcome components into mortality, dialysis, AKI progression, composite outcome, and discharge-to-home rates. All metrics are re-ported as the mean, with standard errors (SE) computed across the repeated sample splits. 
+
+## 5.4 Results 
+
+Table 1 and Figure 5 summarize the primary results. The strongest overall rule is the blanket Never alert policy, which attains both the largest certified value and the largest composite-free value. This finding is inherently informative: the ELAIA data do not represent a regime in which indiscriminate alerting is broadly beneficial. Consequently, any learned rule must justify its utility against a strong conservative benchmark rather than a blanket intervention. Against this backdrop, PROWL emerges as the strongest adaptive learner. Among the learned policies, it achieves the highest certified value, the highest composite-free value, and the numerically lowest mortality risk, while recommending alerts for approximately half of the patient population. Relative to its uncertified ablation PROWL ( U = 0), the gains are modest but directionally uniform: the certified value increases, the composite-free value improves, and the alert rate decreases. When compared to the strongest raw-reward and lower-reward plug-in competitors (Q-learning ( R) and Q-learning ( R)), PROWL achieves marginally better certified and composite-free values while maintain-ing an equivalent alert burden. Conversely, the OWL variants are substantially more aggressive, alerting roughly two-thirds to three-quarters of patients while delivering in-ferior certified and clinical performance. These absolute differences are necessarily small because the conservative no-alert benchmark is already highly effective on this dataset; the salient empirical question is therefore not whether a learned rule can dominate Never alert, but whether certification systematically improves the quality of a selective alerting regime once the decision to learn such a rule has been made. Figure 6 clarifies how certification structurally alters the learned policy. We compare PROWL against the strongest raw-reward baseline, Q-learning ( R), and the strongest lower-reward plug-in baseline, Q-learning ( R). All three methods increase their alerting frequency in tandem with the estimated baseline risk, and all are more aggressive in teaching hospitals than in non-teaching hospitals. However, PROWL is systematically more conservative in the non-teaching sites, particularly within the highest-risk quintile, whereas the two Q-learning policies continue to recommend alerts more indiscriminately. In the top baseline-risk quintile at non-teaching hospitals, PROWL recommends alerts for about 30% of patients, compared to roughly 34% for Q-learning ( R) and 35% for 17 Table 1: Repeated sample-split AIPW comparison on the ELAIA-1 AKI-alert trial under the three-component uncertain hard-clinical utility with ρ = 1. Entries are means with standard errors over 30 repeated 70 /30 hospital-by-alert stratified splits. Certified value is the estimate of VR, nominal value is the corresponding estimate of VR, and composite-free value uses Rcomp = 1 − composite outcome . Among adaptive learned policies, PROWL attains the largest certified value and the largest composite-free value. Methods Certified value Nominal value Composite-free value Mortality risk Alert rate Never alert 0.905 (0 .001) 0.918 (0 .001) 0.797 (0 .001) 0.086 (0 .001) 0.000 (0 .000) Always alert 0.900 (0 .001) 0.914 (0 .001) 0.783 (0 .002) 0.088 (0 .001) 1.000 (0 .000) OWL ( R) 0.900 (0 .001) 0.914 (0 .001) 0.786 (0 .002) 0.089 (0 .001) 0.672 (0 .024) Q-learning ( R) 0.903 (0 .001) 0.917 (0 .001) 0.793 (0 .002) 0.086 (0 .001) 0.500 (0 .005) RWL ( R) 0.903 (0 .001) 0.916 (0 .001) 0.793 (0 .002) 0.088 (0 .001) 0.450 (0 .030) OWL ( R) 0.901 (0 .001) 0.915 (0 .001) 0.787 (0 .002) 0.087 (0 .001) 0.715 (0 .024) Q-learning ( R) 0.904 (0 .001) 0.917 (0 .001) 0.794 (0 .002) 0.086 (0 .001) 0.500 (0 .005) RWL ( R) 0.903 (0 .001) 0.917 (0 .001) 0.794 (0 .002) 0.087 (0 .001) 0.475 (0 .022) PROWL ( U = 0) 0.904 (0 .001) 0.917 (0 .001) 0.794 (0 .002) 0.086 (0 .001) 0.509 (0 .009) PROWL 0.904 (0 .001) 0.917 (0 .001) 0.795 (0 .002) 0.086 (0 .001) 0.498 (0 .008) Q-learning ( R). In teaching hospitals, the behavior of the three rules is much more closely aligned. Thus, the practical role of reward certification is not to suppress alerts uniformly, but rather to strategically reallocate alerts away from sites and patient strata where the proxy reward appears excessively optimistic relative to the clinically anchored lower utility. Overall, the actual-data analysis does not suggest that a learned adaptive rule should overturn the conservative Never alert benchmark. Instead, it demonstrates that when learning an adaptive alerting policy under uncertain clinical utility, PROWL yields the most favorable empirical trade-off among the evaluated competitors: it secures the highest certified value, prevents deterioration on the trial’s primary composite anchor, achieves the lowest mortality risk, and maintains a moderate alert burden. 
+
+# 6 Discussion 
+
+This paper establishes a reward-certified framework for outcome weighted learning. Motivated by applications where the observable reward serves merely as a noisy, delayed, or overly optimistic proxy for the latent utility of interest, PROWL effectively addresses this structural mismatch. It achieves this by directly embedding a one-sided uncertainty certificate into the learning objective to optimize a nonasymptotic lower bound on the target value. Two theoretical implications of this formulation are particularly notable. First, the exact certified reduction in Theorem 1 demonstrates that uncertainty-aware pol-icy learning remains exactly reducible to a weighted classification problem. This reduction preserves the algorithmic tractability that has made standard OWL widely adopted. Sec-ond, Theorem 3 establishes that the posterior maximizing our PAC-Bayes lower bound is precisely a generalized Bayes posterior. Consequently, the generalized Bayesian up-date is not merely an axiomatic postulate in our setting. Rather, it emerges naturally as the unique and exact optimizer of a finite-sample lower-confidence criterion for learning treatment rules. This perspective rigorously situates PROWL within the broader direct-learning litera-ture. A substantial body of work has advanced OWL through residualization, augmenta-18 0.890 0.895 0.900 0.905 0.910 0.915      
+
+> Estimated certified value
+> Never alert Always alert OWL ( 𝑅 )Q-learning ( 𝑅 )RWL ( 𝑅 )OWL ( 𝑅 )Q-learning ( 𝑅 )RWL ( 𝑅 )PROWL ( 𝑈 =0) PROWL
+> 0.77 0.78 0.79 0.80
+> Estimated composite-free value
+
+Figure 5: Point-range summary of the primary actual-data comparison on ELAIA-1. Left panel reports the estimated certified value ˆVR with 95% confidence intervals across the 30 repeated sample splits. Right panel reports the estimated composite-free value ˆVcomp with the same uncertainty summary. The figure complements Table 1 by emphasizing method ordering on the certified objective and on the trial’s primary hard-outcome anchor. tion, doubly robust scoring, sparse regularization, and flexible policy classes (Song et al., 2015; Zhou et al., 2017; Liu et al., 2018; Zhu et al., 2017; Zhang et al., 2020; Pan and Zhao, 2021; Zhou et al., 2023). However, these methods predominantly assume that the observed outcome is the definitive target and therefore optimize a point-estimated reward. In contrast, PROWL is explicitly designed for environments where the observed reward is systematically misaligned with the true utility. Furthermore, our framework comple-ments recent causal learning approaches that rely on surrogate outcomes, semi-supervised labels, or latent variables to recover long-term targets prior to policy optimization (Chen et al., 2021; Sonabend-W et al., 2023; Yang et al., 2024; Fei et al., 2026). Whereas exist-ing methods focus on identifying the target reward, PROWL shifts the paradigm toward certification. Specifically, it asks which policy yields the highest utility that can be math-ematically guaranteed from finite samples under strictly one-sided reward information. The inherent conservatism underpinning the safety guarantees of PROWL also dic-tates its primary limitation. When the certificate is tight and informative, the procedure effectively penalizes policies whose apparent values are inflated in regions of high reward uncertainty. However, if the certificate is valid but excessively loose, the certified reward becomes overly pessimistic. This pessimism attenuates the certified advantage, effectively flattening the learning objective and complicating policy discrimination. This intrinsic trade-off highlights that certificate construction is not a benign preprocessing step but rather a core component of the statistical decision problem itself. Practical success relies not only on marginal validity but also on ensuring that the certificate is highly policy-discriminating. This necessary discrimination can be achieved through either treatment-specific structural constraints or active clipping. As noted in Remark 1, if the uncertainty penalty acts in a policy-invariant manner, the certification remains valid but structurally fails to shift the optimal decision boundary. Several directions for future theoretical work remain. First, while Theorem 3 strictly certifies the expected value of the randomized Gibbs policy V ∗(dQ), clinical applica-tions typically demand a deterministic rule T (Q). Bounding the derandomization regret 19 Q1 Q2 Q3 Q4 Q5          
+
+> Baseline-risk quintile
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> Recommended alert rate
+> PROWL
+> Q1 Q2 Q3 Q4 Q5
+> Baseline-risk quintile
+> Q-learning ( 𝑅 )
+> Q1 Q2 Q3 Q4 Q5
+> Baseline-risk quintile
+> Q-learning ( 𝑅 )Teaching Non-teaching
+
+Figure 6: Learned alert allocation by baseline-risk quintile and hospital type. Baseline-risk quintiles are obtained within each training fold by fitting a control-arm risk model for the primary composite outcome and then evaluating the resulting risk scores on the held-out fold. Each panel displays the mean recommended alert rate across the repeated sample splits for one policy. Teaching hospitals are shown in blue and non-teaching hospitals in red. PROWL is compared against the strongest raw-reward baseline, Q-learning ( R), and the strongest lower-reward plug-in baseline, Q-learning ( R). 
+
+V ∗(dQ) − V ∗(T (Q)) is an open challenge, requiring the extension of margin-based and disintegrated PAC-Bayesian tools (Germain et al., 2015; Biggs and Guedj, 2022; Vial-lard et al., 2024) to handle value-based objectives with inverse-propensity weighting and joint nuisance learning. Second, our current analysis assumes that the prior and any actively learned certificates are constructed independently of the policy-learning sample. Tuning the certificate U on the same data Z1: n to tighten the bound would induce a double-overfitting phenomenon that alters the empirical objective itself; formalizing this necessitates new simultaneous high-probability bounds leveraging distribution-dependent priors or random hypothesis sets (Parrado-Hern´ andez et al., 2012; Lever et al., 2013; Dz-iugaite and Roy, 2018; Dupuis et al., 2024). Third, our exact general Bayes update relies on the linearity of the certified value, which follows from its exact reduction to a weighted 0–1 risk. Extending this mathematically rigorous framework to non-linear, ambiguity-aware value functionals, while simultaneously controlling uncertainties arising from both off-policy evaluation and the reward certificate (Athey and Wager, 2021; Sakhi et al., 2023; Gouverneur et al., 2025), represents a critical next step for robust policy learning. Finally, the PROWL framework can be overly conservative in finite samples because it bounds the optimistic error instead of using an exact oracle bias correction. Mitigat-ing this over-correction while maintaining strict one-sided validity remains a crucial open problem. One possible solution is to develop higher-order corrections or value-aware pri-ors, similar to asymptotically unbiased Bayesian frameworks (Hartigan, 1965; Sakai et al., 2025). However, this application is challenging, since the target policy-dependent objec-tive requires inverse-probability weighting and joint nuisance learning, which introduce large variances and complex correlations, making standard prior adjustments difficult. In conclusion, PROWL establishes a formal bridge connecting causal policy learning, PAC-Bayesian generalization theory, and generalized Bayesian inference. By elevating reward uncertainty from a post-hoc consideration to a fundamental component of the op-timization objective, our framework shifts the focus of individualized treatment estimation from maximizing nominal values to verifiable safety. This certified approach provides a 20 mathematically principled foundation for deploying data-driven decision rules in high-stakes domains. In such settings, establishing the reliability of a policy is as critical as optimizing its empirical performance. 
+
+# Code Availability 
+
+The Python implementation of the proposed method and simulation experiments in this study are available at https://github.com/shutech2001/PROWL .
+
+# Acknowledgements 
+
+This work was supported by JSPS KAKENHI Grant Number 25K24203. 
+
+# References 
+
+Altamirano, M., Briol, F.-X., and Knoblauch, J. (2023). Robust and scalable Bayesian online changepoint detection. In Proceedings of the 40th International Conference on Machine Learning , volume 202 of Proceedings of Machine Learning Research , pages 642–663. Athey, S. and Wager, S. (2021). Policy learning with observational data. Econometrica ,89(1):133–161. Biggs, F. and Guedj, B. (2022). On margins and derandomisation in PAC-Bayes. In Pro-ceedings of the 25th International Conference on Artificial Intelligence and Statistics ,volume 151 of Proceedings of Machine Learning Research , pages 3709–3731. PMLR. Bissiri, P. G., Holmes, C. C., and Walker, S. G. (2016). A general framework for updating belief distributions. J. R. Stat. Soc. Ser. B. Stat. Methodol. , 78(5):1103–1130. Butler, E. L., Laber, E. B., Davis, S. M., and Kosorok, M. R. (2018). Incorporating pa-tient preferences into estimation of optimal individualized treatment rules. Biometrics ,74(1):18–26. Catoni, O. (2007). Pac-Bayesian supervised classification: The thermodynamics of sta-tistical learning. Lecture Notes-Monograph Series , 56:i–163. Chen, G., Zeng, D., and Kosorok, M. R. (2016). Personalized dose finding using outcome weighted learning. J. Amer. Statist. Assoc. , 111(516):1509–1521. Chen, J., Fu, H., He, X., Kosorok, M. R., and Liu, Y. (2018). Estimating individualized treatment rules for ordinal treatments. Biometrics , 74(3):924–933. Chen, Y., Zeng, D., and Wang, Y. (2021). Learning individualized treatment rules for multiple-domain latent outcomes. J. Amer. Statist. Assoc. , 116(533):269–282. Dupuis, B., Viallard, P., Deligiannidis, G., and S ¸im¸ sekli, U. (2024). Uniform generaliza-tion bounds on data-dependent hypothesis sets via PAC-Bayesian theory on random sets. J. Mach. Learn. Res. , 25(409):1–55. 21 Dziugaite, G. K. and Roy, D. M. (2018). Data-dependent PAC-Bayes priors via differential privacy. Advances in Neural Information Processing Systems , 31. Fei, W., Chen, Y., Cai, Z., Zeng, D., and Wang, Y. (2026). Learning optimal early decision treatment rules with multi-domain intermediate outcomes. Biometrics , 82(1):ujaf167. Freeman, N. L. B. and Yazzourh, S. (2024). Bayesian outcome weighted learning. In 
+
+NeurIPS 2024 Workshop on Bayesian Decision-Making and Uncertainty .Fu, S., He, Q., Zhang, S., and Liu, Y. (2019). Robust outcome weighted learning for optimal individualized treatment rules. J Biopharm Stat. , 29(4):606–624. Germain, P., Lacasse, A., Laviolette, F., Marchand, M., and Roy, J.-F. (2015). Risk bounds for the majority vote: From a PAC-Bayesian analysis to a learning algorithm. 
+
+J. Mach. Learn. Res. , 16(26):787–860. Gouverneur, A., Oechtering, T. J., and Skoglund, M. (2025). Refined PAC-Bayes bounds for offline bandits. arXiv preprint arXiv:2502.11953 .Gr¨ unwald, P. and van Ommen, T. (2017). Inconsistency of Bayesian inference for misspec-ified linear models, and a proposal for repairing it. Bayesian Anal. , 12(4):1069–1103. Hartigan, J. A. (1965). The asymptotically unbiased prior distribution. Ann. Math. Statist. , 36(4):1137–1152. Hirano, K. and Porter, J. R. (2009). Asymptotics for statistical treatment rules. Econo-metrica , 77(5):1683–1701. Holmes, C. C. and Walker, S. G. (2017). Assigning a value to a power likelihood in a general Bayesian model. Biometrika , 104(2):497–503. Huang, L. and Wang, F. (2025). Identification of L-shaped curve association between serum bicarbonate concentrations and short-term outcomes in patients with acute kid-ney injury: A retrospective cohort study. Ren Fail. , 47(1):2462264. Kitagawa, T. and Tetenov, A. (2018). Who should be treated? Empirical welfare maxi-mization methods for treatment choice. Econometrica , 86(2):591–616. Kosorok, M. R. and Laber, E. B. (2019). Precision medicine. Annu. Rev. Stat. Appl. ,6:263–286. Lever, G., Laviolette, F., and Shawe-Taylor, J. (2013). Tighter PAC-Bayes bounds through distribution-dependent priors. Theoret. Comput. Sci. , 473:4–28. Lipkovich, I., Svensson, D., Ratitch, B., and Dmitrienko, A. (2024). Modern approaches for evaluating treatment effect heterogeneity from clinical trials and observational data. 
+
+Stat. Med. , 43(22):4388–4436. Liu, Y., Wang, Y., Kosorok, M. R., Zhao, Y., and Zeng, D. (2018). Augmented outcome-weighted learning for estimating optimal dynamic treatment regiments. Stat. Med. ,37(26):3776–3788. Lyddon, S. P., Holmes, C. C., and Walker, S. G. (2019). General Bayesian updating and the loss-likelihood bootstrap. Biometrika , 106(2):465–478. 22 Ma, H., Zeng, D., and Liu, Y. (2023). Learning optimal group-structured individualized treatment rules with many treatments. J. Mach. Learn. Res. , 24(102):1–48. Manski, C. F. (2004). Statistical treatment rules for heterogeneous populations. Econo-metrica , 72(4):1221–1246. Maurer, A. (2004). A note on the PAC Bayesian theorem. arXiv preprint cs/0411099 .McAllester, D. A. (1998). Some PAC-Bayesian theorems. In Proceedings of the 11th Annual Conference on Computational Learning Theory , pages 230–234. McAllester, D. A. (2003). PAC-Bayesian stochastic model selection. Mach. Learn. ,51(1):5–21. Miller, J. W. and Dunson, D. B. (2019). Robust Bayesian inference via coarsening. J. Amer. Statist. Assoc. , 114(527):1113–1125. Moodie, E. E. M., Richardson, T. S., and Stephens, D. A. (2007). Demystifying optimal dynamic treatment regimes. Biometrics , 63(2):447–455. Murphy, S. A. (2003). Optimal dynamic treatment regimes. J. R. Stat. Soc. Ser. B Stat. Methodol. , 65(2):331–366. Pan, Y. and Zhao, Y.-Q. (2021). Improved doubly robust estimation in learning optimal individualized treatment rules. J. Amer. Statist. Assoc. , 116(533):283–294. Parrado-Hern´ andez, E., Ambroladze, A., Shawe-Taylor, J., and Sun, S. (2012). PAC-Bayes bounds with data dependent priors. J. Mach. Learn. Res. , 13:3507–3531. Qian, M. and Murphy, S. A. (2011). Performance guarantees for individualized treatment rules. Ann. Statist. , 39(2):1180–1210. Robins, J. (1986). A new approach to causal inference in mortality studies with a sustained exposure period —application to control of the healthy worker survivor effect. Math. Model. , 7(9-12):1393–1512. Robins, J. M. (2004). Optimal structural nested models for optimal sequential decisions. In Lin, D. Y. and Heagerty, P. J., editors, Proceedings of the Second Seattle Symposium in Biostatistics: Analysis of Correlated Data , pages 189–326. Springer New York, New York, NY. Robins, J. M., Hernan, M. A., and Brumback, B. (2000). Marginal structural models and causal inference in epidemiology. Epidemiology , 11(5):550–560. Rodr´ ıguez-G´ alvez, B., Thobaben, R., and Skoglund, M. (2024). More PAC-Bayes bounds: From bounded losses, to losses with general tail behaviors, to anytime validity. J. Mach. Learn. Res. , 25(110):1–43. Sakai, M., Matsuda, T., and Kubokawa, T. (2025). Priors for second-order unbiased Bayes estimators. Biometrika , 112(4):asaf068. Sakhi, O., Alquier, P., and Chopin, N. (2023). PAC-Bayesian offline contextual ban-dits with guarantees. In Proceedings of the 40th International Conference on Machine Learning , volume 202 of Proceedings of Machine Learning Research , pages 29777–29799. PMLR. 23 Schulte, P. J., Tsiatis, A. A., Laber, E. B., and Davidian, M. (2014). Q- and A-learning methods for estimating optimal dynamic treatment regimes. Statist. Sci. , 29(4):640– 661. Seeger, M. (2003). PAC-Bayesian generalisation error bounds for Gaussian process clas-sification. J. Mach. Learn. Res. , 3(2):233–269. Sonabend-W, A., Laha, N., Ananthakrishnan, A. N., Cai, T., and Mukherjee, R. (2023). Semi-supervised off-policy reinforcement learning and value estimation for dynamic treatment regimes. J. Mach. Learn. Res. , 24(343):1–86. Song, R., Kosorok, M., Zeng, D., Zhao, Y., Laber, E., and Yuan, M. (2015). On sparse representation for optimal individualized treatment selection with penalized outcome weighted learning. Stat , 4:59–68. Sverdrup, E., Kanodia, A., Zhou, Z., Athey, S., and Wager, S. (2020). policytree: Policy learning via doubly robust empirical welfare maximization over trees. J. Open Source Softw. , 5(50):2232. Syring, N. and Martin, R. (2019). Calibrating general posterior credible regions. 
+
+Biometrika , 106(2):479–486. Tamano, S. and Tomo, Y. (2025). Location–scale calibration for generalized posteriors. 
+
+arXiv preprint arXiv:2511.15320 .Viallard, P., Germain, P., Habrard, A., and Morvant, E. (2024). A general framework for the practical disintegration of PAC-Bayesian bounds. Mach. Learn. , 113(2):519–604. Wu, P.-S. and Martin, R. (2023). A comparison of learning rate selection methods in generalized Bayesian inference. Bayesian Anal. , 18(1):105–132. Xu, Y., Greene, T. H., Bress, A. P., Sauer, B. C., Bellows, B. K., Zhang, Y., Weintraub, W. S., Moran, A. E., and Shen, J. (2022). Estimating the optimal individualized treatment rule from a cost-effectiveness perspective. Biometrics , 78(1):337–351. Yang, J., Eckles, D., Dhillon, P., and Aral, S. (2024). Targeting for long-term outcomes. 
+
+Manag. Sci. , 70(6):3841–3855. Zhang, B., Tsiatis, A. A., Davidian, M., Zhang, M., and Laber, E. (2012a). Estimating optimal treatment regimes from a classification perspective. Stat , 1:103–114. Zhang, B., Tsiatis, A. A., Laber, E. B., and Davidian, M. (2012b). A robust method for estimating optimal treatment regimes. Biometrics , 68(4):1010–1018. Zhang, C., Chen, J., Fu, H., He, X., Zhao, Y.-Q., and Liu, Y. (2020). Multicategory outcome weighted margin-based learning for estimating individualized treatment rules. 
+
+Statist. Sinica , 30(4):1857–1879. Zhao, Y., Zeng, D., Rush, A. J., and Kosorok, M. R. (2012). Estimating individu-alized treatment rules using outcome weighted learning. J. Amer. Statist. Assoc. ,107(499):1106–1118. 24 Zhao, Y.-Q., Zeng, D., Laber, E. B., and Kosorok, M. R. (2015). New statistical learning methods for estimating optimal dynamic treatment regimes. J. Amer. Statist. Assoc. ,110(510):583–598. Zhou, X., Mayer-Hamblett, N., Khan, U., and Kosorok, M. R. (2017). Residual weighted learning for estimating individualized treatment rules. J. Amer. Statist. Assoc. ,112(517):169–187. Zhou, Z., Athey, S., and Wager, S. (2023). Offline multi-action policy learning: General-ization and optimization. Oper. Res. , 71(1):148–183. Zhu, R., Zhao, Y.-Q., Chen, G., Ma, S., and Zhao, H. (2017). Greedy outcome weighted tree learning of optimal personalized treatment rules. Biometrics , 73(2):391–400. 
+
+# A Additional Theory 
+
+Since X ⊂ Rp is a Borel subset of a Polish space, regular conditional distributions given X exist. Throughout this appendix, we fix measurable versions of every conditional expectation and conditional variance that appears below. Furthermore, because U , νa,and f are jointly measurable and the mapping sgn : R → {− 1, 1} is Borel measurable, the composite mappings ( x, β ) 7 → dβ (x), ( z, α ) 7 → Γαa (z), ( z, β, α ) 7 → Γαdβ (z), as well as the induced maps ( z, α ) 7 → Dα(z), ( z, α ) 7 → Yα(z), ( z, α ) 7 → Wα(z), ( z, β, α ) 7 → ℓval (β, α ; z), and ( z, β, α ) 7 → ℓh(β, α ; z) are all rigorously measurable. Consequently, all expectations, conditional expectations, and posterior integrals utilized below are rigorously well-defined. 
+
+## A.1 Identification and Certified Lower-Value Domination 
+
+We begin by presenting the standard inverse-probability weighting representation, followed by a formalization of the policy-wise domination induced by the certificate. 
+
+Proposition 8 (Inverse-propensity representations) . Under Assumption 1, every mea-surable ITR d : X → {− 1, 1} exactly satisfies 
+
+V (d) = E
+
+"
+
+R1{A = d(X)}
+
+π(A | X)
+
+#
+
+, V ∗(d) = E
+
+"
+
+R∗1{A = d(X)}
+
+π(A | X)
+
+#
+
+. (11) See Appendix B.8 for the proof. Proposition 8 formally establishes that the expected and target values of any measurable policy can be robustly identified using standard inverse-probability weighting under the strict overlap and ignorability assumptions. 
+
+Proposition 9 (Certified lower-value domination) . Under Assumptions 1 and 2, every measurable ITR d strictly satisfies 
+
+V ∗(d) ≥ VR(d). (12) 
+
+If, in addition, U ≤ R almost surely, then R = R − U almost surely, yielding 
+
+V ∗(d) ≥ V (d) − E
+
+"
+
+U 1{A = d(X)}
+
+π(A | X)
+
+#
+
+. (13) 25 See Appendix B.9 for the proof. Proposition 9 demonstrates that any policy’s un-observed target value is fundamentally bounded below by its observable certified value, guaranteeing that optimizing this proxy strictly improves the lower bound of the target reward. 
+
+Remark 1 (When the certificate does not alter policy ranking) . Suppose that U ≤ R
+
+almost surely and that U = U (X) depends exclusively on X. Then, for every measurable ITR d, we have 
+
+E
+
+"
+
+U (X)1{A = d(X)}
+
+π(A | X)
+
+#
+
+= EU (X),
+
+which follows directly from the identity 
+
+E
+
+"
+
+1{A = d(X)}
+
+π(A | X) X
+
+#
+
+= 1 a.s. Hence, the penalty term detailed in (13) is entirely independent of the policy. Con-sequently, reward uncertainty impacts the ranking of policies only through treatment-dependent certification or the active clipping inherent in the definition R = ( R − U )+.
+
+## A.2 Special Cases and Nuisance Design 
+
+We next highlight several salient special cases of the certified reduction, accompanied by conditional moment calculations that elucidate the optimal design of the nuisance functions. 
+
+Proposition 10 (Special cases of the certified reduction) . Fix α ∈ A .(i) Certified OWL. If ν1,α ≡ ν−1,α ≡ 0, then for a ∈ {− 1, 1},
+
+Γαa (Z) = R1{A = a}
+
+π(a | X) ,
+
+and therefore, 
+
+Dα(Z) = AR π(A | X), Wα(Z) = Rπ(A | X), Yα(Z) = A on {R > 0}.
+
+Because Wα(Z) = 0 on the event {R = 0 }, the resulting weighted classification problem corresponds exactly to OWL applied to the certified reward R.(ii) Certified residual weighted learning. If ν1,α = ν−1,α = mα for some measurable mapping mα : X → [0 , 1] , then 
+
+Dα(Z) = A{R − mα(X)}
+
+π(A | X) , Wα(Z) = |R − mα(X)|
+
+π(A | X) , Yα(Z) = A sgn {R−mα(X)}.
+
+Under a balanced randomization scenario and setting mα(x) = E[R | X = x], this yields the exact certified equivalent of residual weighted learning. (iii) Arm-specific augmentation. For arbitrarily measurable arm-specific nuisances 
+
+ν1,α and ν−1,α , each Γαa functions as an unbiased action-specific score, such that 
+
+E[Γ αa (Z) | X = x] = μa(x) for PX -a.e. x. 
+
+26 See Appendix B.10 for the proof. Proposition 10 clarifies the versatility of our certified reduction framework, revealing that it seamlessly recovers certified versions of Outcome Weighted Learning and Residual Weighted Learning through specific, principled choices of the nuisance functions. 
+
+## A.3 Properties of the Certified Hinge Surrogate 
+
+For a given measurable score function g : X → R, recall the induced decision rule 
+
+dg(x) := sgn {g(x)} and the exact certified hinge risk Rα 
+
+> h
+
+(g) defined in the main text. 
+
+Lemma 11 (Elementary bounds for the certified advantage) . Under Assumption 1, for every α ∈ A ,
+
+|Dα(Z)| ≤ 1 + ε−1 a.s., (14) 
+
+which directly implies 
+
+0 ≤ Wα(Z) ≤ 1 + ε−1 a.s. (15) See Appendix B.11 for the proof. Lemma 11 establishes deterministic upper bounds on the certified advantage and absolute weights, which are essential for controlling the empirical processes in our subsequent nonasymptotic analysis. 
+
+Proposition 12 (Variational characterization of the practical posterior) . Fix λ > 0 and define the empirical hinge loss 
+
+ˆLh,n (θ) := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓh(θ; Zi), θ ∈ Θ.
+
+Then, for any realized sample Z1: n, the objective functional 
+
+Q 7 → Eθ∼Q
+
+ ˆLh,n (θ) + 1
+
+λn KL( Q∥Π0)
+
+defined over the space of probability measures {Q : Q ≪ Π0}, admits the unique global minimizer 
+
+ˆQPROWL ,h 
+
+> λ
+
+(d θ) = exp {− λn ˆLh,n (θ)}Π0(d θ)
+
+R 
+
+> Θ
+
+exp {− λn ˆLh,n (t)}Π0(d t). (16) 
+
+Because ˆLh,n (θ) = n−1 Pni=1 ℓh(θ; Zi), the expression in (16) aligns exactly with the pos-terior family defined in Section 3.3. 
+
+See Appendix B.12 for the proof. Proposition 12 formalizes the variational characteri-zation of the empirical Gibbs posterior, directly linking the minimization of the empirical certified hinge risk to a well-defined and theoretically sound Bayesian update. 
+
+Corollary 13 (MAP form under an exponential prior density) . Assume that the prior 
+
+Π0 admits a density with respect to a σ-finite reference measure ρ of the form 
+
+π0(β, α ) = c0 exp {− λ0J(β, α )}, (β, α ) ∈ Θ,
+
+where c0 > 0 is a normalization constant, λ0 > 0 controls the prior concentration, and 
+
+J : Θ → (−∞ , ∞] is a measurable penalty function. Under these conditions, the posterior 
+
+ˆQPROWL ,h 
+
+> λ
+
+admits the ρ-density 
+
+(β, α ) 7 → cλ,n exp 
+
+(
+
+−λ
+
+> n
+
+X
+
+> i=1
+
+ℓh(( β, α ); Zi) − λ0J(β, α )
+
+)
+
+,
+
+27 where cλ,n > 0 is the normalizing constant. Consequently, any MAP estimator under 
+
+ˆQPROWL ,h 
+
+> λ
+
+natively minimizes the regularized empirical risk: 
+
+(β, α ) 7 → 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓh(( β, α ); Zi) + λ0
+
+λn J(β, α ). (17) See Appendix B.13 for the proof. Corollary 13 demonstrates that computing the MAP estimator elegantly reduces to solving a standard regularized empirical risk minimization problem, ensuring practical computational tractability. 
+
+## A.4 Auxiliary PAC-Bayes Tools 
+
+This subsection consolidates the foundational variational and concentration inequali-ties utilized throughout the proofs of our main PAC-Bayes results. 
+
+Lemma 14 (Donsker–Varadhan variational principle) . Let S : Θ → R be a measurable function, and suppose there exists a τ > 0 satisfying the integrability condition 
+
+Z
+
+> Θ
+
+eτ S (θ)Π0(d θ) < ∞.
+
+Then, the following dual representation holds: 
+
+sup 
+
+> Q≪Π0
+
+(
+
+Eθ∼Q[S(θ)] − 1
+
+τ KL( Q∥Π0)
+
+)
+
+= 1
+
+τ log 
+
+Z
+
+> Θ
+
+eτ S (θ)Π0(d θ), (18) 
+
+where the supremum is uniquely achieved by the tilted measure 
+
+Q∗(d θ) = eτ S (θ)Π0(d θ)
+
+R 
+
+> Θ
+
+eτ S (t)Π0(d t).
+
+Correspondingly, if T : Θ → R is measurable and R 
+
+> Θ
+
+e−τ T (θ)Π0(d θ) < ∞, then 
+
+inf 
+
+> Q≪Π0
+
+(
+
+Eθ∼Q[T (θ)] + 1
+
+τ KL( Q∥Π0)
+
+)
+
+= − 1
+
+τ log 
+
+Z
+
+> Θ
+
+e−τ T (θ)Π0(d θ), (19) 
+
+and the infimum is exclusively attained by the Gibbs measure proportional to e−τ T (θ)Π0(d θ).
+
+See Appendix B.14 for the proof. Lemma 14 provides the standard Donsker–Varadhan variational principle, which serves as the core algebraic mechanism for converting expo-nentiated empirical bounds into penalized risk bounds over probability measures. 
+
+Lemma 15 (Scalar exponential bound for bounded variables) . Let Y1, . . . , Y n be a se-quence of i.i.d. random variables bounded in [0 , 1] with expectation μ = E[Y1], and define their empirical mean ¯Yn = n−1 Pni=1 Yi. Then, the following exponential inequality holds: 
+
+E
+
+h
+
+exp n kl( ¯Yn∥μ)
+
+i
+
+≤ ξ(n), ξ(n) := exp 112 n
+
+!r πn 
+
+2 + 2 . (20) See Appendix B.15 for the proof. Lemma 15 provides a tight, nonasymptotic expo-nential inequality for the Kullback–Leibler divergence between Bernoulli distributions, yielding a strictly bounded moment-generating function that is essential for our uniform concentration results. 28 Lemma 16 (Uniform Seeger–Langford inequality for bounded losses) . Let ℓ : Θ × (X × {− 1, 1} × [0 , 1]) → [0 , 1] be a measurable loss function, and define 
+
+L(θ) := E[ℓ(θ; Z)] , ˆLn(θ) := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓ(θ; Zi).
+
+For any posterior Q ≪ Π0, define the aggregate risks 
+
+L(Q) := Eθ∼Q[L(θ)] , ˆLn(Q) := Eθ∼Q[ ˆLn(θ)] .
+
+Then, for any tolerance level δ ∈ (0 , 1) , the bound 
+
+kl   ˆLn(Q)∥L(Q) ≤ KL( Q∥Π0) + log {ξ(n)/δ }
+
+n (21) 
+
+holds with probability at least 1 − δ, simultaneously across all posteriors Q ≪ Π0.
+
+See Appendix B.16 for the proof. Lemma 16 establishes a uniform Seeger–Langford-type PAC-Bayes bound, allowing pointwise concentration properties to hold simultane-ously across all absolutely continuous posterior distributions. 
+
+Lemma 17 (Uniform Catoni bound for bounded losses) . Under the same assumptions and notation as Lemma 16, for any tolerance level δ ∈ (0 , 1) , the bound 
+
+L(Q) ≤ 1 − exp −cn,δ (Q) − γ ˆLn(Q)
+
+1 − exp( −γ) (22) 
+
+holds with probability at least 1−δ, simultaneously for all Q ≪ Π0 and any scale parameter 
+
+γ > 0, where we denote 
+
+cn,δ (Q) := KL( Q∥Π0) + log {ξ(n)/δ }
+
+n .
+
+See Appendix B.17 for the proof. Lemma 17 offers a uniform Catoni-style bound, enabling the derivation of our exact, temperature-dependent empirical lower confidence bounds for the expected loss. 
+
+Lemma 18 (Range of the certified value score and loss) . Under Assumption 1, for every measurable ITR d and α ∈ A , we have 
+
+Γαd (Z) ∈ [1 − ε−1, ε −1] a.s. (23) 
+
+As a direct consequence, defining the scaling constants 
+
+cε := ε−1, Kε := 2 ε−1 − 1,
+
+ensures that the transformed loss function 
+
+ℓval (θ; Z) := cε − Γαdβ (Z)
+
+Kε
+
+, θ = ( β, α ) ∈ Θ,
+
+is bounded in [0 , 1] almost surely. 
+
+See Appendix B.18 for the proof. Lemma 18 guarantees that the certified value score and its induced loss function are almost surely bounded, satisfying the strict range re-quirements necessary to apply the aforementioned concentration inequalities. 29 B Proofs 
+
+## B.1 Proof of Theorem 1 
+
+Proof of Theorem 1. Fix a measurable ITR d and a nuisance parameter α ∈ A . We first establish the exact certified value representation. By definition (2), we have Γαd (Z) = X
+
+> a∈{− 1,1}
+
+1{d(X) = a}
+
+"
+
+νa,α (X) + 1{A = a}
+
+π(a | X) {R − νa,α (X)}
+
+#
+
+.
+
+Fix x ∈ X outside a PX -null set, and let ad = d(x). Conditioning on X = x, we obtain 
+
+E[Γ αd (Z) | X = x] = νad,α (x) + E
+
+"
+
+1{A = ad}
+
+π(ad | x) {R − νad,α (x)} X = x
+
+#
+
+= νad,α (x) + E[R − νad,α (x) | X = x, A = ad]= μad (x).
+
+Therefore, E[Γ αd (Z)] = E[μd(X)(X)]. On the other hand, 
+
+VR(d) = E
+
+"
+
+R1{A = d(X)}
+
+π(A | X)
+
+#
+
+= E
+
+"
+
+E R1{A = d(X)}
+
+π(A | X) X
+
+!# 
+
+= E[μd(X)(X)] .
+
+Hence, VR(d) = E[Γ αd (Z)], which concludes the first part of the proof. Next, we prove the exact weighted classification reduction. Define the observable quantity 
+
+Cobs  
+
+> α
+
+(Z) := 12
+
+n
+
+Γα 
+
+> 1
+
+(Z) + Γ α
+
+> −1
+
+(Z) + Wα(Z)
+
+o
+
+,
+
+so that C♯α = E[Cobs  
+
+> α
+
+(Z)]. For any rule d, we can write Γαd (Z) = Γα 
+
+> 1
+
+(Z) + Γ α
+
+> −1
+
+(Z)2 + d(X)2 {Γα 
+
+> 1
+
+(Z) − Γα
+
+> −1
+
+(Z)}
+
+= Γα 
+
+> 1
+
+(Z) + Γ α
+
+> −1
+
+(Z)2 + d(X)2 Dα(Z)= Γα 
+
+> 1
+
+(Z) + Γ α
+
+> −1
+
+(Z)2 + Wα(Z)2 d(X)Yα(Z).
+
+Since d(X), Y α(Z) ∈ {− 1, 1}, it follows that d(X)Yα(Z) = 1 − 21{Yα(Z)̸ = d(X)}.Substituting this relationship into the previous display yields Γαd (Z) = Cobs  
+
+> α
+
+(Z) − Wα(Z)1{Yα(Z)̸ = d(X)}.
+
+Taking expectations and applying the identity established in the first part of the proof, we find 
+
+VR(d) = E[Γ αd (Z)] = C♯α − R α
+
+> 01
+
+(d).
+
+This confirms the exact reduction. 30 Finally, observing that 
+
+VR(d) = Eμ1(X)1{d(X) = 1 } + μ−1(X)1{d(X) = −1},
+
+the integrand is maximized pointwise by selecting an action a ∈ arg max a∈{− 1,1} μa(X). Therefore, a measurable ITR d is Bayes-optimal for VR if and only if 
+
+d(x) ∈ arg max 
+
+> a∈{− 1,1}
+
+μa(x) for PX -a.e. x. 
+
+In particular, the measurable selector d∗
+
+> R
+
+(x) = sgn {μ1(x) − μ−1(x)} (adopting the con-vention sgn(0) = 1) is strictly Bayes-optimal. 
+
+## B.2 Proof of Proposition 2 
+
+Proof of Proposition 2. Fix an x ∈ X outside a PX -null set such that all requisite condi-tional moments are well-defined, and introduce the shorthand notations: 
+
+pa = pa(x), μa = μa(x), σ2 
+
+> a
+
+= σ2
+
+> a
+
+(x), νa = νa,α (x).
+
+To prove part (i), define ∆ a(Z) := Γ αa (Z) − μa. Using (1), we have ∆a(Z) = νa − μa + 1{A = a}
+
+pa
+
+{R − νa}
+
+= 1{A = a}
+
+pa
+
+(R − μa) + 1{A = a}
+
+pa
+
+− 1
+
+!
+
+(μa − νa).
+
+Taking the conditional expectation given X = x, the first term vanishes because 
+
+E
+
+"
+
+1{A = a}
+
+pa
+
+(R − μa) X = x
+
+#
+
+= E[R − μa | X = x, A = a] = 0 ,
+
+and the second term similarly vanishes because 
+
+E
+
+"
+
+1{A = a}
+
+pa
+
+− 1 X = x
+
+#
+
+= P(A = a | X = x)
+
+pa
+
+− 1 = 0 .
+
+Thus, E[Γ αa (Z) | X = x] = μa.To compute the conditional variance, we first note that the conditional covariance between the two centered terms is zero: 
+
+E
+
+"
+
+1{A = a}
+
+pa
+
+(R − μa) 1{A = a}
+
+pa
+
+− 1
+
+!
+
+X = x
+
+#
+
+= 1
+
+pa
+
+− 1
+
+!
+
+E
+
+"
+
+1{A = a}
+
+pa
+
+(R − μa) X = x
+
+#
+
+= 0 .
+
+Therefore, the conditional variance simplifies to Var(Γ αa (Z) | X = x)= E
+
+"
+
+1{A = a}
+
+pa
+
+(R − μa)
+
+!2
+
+X = x
+
+#
+
++ E
+
+"
+
+1{A = a}
+
+pa
+
+− 1
+
+!2
+
+X = x
+
+#
+
+(μa − νa)2.
+
+31 Evaluating the first term, we obtain 
+
+E
+
+"
+
+1{A = a}
+
+pa
+
+(R − μa)
+
+!2
+
+X = x
+
+#
+
+= 1
+
+p2
+
+> a
+
+E1{A = a}(R − μa)2 | X = x
+
+= 1
+
+pa
+
+E(R − μa)2 | X = x, A = a = σ2
+
+> a
+
+pa
+
+.
+
+For the second term, we have 
+
+E
+
+"
+
+1{A = a}
+
+pa
+
+− 1
+
+!2
+
+X = x
+
+#
+
+= pa
+
+1
+
+pa
+
+− 1
+
+!2
+
++ (1 − pa) = (1 − pa)2
+
+pa
+
++ 1 − pa = 1 − pa
+
+pa
+
+.
+
+This establishes (4). The final statement in part (i) follows immediately because the second summand in (4) is a strictly convex quadratic function of νa, possessing a unique minimizer at νa = μa.For part (ii), let 
+
+p = p(x), q = q(x), δ1 := μ1(x) − ν1,α (x), δ−1 := μ−1(x) − ν−1,α (x),
+
+and introduce the abbreviation ∆ := μ1(x) − μ−1(x). On the event {A = 1 }, we have 
+
+Dα(Z) = ν1,α (x) − ν−1,α (x) + R − ν1,α (x)
+
+p ,
+
+which implies 
+
+Dα(Z) − ∆ = R − μ1(x)
+
+p + qpδ1 + δ−1.
+
+Similarly, on the event {A = −1}, we have 
+
+Dα(Z) = ν1,α (x) − ν−1,α (x) − R − ν−1,α (x)
+
+q ,
+
+yielding 
+
+Dα(Z) − ∆ = −R − μ−1(x)
+
+q − δ1 − pq δ−1.
+
+Taking the conditional expectation given X = x directly yields (5). Since E[Dα(Z) − ∆ |
+
+X = x] = 0, the conditional variance can be expressed as Var( Dα(Z) | X = x) = p
+
+(
+
+σ21 (x)
+
+p2 + qpδ1 + δ−1
+
+!2)
+
++ q
+
+(
+
+σ2
+
+> −1
+
+(x)
+
+q2 + δ1 + pq δ−1
+
+!2)
+
+= σ21 (x)
+
+p + σ2
+
+> −1
+
+(x)
+
+q + qpδ21 + pq δ2 
+
+> −1
+
++ 2 δ1δ−1.
+
+The last three terms factor neatly as 
+
+qpδ21 + pq δ2 
+
+> −1
+
++ 2 δ1δ−1 = (qδ 1 + pδ −1)2
+
+pq ,
+
+32 which establishes (6). Because the quadratic term is strictly nonnegative and vanishes if and only if qδ 1 + pδ −1 = 0, the minimizers are precisely the pairs of nuisance functions that satisfy the linear constraint (7). To prove part (iii), we enforce the restriction ν1,α = ν−1,α = mα. Under this condition, (7) reduces to 
+
+q(x){μ1(x) − mα(x)} + p(x){μ−1(x) − mα(x)} = 0 ,
+
+which is algebraically equivalent to mα(x) = q(x)μ1(x)+ p(x)μ−1(x). This proves (8). The uniqueness of this minimizer follows from the strict convexity of the quadratic term in (6) with respect to mα(x) within this one-dimensional subclass. In the special case of balanced randomization where p(x) = q(x) = 1 /2, this expression simplifies to m†(x) = μ1(x)+ μ−1(x)2 .Finally, recognizing that E[R | X = x] = p(x)μ1(x) + q(x)μ−1(x), we see that under balanced randomization, the previous expression is exactly equal to E[R | X = x]. This concludes the proof of (9). 
+
+## B.3 Proof of Theorem 3 
+
+Proof of Theorem 3. For θ = ( β, α ) ∈ Θ, define the expected and empirical certified value losses as 
+
+Lval (θ) := E[ℓval (θ; Z)] , ˆLval ,n (θ) := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓval (θ; Zi).
+
+For a posterior Q ≪ Π0, define their Q-averaged counterparts: 
+
+Lval (Q) := Eθ∼Q[Lval (θ)] , ˆLval ,n (Q) := Eθ∼Q[ ˆLval ,n (θ)] .
+
+By the boundedness established in Lemma 18, Fubini’s theorem applies, yielding 
+
+Lval (Q) = Eθ∼Q
+
+"cε − E[Γ αdβ (Z)] 
+
+Kε
+
+#
+
+= cε − VR(dQ)
+
+Kε
+
+, (24) ˆLval ,n (Q) = Eθ∼Q
+
+"
+
+cε − ˆVR,n (dθ)
+
+Kε
+
+#
+
+= cε − ˆVR,n (dQ)
+
+Kε
+
+, (25) where the first equality utilizes Theorem 1 pointwise in θ.We first establish the fixed-temperature PAC-Bayes inequality. Fix θ ∈ Θ. By Lemma 18, the random variable ℓval (θ; Z) takes values in [0 , 1]. Thus, Hoeffding’s lemma yields, for every s ∈ R,
+
+E
+
+h
+
+exp {s(ℓval (θ; Z) − Lval (θ)) }
+
+i
+
+≤ exp 
+
+s2
+
+8
+
+
+
+.
+
+Applying this to the empirical mean of the n i.i.d. observations gives 
+
+E
+
+h
+
+exp {s( ˆLval ,n (θ) − Lval (θ)) }
+
+i
+
+≤ exp 
+
+ s2
+
+8n
+
+
+
+.
+
+Integrating with respect to the prior and applying Fubini’s theorem, we have 
+
+E
+
+"Z
+
+> Θ
+
+exp {s( ˆLval ,n (θ) − Lval (θ)) }Π0(d θ)
+
+#
+
+≤ exp 
+
+ s2
+
+8n
+
+
+
+.
+
+33 Markov’s inequality then implies that, with probability at least 1 − δ,
+
+Z
+
+> Θ
+
+exp {s( ˆLval ,n (θ) − Lval (θ)) }Π0(d θ) ≤ δ−1 exp 
+
+ s2
+
+8n
+
+
+
+.
+
+Conditioning on this high-probability event, applying Lemma 14 with S(θ) = s{ ˆLval ,n (θ)−
+
+Lval (θ)} and τ = 1 yields, for every Q ≪ Π0,
+
+s{ ˆLval ,n (Q) − Lval (Q)} ≤ KL( Q∥Π0) + log(1 /δ ) + s2
+
+8n.
+
+Setting s = ηn , we obtain 
+
+Lval (Q) ≤ ˆLval ,n (Q) + KL( Q∥Π0) + log(1 /δ )
+
+ηn + η
+
+8simultaneously for all Q ≪ Π0. Substituting Equations (24) and (25) into this inequality and rearranging the terms yields 
+
+VR(dQ) ≥ ˆVR,n (dQ) − Kε
+
+(
+
+KL( Q∥Π0) + log(1 /δ )
+
+ηn + η
+
+8
+
+)
+
+.
+
+By Proposition 9, V ∗(dQ) ≥ VR(dQ), and therefore 
+
+V ∗(dQ) ≥ ˆVR,n (dQ) − Kε
+
+(
+
+KL( Q∥Π0) + log(1 /δ )
+
+ηn + η
+
+8
+
+)
+
+,
+
+which confirms the claimed simultaneous lower bound. Next, we identify the posterior that maximizes the right-hand side for a fixed η. Be-cause the terms involving log(1 /δ ) and η/ 8 are independent of Q, maximizing the bound is strictly equivalent to maximizing the functional 
+
+Q 7 → ˆVR,n (dQ) − Kε
+
+ηn KL( Q∥Π0).
+
+We apply Lemma 14 with 
+
+S(θ) = ˆVR,n (dθ), τ = ηn Kε
+
+.
+
+Since ˆVR,n (dθ) is bounded (as shown in Lemma 18), the integrability condition is au-tomatically satisfied. The variational identity (18) dictates that the unique maximizer is ˆQPROWL ,val  
+
+> η
+
+(d θ) = exp {ηn ˆVR,n (dθ)/K ε}Π0(d θ)
+
+R 
+
+> Θ
+
+exp {ηn ˆVR,n (dt)/K ε}Π0(d t).
+
+Finally, noting the algebraic relation 
+
+> n
+
+X
+
+> i=1
+
+ℓval (θ; Zi) = 1
+
+KεnX
+
+> i=1
+
+{cε − Γαdβ (Zi)} = nc ε
+
+Kε
+
+− nKε
+
+ˆVR,n (dθ),
+
+we have exp 
+
+(
+
+−η
+
+> n
+
+X
+
+> i=1
+
+ℓval (θ; Zi)
+
+)
+
+= exp 
+
+
+
+−ηnc ε/K ε
+
+
+
+exp 
+
+n
+
+ηn ˆVR,n (dθ)/K ε
+
+o
+
+.
+
+34 Because the prefactor exp( −ηnc ε/K ε) is independent of θ, it cancels out upon normaliza-tion, leaving ˆQPROWL ,val  
+
+> η
+
+(d θ) ∝ exp 
+
+(
+
+−η
+
+> n
+
+X
+
+> i=1
+
+ℓval (θ; Zi)
+
+)
+
+Π0(d θ).
+
+This coincides exactly with the general Bayes update associated with the loss ℓval , as formulated by Bissiri et al. (2016). 
+
+## B.4 Proof of Proposition 4 
+
+Proof of Proposition 4. We first apply Lemma 17 to the bounded loss ℓval (θ; Z) ∈ [0 , 1], whose boundedness is guaranteed by Lemma 18. With probability at least 1 − δ, we have 
+
+Lval (Q) ≤ 1 − exp {− cn,δ (Q) − γ ˆLval ,n (Q)}
+
+1 − exp( −γ)simultaneously for all posteriors Q ≪ Π0 and all scale parameters γ > 0. Substituting the linear relations (24) and (25) into this inequality yields 
+
+VR(dQ) ≥ cε − Kε
+
+1 − exp {− cn,δ (Q) − γ ˆLval ,n (Q)}
+
+1 − exp( −γ) = LCB val 
+
+> n,δ
+
+(Q; γ).
+
+Invoking Proposition 9, we obtain the simultaneous lower confidence bound: 
+
+V ∗(dQ) ≥ VR(dQ) ≥ LCB val 
+
+> n,δ
+
+(Q; γ).
+
+Now, fix γ > 0. Because 1 − e−γ > 0, the mapping 
+
+t 7 → cε − Kε
+
+1 − e−t
+
+1 − e−γ
+
+is strictly monotonically decreasing on R. Therefore, maximizing the objective Q 7 →
+
+LCB val 
+
+> n,δ
+
+(Q; γ) is strictly equivalent to minimizing t(Q) := cn,δ (Q) + γ ˆLval ,n (Q), or equiva-lently, to maximizing 
+
+−t(Q) = −KL( Q∥Π0) + log {ξ(n)/δ }
+
+n − γ ˆLval ,n (Q).
+
+Discarding the Q-independent additive constant − log {ξ(n)/δ }/n and substituting (25), the problem reduces to maximizing ˆVR,n (dQ) − Kε
+
+γn KL( Q∥Π0).
+
+By Theorem 3, the unique maximizer of this functional is precisely ˆQPROWL ,val 
+
+> γ
+
+Finally, consider a finite grid Tn ⊂ (0 , ∞) and let ˆγ ∈ arg max 
+
+> γ∈T n
+
+LCB val 
+
+> n,δ
+
+  ˆQPROWL ,val  
+
+> γ
+
+; γ.
+
+Because the high-probability event established above holds uniformly for all Q ≪ Π0 and all γ > 0, it holds in particular for the data-dependent choices 
+
+Q = ˆQPROWL ,val ˆγ and γ = ˆ γ. 
+
+Consequently, on that event, it is guaranteed that 
+
+V ∗(d ˆQPROWL ,val ˆγ
+
+) ≥ LCB val 
+
+> n,δ
+
+  ˆQPROWL ,val ˆγ ; ˆ γ
+
+= max 
+
+> γ∈T n
+
+LCB val 
+
+> n,δ
+
+  ˆQPROWL ,val  
+
+> γ
+
+; γ,
+
+which concludes the proof of the temperature-selection guarantee. 35 B.5 Proof of Proposition 5 
+
+Proof of Proposition 5. To establish part (i), observe that Wα(Z)Yα(Z) = Dα(Z) by def-inition. Consequently, for PX -almost every x, we have 
+
+uα(x) − vα(x) = EWα(Z)Yα(Z) | X = x
+
+= E[Dα(Z) | X = x] = μ1(x) − μ−1(x),
+
+where the final equality follows from (5) in Proposition 2. For part (ii), fix x outside a PX -null set and abbreviate u = uα(x) and v = vα(x). For a scalar score value t ∈ R, the conditional hinge risk at x is given by ϕx(t) := 
+
+u(1 − t)+ + v(1 + t)+. A direct piecewise expansion yields 
+
+ϕx(t) = 
+
+
+
+u(1 − t), t ≤ − 1,u(1 − t) + v(1 + t), −1 ≤ t ≤ 1,v(1 + t), t ≥ 1.
+
+If u > v , the function ϕx(t) is strictly decreasing on the interval [ −1, 1] (with a slope of 
+
+v − u < 0) and strictly increasing on [1 , ∞) (with a slope of v ≥ 0); thus, the unique minimizer is t = 1. Conversely, if u < v , a symmetric argument shows that the unique minimizer is t = −1. If u = v, the function is constant on [ −1, 1], meaning any t ∈ [−1, 1] minimizes ϕx. Therefore, the pointwise measurable choice g†
+
+> α
+
+(x) defined previously is a conditional risk minimizer for almost every x. Because the expected hinge risk satisfies 
+
+Rα 
+
+> h
+
+(g) = EϕX (g(X)) ,
+
+it follows that g† 
+
+> α
+
+universally minimizes Rα 
+
+> h
+
+(g) across all measurable scores. By part (i), we have sgn {uα(x) − vα(x)} = sgn {μ1(x) − μ−1(x)} for PX -a.e. x. 
+
+Hence, the induced rule dg† 
+
+> α
+
+(x) selects an action in arg max a∈{− 1,1} μa(x) for PX -almost every x. By Theorem 1, such a rule is strictly Bayes-optimal for the certified value VR,proving Fisher consistency. For part (iii), again fix x outside a PX -null set and retain the abbreviations u = uα(x)and v = vα(x). Define the conditional exact weighted classification risk for a score t as 
+
+ψx(t) := u1{t < 0} + v1{t ≥ 0}, noting that our convention sgn(0) = 1 dictates dg(x) = 1 when g(x) = 0. Its minimum is ψ∗ 
+
+> x
+
+= min {u, v }, while the minimum conditional hinge risk is ϕ∗ 
+
+> x
+
+= 2 min {u, v }. We claim that the pointwise excess classification risk is strictly dominated by the excess hinge risk: 
+
+ψx(t) − ψ∗ 
+
+> x
+
+≤ ϕx(t) − ϕ∗ 
+
+> x
+
+for all t ∈ R. (26) Suppose first that u ≥ v. If t ≥ 0, then ψx(t) = v = ψ∗
+
+> x
+
+, rendering the left-hand side of (26) zero, and the inequality holds trivially. If −1 ≤ t < 0, then ψx(t) − ψ∗ 
+
+> x
+
+= u − v,while 
+
+ϕx(t) − ϕ∗ 
+
+> x
+
+= u(1 − t) + v(1 + t) − 2v = ( u − v)(1 − t) ≥ u − v. 
+
+If t < −1, we again have ψx(t) − ψ∗ 
+
+> x
+
+= u − v, whereas 
+
+ϕx(t) − ϕ∗ 
+
+> x
+
+= u(1 − t) − 2v = ( u − v) + {u(−t) − v} ≥ u − v, 
+
+36 since −t > 1 and u ≥ v imply u(−t) − v ≥ u − v ≥ 0. Thus, (26) holds when u ≥ v.The case where u < v follows by a symmetric argument. If t < 0, then ψx(t) = u = ψ∗
+
+> x
+
+,making the inequality trivial. If 0 ≤ t ≤ 1, we have 
+
+ψx(t) − ψ∗ 
+
+> x
+
+= v − u, ϕx(t) − ϕ∗ 
+
+> x
+
+= u(1 − t) + v(1 + t) − 2u = ( v − u)(1 + t) ≥ v − u. 
+
+If t > 1, we similarly find 
+
+ψx(t) − ψ∗ 
+
+> x
+
+= v − u, ϕx(t) − ϕ∗ 
+
+> x
+
+= v(1 + t) − 2u = ( v − u) + {vt − u} ≥ v − u, 
+
+because t > 1 and v > u strictly guarantee vt − u ≥ v − u > 0. Consequently, (26) holds unconditionally for all x and all t.Substituting t = g(x) and integrating (26) with respect to PX yields 
+
+Rα
+
+> 01
+
+(g) − inf  
+
+> h
+
+Rα
+
+> 01
+
+(h) ≤ R α 
+
+> h
+
+(g) − inf  
+
+> h
+
+Rα 
+
+> h
+
+(h).
+
+Finally, by the equivalence established in Theorem 1, 
+
+VR(d∗
+
+> R
+
+) − VR(dg) = Rα
+
+> 01
+
+(g) − inf  
+
+> h
+
+Rα
+
+> 01
+
+(h),
+
+which verifies the excess-risk domination bound (10). 
+
+## B.6 Proof of Corollary 6 
+
+Proof of Corollary 6. Consider any finite, data-dependent family of posteriors Qn = { ˆQλ :
+
+λ ∈ Λn} such that ˆQλ ≪ Π0 almost surely for every λ ∈ Λn. Conditional on the high-probability event established in Proposition 4, we have 
+
+V ∗(dQ) ≥ LCB val 
+
+> n,δ
+
+(Q; γ) simultaneously for all Q ≪ Π0 and all γ > 0.
+
+Because this event holds uniformly over all absolutely continuous posteriors, the inequality remains perfectly valid when evaluated at the random, data-dependent choices Q = ˆQλ.Thus, on the same event, 
+
+V ∗(d ˆQλ ) ≥ LCB val 
+
+> n,δ
+
+( ˆQλ; γ) for all ( λ, γ ) ∈ Λn × T n.
+
+Let the empirical maximizer be defined as (ˆλ, ˆγ) ∈ arg max 
+
+> (λ,γ )∈Λn×T n
+
+LCB val 
+
+> n,δ
+
+( ˆQλ; γ).
+
+Evaluating the preceding simultaneous inequality at ( ˆλ, ˆγ) directly yields 
+
+V ∗(d ˆQˆλ
+
+) ≥ LCB val 
+
+> n,δ
+
+( ˆQˆλ; ˆ γ) = max 
+
+> (λ,γ )∈Λn×T n
+
+LCB val 
+
+> n,δ
+
+( ˆQλ; γ),
+
+which completes the proof. 37 B.7 Proof of Corollary 7 
+
+Proof of Corollary 7. Let us condition on the σ-algebra σ(Dcal  
+
+> m
+
+). By assumption, on the event Ecert , the learned certificate ˆU is measurable, takes values in [0 , 1], and satisfies 
+
+R∗ ≥ R − ˆU (X, A, R ) almost surely under the policy-learning distribution. Consequently, on Ecert , the induced random variable R ˆU := ( R − ˆU )+ is measurable, bounded in [0 , 1], and robustly satisfies R∗ ≥ R ˆU almost surely. Therefore, every theoretical construction detailed in Sections 2.2 through 3.3 remains structurally valid upon substituting U with ˆU and R with R ˆU .Since the auxiliary sample Dcal  
+
+> m
+
+is completely independent of the policy-learning sample 
+
+Z1: n, the conditional distribution of Z1: n given Dcal  
+
+> m
+
+remains i.i.d., preserving the original policy-learning distribution. Thus, conditional on both Dcal  
+
+> m
+
+and Ecert , all preceding PAC-Bayes derivations apply verbatim. To formalize the unconditional joint-probability guarantee, let EPB denote the event that any specific 1 − δ PAC-Bayes bound established above holds when substituting U
+
+with ˆU . We then have 
+
+P(EPB | D cal  
+
+> m
+
+) ≥ 1 − δ almost surely on Ecert .
+
+Integrating over the distribution of Dcal  
+
+> m
+
+, we obtain 
+
+P(Ecert ∩ E PB ) = E
+
+h
+
+1{E cert }P(EPB | D cal  
+
+> m
+
+)
+
+i
+
+≥ (1 − δ)P(Ecert )
+
+≥ (1 − δ)(1 − αcert ).
+
+This establishes the claimed joint-probability bound, verifying that all preceding results 
+
+—including the fixed-temperature bounds and the automated lower-confidence-bound se-lection —scale seamlessly to the setting of actively learned certificates. 
+
+## B.8 Proof of Proposition 8 
+
+Proof of Proposition 8. We establish the identity for the target value V ∗(d); the derivation for the proxy value V (d) follows symmetrically by replacing R∗ with R. Applying the law of iterated expectations, we have 
+
+E
+
+"
+
+R∗1{A = d(X)}
+
+π(A | X)
+
+#
+
+= E
+
+"
+
+E R∗1{A = d(X)}
+
+π(A | X) X
+
+!# 
+
+.
+
+Let x ∈ X be a point outside a PX -null set where the relevant conditional expectations are well-defined, and denote the deterministic action ad = d(x) ∈ {− 1, 1}. Conditioning on X = x yields 
+
+E R∗1{A = d(X)}
+
+π(A | X) X = x
+
+!
+
+= X
+
+> a∈{− 1,1}
+
+1{ad = a}E R∗1{A = a}
+
+π(a | x) X = x
+
+!
+
+.
+
+By causal consistency (Assumption 1), R∗ = ( R∗)a almost surely on the event {A = a},which implies R∗1{A = a} = ( R∗)a1{A = a} almost surely. Hence, 
+
+E R∗1{A = a}
+
+π(a | x) X = x
+
+!
+
+= E (R∗)a1{A = a}
+
+π(a | x) X = x
+
+!
+
+= 1
+
+π(a | x)E
+
+h
+
+(R∗)a1{A = a} | X = x
+
+i
+
+.
+
+38 Invoking conditional ignorability (Assumption 1), we have ( R∗)a ⊥⊥ A | X, which factors the conditional expectation as 
+
+E
+
+h
+
+(R∗)a1{A = a} | X = x
+
+i
+
+= E(R∗)a | X = xP(A = a | X = x)= E(R∗)a | X = xπ(a | x).
+
+Substituting this back, we obtain 
+
+E R∗1{A = a}
+
+π(a | x) X = x
+
+!
+
+= E(R∗)a | X = x,
+
+and consequently, 
+
+E R∗1{A = d(X)}
+
+π(A | X) X = x
+
+!
+
+= E(R∗)ad | X = x = E(R∗)d(x) | X = x.
+
+Finally, taking the outer expectation over the marginal distribution of X directly recovers the target value: 
+
+E
+
+"
+
+R∗1{A = d(X)}
+
+π(A | X)
+
+#
+
+= E(R∗)d(X) = V ∗(d).
+
+This completes the proof of the identity (11). 
+
+## B.9 Proof of Proposition 9 
+
+Proof of Proposition 9. By Assumption 2, R∗ ≥ R − U almost surely. Given that R∗ ∈
+
+[0 , 1], it naturally follows that R∗ ≥ (R − U )+ = R almost surely. Consequently, we have 
+
+R∗1{A = d(X)}
+
+π(A | X) ≥ R1{A = d(X)}
+
+π(A | X) a.s. Taking the expectation of both sides and invoking Proposition 8 yields 
+
+V ∗(d) = E
+
+"
+
+R∗1{A = d(X)}
+
+π(A | X)
+
+#
+
+≥ E
+
+"
+
+R1{A = d(X)}
+
+π(A | X)
+
+#
+
+= VR(d),
+
+which establishes (12). Furthermore, if U ≤ R almost surely, then R = R − U almost surely. In this case, we obtain 
+
+VR(d) = E
+
+"
+
+(R − U )1{A = d(X)}
+
+π(A | X)
+
+#
+
+= E
+
+"
+
+R1{A = d(X)}
+
+π(A | X)
+
+#
+
+− E
+
+"
+
+U 1{A = d(X)}
+
+π(A | X)
+
+#
+
+= V (d) − E
+
+"
+
+U 1{A = d(X)}
+
+π(A | X)
+
+#
+
+,
+
+where the final equality follows from Proposition 8. Combining this identity with (12) yields the desired bound (13). 39 B.10 Proof of Proposition 10 
+
+Proof of Proposition 10. To establish part (i), suppose ν1,α ≡ ν−1,α ≡ 0. Then, by (1), we have Γαa (Z) = 0 + 1{A = a}
+
+π(a | X) {R − 0} = R1{A = a}
+
+π(a | X) .
+
+Consequently, 
+
+Dα(Z) = Γ α 
+
+> 1
+
+(Z) − Γα
+
+> −1
+
+(Z) = R1{A = 1 }
+
+π(1 | X) − R1{A = −1}
+
+π(−1 | X) = AR π(A | X).
+
+Taking the absolute value yields the expression for Wα(Z). On the event {R > 0}, the sign of Dα(Z) matches the sign of A, which implies Yα(Z) = A. Conversely, on the event 
+
+{R = 0 }, we have Wα(Z) = 0; thus, the corresponding pseudo-label does not contribute to the weighted 0–1 risk. Regarding part (ii), if we restrict ν1,α = ν−1,α = mα, we obtain 
+
+Dα(Z) = mα(X) − mα(X) + Aπ(A | X){R − mα(X)} = A{R − mα(X)}
+
+π(A | X) ,
+
+where the second equality follows from the definition in (3). The corresponding formulas for Wα(Z) and Yα(Z) follow immediately from their definitions. For part (iii), fix a ∈ {− 1, 1} and an x ∈ X outside a PX -null set. Invoking (1), we can write 
+
+E[Γ αa (Z) | X = x] = νa,α (x) + E
+
+"
+
+1{A = a}
+
+π(a | x) {R − νa,α (x)} X = x
+
+#
+
+= νa,α (x) + E[R − νa,α (x) | X = x, A = a]= μa(x).
+
+This confirms the unbiasedness claim. 
+
+## B.11 Proof of Lemma 11 
+
+Proof of Lemma 11. By the definition in (3), we can express the certified advantage as 
+
+Dα(Z) = ν1,α (X) − ν−1,α (X) + Aπ(A | X){R − νA,α (X)}.
+
+Since ν1,α (X), ν−1,α (X), and R are bounded in [0 , 1] almost surely, it naturally follows that 
+
+|ν1,α (X) − ν−1,α (X)| ≤ 1, |R − νA,α (X)| ≤ 1 a.s. Furthermore, the strict overlap condition (Assumption 1) guarantees π(A | X) ≥ ε almost surely, which implies 
+
+Aπ(A | X){R − νA,α (X)} ≤ ε−1 a.s. Applying the triangle inequality directly yields (14). Finally, the bound in (15) is an immediate consequence of the definition Wα(Z) := |Dα(Z)|.40 B.12 Proof of Proposition 12 
+
+Proof of Proposition 12. Since the hinge loss ℓh(θ; Zi) is non-negative and finite for all (θ, Z i), the normalizing constant in (16) is guaranteed to be strictly positive and bounded by 1. Applying the infimum formulation of the Donsker–Varadhan variational principle (Lemma 14) with 
+
+T (θ) = ˆLh,n (θ) and τ = λn, 
+
+yields inf 
+
+> Q≪Π0
+
+(
+
+Eθ∼Q
+
+ ˆLh,n (θ) + 1
+
+λn KL( Q∥Π0)
+
+)
+
+= − 1
+
+λn log 
+
+Z
+
+> Θ
+
+exp {− λn ˆLh,n (θ)}Π0(d θ).
+
+The unique minimizer of this variational problem is precisely the Gibbs measure defined in (16). The equivalence with the practical posterior defined in Section 3.3 is readily confirmed by substituting the identity 
+
+n ˆLh,n (θ) = 
+
+> n
+
+X
+
+> i=1
+
+ℓh(θ; Zi).
+
+## B.13 Proof of Corollary 13 
+
+Proof of Corollary 13. The expression for the posterior density follows immediately by multiplying the prior density by the exponentiated empirical risk factor in (16). Taking the negative logarithm reveals that computing the MAP estimator is strictly equivalent to minimizing the regularized objective: (β, α ) 7 → λ
+
+> n
+
+X
+
+> i=1
+
+ℓh(( β, α ); Zi) + λ0J(β, α ),
+
+which directly translates to the empirical risk minimization problem (17) upon division by λn .
+
+## B.14 Proof of Lemma 14 
+
+Proof of Lemma 14. Define the tilted probability measure 
+
+eΠτ (d θ) := eτ S (θ)Π0(d θ)
+
+R 
+
+> Θ
+
+eτ S (t)Π0(d t).
+
+For any absolutely continuous measure Q ≪ Π0, we can express the Kullback–Leibler divergence as KL( Q∥eΠτ ) = 
+
+Z
+
+> Θ
+
+log dQ
+
+deΠτ
+
+!
+
+Q(d θ)=
+
+Z
+
+> Θ
+
+log dQ
+
+dΠ 0
+
+R 
+
+> Θ
+
+eτ S (t)Π0(d t)
+
+eτ S (θ)
+
+!
+
+Q(d θ)= KL( Q∥Π0) − τ Eθ∼Q[S(θ)] + log 
+
+Z
+
+> Θ
+
+eτ S (t)Π0(d t).
+
+41 Since KL( Q∥eΠτ ) ≥ 0, rearranging the terms yields the fundamental inequality: 
+
+Eθ∼Q[S(θ)] − 1
+
+τ KL( Q∥Π0) ≤ 1
+
+τ log 
+
+Z
+
+> Θ
+
+eτ S (t)Π0(d t).
+
+Equality is achieved if and only if KL( Q∥eΠτ ) = 0, which holds if and only if Q = eΠτ
+
+almost everywhere. This establishes (18) and the uniqueness of its maximizer. Finally, the infimum formulation (19) is obtained directly by substituting S = −T into (18). 
+
+## B.15 Proof of Lemma 15 
+
+Proof of Lemma 15. If μ ∈ { 0, 1}, the boundedness 0 ≤ Yi ≤ 1 implies Yi = μ almost surely for all i. Consequently, ¯Yn = μ almost surely, and the left-hand side of (20) trivially evaluates to 1. Thus, it suffices to consider μ ∈ (0 , 1). Define 
+
+gμ(x) := exp {n kl( x∥μ)}, x ∈ [0 , 1] .
+
+Because the mapping x 7 → kl( x∥μ) is convex on [0 , 1] and the exponential function is both convex and strictly increasing, the composition gμ is convex on [0 , 1]. Let 
+
+F (y1, . . . , y n) := gμ
+
+ 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+yi
+
+
+
+, (y1, . . . , y n) ∈ [0 , 1] n.
+
+For each coordinate i, the map 
+
+y 7 → F (y1, . . . , y i−1, y, y i+1 , . . . , y n)is convex on [0 , 1]. Hence, for every deterministic y ∈ [0 , 1], we have 
+
+F (y1, . . . , y i−1, y, y i+1 , . . . , y n)
+
+≤ (1 − y)F (y1, . . . , y i−1, 0, y i+1 , . . . , y n) + yF (y1, . . . , y i−1, 1, y i+1 , . . . , y n).
+
+Taking the conditional expectation with respect to Yi and noting that E[Yi] = μ yields 
+
+EF (Y1, . . . , Y n) | Yj , j ̸ = i
+
+≤ (1 − μ)F (Y1, . . . , Y i−1, 0, Y i+1 , . . . , Y n) + μF (Y1, . . . , Y i−1, 1, Y i+1 , . . . , Y n).
+
+Let Bi ∼ Bernoulli( μ) be independent of ( Yj )j̸ =i. The right-hand side of the above inequality is exactly 
+
+EF (Y1, . . . , Y i−1, B i, Y i+1 , . . . , Y n) | Yj , j ̸ = i.
+
+Taking expectations over the remaining variables yields 
+
+EF (Y1, . . . , Y n) ≤ EF (Y1, . . . , Y i−1, B i, Y i+1 , . . . , Y n).
+
+Repeating this replacement iteratively for i = 1 , . . . , n , we obtain 
+
+Egμ( ¯Yn) ≤ Egμ( ¯Bn),
+
+where B1, . . . , B n are i.i.d. Bernoulli( μ) and ¯Bn = n−1 Pni=1 Bi.42 Let Kn = Pni=1 Bi ∼ Binomial( n, μ ). Then, 
+
+Egμ( ¯Bn) =
+
+> n
+
+X
+
+> k=0
+
+nk
+
+
+
+μk(1 − μ)n−k exp 
+
+n
+
+n kl 
+
+ kn μ
+
+o 
+
+=
+
+> n
+
+X
+
+> k=0
+
+nk
+
+ kn
+
+k
+
+1 − kn
+
+n−k
+
+,
+
+adopting the conventions 0 0 = 1 and 1 0 = 1. Note that the boundary terms for k = 0 and 
+
+k = n both evaluate to 1. Fix 1 ≤ k ≤ n − 1. Using the standard Stirling bounds 
+
+√2πm 
+
+me
+
+m
+
+≤ m! ≤ exp 
+
+ 112 m
+
+√2πm 
+
+me
+
+m
+
+, m ∈ N,
+
+we obtain 
+
+nk
+
+ kn
+
+k
+
+1 − kn
+
+n−k
+
+= n!
+
+k!( n − k)! 
+
+kk(n − k)n−k
+
+nn
+
+≤ exp   112 n
+
+√2πn (n/e )n
+
+√2πk (k/e )kp2π(n − k)(( n − k)/e )n−k
+
+kk(n − k)n−k
+
+nn
+
+= exp( 112 n )
+
+√2π
+
+r nk(n − k).
+
+It remains to bound the sum 
+
+Sn := 
+
+> n−1
+
+X
+
+> k=1
+
+1
+
+pk(n − k).
+
+Define fn(x) := {x(n − x)}−1/2 on (0 , n ). Observe that fn is strictly decreasing on (0 , n/ 2] and strictly increasing on [ n/ 2, n ). If n = 2 m + 1 is odd, then 
+
+Sn =
+
+> m
+
+X
+
+> k=1
+
+fn(k) + 
+
+> 2m
+
+X
+
+> k=m+1
+
+fn(k)
+
+≤
+
+Z m
+
+> 0
+
+fn(x) d x +
+
+Z 2m+1 
+
+> m+1
+
+fn(x) d x
+
+≤
+
+Z n
+
+> 0
+
+fn(x) d x. 
+
+If n = 2 m is even, fn attains its minimum at x = m, implying fn(x) ≥ fn(m) = 1 /m for all x ∈ [m − 1, m + 1]. Hence, 
+
+Sn =
+
+> m−1
+
+X
+
+> k=1
+
+fn(k) + fn(m) + 
+
+> 2m−1
+
+X
+
+> k=m+1
+
+fn(k)
+
+≤
+
+Z m−10
+
+fn(x) d x +
+
+Z m+1 
+
+> m−1
+
+fn(x) d x +
+
+Z 2mm+1 
+
+fn(x) d x
+
+=
+
+Z n
+
+> 0
+
+fn(x) d x. 
+
+43 In both cases, we establish the upper bound 
+
+Sn ≤
+
+Z n
+
+> 0
+
+dx
+
+px(n − x).
+
+Using the substitution x = n sin 2 t, we evaluate the integral as 
+
+Z n
+
+> 0
+
+dx
+
+px(n − x) =
+
+Z π/ 20
+
+2 d t = π. 
+
+Therefore, 
+
+Egμ( ¯Yn) ≤ 2 + exp( 112 n )
+
+√2π
+
+√n S n ≤ 2 + exp 
+
+ 112 n
+
+rπn 
+
+2 = ξ(n),
+
+which completes the proof of (20). 
+
+## B.16 Proof of Lemma 16 
+
+Proof of Lemma 16. Fix θ ∈ Θ. Since ℓ(θ; Zi) ∈ [0 , 1] almost surely and the observations are i.i.d., applying Lemma 15 to Yi = ℓ(θ; Zi) yields 
+
+E
+
+h
+
+exp n kl( ˆLn(θ)∥L(θ)) 
+
+i
+
+≤ ξ(n).
+
+Integrating with respect to the prior Π 0 and invoking Fubini’s theorem, we obtain 
+
+E
+
+"Z
+
+> Θ
+
+exp n kl( ˆLn(θ)∥L(θ)) Π0(d θ)
+
+#
+
+≤ ξ(n).
+
+By Markov’s inequality, with probability at least 1 − δ, we have 
+
+Z
+
+> Θ
+
+exp n kl( ˆLn(θ)∥L(θ)) Π0(d θ) ≤ ξ(n)
+
+δ . (27) Conditioning on the high-probability event where (27) holds, we apply Lemma 14 with 
+
+S(θ) = n kl( ˆLn(θ)∥L(θ)) and τ = 1 ,
+
+which ensures that for every Q ≪ Π0,
+
+nEθ∼Q
+
+kl( ˆLn(θ)∥L(θ))  ≤ KL( Q∥Π0) + log {ξ(n)/δ }.
+
+Because the Bernoulli relative entropy ( p, q ) 7 → kl( p∥q) is jointly convex on [0 , 1] 2, applying Jensen’s inequality yields kl   ˆLn(Q)∥L(Q) = kl 
+
+
+
+Eθ∼Q[ ˆLn(θ)] Eθ∼Q[L(θ)] 
+
+
+
+≤ Eθ∼Q
+
+kl( ˆLn(θ)∥L(θ)) .
+
+Combining the last two displays proves (21). 44 B.17 Proof of Lemma 17 
+
+Proof of Lemma 17. By Lemma 16, with probability at least 1 − δ, the inequality kl   ˆLn(Q)∥L(Q) ≤ n c n,δ (Q)holds simultaneously for all Q ≪ Π0. Conditioning on this event, fix an arbitrary pos-terior Q ≪ Π0 and a scale parameter γ > 0. The Bernoulli relative entropy admits the variational representation kl( p∥q) = sup 
+
+> λ∈R
+
+n
+
+λp − log  1 − q + qe λo
+
+, p, q ∈ [0 , 1] . (28) Applying (28) with λ = −γ provides the lower bound 
+
+−γ ˆLn(Q) − log  1 − L(Q) + L(Q)e−γ  ≤ kl   ˆLn(Q)∥L(Q) ≤ n c n,δ (Q).
+
+Exponentiating and rearranging the terms, we obtain 
+
+L(Q){1 − e−γ } ≤ 1 − exp −cn,δ (Q) − γ ˆLn(Q) .
+
+Since γ > 0, it strictly follows that 1 − e−γ > 0. Dividing both sides by this quantity yields (22), completing the proof. 
+
+## B.18 Proof of Lemma 18 
+
+Proof of Lemma 18. Fix a measurable ITR d and a nuisance parameter α ∈ A , and let 
+
+ad = d(X). If A̸ = ad, it trivially follows that Γαd (Z) = νad,α (X) ∈ [0 , 1] a.s. If A = ad, then by (2), we have Γαd (Z) = νad,α (X) + R − νad,α (X)
+
+π(ad | X) = 1 − 1
+
+π(ad | X)
+
+!
+
+νad,α (X) + Rπ(ad | X).
+
+Since R and νad,α (X) are bounded in [0 , 1] and π(ad | X) ≥ ε, the supremum is attained at R = 1 and νad,α (X) = 0, yielding the upper bound Γ αd (Z) ≤ ε−1. Conversely, because 1 − π(ad | X)−1 ≤ 0, the infimum is attained at R = 0 and νad,α (X) = 1, yielding the lower bound Γ αd (Z) ≥ 1 − ε−1. Thus, (23) holds almost surely. Subtracting Γ αd (Z) from cε = ε−1 and dividing by 
+
+Kε = ε−1 − (1 − ε−1) = 2 ε−1 − 1confirms that the transformed loss ℓval (θ; Z) lies in [0 , 1] almost surely. 
+
+# C Detailed Numerical Experiments 
+
+## C.1 Detailed Experimental Setup 
+
+This subsection details the exact simulation and implementation configurations uti-lized in Section 4. We refer to the two primary environments as Scenario 1 and Scenario 2. For notational convenience, we define the clipping operator as clip [a,b ](t) := min {b, max {a, t }} .
+
+45 C.1.1 Common Design 
+
+In each Monte Carlo replication, we draw a policy-learning sample of size N and an independent test sample of size Ntest = 10 ,000. The ρ-sweep experiments presented in the main text fix N = 200 and vary ρ ∈ { 0, 0.25 , 0.5, 0.75 , 1.0, 1.25 , 1.5, 1.75 , 2.0}, whereas the 
+
+N -sweep experiments fix ρ = 1 .5 and vary N ∈ { 100 , 200 , 500 , 1000 , 2000 }. The results for both sweeps are averaged over 30 independent replications. For the certificate diagnostics presented exclusively in this appendix, we fix N = 1000 and reuse the identical ρ grid. The split-free ablation study fixes ρ = 1 .5 and utilizes the same sample size grid for N .Unless explicitly stated otherwise, we employ oracle certificates throughout the synthetic experiments. For each arm a ∈ {− 1, 1}, let 
+
+μ∗
+
+> a
+
+(x) := E[( R∗)a | X = x], μa(x) := E[Ra | X = x], μa(x) := E[Ra | X = x].
+
+The true logging propensities are assumed to be known to the learner. Scenario 1 employs balanced randomization, whereas Scenario 2 utilizes a covariate-dependent propensity score, as detailed below. In both scenarios, all realized rewards are strictly bounded within [0 , 1] via clipping. 
+
+C.1.2 Scenario 1 
+
+We generate the covariates as 
+
+X1, X 2i.i.d.
+
+∼ Unif[ −1, 1] , π(1 | x) = π(−1 | x) = 12.
+
+The main and treatment effects are formulated as 
+
+m1(x) = 0 .38 x1 − 0.22 x2, τ1(x) = 0 .72( x1 + 0 .65 x2)/1.65 .
+
+The arm-specific target conditional means are given by 
+
+μ∗
+
+> a
+
+(x) = clip [0 ,1] 
+
+ 0.5 + 0 .15 m1(x) + 0 .15 a τ 1(x), a ∈ {− 1, 1}.
+
+We define an identical base certificate envelope for both arms: 
+
+U (1) 0,1 (x) = U (1) 0,−1(x) = 0 .02 + 0 .04 1{x1 > 0, x 2 > 0}.
+
+For a given uncertainty level ρ, the envelope is scaled as 
+
+U (1)  
+
+> ρ,a
+
+(x) = min {ρ U (1) 0,a (x), 0.10 }, a ∈ {− 1, 1}.
+
+The proxy conditional means are then defined as 
+
+μa(x) = clip [0 ,1] 
+
+ μ∗
+
+> a
+
+(x) + 0 .50 U (1)  
+
+> ρ,a
+
+(x).
+
+The realized target rewards are generated according to (R∗)a = clip [0 ,1] 
+
+ μ∗
+
+> a
+
+(X) + 0 .10 ε∗
+
+> a
+
+, ε∗ 
+
+> a
+
+∼ Unif[ −1, 1] .
+
+The optimism bias is introduced as 
+
+Ba = U (1)  
+
+> ρ,a
+
+(X)Va, Va ∼ Unif[0 , 1] ,
+
+yielding the observed proxy and certified rewards: 
+
+Ra = clip [0 ,1] 
+
+ (R∗)a + Ba, Ra = ( Ra − U (1)  
+
+> ρ,a
+
+(X)) +.
+
+Since an identical envelope is applied to both arms and the effect of active clipping is negligible in these configurations, the reward uncertainty in Scenario 1 is effectively policy-invariant. 46 C.1.3 Scenario 2 
+
+We generate the covariates by first drawing 
+
+X1, X 2, X 3, X 4i.i.d.
+
+∼ Unif[ −1, 1] , ε5, ε 6, ε 7, ε 8i.i.d.
+
+∼ N (0 , 1) ,
+
+and subsequently defining the following transformations: 
+
+X5 = clip [−1,1] 
+
+ 0.50 X1 − 0.22 X2 + 0 .14 X3 + 0 .32 ε5
+
+,X6 = clip [−1,1] 
+
+ −0.30 X2 + 0 .26 X3 + 0 .18 X5 + 0 .34 ε6
+
+,X7 = clip [−1,1] 
+
+ 0.68 X5 + 0 .40 X6 + 0 .30 X1 + 0 .28 ε7
+
+,
+
+and 
+
+X8 = clip [−1,1] 
+
+ 0.46 X3 − 0.28 X4 + 0 .60 X7 + 0 .18 X5 + 0 .30 ε8
+
+.
+
+Consequently, the variables ( X5, . . . , X 8) serve as proxies for frailty, workload, and biomark-ers, exhibiting correlation with the primary clinical risk factors. The main effect is formulated as 
+
+m2(x) = clip [−1,1] 
+
+
+
+0.20 sin(1 .2πx 3) + 0 .14 cos(0 .8πx 4) + 0 .10 x5 − 0.08 x6 + 0 .06 x7x8
+
+
+
+.
+
+To define the treatment effect, we set 
+
+r(x) = 0 .90 x1 − 0.64 x2 + 0 .45 sin( πx 3) + 0 .24 x4, w(x) = exp {− 2.9( r(x) − 0.02) 2},
+
+and 
+
+b(x) = 0 .14 tanh( x3 − 0.85 x4) − 0.04( x5)+ − 0.03( x6)+.
+
+This yields the treatment effect function: 
+
+τ2(x) = clip [−1,1] 
+
+
+
+tanh  2.05 {w(x) + b(x) − 0.60 }
+
+.
+
+The arm-specific target conditional means are then given by 
+
+μ∗
+
+> a
+
+(x) = clip [0 ,1] 
+
+ 0.5 + 0 .15 m2(x) + 0 .15 a τ 2(x), a ∈ {− 1, 1}.
+
+This design yields a genuinely beneficial treatment effect localized strictly within a moderate-risk patient subgroup. To construct the arm-specific reward certificates, we define the following auxiliary functions: 
+
+ru(x) = 0 .94 x1 − 0.70 x2 + 0 .48 sin( πx 3) + 0 .24 x4, h(x) = 11 + exp {− 2.6( ru(x) − 0.02) },q(x) = exp {− 8.6( ru(x) − 0.02) 2}, f (x) = 0 .78( x5)+ + 0 .58( x6)+,o(x) = 11 + exp {− 2.4(1 .18 x7 + 0 .60 x5 − 0.12) },s(x) = 11 + exp {− 2.8(1 .28 x8 + 0 .92 x3x4 + 0 .78 x5x7 + 0 .48 x6x8 − 0.06) },t(x) = 11 + exp {− 2.5(1 .08 x7 + 0 .96 x8 + 0 .92 x5x7 + 0 .70 x6x8 − 0.08) },
+
+47 and 
+
+c(x) = 11 + exp {− 1.9(0 .48 x6 − 0.52 x7 − 0.28 x8 − 0.10) }.
+
+The base envelopes are specified as 
+
+U (2) 0,1 (x) = clip [0 ,0.32] 
+
+
+
+0.010 + 0 .020 h(x) + q(x){0.16 f (x) + 0 .17 s(x) + 0 .11 o(x) + 0 .19 t(x)}
+
++ 0 .075 t(x) + 0 .022 f (x)t(x)
+
+
+
+,
+
+and 
+
+U (2) 0,−1(x) = clip [0 ,0.06] 
+
+
+
+0.002 + 0 .006 h(x) + 0 .010 q(x)c(x) + 0 .004 c(x)
+
+
+
+.
+
+For a given uncertainty level ρ, these envelopes are scaled to 
+
+U (2)  
+
+> ρ,a
+
+(x) = min {ρ U (2) 0,a (x), 0.32 }, a ∈ {− 1, 1}.
+
+Consequently, the treated arm is assigned a substantially larger and more complex uncer-tainty certificate compared to the control arm. The proxy conditional means are constructed as 
+
+μ1(x) = clip [0 ,1] 
+
+ μ∗
+
+> 1
+
+(x) + 0 .92 U (2)  
+
+> ρ, 1
+
+(x), μ−1(x) = clip [0 ,1] 
+
+ μ∗−1(x) + 0 .14 U (2) 
+
+> ρ, −1
+
+(x).
+
+The realized target rewards are generated according to (R∗)1 = clip [0 ,1] 
+
+ μ∗
+
+> 1
+
+(X) + {0.08 + 0 .68 U (2)  
+
+> ρ, 1
+
+(X)}ε∗
+
+> 1
+
+,
+
+(R∗)−1 = clip [0 ,1] 
+
+ μ∗−1(X) + {0.05 + 0 .04 U (2) 
+
+> ρ, −1
+
+(X)}ε∗−1
+
+,
+
+where ε∗
+
+> 1
+
+, ε ∗−1 ∼ Unif[ −1, 1]. The optimism biases are modeled as 
+
+B1 = U (2)  
+
+> ρ, 1
+
+(X)V1, V1 ∼ Beta(7 .0, 1.0) ,
+
+and 
+
+B−1 = U (2) 
+
+> ρ, −1
+
+(X)V−1, V−1 ∼ Beta(1 .08 , 5.2) .
+
+Finally, the observed proxy and certified rewards are computed as 
+
+Ra = clip [0 ,1] 
+
+ (R∗)a + Ba, Ra = ( Ra − U (2)  
+
+> ρ,a
+
+(X)) +.
+
+This configuration establishes a challenging nuisance-conflict scenario: while the treat-ment is genuinely beneficial for a moderate-risk subgroup, the observed proxy reward for the treated arm exhibits the highest optimism bias specifically within clinically vulnerable regions. Furthermore, the logging propensity in Scenario 2 is non-uniform. We define 
+
+rπ(x) = 0 .84 x1 − 0.60 x2 + 0 .42 sin( πx 3) + 0 .20 x4,
+
+and 
+
+ℓπ(x) = 0 .20 rπ(x)+1 .35( x5)+ +1 .10( x6)+ +1 .55 x7 +1 .25 x8 +1 .55 x5x7 +0 .95 x6x8 −0.40 x3x4.
+
+This yields the propensity scores: 
+
+π(1 | x) = clip [0 .01 ,0.99] 
+
+ 11 + exp {− ℓπ(x)}
+
+
+
+, π(−1 | x) = 1 − π(1 | x).
+
+48 C.1.4 Feature Maps and Policy Classes 
+
+All covariates are standardized based on the policy-learning sample prior to any feature expansion. In Scenario 1, all score-based methods employ a standardized linear score that includes an intercept. For Scenario 2, we utilize a richer, common clinical basis for all score-based methods. This feature map comprises main effects, quadratic terms, sine transformations of x1, . . . , x 4, positive-part thresholding for x5, x 6, x 7, and select low-order interactions among the primary clinical, frailty, workload, and biomarker variables (specifically, x1x2, x3x4, x1x3, x1x4, x2x3, x2x4, x4x6, x5x6, x5x7, x6x7, x4x7, x3x8), along with an intercept. In contrast, Policy Tree operates directly on the raw, unexpanded covariates. 
+
+C.1.5 Model Construction 
+
+For OWL, we train a weighted hinge-loss classifier, selecting the ℓ2 penalty from the grid {10 −3, 10 −2, 10 −1, 1} via 5-fold cross-validation. The tuning objective maximizes the inverse-probability-weighted empirical value corresponding to the specified reward variant. For the R-family models, the training labels are the observed treatments A with sample weights R/π (A | X). For the R-family models, the weights are replaced by R/π (A | X). For Q-learning, we fit a single-stage linear working model of the form Q(x, a ) = 
+
+β⊤h0(x) + a ψ ⊤h1(x), utilizing the scenario-specific feature map for both h0 and h1. The ridge penalty is selected from the identical grid based on 5-fold cross-validated mean squared prediction error. For RWL, we implement a linear residual weighted learner paired with a treatment-free residual regression model. Both the policy score and the residual model employ the aforementioned scenario-specific feature map. The regularization parameter is tuned over the same grid via 5-fold cross-validation, targeting the maximization of the stabilized value criterion. For Policy Tree, we constrain the hypothesis class to depth-2 decision trees, enforcing a minimum node size of 20 and a split step of 25. The input score matrix is constructed using a doubly robust plug-in estimator, which relies on arm-specific nuisance outcome regressions fitted to the corresponding reward variant. PROWL and its uncertified ablation, PROWL ( U = 0), share an identical finite-library PAC-Bayesian implementation. The nuisance models are estimated separately for each arm via ridge regression (with a fixed penalty of 10 −6) on the entire policy-learning sample, explicitly avoiding sample splitting. Temperature scaling parameters η and γ are jointly tuned over the grid {1/8, 1/4, 1/2, 1, 2, 4, 8}, selecting the pair that maximizes the exact-value lower confidence bound derived in Section 3.3. We specify the confidence level as δ = 0 .1, the prior standard deviation as 5, and restrict the score bound to 3. The finite posterior library is constructed using two Gaussian anchor particles, 32 prior particles, and four local perturbations per anchor with a local scale parameter of 0 .3. This candidate library is further enriched by incorporating anchor solutions obtained from certi-fied weighted-hinge optimizations, treatment-free residualized fits, and plug-in Q-learning or RWL solutions, scanned across an auxiliary penalty grid of {10 −4, 10 −3, 10 −2, 10 −1, 1}.The PROWL ( U = 0) benchmark is executed by substituting the certified reward R with the nominal proxy reward R throughout this entire pipeline. To ensure a fair comparison with the deterministic classical baselines, both PROWL and PROWL ( U = 0) output the deterministic rule corresponding to the Maximum a Posteriori (MAP) element selected from the fitted finite posterior library. 49 C.1.6 Evaluation 
+
+For any learned deterministic policy ˆd, we evaluate the out-of-sample target and robust regrets on the independent test set utilizing the oracle conditional means: ˆV ∗( ˆd) = 1
+
+Ntest 
+
+> Ntest
+
+X
+
+> i=1
+
+μ∗
+
+> ˆd(Xi)
+
+(Xi), ˆVR( ˆd) = 1
+
+Ntest 
+
+> Ntest
+
+X
+
+> i=1
+
+μ ˆd(Xi)(Xi).
+
+The true target and robust regrets are subsequently computed by subtracting these real-ized values from the corresponding theoretical optimal values. For the certificate diagnostics presented solely in this appendix, we further report the following policy-level gaps: ProxyTargetGap( ˆd) := V ( ˆd) − V ∗( ˆd),
+
+TargetCertifiedGap( ˆd) := V ∗( ˆd) − VR( ˆd).
+
+These metrics quantify the inherent optimism of the proxy reward and the degree of conservatism introduced by the certification process, respectively. At the dataset level, we compute the expected certificate magnitude E[U ], the active clipping rate Clip, and the certificate validity rate Valid, defined as follows: Clip := P{U > R }, Valid := PR1 − (R∗)1 ≤ Uρ, 1(X), R −1 − (R∗)−1 ≤ Uρ, −1(X) .
+
+Here, E[U ] and Clip are estimated using the policy-learning sample, whereas Valid is evaluated on the independent test sample. In the split-free ablation study, we compare our default split-free PROWL implemen-tation against an honest sample-split variant. The latter allocates one arm-stratified half of the data for estimating the nuisance models and reserves the remaining half for policy learning, maintaining identical tuning grids and evaluation criteria. 
+
+## C.2 Additional Results 
+
+Figures 7 through 10 in the appendix present the complementary metric-family pair-ings that were omitted from the main text for brevity. The qualitative conclusions derived from these figures align closely with those in the primary analysis. While substituting 
+
+R with R demonstrably improves the classical baselines —particularly in Scenario 2 —
+
+PROWL consistently emerges as the most robust procedure. Notably, its performance advantage is most pronounced in this highly heterogeneous clinical setting. To understand how the oracle certificate structurally reshapes the decision problem, Figure 11 plots the proxy-target gap and the target-certified gap as functions of the uncer-tainty level ρ. These metrics are evaluated at N = 1000 for PROWL, PROWL ( U = 0), and the R-family of classical baselines. In Scenario 1, the performance trajectories are nearly indistinguishable across the methods, a behavior that is theoretically consistent with the policy-invariant nature of the reward uncertainty in this setup. Conversely, in Scenario 2, both gaps widen as ρ increases, with the proxy-target gap remaining substan-tially larger than the target-certified gap. This discrepancy indicates that the primary impediment to policy learning is the systematic optimism bias inherent in the proxy re-ward, rather than any excessive conservatism introduced by the certified reward bound. Notably, PROWL consistently achieves the smallest, or near-smallest, proxy-target gap 50 0.0 0.5 1.0 1.5 2.0      
+
+> 𝜌
+> 0.0000
+> 0.0025
+> 0.0050
+> 0.0075
+> 0.0100
+> 0.0125
+> 0.0150
+> 0.0175
+> Target Regret ( 𝑅  family)
+> 0.00.51.01.52.0
+> 𝜌
+> 0.0000
+> 0.0025
+> 0.0050
+> 0.0075
+> 0.0100
+> 0.0125
+> 0.0150
+> 0.0175
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 7: Complementary performance comparison across varying uncertainty levels ( ρ)for Scenario 1. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. across the majority of the ρ-sweep. This highlights its ability to strategically avoid co-variate regions where the proxy reward is most misleading. Table 2 summarizes the dataset-level diagnostics for the constructed certificates. As expected, the average certificate magnitude increases monotonically with ρ across both scenarios. Furthermore, it is uniformly larger in Scenario 2, corroborating that the clin-ically heterogeneous environment necessitates a more substantial uncertainty correction. Simultaneously, the active clipping rate (Clip) remains effectively zero, and the valid-ity rate (Valid) is strictly one across all evaluated configurations. This confirms that the certificates are both strictly valid and do not pathologically truncate the observed rewards. Therefore, the performance discrepancies highlighted in the main text do not stem from aggressive reward clipping; rather, they reflect the varying capacities of the learning algorithms to effectively optimize under a valid, treatment-sensitive uncertainty correction. Finally, Figure 12 contrasts our default split-free PROWL implementation with an honest sample-splitting baseline, where one arm-stratified half of the data is used for nuisance estimation and the remaining half for policy optimization. The split-free formu-lation achieves uniformly lower regret, with the performance gap being most pronounced in Scenario 2 under moderate sample sizes. This gap gradually diminishes as N increases and remains marginal in Scenario 1. These observations suggest that the primary benefit of split-free learning lies in its ability to maximize finite-sample efficiency, rather than fundamentally altering the asymptotic learning target. 51 0.0 0.5 1.0 1.5 2.0      
+
+> 𝜌
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Target Regret ( 𝑅  family)
+> 0.00.51.01.52.0
+> 𝜌
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 8: Complementary performance comparison across varying uncertainty levels ( ρ)for Scenario 2. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. 
+
+# D Detailed Actual-Data Experiments 
+
+## D.1 Detailed Data Description and Implementation 
+
+The public ELAIA-1 dataset provides one record per randomized patient episode, com-prising a mixture of baseline, process, and outcome variables. While Huang and Wang (2025) restricted their focus to a secondary-analysis subset with available bicarbonate measurements, our policy-learning framework leverages the complete deidentified dataset and handles missing pre-randomization covariates via within-split imputation. The pri-mary policy covariate set consists of 48 pre-randomization variables, categorized into: (i) hospital and admission context; (ii) demographics; (iii) AKI timing and renal-function metrics; (iv) laboratory measurements and vital signs at randomization; (v) comorbid-ity indicators; and (vi) recent medication or exposure history alongside cumulative alert burden. We strictly exclude all post-randomization fields to prevent information leakage. This encompasses the *post24 variables, consult14 , aki documentation , all clinical outcomes, event-time variables ( time to * ), length-of-stay (LOS) and cost summaries, provider-count summaries, and the highly leakage-prone max stage field. A comprehen-sive variable inventory, detailing inclusion/exclusion statuses and missingness percentages, is provided in the supplementary material. To ensure robust evaluation, all actual-data analyses employ repeated sample splitting rather than a single train/test partition. Across 30 independent replications, we generate 70 /30 training-to-test splits, stratified by both hospital and treatment arm. Preprocess-ing pipelines are independently fitted on each training split. Continuous covariates are median-imputed, standardized, and augmented with missingness indicators where appli-cable. Binary and categorical covariates are mode-imputed, while hospital affiliation is encoded via six one-hot indicators. Subsequently, all candidate learners are trained on 52 100 200 500 1000 2000       
+
+> 𝑁
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> Target Regret ( 𝑅  family)
+> 100 200 500 1000 2000
+> 𝑁
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 9: Complementary performance comparison across varying sample sizes ( N ) for Scenario 1. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. the preprocessed training fold and evaluated on the strictly held-out test fold using the AIPW estimator, leveraging the known randomization propensity of 1 /2. The primary reward specification utilizes the three-component hard clinical utility defined in Section 5. For completeness, the corresponding uncertainty set is formulated as 
+
+Wρ =
+
+(
+
+w ∈ R3+ :
+
+> 3
+
+X
+
+> j=1
+
+wj = 1 , |wj − w0j | ≤ ρ∆j
+
+)
+
+,w0 = (0 .60 , 0.25 , 0.15) ⊤, ∆ = (0 .10 , 0.05 , 0.05) ⊤ with ρ = 1 serving as the baseline param-eter in the main analysis. The certified lower reward, Ri = min w∈W ρ w⊤Gi, is exactly com-puted via a straightforward three-dimensional linear program. For the patient-centered sensitivity analysis detailed subsequently, we augment the utility vector to incorporate discharge-to-home status, defining 
+
+G(4)  
+
+> i
+
+=
+
+
+
+1−death14 i, 1−dialysis14 i, 1−aki progression14 i, discharge to home i
+
+⊤
+
+,
+
+alongside the preference weights w(4) 0 = (0 .55 , 0.20 , 0.15 , 0.10) ⊤ and tolerance ∆ (4) =(0 .10 , 0.05 , 0.05 , 0.05) ⊤.Hyperparameter tuning for OWL, Q-learning, and RWL is conducted via three-fold cross-validation over the regularization grid {10 −3, 10 −2, 10 −1, 1}, optimized independently for both the nominal reward R and the certified reward R. PROWL and its uncertified ablation, PROWL ( U = 0), calibrate the learning and temperature parameters over the grid η, γ ∈ { 1/8, 1/4, 1/2, 1, 2, 4, 8}. We fix the confidence level at δ = 0 .1, the prior stan-dard deviation at 5, and the score bound at 3. The nuisance functions in PROWL are modeled using arm-specific ridge regressions. The basis expansions include the standard-ized main effects, squared continuous covariates, and targeted interaction terms between 53 100 200 500 1000 2000       
+
+> 𝑁
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Target Regret ( 𝑅  family)
+> 100 200 500 1000 2000
+> 𝑁
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> 0.08
+> Robust Regret ( 𝑅  family)
+> PROWL PROWL ( 𝑈 =0) OWL RWL Q-learning Policy Tree
+
+Figure 10: Complementary performance comparison across varying sample sizes ( N ) for Scenario 2. The left panel reports target regret against the R-family baselines, and the right panel reports robust regret against the R-family baselines. care-unit indicators (hospital, ICU, ward) and key severity metrics, including SOFA score, baseline creatinine, initial eGFR, age, AKI duration, and cumulative alert burden. While the main text reports outcomes based on the deterministic mean-rule deployment, the comparative efficacy of MAP and Gibbs sampling deployments is evaluated in Figure 16. 
+
+## D.2 Additional Results of Actual-Data Experiments 
+
+Table 3 disaggregates the primary performance metrics into their constituent clinical outcomes. Among the adaptive learning methods, PROWL achieves the lowest estimated risk for the primary composite outcome and the numerically lowest mortality risk, while remaining highly competitive regarding dialysis and AKI-progression risks. Crucially, this demonstrates that PROWL’s superior certified value is not artificially attained by trading off performance on one hard clinical component for another. In contrast, the blan-ket Always alert policy performs uniformly worse across all hard-outcome components. Furthermore, the OWL variants deploy substantially more aggressive alerting strategies without yielding any commensurate clinical benefit. Figure 13 highlights pronounced hospital-level heterogeneity in the intention-to-treat effect of the alerts. Specifically, the two non-teaching hospitals exhibit positive risk differ-ences for the primary composite outcome (favoring usual care), with Hospital 5 presenting a confidence interval entirely above zero and Hospital 6 displaying a directionally similar trend. Conversely, effects within the teaching hospitals center closely around the null. This discrepancy elucidates the strong empirical performance of the global Never alert rule and further underscores the necessity of site-aware, individualized treatment policies over blanket alerting directives. Figure 14 investigates the procedural sensitivity to the preference-uncertainty radius, 
+
+ρ. As ρ increases, PROWL naturally adopts a more conservative stance: its alert rate 54 0.00            
+
+> 0.02
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> 0.12
+> 0.14
+> Proxy - Target Gap
+> Scenario 1 Scenario 2
+> 0.00.51.01.52.0
+> 𝜌
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+> Target - Certified Gap
+> 0.00.51.01.52.0
+> 𝜌
+> PROWL PROWL ( 𝑈 =0) OWL ( 𝑅 )Q-learning ( 𝑅 )RWL ( 𝑅 )Policy Tree ( 𝑅 )
+
+Figure 11: Certificate-diagnostic plots. Rows report the proxy-target gap V ( ˆd) − V ∗( ˆd)and the target-certified gap V ∗( ˆd) − VR( ˆd), while columns correspond to Scenarios 1 and 2. Methods shown are PROWL, PROWL ( U = 0), and the classical R-family baselines. decreases monotonically, yet the composite-free value remains remarkably stable. The observed decline in certified value is solely a mechanical artifact of the increasingly strin-gent lower-utility criterion. By contrast, the alerting behaviors of PROWL ( U = 0) and Q-learning ( R) are virtually invariant to ρ, while Q-learning ( R) exhibits only marginal shifts. This divergence confirms that explicit uncertainty certification fundamentally al-ters the learned policy, rather than merely adjusting the reported post-hoc lower bound. Figure 15 presents an ablation study where hospital indicators are entirely excluded from the policy covariates. While the absolute performance metrics slightly decrease across all methods, the qualitative ranking remains robustly preserved: PROWL sustains its competitive edge in certified value and continues to consistently outperform both Q-learning baselines on the composite-free anchor. This evidence strongly implies that our primary findings are not merely the result of the models memorizing site-specific labels. Figure 16 compares the efficacy of three distinct deployment strategies: the mean-rule, the MAP rule, and the Gibbs sampling rule, all derived from the identically fitted PROWL posterior. The three strategies are nearly indistinguishable in terms of certified value, composite-free value, and overall alert rate, though the MAP rule demonstrates a marginal numerical advantage. Thus, our core empirical conclusions are strictly robust to the specific derandomization method chosen for practical deployment. Finally, an auxiliary patient-centered sensitivity analysis, which incorporated discharge-55 Table 2: Dataset-level certificate diagnostics across uncertainty levels ρ. Here E[U ] is the logged-sample mean certificate magnitude, Clip is the logged-sample rate P(U > R ), and Valid is the independent-test validity rate that the oracle envelope upper-bounds the true proxy bias in both arms. Scenario 1 Scenario 2 
+
+ρ E[U ] Clip Valid E[U ] Clip Valid 0 0.000 0.000 1.000 0.000 0.000 1.000 0.25 0.008 0.000 1.000 0.023 0.000 1.000 0.5 0.015 0.000 1.000 0.047 0.000 1.000 0.75 0.023 0.000 1.000 0.070 0.000 1.000 1 0.030 0.000 1.000 0.093 0.000 1.000 1.25 0.037 0.000 1.000 0.107 0.000 1.000 1.5 0.045 0.000 1.000 0.119 0.000 1.000 1.75 0.051 0.000 1.000 0.131 0.000 1.000 2 0.055 0.000 1.000 0.141 0.000 1.000 Table 3: Component-wise decomposition of the repeated sample-split AIPW evaluation on ELAIA-1. Entries are means with standard errors over 30 repeated 70 /30 hospital-by-alert stratified splits. This table complements Table 1 by demonstrating that the improvements in certified value are not driven by deterioration in any single hard-outcome component. Methods death14 risk dialysis14 risk aki progression14 risk composite outcome risk discharge to home rate Never alert 0.086 (0 .001) 0.031 (0 .000) 0.151 (0 .001) 0.203 (0 .001) 0.507 (0 .002) Always alert 0.088 (0 .001) 0.034 (0 .001) 0.162 (0 .002) 0.217 (0 .002) 0.490 (0 .003) OWL ( R) 0.089 (0 .001) 0.034 (0 .001) 0.160 (0 .002) 0.214 (0 .002) 0.493 (0 .003) Q-learning ( R) 0.086 (0 .001) 0.032 (0 .001) 0.156 (0 .002) 0.207 (0 .002) 0.494 (0 .002) RWL ( R) 0.088 (0 .001) 0.031 (0 .001) 0.154 (0 .002) 0.207 (0 .002) 0.500 (0 .002) OWL ( R) 0.087 (0 .001) 0.033 (0 .001) 0.160 (0 .002) 0.213 (0 .002) 0.493 (0 .003) Q-learning ( R) 0.086 (0 .001) 0.032 (0 .001) 0.156 (0 .002) 0.206 (0 .002) 0.496 (0 .002) RWL ( R) 0.087 (0 .001) 0.032 (0 .001) 0.154 (0 .002) 0.206 (0 .002) 0.501 (0 .003) PROWL ( U = 0) 0.086 (0 .001) 0.032 (0 .001) 0.154 (0 .002) 0.206 (0 .002) 0.499 (0 .003) PROWL 0.086 (0 .001) 0.032 (0 .001) 0.154 (0 .002) 0.205 (0 .002) 0.499 (0 .003) to-home status into the utility definition (results not shown), reaffirmed the established qualitative rankings. PROWL retained the highest certified value among all adaptive learners and further reduced the alert rate compared to PROWL ( U = 0) and both Q-learning baselines. This consistent performance underscores that the structural advan-tages of explicit reward certification persist even when evaluated under a broadened, more complex utility landscape. 56 0.00 
+
+> 0.02
+> 0.04
+> 0.06
+> Target Regret
+
+Scenario 1 Scenario 2     
+
+> 100 200 500 1000 2000
+
+𝑁     
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+> Robust Regret
+> 100 200 500 1000 2000
+
+𝑁 
+
+PROWL (split-free) PROWL (sample-split) Figure 12: Split-free ablation at ρ = 1 .5. Rows report target regret and robust regret, while columns correspond to Scenarios 1 and 2. PROWL (split-free) fits nuisance functions and the policy on the same sample, whereas PROWL (sample-split) uses a stratified honest half-sample split. 57 −0.10 −0.05 0.00 0.05 0.10 0.15 
+
+Risk difference of alert vs control on composite outcome 
+
+Hospital 6 Hospital 5 Hospital 4 Hospital 3 Hospital 2 Hospital 1 Figure 13: Hospital-level intention-to-treat heterogeneity in the ELAIA-1 trial. The plot-ted quantity is the risk difference of alert versus control on the 14-day composite outcome, accompanied by Wald-type 95% confidence intervals. Positive values favor usual care. The two non-teaching hospitals exhibit the clearest adverse alert signal, strongly motivating the use of site-aware individualized alerting rules. 0.0 0.5 1.0 1.5 2.0             
+
+> 𝜌
+> 0.890
+> 0.895
+> 0.900
+> 0.905
+> 0.910
+> 0.915
+> Certified value
+> 0.00.51.01.52.0
+> 𝜌
+> 0.7930
+> 0.7935
+> 0.7940
+> 0.7945
+> Composite-free value
+> 0.00.51.01.52.0
+> 𝜌
+> 0.490
+> 0.495
+> 0.500
+> 0.505
+> 0.510
+> Alert rate
+> PROWL PROWL ( 𝑈 =0) Q-learning ( 𝑅 )Q-learning ( 𝑅 )
+
+Figure 14: Procedural sensitivity to the preference-uncertainty radius ρ in the actual-data experiment. The panels report the estimated certified value, composite-free value, and alert rate for PROWL, PROWL ( U = 0), Q-learning ( R), and Q-learning ( R) across varying levels of ρ. While a larger ρ structurally induces a more conservative lower utility, PROWL strategically responds by modestly reducing its alerting frequency, consistently preserving the clinically anchored composite-free value. 58 0.898 0.900 0.902 0.904 0.906             
+
+> Certified value
+> Never alert Always alert OWL ( 𝑅 )Q-learning ( 𝑅 )RWL ( 𝑅 )OWL ( 𝑅 )Q-learning ( 𝑅 )RWL ( 𝑅 )PROWL ( 𝑈 =0) PROWL
+> 0.780 0.785 0.790 0.795 0.800
+> Composite-free value
+> 0.00.20.40.60.81.0
+> Alert rate
+> Main covariates Without hospital
+
+Figure 15: Ablation sensitivity analysis excluding hospital covariates. For each method, the points and intervals compare the baseline analysis against a refitted model that com-pletely removes hospital indicators from the policy covariates. Although absolute perfor-mance experiences a slight drop across all methods, the relative ordering remains robustly unchanged. This confirms that the observed gains of PROWL are not driven merely by the memorization of site-specific labels. 0.895 0.900 0.905 0.910 0.915          
+
+> Certified value
+> PROWL (mean-rule) PROWL (MAP) PROWL (Gibbs)
+> 0.785 0.790 0.795 0.800 0.805
+> Composite-free value
+> 0.47 0.48 0.49 0.50 0.51 0.52
+> Alert rate
+
+Figure 16: Deployment derandomization sensitivity for PROWL. This figure compares the deterministic mean-rule (utilized in the main text analysis) against MAP and Gibbs deployment strategies derived from the identically fitted posterior. Across all three con-figurations, the certified value, composite-free value, and alert rates are virtually indistin-guishable, underscoring the robustness of our empirical findings. 59
