@@ -1,0 +1,843 @@
+Title: Informed Machine Learning with Knowledge Landmarks
+
+URL Source: https://arxiv.org/pdf/2604.00256v1
+
+Published Time: Thu, 02 Apr 2026 00:20:02 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+> 1
+
+# Informed Machine Learning with Knowledge Landmarks 
+
+Chuyi Dai, Witold Pedrycz, Life Fellow, IEEE , Suping Xu, Ding Liu, and Xianmin Wang 
+
+Abstract —Informed Machine Learning has emerged as a viable generalization of Machine Learning (ML) by building a unified conceptual and algorithmic setting for constructing models on a unified basis of knowledge and data. Physics-informed ML involving physics equations is one of the developments within Informed Machine Learning. This study proposes a novel di-rection of Knowledge-Data ML, referred to as KD -ML, where numeric data are integrated with knowledge tidbits expressed in the form of granular knowledge landmarks. We advocate that data and knowledge are complementary in several fundamental ways: data are precise (numeric) and local, usually confined to some region of the input space, while knowledge is global and formulated at a higher level of abstraction. The knowledge can be represented as information granules and organized as a collection of input-output information granules called knowl-edge landmarks. In virtue of this evident complementarity, we develop a comprehensive design process of the KD -ML model and formulate an original augmented loss function L, which additively embraces the component responsible for optimizing the model based on available numeric data, while the second component, playing the role of a granular regularizer, so that it adheres to the granular constraints (knowledge landmarks). We show the role of the hyperparameter positioned in the loss function, which balances the contribution and guiding role of data and knowledge, and point to some essential tendencies associated with the quality of data (noise level) and the level of granularity of the knowledge landmarks. Experiments on two physics-governed benchmarks demonstrate that the proposed KD 
+
+model consistently outperforms data-driven ML models. 
+
+Index Terms —Granular computing, granular embedding, in-formation granules, knowledge-data design environment, ma-chine learning (ML). 
+
+I. I NTRODUCTION 
+
+# MACHINE learning has achieved numerous successes in scientific and engineering domains through flexible function approximation [1]. However, these advances typically depend on large, representative data [2]. This requirement is difficult to satisfy in such applications where data acquisition is expensive or operationally constrained [3], [4]. In these simulations, accurate numeric measurements are confined to a local domain, while reliable predictions are needed across the entire domain. A purely data-driven model trained on such localized observations will typically interpolate well within a local region but extrapolate unreliably elsewhere [5]–[7]. 
+
+Chuyi Dai, Witold Pedrycz, and Suping Xu are with the Department of Electrical and Computer Engineering, University of Alberta, Edmonton, T6G 1H9, Canada (e-mail: cdai4@ualberta.ca; wpedrycz@ualberta.ca; sup-ing2@ualberta.ca). Ding Liu is with the School of ElectroMechanical Engineering, Xidian University, Xi’an 710071, China (e-mail: dliu@xidian.edu.cn). Xianmin Wang is with the Hubei Subsurface Multi-Scale Imaging Key Laboratory, Institute of Geophysics and Geomatics, China University of Geo-sciences, Wuhan 430074, China (e-mail: wangxianmin781029@hotmail.com). 
+
+At the same time, domain experts often possess valuable physical knowledge about these systems. For example, prior physical knowledge may indicate that specific local operating conditions consistently correspond to outputs within a pre-dictable range, even as the exact governing parameters vary across scenarios. However, such knowledge is qualitative and imprecise in nature, capturing general behavioral tendencies rather than explicit equations or exact numeric labels for indi-vidual points. It describes plausible behavioral patterns at an abstract level, reflecting that the physical conditions governing the system may vary across scenarios. The challenge is that tra-ditional machine learning methods lack a natural mechanism for incorporating such abstract, non-numeric guidance into the training process. This limitation motivates a central question: 
+
+how can qualitative, multi-scenario physical knowledge be systematically integrated with localized numerical data to enable reliable full-domain prediction? 
+
+Physics-informed machine learning (PIML) addresses this challenge through a series of strategies that embed domain knowledge into learning systems [8]–[11]. Physics-informed neural networks (PINNs), for instance, encode governing PDEs as soft constraints via automatic differentiation [12]. Yet many engineering applications lack explicit PDEs. In these cases, domain knowledge takes qualitative or simulation-derived forms, such as operational limits, monotonicity re-lationships, or behavioral envelopes, and the objective is prediction rather than equation solving [9], [10], [13]. What is needed is a PIML approach that can accommodate diverse, inherently imprecise knowledge while remaining computation-ally efficient [14], [15]. Granular Computing (GrC) provides a comprehensive foun-dation for explicitly addressing this gap [16]–[18]. Rather than forcing uncertain, multi-scenario physical relationships into rigid point-wise constraints, GrC abstracts them into 
+
+information granules that reflect the variability of the system’s behavior. Within this paradigm, fuzzy sets bridge symbolic physics and numeric optimization. Their support for member-ship and gradual transitions [19] allows qualitative physical rules to be translated into smooth, differentiable constraint landscapes. Furthermore, to ensure these granular constraints are physically meaningful, the principle of justifiable granu-larity (PJG) [20], [21] provides a systematic criterion for their construction. PJG establishes a trade-off between coverage 
+
+(encompassing the physical variability across different scenar-ios) and specificity (maintaining sufficient semantic soundness to guide the model). Building on these foundations, this paper proposes aKnowledge-Data ( KD ) Machine Learning framework designed 
+
+> arXiv:2604.00256v1 [cs.LG] 31 Mar 2026 2
+
+to integrate abstract physical knowledge with localized nu-meric data. The central and original construct of our approach is a collection of knowledge landmarks , defined as pairs of input- and output-space information granules that summarize the behavior of the physical system across varying operational conditions. Rather than prescribing explicit equations, the framework accommodates parameter variability by formulat-ing justifiable granular constraints that map distinct physical response regimes to their corresponding input conditions. The granularity of these resulting landmarks represents the extent of this variability across scenarios. Finally, model training is guided by a unified objective that seamlessly balances the fit to local numeric observations with a global knowledge regularization, ensuring that the network’s predictions remain physically consistent across the entire input domain. The main contributions of this study are outlined as follows:  
+
+> •
+
+We propose a novel KD framework for localized su-pervision that bypasses the need for explicit differential equations. In this framework, multi-scenario physical variability is encoded into knowledge landmarks , which are global input-output information granules that act as structural constraints over the full input domain.  
+
+> •
+
+We construct physically meaningful knowledge land-marks by structurally aligning system behaviors with in-put conditions, and formulate an augmented loss function that integrates local data fitting with landmark-induced knowledge regularization. This formulation transforms physical constraints into a computable training objective, enabling unified optimization of local data fitting and global physical consistency.  
+
+> •
+
+Evaluations on two real physics-governed benchmarks confirm that KD -model consistently improves full-domain generalization across local observation windows. Further-more, the framework demonstrates proven robustness to noisy local labels and adapts logically to variations in knowledge specificity. To the best of our knowledge, this is the first study to integrate granular knowledge landmarks with localized nu-meric data within a unified learning framework. The paper is organized as follows. Section II formalizes the problem. Section III reviews the related work. Section IV introduces the granular computing prerequisites. Section V presents the augmented loss function and the design process. Section VI reports experimental results on two physics-governed bench-marks. Section VII concludes the paper and highlights several future research directions. II. P ROBLEM FORMULATION 
+
+We consider a machine learning problem in which the behavior of a physical system is governed by a physics input– output relationship f :
+
+y = f (x; w), (1) where x ∈ Ω denotes the input and w is a vector of parameters whose precise (numeric) values are unknown. The available numeric data generated by this relation are confined to a local region of the input space, denoted by Ω∗ ⊂ Ω. These localized               
+
+> Fig. 1. Input space Ωwith a collection of knowledge landmarks (Ai, B i)
+> and limited space Ω∗for which numeric data are generated by f(x;W)for some specific numeric values of W, namely w0.
+
+observations constitute the training dataset D∗, consisting of 
+
+N1 input-output pairs: 
+
+D∗ = {(xk, target k)} , xk ∈ Ω∗, k = 1 , 2, . . . , N 1. (2) It is known that the same physics relation f stands behind numerous data collected across different scenarios, locations, and time periods. While the structural form of f is invariant and known, the values of the parameters w vary across such settings. These parameters are therefore sought not as single numeric quantities but as information granules (e.g., intervals, fuzzy sets, probability distributions). To account for this variability, we consider a granular generalization of the physical model, 
+
+y = f (x; W ) (3) where W = ( w1, . . . , w p) denotes a vector of granular pa-rameters, each representing the admissible variability observed across different scenarios. Instead of W being supplied explic-itly, the global information implied by these diverse scenarios is summarized in a collection of knowledge landmarks K
+
+expressed in the form of the pairs of input–output information granules 
+
+K = {(Ai, B i)} , i = 1 , 2, . . . , c (4) where Ai is an information granule in the input space Ω
+
+and Bi is its corresponding granule located in the output space. The granularity of (Ai, B i) reflects the variability of the parameters governing f under different operating conditions. The landmarks {(Ai, B i)} are distributed across the complete space Ω, whereas, in contrast, the numeric data D∗ are positioned in the localized region Ω∗, as illustrated in Fig. 1. The design objective is to construct a ML model M (x; a)
+
+with optimized parameters a by utilizing both the local data 
+
+D∗ and the abstract global knowledge landmarks K. This is achieved by minimizing a composite loss function: 
+
+L(a; λ) = λL 1 + (1 − λ)L2, λ ∈ [0 , 1] , (5) where L1 quantifies the approximation quality of D∗ delivered by M . The second component of the loss function L2 describes the distance between the granular manifestation of the physical model through the knowledge landmarks and the numeric ML model. In this sense, in analogy with the commonly studied regularization mechanism in ML, we can view L2 as the knowledge regularization. The hyperparameter λ assuming values in [0 , 1] strikes a sound balance between the data 3
+
+and knowledge guidance included in the design process for given λ. The optimal parameters are obtained through the minimization of the loss function L,
+
+(aopt , λ opt ) = arg min a,λ L(a; λ). (6) It is worth stressing that the levels of granularity of the data 
+
+D∗ and K are fundamentally different: the former consists of precise pointwise measurements, while the latter describes global constraints that are inherently granular (at the higher level of abstraction). The detailed optimization of Eq. (5) is discussed in Section V. III. L ITERATURE REVIEW 
+
+A. Physics-informed and knowledge-guided learning 
+
+Physics-informed machine learning (PIML) aims to improve data efficiency, predictive capability, and the physical plausi-bility of ML models by embedding domain knowledge into the learning process [8]–[10], [22]. Recent studies have identified several forms in which such knowledge may emerge, including governing equations, simulation outputs, algebraic relations, logical rules, and expert constraints, and have examined how these forms can be integrated at different stages of the learning pipeline [9], [10], [22]. In this landscape, Physics-Informed Neural Networks (PINNs) have emerged as one of the most established equation-based frameworks. PINNs incorporate physical laws by penalizing PDE residuals, together with boundary and initial conditions, through automatic differen-tiation [12], [23], [24]. This formulation has been effective in many forward and inverse problems, especially when the governing equations are known and can be evaluated over the domain. At the same time, PINNs usually involve several conflicting design objectives, and their performance is often sensitive to the balance among data fitting, residual terms, and boundary constraints. This has led to a substantial line of work on adaptive loss balancing and training stabilization [25]–[29]. Beyond PINNs, a broader class of physics-guided and knowledge-guided methods has emerged. These approaches incorporate prior knowledge through simulator outputs, proba-bilistic structures, algebraic constraints, or hybrid mechanisms that couple data-driven models with scientific structure [6], [13]. Related work on equation discovery further expands the scope of informed learning by identifying governing relation-ships directly from sparse or noisy observations [14], [15]. More recently, operator-learning methods such as DeepONet and Neural Operator models have shifted attention from point-wise solution fitting to mappings between function spaces, which has substantially broadened the methodological land-scape of scientific machine learning [30]–[32]. In parallel, differentiable constraint-based learning has shown that abstract prior knowledge can be translated into penalty terms that can subsequently be incorporated into gradient-based optimization [33]–[35]. Overall, these developments show that useful phys-ical guidance need not always be expressed as a classical PDE residual. However, an important limitation remains. Many existing methods assume that the available knowledge can ultimately be written in an explicit mathematical form, such as a dif-ferential equation, an algebraic relation, or a well-defined simulator constraint [8], [13]. Even when the formulation moves beyond PDE residuals, the guidance is often enforced through point-wise constraints or is learned from sufficiently comprehensive coverage of the input–output space through representative data distributed across the entire domain [30]– [32]. This requirement is not fully aligned with the nature of real-world problems in which available numeric data are confined to a limited region of the input space. In contrast, the physical knowledge is global in character; however, such domain knowledge is qualitative to some extent and uncertain, with this uncertainty naturally quantified in the language of information granules. Addressing this gap, together with the complementarity of data and knowledge, forms a compelling motivation for studying the formation of the KD -ML environ-ment. 
+
+B. Granular computing and justifiable granularity 
+
+Granular Computing (GrC) formalizes the idea of abstrac-tion by representing imprecise concepts and heterogeneous evidence in the form of information granules [16], [17], [36]. As a canonical formalism within GrC, fuzzy sets connect sym-bolic descriptions with numerical computation through mem-bership degrees, thereby forming gradual conceptual bound-aries [18], [19], [37], [38]. To assure the semantic quality of these constructs, the principle of justifiable granularity provides an optimization criterion that constructs information granules by balancing the criteria of data support (coverage) and semantic precision (specificity) [20]. In ML, GrC has been deployed to extract robust data rep-resentations for tasks such as time-series forecasting [39] and complex pattern classification [40]. However, methodologies that integrate limited numeric data and global information granules within a unified learning scheme are not yet avail-able. Most existing implementations view granular constructs merely as isolated pre-processing steps [41]–[43]. While recent theoretical perspectives position GrC as a foundation for knowledge–data learning and suggest incorporating physical guidance via granular regularization [21], a critical method-ological gap still remains. Making this approach operational calls for a unified, gradient-based optimization framework capable of jointly leveraging data-based and knowledge-based aspects of the loss function used to guide the development of 
+
+KD -models. IV. G RANULAR CONSTRUCTS : S OME PREREQUISITES 
+
+In this section, we recall in a systematic way the essentials of granular constructs that are of relevance in the context of this study. 
+
+A. The principle of justifiable granularity 
+
+The principle of justifiable granularity delivers an intuitively appealing algorithmic framework supporting the construction of information granules. The underlying idea assumes that an information granule is an abstraction of experimental data. The 4
+
+data support the information granule. To retain the associated semantics, it is also required that the granule be precise enough. These two requirements are formalized through the criteria of coverage and specificity. To elaborate on the main idea, consider one-dimensional real data {x1, x 2, . . . , x N } and an interval information granule 
+
+A = [ a, b ] or, more generally, a fuzzy set A with membership function parameterized by some vector p. Note that in case of the interval, p = [ a, b ]. The coverage of A is expressed as a normalized cardinality, 
+
+cov( A) = 1
+
+N card {xk ∈ [a, b ]} . (7) The specificity measure is a decreasing function ϕ of the size (length) of the interval, 
+
+sp( A) = ϕ length( A). (8) In particular, ϕ can be treated as a linearly decreasing function of length, namely, 
+
+sp( A) = 1 − b − a
+
+range , (9) where range is regarded as a calibration factor selected on the basis of the magnitude of the data, 
+
+range = max k xk − min k xk. (10) The two criteria are in conflict. With the intent of maximiz-ing both, we determine the optimal values of the parameters by maximizing the product of coverage and specificity. For fuzzy sets, the coverage and specificity criteria are revised to accommodate membership grades of A. Thus, the coverage is taken as the sum of membership degrees, 
+
+cov( A) = 
+
+> N
+
+X
+
+> k=1
+
+A(xk). (11) The specificity sp( A) is determined by integrating the speci-ficity values of the α-cuts of A, namely, 
+
+sp( A) = 
+
+Z 10
+
+sp( Aα) dα. (12) The optimization of the product of coverage and specificity leads to 
+
+popt = arg max p cov( A) sp( A). (13) 
+
+B. Algorithmic development of information granules for gran-ular models 
+
+To capture the variability of system outputs across Ω, we first construct a collection of C context information granules 
+
+{Bi}Ci=1 formed in the output space. Each Bi represents an admissible region in the output space that serves as the con-ditioning context for the input-space clustering used to build knowledge landmarks. These output contexts being expressed by Gaussian membership functions, 
+
+Bi(y) = exp 
+
+
+
+− (y − ci)2
+
+σ2
+
+> i
+
+
+
+, (14) where ci and σi denote the center and spread of granule Bi,respectively. To ensure that the granules achieve a balance between their coverage and specificity, we employ a density-adaptive strat-egy to determine their parameters. To mitigate the impact of eventual outliers, we define an operational range [ylow , y high ],where the corresponding boundaries correspond to the 2.5th and 97 .5th percentiles of the experimental data of the output variable y, respectively. The modal values (centers) {ci}Ci=1 
+
+are uniformly distributed across this range. This uniform placement ensures that the granules collectively cover the effective operational range of the output variable, thereby providing a consistent contextual partition of the output space. Subsequently, the spread of each granule is adapted to the local data density. Let Y = {yj }Nj=1 denote the set of output samples used to construct the contexts within [ylow , y high ]. For each center ci, we calculate the distance to its κth nearest neighbor in Y, denoted as 
+
+δi = ci − y(κ)NN , (15) where y(κ)NN denotes the κth nearest neighbor of ci in Y, κ =
+
+⌈ρN ⌉, ⌈·⌉ denotes the ceiling function, and ρ ∈ (0 , 1) is a user-specified neighborhood fraction (e.g., ρ = 0 .2). This distance defines the spread of the membership function as σi = δi,ensuring that granules in sparse regions are wider to maintain coverage, whereas those in dense regions are made narrower to enhance specificity. 
+
+C. Conditional Fuzzy C-Means 
+
+Given the context information granule Bi, i = 1 , . . . , C ,conditional FCM determines Ki clusters formed in the input space by minimizing the following objective function: 
+
+Ji =
+
+> N
+
+X
+
+> k=1
+> Ki
+
+X
+
+> j=1
+
+u mijk ∥xk − vij ∥2, (16) 
+
+uijk subject to the constraint described by Bi,
+
+> Ki
+
+X
+
+> j=1
+
+uijk = Bi(yk), k = 1 , . . . , N, (17) where m > 1 is the fuzzification parameter and U = [ uijk ]
+
+forms a three-dimensional partition tensor expressed across contexts, clusters, and samples. The constraint above under-scores that the total membership mass assigned to xk under the 
+
+ith context is exactly the output membership degree Bi(yk);hence, clustering is explicitly conditioned on the specified context. The objective function is minimized with respect to the partition tensor and the prototypes. Its optimization is carried out by successively computing the partition tensor and the prototypes: 
+
+uijk = Bi(yk)
+
+> Ki
+
+X
+
+> ℓ=1
+
+ ∥xk − vij ∥∥xk − viℓ ∥
+
+ 2
+
+> m−1
+
+, (18) 
+
+vij =
+
+> N
+
+X
+
+> k=1
+
+u mijk xkNX
+
+> k=1
+
+u mijk 
+
+. (19) 5
+
+For the clarity of presentation, we assume that the number of clusters for each context is the same and equal to K, i.e., 
+
+Ki = K for all i. Thus, the total number of numeric prototypes produced by conditional FCM is c = CK . Conditional FCM yields numeric prototypes vij , which we elevate to input information granules by following the principle of justifiable granularity, i.e., selecting the granularity by balancing cover-age and specificity. Let 
+
+wijk = u mijk NX
+
+> r=1
+
+u mijr 
+
+, k = 1 , . . . , N, (20) be the weights supporting prototype vij . For each input variable d = 1 , . . . , n , we first normalize the data to [0 , 1] , and define a one-dimensional granule centered at v(d) 
+
+> ij
+
+with width 
+
+σ(d) 
+
+> ij
+
+∈ (0 , 1] considering a Gaussian membership function 
+
+μ(d) 
+
+> ij
+
+(x) = exp − (x − v(d) 
+
+> ij
+
+)2
+
+(σ(d) 
+
+> ij
+
+)2
+
+!
+
+. (21) Given the normalized support weights {wijk }Nk=1 induced by conditional FCM, we define the coverage of the candidate one-dimensional granule as the empirical expectation of its membership function with respect to this discrete weighted evidence, 
+
+cov (d) 
+
+> ij
+
+(σ) = 
+
+> N
+
+X
+
+> k=1
+
+wijk μ(d) 
+
+> ij
+
+(x(d) 
+
+> k
+
+). (22) If the space is normalized, its specificity is quantified as 
+
+sp( σ) = 1 − σ. (23) The idea behind the principle of justifiable granularity is to maximize the product of coverage and specificity by choosing the width σ(d) 
+
+> ij
+
+that maximizes the tradeoff between these two criteria: 
+
+σ(d) 
+
+> ij
+
+= arg max σ∈(0 ,1] cov (d) 
+
+> ij
+
+(σ) sp( σ). (24) Finally, the n-dimensional input granule Aij is obtained by the Cartesian product of the one-dimensional granules, implemented via a t-norm. In our implementation, we use the product t-norm: 
+
+Aij (x) = 
+
+> n
+
+Y
+
+> d=1
+
+μ(d) 
+
+> ij
+
+(x(d)). (25) With a mild abuse of notation, we re-label the resulting granular signatures Aij as Aℓ and Bi as Bℓ, ℓ = 1 , 2, . . . , c ,and in the sequel treat them as knowledge landmarks. 
+
+D. Matching Information Granules and Numeric Results 
+
+By analyzing the structure of the loss function L, it becomes evident that in the same expression one encounters numeric entities and information granules (fuzzy sets). Subsequently, one has to determine a sound way of matching these two constructs. Denote by B the information granule, and let x0
+
+stand for the numeric entity; see Fig. 2.     
+
+> Fig. 2. Matching of an information granule Band a numeric entity x0.
+
+The proposal reported in the literature is to compute the product cov( x0, B ) sp( B) = B(x0) sp( B). The higher the product, the higher the level of matching. Note that the calculations also involve the specificity of B. This distin-guishes between the cases where B(x0) = B′(x0) but if 
+
+sp( B) > sp( B′) then we view the matching achieved for B
+
+as higher than that achieved for B′.V. A UGMENTED LOSS FUNCTION , ITS MINIMIZATION , AND VALIDATION ENVIRONMENT 
+
+Following the formulation of the KD -model setting in-troduced in Section II, we formulate an augmented loss function that incorporates both the numeric data D∗ =
+
+{(xk, target k)}N1 
+
+> k=1
+
+and a collection of knowledge landmarks 
+
+K = {(Ai, B i)}ci=1 , where Ai and Bi denote input-space and output-space information granules, respectively. Since both numeric evidence and knowledge guidance are involved in the design process, a suitable trade-off between them has to be established and optimized. We start by introducing the loss function and then develop the corresponding validation process. Learning based on numeric data is available only on a limited subspace Ω∗, yielding a local labeled dataset D∗,whereas global guidance over the full domain Ω is provided through the set of knowledge landmarks K. We quantify these two objectives by using the loss function Q1 viewed as RMSE determined on Ω∗, while Q2 is treated as RMSE evaluated over Ω. We determine a value of the trade-off parameter λ by minimizing the composite criterion eQ = Q1 + Q2 associated with the augmented loss L(a; λ).
+
+A. Loss function, its interpretation, and minimization 
+
+Given a ML model M (x; a), the augmented objective function comes in the form: 
+
+L(a; λ) = λL data (a) + (1 − λ)Lknowledge (a), λ ∈ [0 , 1] .
+
+(26) The first component of the loss function is a normalized mean-squared error computed on the local data D∗:
+
+Ldata (a) = 1
+
+N1y2span 
+
+> N1
+
+X
+
+> k=1
+
+(M (xk; a) − target k)2 , (27) where yspan denotes a normalization factor considered as the range of the output variable target k, k = 1 , 2, . . . , N 1.The second component, Lknowledge , penalizes departure from 6
+
+the landmark-induced constraints by quantifying the level of matching between the numeric output M (x; a) and the granular output Bi taken as the activation of the input granule 
+
+Ai. Recalling the matching mechanism introduced in Sec-tion IV-D, we describe this term as 
+
+Lknowledge (a) = 1
+
+N2
+
+> N2
+
+X
+
+> q=1
+> c
+
+X
+
+> i=1
+
+Ai(xq ) (1 − Vi(xq ; a)) 2 , (28) where the first sum is completed over {xq }N2 
+
+> q=1
+
+being dis-tributed over Ω. The term Vi(x; a) is expressed as 
+
+Vi(x; a) = cov( M (x; a), B i) sp( Bi). (29) This part of the loss function is minimized by optimizing the model parameters a so that Vi(x; a) becomes as close to 
+
+1 as possible (thus 1 − Vi(x; a) is minimized). The quantity 
+
+1 − Vi(xq ; a) is treated as a component of the loss function when xq falls within the scope of Ai, as expressed by the activation term Ai(xq ).It is worth noting that the loss function is equipped with a hyperparameter λ, whose role is self-evident: higher values of λ imply a higher contribution of D∗ in the construction of the model. The choice of the optimal value λopt is critical and must be properly selected. Obviously, considering Eq. (26) only, higher values of λ entail higher values of L, so a vali-dation process is realized by introducing a suitable validation index. 
+
+B. Validation process 
+
+The validation process is carried out in the presence of a validation dataset structured by taking into account the granularity of the parameters of the physical model W in the loss function consisting of the following two terms: 
+
+Q1(λ) = E(x,t )∼p(x,t )
+
+h
+
+(M (x; a, λ ) − t)2i
+
+. (30) where x is sampled from Ω∗ and follows a joint probability function p(x, t ). Note that Q1 is also a function of λ and in-cludes the model determined by minimizing Eq. (26) following a certain fixed value of this hyperparameter. 
+
+Q2(λ) = Ex∼p(x), w∼p(w)
+
+h
+
+(M (x; a, λ ) − f (x; w)) 2i
+
+.
+
+(31) where p(w) is the probability density function of the param-eters w, and p(x) is defined over Ω. The optimization of λ is completed through the minimization of the sum Q1 + Q2. We sweep through the values of λ and for a given λ, determine 
+
+L. Finally, the optimal model is the one for which Q1 + Q2
+
+attains minimum. In the same way, by sampling Ω and W , we realize a testing phase. Once the λopt has been determined in the validation phase, we compute the sum Q1(λopt ) + Q2(λopt ).VI. E XPERIMENTAL STUDIES 
+
+Through a series of experiments, we evaluate the devel-oped KD -model on two physics-based benchmarks, namely                                
+
+> TABLE I VARIABLE RANGES AND PARAMETERS FOR ENVIRONMENTAL
+> POLLUTANT DISPERSION
+> Variable Symbol Range Unit
+> Input Variables
+> Spatial Coordinate s[0 ,3] mTime t(0 ,60] s
+> Parameters
+> Spilled Mass R[7 ,13] kg Diffusion Rate Y[0 .02 ,0.12] m2/s Second Spill Location L[0 .01 ,3] mSecond Spill Time τ[30 .01 ,30 .295] s
+
+Environmental Pollutant Dispersion [44] and Piston Cycle-Time Simulation [45]. The model M (x; a) is realized as a single-hidden-layer MLP with 64 hidden neurons and a tanh 
+
+activation function. The number of neurons in the hidden layer is selected experimentally following simple heuristics: when the hidden layer is small, the neural-network performance is relatively poor; it improves as the number of neurons increases, and stabilizes around 64. Information granules are realized using Gaussian membership functions. 
+
+A. Environmental Pollutant Dispersion Benchmark 
+
+An environmental dispersion model describes pollutant transport following a chemical spill. The analytical expression of the concentration field C(s, t ) at spatial coordinate s ∈ [0 , 3] 
+
+meters and time t ∈ (0 , 60] seconds is 
+
+C(s, t ) = R
+
+√4πY t exp 
+
+
+
+− s2
+
+4Y t 
+
+
+
++ R
+
+p4πY (t − τ ) exp 
+
+
+
+− (s − L)2
+
+4Y (t − τ )
+
+
+
+I(t > τ ),
+
+(32) where I(t > τ ) is the indicator function ensuring that the second source contributes only after activation. The model output 
+
+f (s, t ) = p4πC (s, t ), (33) is the scaled concentration over the spatiotemporal domain 
+
+Ω = [0 , 3] ×(0 , 60] . The parameter vector W = ( R, Y, L, τ ) is sampled from uniform distributions. The parameters of interest and their ranges are summarized in Table I. Fig. 3(a) shows the pollutant concentration field f (s, t )
+
+over the spatiotemporal domain, computed using baseline parameters R = 10 kg, Y = 0.07 m2/s, L = 1.505 m, and τ = 30 .1525 s. The localized dataset D∗ is generated by uniform sampling on a selected observation window Ω∗ 
+
+> 1
+
+⊂ Ω
+
+with N1 = 1000 , i.e., approximately a 5% label budget compared with a full-domain split, as shown in Fig. 3(b). We construct knowledge landmarks K = {(Ai, B i)}5 
+
+> i=1
+
+from the entire space Ω. First, we granulate the output space by forming contexts {B1, . . . , B 5} using Gaussian membership functions (Fig. 4). Second, for each output context Bi, we apply conditional FCM to obtain K input clusters in the s–t
+
+space, conditioned on the context membership Bi(yk). This yields numeric prototypes vik , which are elevated to input 7                      
+
+> (a) (b)
+> Fig. 3. Spatiotemporal domain and local observation setup for the environ-mental benchmark. (a) Pollutant concentration field f(s, t )over Ω, computed with baseline parameters. (b) Domain Ωand local observation window Ω∗
+> 1in the (s, t )space.
+> Fig. 4. Output space granulation for the environmental model. The histogram shows the distribution of scaled concentration values in Ω,and curves represent five Gaussian membership functions defining the output contexts.
+
+information granules via the principle of justifiable granularity, producing {Aik }Kk=1 . The resulting input granules and their memberships are visualized in Fig. 5. Qualitatively, low-concentration contexts (e.g., B1) are associated with early-time and/or far-from-source regions, while high-concentration con-texts (e.g., B5) concentrate near the spill sources at later times, demonstrating that the landmarks capture the spatiotemporal structure of the process. Following the methodology outlined in Section V, we minimize the loss function L(a; λ) and perform a grid search over λ ∈ [0 , 1] with a step size of 0.02 . As λ increases, the loss function places greater weight on the local data term, so Q1 decreases monotonically. The curves of Q2(λ) and 
+
+Q1(λ)+ Q2(λ) are illustrated in Fig. 6, where the sum Q1 +Q2
+
+attains a minimum at λopt . The absolute improvement of the 
+
+KD -model over the D∗-based model is defined as 
+
+∆Q = Qbase − Qopt , (34) where Qbase denotes the objective obtained with λ = 1 , and 
+
+Qopt corresponds to the objective under λopt . The relative gain is computed as 
+
+∆Q(%) = ∆QQbase 
+
+× 100% . (35) At the Ω∗ 
+
+> 1
+
+location, the KD -model achieves a 15.10% reduc-tion in the composite objective compared with the data-based model ( λ = 1 ), demonstrating that knowledge regularization enables effective extrapolation beyond the observed region and leads to lower global error. To evaluate the effectiveness of the proposed KD -model, we consider multiple observation windows Ω∗
+
+> 2
+
+, Ω∗
+
+> 3
+
+, Ω∗ 
+
+> 4
+
+⊂ Ω
+
+(Positions 2–4; Fig. 7). The performance gains of KD -model are not restricted to a particular local region Ω∗ 
+
+> i
+
+, but become visible across these regions. The selected windows correspond to qualitatively different dynamical conditions of the disper-sion process:  
+
+> •
+
+Ω∗
+
+> 2
+
+: early time instances ( t small) and spatial locations far from the leakage source, where the surface response is relatively smooth and low in magnitude;  
+
+> •
+
+Ω∗
+
+> 3
+
+: regions both temporally and spatially distant from the leakage events, representing downstream plateau be-havior;  
+
+> •
+
+Ω∗
+
+> 4
+
+: the vicinity of the second leakage event at its acti-vation time, where the concentration field exhibits sharp gradients and substantial local variability. The KD -model consistently outperforms the data-driven model across all observation windows with ∆Q(%) equal to 7.60%, 22.02%, and 6.34% for Ω∗
+
+> 2
+
+, Ω∗
+
+> 3
+
+, and Ω∗
+
+> 4
+
+, respectively. These results attest to the effectiveness of the proposed knowledge regularization. Interestingly, the magnitude of improvement varies with the physical characteristics of the local region. The largest gain is observed at Ω∗
+
+> 3
+
+, where the local data are col-lected far from both leakage events. In this regime, purely data-driven training struggles to infer the global structure of the concentration field, whereas the knowledge landmarks provide strong guidance, leading to substantial error reduction. In con-trast, the smallest improvement occurs at Ω∗
+
+> 4
+
+, which coincides with the activation of the second leakage source. This region contains highly complex and rapidly varying surface behavior. Because the localized dataset already captures rich local variability and steep gradients, the incremental benefit from additional global knowledge becomes comparatively smaller. Nevertheless, KD -model still achieves consistent performance gains, demonstrating stability even in dynamically complex regimes. 
+
+B. Piston Cycle-Time Simulation Benchmark 
+
+A mechanical engineering simulation of a piston within a cylinder is studied. The cycle time ψ required to complete one piston cycle is a function of piston weight ξ and surface area 
+
+Γ, expressed as 
+
+ψ(ξ, Γ) = 2 π
+
+s ξk + Γ2P0V0Ta 
+
+> T0V2
+
+, (36) The intermediate volume variable V and force term A are defined as 
+
+V = Γ2k
+
+r
+
+A2 + 4kP 0V0Ta
+
+T0
+
+− A
+
+!
+
+,A = P0Γ + 19 .62 ξ − kV 0
+
+Γ .
+
+(37) over the entire domain Ω = [30 , 60] × [0 .005 , 0.020] . The parameter vector W = ( V0, k, P 0, T a, T 0) is sampled from uniform distributions, as detailed in Table III. The localized dataset D∗ is generated by uniform sampling on a selected observation window Ω∗ 
+
+> 1
+
+⊂ Ω with N1 = 1000 , as shown in Fig. 8(b). 8
+
+Fig. 5. Input granules {Aik } for the environmental model, obtained via conditional FCM for each output context. Each subplot shows eight input granules associated with one output context Bi, where the color of each point represents its membership degree. TABLE II IMPROVEMENT OF THE TOTAL OBJECTIVE Q = Q1 + Q2 FOR ENVIRONMENTAL POLLUTANT DISPERSION .
+
+Position of Ω∗ λopt KD -model Data-based model ( λ = 1 ) Q1 + Q2 Improvement 
+
+Q1 Q2 Q1 + Q2 Q1 Q2 Q1 + Q2
+
+Ω∗ 
+
+> 1
+
+0.88 0.012 6.626 6.638 0.002 7.816 7.819 15.10% 
+
+Ω∗ 
+
+> 2
+
+0.98 0.009 6.613 6.622 0.004 7.163 7.167 7.60% 
+
+Ω∗ 
+
+> 3
+
+0.32 0.095 6.672 6.767 0.794 7.883 8.678 22.02% 
+
+Ω∗ 
+
+> 4
+
+0.74 0.010 6.949 6.959 0.010 7.420 7.431 6.34% 
+
+Fig. 6. Curves of Q2(λ), and Q1(λ) + Q2(λ) for the environmental benchmark as functions of the trade-off parameter λ.
+
+Fig. 7. Different positions of Ω∗ for the environmental benchmark: Ω∗ 
+
+> 2
+
+, Ω∗ 
+
+> 3
+
+,and Ω∗ 
+
+> 4
+
+.
+
+We construct knowledge landmarks K = {(Ai, B i)}5 
+
+> i=1
+
+in the entire space Ω. The resulting output granules and input granules with their memberships are visualized in Fig. 9 and 10. The cluster prototypes (red crosses) capture the physical monotonicity, where heavier pistons result in slower cycle times. This demonstrates how knowledge landmarks encode qualitative physics through granular input-output associations. The results are reported in the same way as in the previous study; see Fig. 11 for the optimal values of λ. At the 
+
+Ω∗ 
+
+> 1
+
+location, the KD -model achieves a 61.70% reduction in 
+
+TABLE III VARIABLE RANGES AND PARAMETERS FOR PISTON SIMULATION 
+
+Variable Symbol Range Unit 
+
+Input Design Variables 
+
+Piston Weight ξ [30 , 60] kg Surface Area Γ [0 .005 , 0.020] m2
+
+Parameters 
+
+Gas Volume V0 [0 .002 , 0.010] m3
+
+Spring Coeff. k [1000 , 5000] N/m Atm. Pressure P0 [9 × 10 4, 1.1 × 10 5] N/m 2
+
+Ambient Temp. Ta [290 , 296] KFilling Temp. T0 [340 , 360] K
+
+(a) (b) 
+
+Fig. 8. Spatiotemporal domain and local observation setup for the piston benchmark. (a) Cycle-time response surface ψ(ξ, Γ) over the design space. (b) Full domain Ω and local subdomain location Ω∗ 
+
+> 1
+
+for the piston model. 
+
+the composite objective Q1 + Q2. Furthermore, we observe that the KD -model exhibits superior full-domain performance compared to the pure data-driven model. To evaluate effective-ness across heterogeneous operating conditions, we consider another three local regions Ω∗
+
+> 2
+
+, Ω∗
+
+> 3
+
+, Ω∗ 
+
+> 4
+
+⊂ Ω (Positions 2–4; Fig. 12). The selected windows correspond to the following operating conditions: 9                                                            
+
+> TABLE IV IMPROVEMENT OF THE TOTAL OBJECTIVE Q=Q1+Q2FOR PISTON CYCLE -T IME SIMULATION .
+> Position of Ω∗λopt
+> KD -model Data-based model ( λ= 1 )Q1+Q2Improvement
+> Q1Q2Q1+Q2Q1Q2Q1+Q2
+> Ω∗
+> 10.90 0.0001 0.0968 0.0977 0.0011 0.2540 0.2551 61.70%
+> Ω∗
+> 20.78 0.0002 0.0921 0.0923 0.0004 0.1359 0.1363 32.27%
+> Ω∗
+> 30.36 0.0004 0.0912 0.0916 0.0007 0.1345 0.1352 32.28%
+> Ω∗
+> 40.10 0.0004 0.0927 0.0931 0.0009 0.2279 0.2288 59.32%
+> Fig. 9. Output space granulation for the Piston Cycle-Time Simulation benchmark.
+> •
+
+Ω∗
+
+> 2
+
+: heavy piston with small surface area ( ξ ∈ [50 , 55] 
+
+kg, Γ ∈ [0 .005 , 0.008] m2), where high inertia elongates the cycle and reduces sensitivity to Γ; 
+
+> •
+
+Ω∗
+
+> 3
+
+: heavy piston with large surface area ( ξ ∈ [50 , 55] kg, 
+
+Γ ∈ [0 .014 , 0.017] m2), where both inertial and pressure-force effects are substantial, producing a more complex local response surface;  
+
+> •
+
+Ω∗
+
+> 4
+
+: light piston with large surface area ( ξ ∈ [30 , 35] kg, 
+
+Γ ∈ [0 .014 , 0.017] m2), in which large pressure forces act on a low-mass piston, yielding pronounced nonlinear sensitivity to Γ.According to Table IV, KD -model consistently outperforms the data-based model ( λ = 1 ) across all observation windows. These results confirm that the proposed knowledge-regularized formulation improves full-domain predictive accuracy regard-less of the chosen local region. 
+
+C. Robustness to noisy local supervision 
+
+To examine the robustness of the proposed KD -model framework under corrupted local data, we add noise only to the numeric data points in the local dataset D∗, while keeping the knowledge dataset and the resulting knowledge landmarks 
+
+K unchanged. For each point in D∗, we generate a noisy data point by 
+
+^target k = target k + N (0 , σ ), (38) and use this noisy dataset 
+
+D∗ 
+
+> noise
+
+= {(xk, ^target k)}N1 
+
+> k=1
+
+(39) for training. The noise standard deviation is defined relative to the variability of the clean local data, where std( ·) denotes the sample standard deviation. Specifically, we set 
+
+σ = α std  {target k}N1
+
+> k=1
+
+, α ∈ { 0.1, 0.2, . . . , 0.9}.
+
+(40) Hence, the imposed noise level ranges from 10% to 90% of the standard deviation of the original data in D∗. Since the injected noise is randomly generated, the resulting value of λopt may vary slightly across runs. To mitigate this stochastic variability and obtain a more robust estimate of the trend, we repeat the experiment three times for each noise level using independent noise realizations. In the figures, the scattered points show the three obtained values of λopt , the diamond marker denotes the median, the error bar spans the minimum and maximum, and the solid line connects the medians. Fig. 13 shows that, for both benchmarks, λopt decreases as the noise level increases. In view of the augmented loss function, this behavior is consistent with the intended seman-tics of λ: as local data become increasingly noisy, the model selection criterion adaptively down-weights the corrupted data term and relies more heavily on the knowledge landmarks to maintain robust and globally consistent predictions over the full domain Ω.
+
+D. Sensitivity to Knowledge Specificity via Parameter-space Width 
+
+To examine how knowledge specificity affects KD -model, we vary the width of the parameter ranges used to generate the full-domain splits. In the default setting, each component wj
+
+of w is sampled from its full admissible range. To control the range width, we define the center and width of each component as 
+
+¯wj = wmin  
+
+> j
+
++ wmax 
+
+> j
+
+2 , ∆j = wmax  
+
+> j
+
+− wmin  
+
+> j
+
+, (41) and introduce a width ratio r ∈ [0 , 1] . Each parameter is then sampled uniformly from the reduced interval 
+
+wj ∼ U
+
+
+
+¯wj − r∆j
+
+2 , ¯wj + r∆j
+
+2
+
+
+
+, j = 1 , . . . , p. (42) When r = 0, all parameters are numeric and fixed at their mean values, so the generated full-domain data are most closely aligned with the local dataset D∗. When r = 1,the original parameter ranges are fully recovered. For each width ratio, we regenerate the full-domain splits, construct the knowledge landmarks from Ω, and train KD -model with the augmented loss L(a; λ).As shown in Fig. 14, λopt exhibits a clear increasing trend as the width ratio r grows. This indicates that the model becomes progressively more reliant on the data term when the parameter variability becomes broader. The reason is that, as the parame-ter space expands, the knowledge landmarks constructed from 10                      
+
+> Fig. 10. Input granules {Aik }for the Piston Cycle-Time Simulation benchmark. Each subplot shows five input granules associated with one output context
+> Bi, where the color of each point represents its membership degree.
+> Fig. 11. Curves of Q2(λ), and Q1(λ) + Q2(λ)for the piston benchmark as functions of the trade-off parameter λ.
+> Fig. 12. Different positions of Ω∗for the piston benchmark: Ω∗
+> 2,Ω∗
+> 3, and
+> Ω∗
+> 4.
+> (a)
+> (b)
+> Fig. 13. Selected λopt versus noise level. Points denote repeated runs; dia-monds denote medians. (a) Environmental benchmark. (b) Piston benchmark.
+
+Ω capture a broad range of system behavior and therefore become less specific. As a result, the knowledge term provides weaker guidance, and the optimal balance between the data      
+
+> Fig. 14. Sensitivity of the trade-off parameter λopt to the parameter-space width ratio rfor both benchmarks. The dashed line corresponds to the Environmental Pollutant Dispersion benchmark and the solid line to the Piston Cycle-Time Simulation benchmark.
+
+and knowledge shifts toward the local numeric supervision in the design of the KD environment. VII. C ONCLUSION 
+
+In this study, we developed an original KD -ML design environment that seamlessly combines data and knowledge landmarks. The loss function, as the essential design com-ponent, delivers a sound tradeoff that balances the precision and locality of data and knowledge, as well as their impact in the optimization process. We carried out a detailed analysis of such knowledge-informed ML models and identified the extent to which knowledge and data contributed to the opti-mization of the models. In particular, two intuitively appealing relationships were specified and quantified: (i) noisy data lead to a reduced impact on the minimization of the loss function, as manifested through lower optimal values of λ, whereas (ii) a decreasing level of granularity of the granular parameters of the physical reference relationship reduces the contribution of the knowledge landmarks to the optimization of the model, as reflected by lower optimal values of 1 − λ. The experimental studies helped quantify these tendencies. While the study has offered a complete conceptual and algorithmic discussion and initiated a new line of research in knowledge-informed ML, there are several directions worth pursuing in future research. The investigations reported here are general and model-agnostic. While the experiments con-sidered neural networks, different classes of models could be studied and their performance in the KD environment could be analyzed. Another possible line of research could include investigations of multiple sources of knowledge and data with different characteristics of granularity and localization, all involved jointly in the minimization of the augmented loss function. The discussed ML models are numeric, in the sense that their parameters are numeric. An extension of 11 
+
+the methodology toward the development of granular models constitutes a logical continuation of the completed studies. REFERENCES [1] J. Gui, T. Chen, J. Zhang, Q. Cao, Z. Sun, H. Luo, and D. Tao, “A survey on self-supervised learning: Algorithms, applications, and future trends,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 46, no. 12, pp. 9052–9071, 2024. [2] D. Li, Z. Wang, Y. Chen, R. Jiang, W. Ding, and M. Okumura, “A survey on deep active learning: Recent advances and new frontiers,” 
+
+IEEE Transactions on Neural Networks and Learning Systems , vol. 36, no. 4, pp. 5879–5899, 2025. [3] Z. Zhou, Z. Wei, A. Tahir, J. Ren, Y. Yin, G. F. Pedersen, and M. Shen, “A high-quality data acquisition method for machine-learning-based design and analysis of electromagnetic structures,” IEEE Transactions on Microwave Theory and Techniques , vol. 71, no. 10, pp. 4295–4306, 2023. [4] R. Xiong, F. Sun, Z. Chen, and H. He, “A data-driven multi-scale extended kalman filtering based parameter and state estimation approach of lithium-ion polymer battery in electric vehicles,” Applied Energy , vol. 113, pp. 463–476, 2014. [5] A. Lanubile, P. Bosoni, G. Pozzato, A. Allam, M. Acquarone, and S. Onori, “Domain knowledge-guided machine learning framework for state of health estimation in lithium-ion batteries,” Communications Engineering , vol. 3, no. 1, p. 168, 2024. [6] A. Subramanian and S. Mahadevan, “Probabilistic physics-informed machine learning for dynamic systems,” Reliability Engineering &System Safety , vol. 230, p. 108899, 2023. [7] Z. Li, J. Zhou, H. Nassif, D. Coit, and J. Bae, “Fusing physics-inferred information from stochastic model with machine learning approaches for degradation prediction,” Reliability Engineering & System Safety , vol. 232, p. 109078, 2023. [8] G. E. Karniadakis, I. G. Kevrekidis, L. Lu, P. Perdikaris, S. Wang, and L. Yang, “Physics-informed machine learning,” Nature Reviews Physics ,vol. 3, no. 6, pp. 422–440, 2021. [9] J. Willard, X. Jia, S. Xu, M. Steinbach, and V. Kumar, “Integrating scientific knowledge with machine learning for engineering and envi-ronmental systems,” ACM Computing Surveys , vol. 55, no. 4, pp. 1–37, 2022. [10] L. von Rueden, S. Mayer, K. Beckh, B. Georgiev, S. Giesselbach, R. Heese, B. Kirsch, J. Pfrommer, A. Pick, R. Ramamurthy, M. Walczak, J. Garcke, C. Bauckhage, and J. Schuecker, “Informed machine learning – a taxonomy and survey of integrating prior knowledge into learning systems,” IEEE Transactions on Knowledge and Data Engineering ,vol. 35, no. 1, pp. 614–633, 2023. [11] Y. Wu, B. Sicard, and S. A. Gadsden, “Physics-informed machine learning: A comprehensive review on applications in anomaly detection and condition monitoring,” Expert Systems with Applications , vol. 255, p. 124678, 2024. [12] M. Raissi, P. Perdikaris, and G. E. Karniadakis, “Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations,” 
+
+Journal of Computational Physics , vol. 378, pp. 686–707, 2019. [13] S. A. Faroughi, N. M. Pawar, C. Fernandes, M. Raissi, S. Das, N. K. Kalantari, and S. Kourosh Mahjour, “Physics-guided, physics-informed, and physics-encoded neural networks and operators in scientific comput-ing: Fluid and solid mechanics,” Journal of Computing and Information Science in Engineering , vol. 24, no. 4, p. 040802, 2024. [14] G.-J. Both, S. Choudhury, P. Sens, and R. Kusters, “Deepmod: Deep learning for model discovery in noisy data,” Journal of Computational Physics , vol. 428, p. 109985, 2021. [15] Z. Chen, Y. Liu, and H. Sun, “Physics-informed learning of governing equations from scarce data,” Nature Communications , vol. 12, no. 1, p. 6136, 2021. [16] L. A. Zadeh, “Toward a theory of fuzzy information granulation and its centrality in human reasoning and fuzzy logic,” Fuzzy Sets and Systems ,vol. 90, no. 2, pp. 111–127, 1997. [17] J. T. Yao, A. V. Vasilakos, and W. Pedrycz, “Granular computing: Perspectives and challenges,” IEEE Transactions on Cybernetics , vol. 43, no. 6, pp. 1977–1989, 2013. [18] A. Bargiela and W. Pedrycz, “Toward a theory of granular computing for human-centered information processing,” IEEE Transactions on Fuzzy Systems , vol. 16, no. 2, pp. 320–330, 2008. [19] W. Pedrycz, “Granular computing for data analytics: a manifesto of human-centric computing,” IEEE/CAA Journal of Automatica Sinica ,vol. 5, no. 6, pp. 1025–1034, 2018. [20] W. Pedrycz and W. Homenda, “Building the fundamentals of granular computing: A principle of justifiable granularity,” Applied Soft Comput-ing , vol. 13, no. 10, pp. 4209–4218, 2013. [21] W. Pedrycz, “Granular computing for machine learning: Pursuing new development horizons,” IEEE Transactions on Cybernetics , vol. 55, no. 1, pp. 460–471, 2025. [22] C. Meng, S. Griesemer, D. Cao, S. Seo, Y. Liu et al. , “When physics meets machine learning: a survey of physics-informed machine learn-ing,” Machine Learning for Computational Science and Engineering ,vol. 1, p. 20, 2025. [23] S. Cai, Z. Mao, Z. Wang, M. Yin, and G. E. Karniadakis, “Physics-informed neural networks (pinns) for fluid mechanics: A review,” Acta Mechanica Sinica , vol. 37, no. 12, pp. 1727–1738, 2021. [24] W. He, J. Li, X. Kong, and L. Deng, “Multi-level physics informed deep learning for solving partial differential equations in computational structural mechanics,” Communications Engineering , vol. 3, no. 1, p. 151, 2024. [25] Z. Chen, V. Badrinarayanan, C.-Y. Lee, and A. Rabinovich, “Gradnorm: Gradient normalization for adaptive loss balancing in deep multitask networks,” in International conference on machine learning . PMLR, 2018, pp. 794–803. [26] A. A. Heydari, C. A. Thompson, and A. Mehmood, “Softadapt: Tech-niques for adaptive loss weighting of neural networks with multi-part loss functions,” arXiv preprint arXiv:1912.12355 , 2019. [27] S. Wang, Y. Teng, and P. Perdikaris, “Understanding and mitigating gradient flow pathologies in physics-informed neural networks,” SIAM Journal on Scientific Computing , vol. 43, no. 5, pp. A3055–A3081, 2021. [28] R. Bischof and M. A. Kraus, “Multi-objective loss balancing for physics-informed deep learning,” Computer Methods in Applied Mechanics and Engineering , vol. 439, p. 117914, 2025. [29] A. Krishnapriyan, A. Gholami, S. Zhe, R. Kirby, and M. W. Mahoney, “Characterizing possible failure modes in physics-informed neural net-works,” in Advances in Neural Information Processing Systems , 2021. [30] L. Lu, P. Jin, G. Pang, Z. Zhang, and G. E. Karniadakis, “Learning nonlinear operators via DeepONet based on the universal approximation theorem of operators,” Nature Machine Intelligence , vol. 3, pp. 218–229, 2021. [31] N. Kovachki, Z. Li, B. Liu, K. Azizzadenesheli, K. Bhattacharya, A. Stuart, and A. Anandkumar, “Neural operator: Learning maps be-tween function spaces with applications to PDEs,” Journal of Machine Learning Research , vol. 24, no. 89, pp. 1–97, 2023. [32] K. Azizzadenesheli, N. Kovachki, Z. Li, M. Liu-Schiaffini, J. Kossaifi, and A. Anandkumar, “Neural operators for accelerating scientific simu-lations and design,” Nature Reviews Physics , vol. 6, pp. 320–328, 2024. [33] S. Roychowdhury, M. Diligenti, and M. Gori, “Regularizing deep net-works with prior knowledge: A constraint-based approach,” Knowledge-Based Systems , vol. 222, p. 106989, 2021. [34] E. van Krieken, E. Acar, and F. van Harmelen, “Analyzing differentiable fuzzy implications,” in Proceedings of the 17th International Conference on Principles of Knowledge Representation and Reasoning , 2020, pp. 893–903. [35] K. Tretiak, G. Schollmeyer, and S. Ferson, “Neural network model for imprecise regression with interval dependent variables,” Neural Networks , vol. 161, pp. 550–564, 2023. [36] W. Pedrycz, Granular Computing: Analysis and Design of Intelligent Systems . CRC Press, 2013. [37] L. Zadeh, “Fuzzy sets,” Information and Control , vol. 8, no. 3, pp. 338– 353, 1965. [38] S. Xu, C. Dai, Y. Liu, L. Shang, X. Yang, and W. Pedrycz, “S 2FS: Spatially-aware separability-driven feature selection in fuzzy decision systems,” arXiv preprint arXiv:2509.25841 , 2025. [39] C. Ma, L. Zhang, W. Pedrycz, and W. Lu, “The long-term prediction of time series: A granular computing-based design approach,” IEEE Transactions on Systems, Man, and Cybernetics: Systems , vol. 52, no. 10, pp. 6326–6338, 2022. [40] R. Behzadidoost, F. Mahan, and H. Izadkhah, “Granular computing-based deep learning for text classification,” Information Sciences , vol. 652, p. 119746, 2024. [41] D. Chen, W. Xu, and J. Li, “Granular computing in machine learning,” 
+
+Granular Computing , vol. 4, no. 3, pp. 299–300, 2019. [42] C. Fu, W. Lu, W. Pedrycz, and J. Yang, “Rule-based granular classifi-cation: A hypersphere information granule-based method,” Knowledge-Based Systems , vol. 194, p. 105500, 2020. [43] J. Niu, D. Chen, J. Li, and H. Wang, “A dynamic rule-based classification model via granular computing,” Information Sciences , vol. 584, pp. 325– 341, 2022. 12 
+
+[44] N. Bliznyuk, D. Ruppert, C. Shoemaker, R. Regis, S. Wild, and P. Mugunthan, “Bayesian calibration and uncertainty analysis for compu-tationally expensive models using optimization and radial basis function approximation,” Journal of Computational and Graphical Statistics ,vol. 17, no. 2, pp. 270–294, 2008. [45] R. S. Kenett and S. Zacks, Modern industrial statistics: With applica-tions in R, MINITAB, and JMP . John Wiley & Sons, 2021.

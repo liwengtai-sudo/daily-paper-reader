@@ -1,0 +1,4580 @@
+Title: Towards Initialization-dependent and Non-vacuous Generalization Bounds for Overparameterized Shallow Neural Networks
+
+URL Source: https://arxiv.org/pdf/2604.00505v1
+
+Published Time: Thu, 02 Apr 2026 00:40:56 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# Towards Initialization-dependent and Non-vacuous Generalization Bounds for Overparameterized Shallow Neural Networks 
+
+## Yunwen Lei, Yufeng Xie 11Department of Mathematics, The University of Hong Kong 
+
+## leiyw@hku.hk, yufeng.xie@connect.hku.hk 
+
+## April 2, 2026 
+
+Abstract 
+
+Overparameterized neural networks often show a benign overfitting property in the sense of achieving excellent generalization behavior despite the number of parameters exceeding the number of training examples. A promising direction to explain benign overfitting is to relate generalization to the norm of distance from initialization, motivated by the empirical observations that this distance is often significantly smaller than the norm itself. However, the existing initialization-dependent complexity analyses cannot fully exploit the power of initialization since the associated bounds depend on the spectral norm of the initialization matrix, which can scale as a square-root function of the width and are therefore not effective for overparameterized models. In this paper, we develop the first fully initialization-dependent complexity bounds for shallow neural networks with general Lipschitz activation functions, which enjoys a logarithmic dependency on the width. Our bounds depend on the path-norm of the distance from initialization, which are derived by introducing a new peeling technique to handle the challenge along with the initialization-dependent constraint. We also develop a lower bound tight up to a constant factor. Finally, we conduct empirical comparisons and show that our generalization analysis implies non-vacuous bounds for overparameterized networks. 
+
+# 1 Introduction 
+
+Deep neural networks (DNNs) have found tremendous successful applications in various fields of science and engineering, leading to rapid progress of artificial intelligence [22]. A notable property of DNNs is that the models are often overparameterized [1, 52], meaning that the number of parameters far exceeds the number of training examples. By the conventional wisdom of statistical learning theory [48], these overparameterized models are doomed to overfit the training examples, yielding vacuous generalization bounds. However, various studies show that overparameterized DNNs can be trained to overfit the training examples while still making accurate predictions on testing examples, showing an interesting benign overfitting phenomenon [7, 39]. The benign overfitting phenomenon motivates a lot of generalization studies of DNNs [4, 5, 17, 37]. A representative result in this direction is to build norm-based generalization bounds, meaning that the generalization bounds depend on the norm of weight matrices instead of the number of parameters. For example, the work [17, 37] used covering numbers and Rademacher complexities to study generalization in terms of norm of weights. Their analyses critically depend on the homogeneity of ReLU activation function, and therefore the results apply only to ReLU networks. Furthermore, it is empirically observed that the neural networks trained by gradient methods often stay close to the initialization point, and the distance from the initialization can be significantly smaller than the norm of the weights [16, 35, 39]. Then, generalization bounds in terms of distance from initialization are significantly sharper than those in terms of weight norms. This observation has motivated the recent growing interests in developing initialization-dependent generalization bounds [5, 13, 32, 39, 39]. 1
+
+> arXiv:2604.00505v1 [cs.LG] 1 Apr 2026
+
+The work [5] used covering numbers to develop generalization bounds depending on ∥W−W(0) ∥1,2,where W and W(0) are the weight matrices for the considered DNNs and the initialization point, respectively, and ∥ · ∥ 1,2 denotes the (1 , 2)-norm of matrices. However, due to the (1 , 2)-norm, the resulting bounds still enjoy a heavy dependency on the width. Several works try to improve this dependency by introducing other techniques. For example, the work [39] introduced a decomposition approach to study ReLU shallow neural networks (SNNs), the work [32] related the complexity of SNNs with smooth activation functions to that of Lipschitz function classes, and the work [13] studied the sample complexity of SNNs from the perspective of approximate description length. While these analyses imply bounds depending on ∥W − W(0) ∥F , their results are not fully initialization-dependent since their bounds also involve ∥W(0) ∥σ [13, 32, 39], where ∥ · ∥ F and ∥ · ∥ σ denote the Frobenius and spectral norm, respectively. These results can admit a square-root dependency on the width due to the appearance of ∥W(0) ∥σ . For example, if we initialize W(0) by Gaussian distribution, then ∥W(0) ∥σ
+
+grows as a square-root function of the width m [49]. Furthermore, the existing initialization-dependent generalization analysis gives bounds depending on the Frobenius norm. For neural networks, a more effective norm to measure the complexity of the function spaces is the path-norm [36, 42]. However, to the best of our knowledge, there are no generalization analyses of SNNs in terms of the path-norm which take into account the effect of the initialization. Also, the analysis in [32] imposes a smoothness assumption on the activation function, while the analysis in [39] considers only the ReLU activation. Moreover, the bounds in [13, 32] are data-independent since they involve the largest norm of inputs. Therefore, there is still a gap between theoretical analysis and empirical observations. The above discussions motivate us to study the following natural questions. 
+
+Can we develop fully initialization-dependent generalization bounds that remain valid for overpa-rameterized networks? Can our generalization bounds be expressed in terms of the path-norm rather than the Frobenius norm? Can the resulting analysis apply to general Lipschitz activation functions and imply data-dependent bounds? Can these bounds be non-vacuous for overparamterized models in empirical analyses? 
+
+In this paper, we aim to answer the above questions affirmatively by presenting sharper initialization-dependent generalization analysis of SNNs in terms of path-norm. We summarize our contributions as follows. 1. We present the first fully initialization-dependent Rademacher complexity bounds for SNNs with general Lipschitz activation functions. As compared to existing bounds depending on the spec-tral norm of the initial weight matrix, our Rademacher complexity bounds depend only on the distance from initialization (for the bottom layer). Furthermore, our bounds are expressed by the path-norm and admit a logarithmic dependency on the width, while the existing initialization-dependent bounds are expressed by the Frobenius norm and can admit an implicit square-root dependency [5, 13, 32, 39]. Based on this, we present generalization bounds which are significantly sharper than existing results, especially if the width is large. 2. We also develop lower bounds for Rademacher complexity of SNNs, which match our upper bounds up to a constant factor. This shows the tightness of our complexity analysis. Unlike the existing lower bounds focusing on W(0) = 0 [5, 39], our lower bounds are also established for initialization-dependent SNNs. 3. We introduce new techniques in the Rademacher complexity analysis to handle the initialization-dependent constraint. Our key idea is to introduce several auxiliary function spaces by fully exploiting the initialization-dependent constraint. We then relate the Rademacher complexity of SNNs to a finite union of these function spaces, which can be estimated by existing structural results on Rademacher complexities [34]. 4. We conduct an empirical analysis to illustrate the behavior of our generalization bounds 1. The experimental comparison shows that our bound achieves a consistent and significant improvement over existing bounds. In particular, empirical analysis shows that our generalization bounds are non-vacuous in the sense of being smaller than 1 even the networks are highly overparameterized. 
+
+> 1Code for empirical studies is available at https://github.com/xxyufeng/Generalization-SNNs.
+
+2We organize the paper as follows. We review the related work in Section 2, and introduce the prob-lem setup in Section 3. We present our main results on Rademacher complexities and generalization bounds in Section 4. We collect the proofs in Section 6, and conclude the paper in Section 7. 
+
+# 2 Related Work 
+
+In this section, we present the related work on generalization analyses of neural networks. We divide our discussions into three categories: complexity approach, stability approach and other approach. 
+
+Complexity approach . A popular approach to study the generalization of neural networks is to study the complexity of the corresponding hypothesis spaces. Classical studies analyzed the complexity by counting the number of parameters [6]. More advanced techniques considered the norm-based complexity analyses, using the techniques of covering numbers [5] and Rademacher complexities [4, 17, 37, 51]. Most of these work considered initialization-independent hypothesis spaces, and developed generalization bounds depending on the product of the Frobenius norm of the weight matrices [17, 23, 37]. Motivated by the empirical observation that ∥W(t) − W(0) ∥F ≪ ∥ W(t)∥F for gradient descent iterates {W(t)}t, there has been growing interest to develop complexity bounds in terms of the distance from initialization. The work [5] used covering numbers to derive complexity bounds that depend on the (1 , 2)-norm of the distance from initialization. The work [39] considered the ReLU SNNs and developed generalization bounds depending on the distance from initialization and also the spectral norm of the initialization matrix. Similar complexity bounds were also derived for SNNs with Lipschitz and smooth activations [32]. The recent work [26, 28] developed Rademacher complexity bounds of ReLU networks in a lazy training setting based on the neural tangent kernels. These complexity bounds were widely used to study the generalization behavior of optimization methods applied to neural networks [1, 3, 10, 11, 15, 21, 26, 28]. 
+
+Stability approach . Another effective approach to study generalization is to consider the stability of an algorithm with respect to the perturbation of the training dataset [8, 18, 24]. The seminal work showed that the weak convexity of neural networks scales as 1√m [30], a result later used to study the generalization of gradient methods to train SNNs under the square loss function [43, 50]. The work [46] showed that neural networks attain a stronger self-bound weak convexity, which plays an important role in the generalization analysis of neural networks with polylogarithmic width [46, 47]. The algorithmic stability of transformers and GANs has also been studied recently [14, 20, 27]. 
+
+Other approach . There are also other approaches to develop generalization bounds for DNNs, including the PAC-Bayesian analysis [38], compression analysis [2, 45], optimal transport analysis [12], approximate description length [13] and information theoretical analysis [19]. 
+
+# 3 Problem Setup 
+
+Let P be a probability measure defined on a sample space Z = X × Y , where X ⊆ Rd is an input space and Y is an output space. We consider a multi-class classification task where Y = {1, . . . , c }
+
+with c being the number of class labels. Let S = {z1, . . . , zi} with zi = ( xi, y i) be a dataset drawn independently from P, based on which we want to build a model g : X 7 → Rc for prediction. The model 
+
+g is a vector-valued function, and the k-th component gk can be interpreted as the score function for the k-th label, based on which we can do the prediction by x ← arg max k gk(x). The performance of a model g on an example ( x, y ) is measured by a loss function ℓy : Rc 7 → R+, i.e., ℓy (g(x)). Then, we can define the empirical and population risk as follows 
+
+FS (h) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓyi (h(xi)) and F (h) = Ez[ℓy (h(x))] ,
+
+which measures the performance of h on training and testing examples, respectively. A term of a central interest in machine learning theory is the generalization gap, which is defined as the difference between the population and empirical risks. 3A popular model for prediction is the neural network. In this paper, we focus on shallow neural networks (SNNs) with a single hidden layer. Let γ : R 7 → R be an activation function and m be the width. Then, an SNN parameterized by W ∈ Rm×d and V ∈ Rc×m takes the form ΨW,V(x) = V
+
+
+
+γ(w⊤ 
+
+> 1
+
+x)...
+
+γ(w⊤
+
+> m
+
+x)
+
+ , (3.1) where ( wj ∈ Rd and vk ∈ Rm)
+
+W =
+
+
+
+w⊤
+
+> 1
+
+...
+
+w⊤
+
+> m
+
+ , V =
+
+
+
+v⊤
+
+> 1
+
+...
+
+v⊤
+
+> c
+
+ . (3.2) Assume that |γ′(a)| ≤ Gγ for all a ∈ R, which is satisfied for popular activation functions such as the ReLU function, the sigmoid function and the hyperbolic tangent activation function. Let RW , R V ≥ 0. We consider hypothesis spaces for SNNs of the following form 
+
+G := 
+
+n
+
+x 7 → ΨW,V(x) : W ∈ W , V ∈ V 
+
+o
+
+, (3.3) where 
+
+W = {W ∈ Rm×d : ∥W − W(0) ∥F ≤ RW } and V = {V ∈ Rc×m : ∥V∥F ≤ RV }, (3.4) and Ψ W,V is defined in Eq. (3.1). 
+
+Remark 1 (Initialization-dependency) . Note we handle the hidden-layer weights W and top-layer weights V differently. For the hidden-layer, we measure the complexity by the Frobenius norm of the distance from the initialization. The underlying motivation is that the distance from the initialization (for hidden layers) is often significantly smaller than the Frobenius norm for neural networks trained by optimization algorithms such gradient methods [16, 35, 39]. Then, a complexity bound in terms of the distance from initialization is significantly better than that in terms of the Frobenius norm. For the top-layer, we measure the complexity by the Frobenius norm. The motivation is that the Frobenius norm and distance from initialization are quite close for the top-layer of neural networks trained by gradient methods [39], which suggests a limited role of initialization for this layer. Indeed, the work [13, 32, 39] also considered similar hypothesis spaces with initialization-dependent constraints on the hidden layer, and initialization-independent constraints on the top layer. The generalization behavior of a model often depends on the complexity of the corresponding hypothesis space. A popular complexity measure is the Rademacher complexity [4]. Since our model outputs are vector-valued, we employ vector-valued Rademacher complexities in our generalization analysis. If c = 1, then the vector-valued Rademacher complexity reduces to the standard Rademacher complexity [4]. 
+
+Definition 1 (Vector-valued Rademacher complexity [33]) . Let G be a class of vector-valued functions and c ∈ N be the output dimension. Let S = {z1, . . . , zn}. Then, we define the vector-valued (empirical) Rademacher complexity by 
+
+RS (G) = 1
+
+n Eσ sup 
+
+> g∈G
+> n
+
+X
+
+> i=1
+> c
+
+X
+
+> k=1
+
+σik gk(zi),
+
+where gk is the k-th component of g and σik are independent Rademacher variables, i.e., they take values in {± 1} with the same probability. We collect some notations here. For a vector w, we denote by ∥w∥2 the Euclidean norm. For a matrix W, we denote by ∥W∥F the Frobenius norm, by ∥W∥σ the spectral norm and by ∥W∥p,q 
+
+the ( p, q ) matrix norm, defined by ∥W∥p,q =  ∥W:,1∥p, . . . , ∥W:,d ∥p
+
+ 
+
+> q
+
+. For any n ∈ N, denote [n] = {1, . . . , n }. We denote A ≲ B if there exists a universal constant C ≥ 0 such that A ≤ CB . We also denote A ≳ B if there exists a universal constant C ≥ 0 such that A ≥ CB . We denote A ≍ B if 
+
+A ≲ B and A ≳ B. We say a function ℓ : R 7 → R is L-smooth if |ℓ′(t) − ℓ(t′)| ≤ L|t − t′| for all t, t ′ ∈ R.44 Main Results 
+
+## 4.1 Complexity and Generalization Bounds 
+
+In this subsection, we present our main results on Rademacher complexity and generalization bounds. Theorem 1 gives data-dependent Rademacher complexity bounds in the sense of involving 
+
+  P ni=1 ∥xi∥22
+
+ 12 and ∥ Pni=1 xix⊤ 
+
+> i
+
+∥ 12 
+
+> σ
+
+. Eq. (4.3) gives complexity bounds in terms of the path-norm, while Eq. (4.4) gives bounds in terms of the product of the Frobenius norm. As we will show, Eq. (4.3) is essential for us to derive generalization bounds in terms of the path-norm of the distance from the initialization. 
+
+Definition 2 (Path-norm) . For any W ∈ Rm×d, V ∈ Rc×m, we define the path-norm with a reference matrix W(0) as 
+
+κ(W, V) = 
+
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+|vkj |∥ wj − w(0)  
+
+> j
+
+∥2.
+
+Remark 2 (Standard path-norm) . If c = 1 and W(0) = 0, then we know κ(W, V) = Pmj=1 |vj |∥ wj ∥2,which recovers the standard path-norm [31, 36, 37, 51]. The standard path-norm appears as a natural complexity measure due to the positive-homogeneity of the ReLU activation function. Specifically, let 
+
+γ(t) = max {t, 0} and Ψ W,V(x) = Pmj=1 vj γ(w⊤ 
+
+> j
+
+x). Then, we can use the property γ(ta ) = tγ (a) for any t ≥ 0 to derive ΨW,V(x) = 
+
+> m
+
+X
+
+> j=1
+
+vj ∥wj ∥2γ(w⊤ 
+
+> j
+
+x/∥wj ∥2) = 
+
+> m
+
+X
+
+> j=1
+
+vj ∥wj ∥2γ( ˜ w⊤ 
+
+> j
+
+x), (4.1) where ˜ wj = wj /∥wj ∥2 is of unit norm. If we ignore γ( ˜ w⊤ 
+
+> j
+
+x), the right-hand side is closely-related to the standard path-norm κs(W, V) := Pmj=1 |vj |∥ wj ∥2. In this way, the Rademacher complexity of SNNs can be related to the product of the path-norm and the Rademacher complexity of the space 
+
+{x 7 → γ( ˜ w⊤x) : ∥ ˜w∥2 ≤ 1}, which reads as 
+
+RS (G) ≤ 2Gγ
+
+n sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+
+|vj |∥ wj ∥2(
+
+> n
+
+X
+
+> i=1
+
+∥xi∥22) 12 , (4.2) where G is defined in Eq. (3.3) and Gγ denotes the Lipschitz constant of γ(·). 
+
+• However, Eq. (4.1) only holds for the ReLU activation function, and it is challenging to use path-norm to derive meaningful complexity bounds for general Lipschitz activation functions even for initialization-independent hypothesis spaces. For example, the work [29] considered the hypothesis space in Eq. (3.3) with W(0) = 0 and a general activation function. They considered a different path-norm κ0(W, v) = Pmj=1 |vj | 1 + ∥wj ∥1
+
+, and showed that the Rademacher complexity is bounded by ζ(γ) sup W,v κ0(W, v)/√n, where ζ(γ) is a measure on the regularity of the activation function [29]. This result cannot be applied to overparameterized models since Pmj=1 |vj | can be very large. 
+
+• Furthermore, Eq. (4.1) only motivates the standard path-norm Pmj=1 |vj |∥ wj ∥2 (i.e., W(0) = 0). It is not clear how to use the path-norm to measure the complexity of initialization-dependent spaces. Theorem 1 addresses these challenging questions by introducing complexity bounds in terms of the path-norm of the distance from initialization. As shown in Figure 1b in Section 5, the path-norm in Definition 2 can be substantially smaller than the standard path-norm (i.e., with W(0) = 0) in practice. This shows the generalization bounds expressed by distance from initialization can be much more effective than bounds expressed by the norm itself. 
+
+Theorem 1 (Complexity Bounds) . Let G be defined in Eq. (3.3) and γ(·) be Gγ -Lipschitz. Then, we have 
+
+RS (G) ≤ Gγ sup 
+
+> W,V
+
+κ(W, V)
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + cm
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
+(4.3) 5and 
+
+RS (G) ≤ Gγ c 12 RW RV
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + cm
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
+, (4.4) 
+
+where cm = 2 √2 1 + 12 log(2 mc )
+
+ log 12
+
+ 2mc  log 2
+
+ 2RW RV (cm ) 12 / sup W,V κ(W, V) .
+
+Remark 3 (Comparison) . We make a detailed comparison with two mostly related work [32, 39] on initialization-dependent bounds. We will give comparisons with more work on the generalization bounds (Section 4.2). The seminal work [39] considered SNNs with the ReLU activation function under a different constraint (we denote vj the j-th column of V)
+
+G1 =
+
+n
+
+x 7 → ΨW,V(x) : W ∈ Rm×d, V ∈ Rc×m : ∥vj ∥2 ≤ αj , ∥wj − w(0)  
+
+> j
+
+∥2 ≤ βj , ∀j ∈ [m]
+
+o
+
+,
+
+and derived the following Rademacher complexity bound 
+
+RS (G1) ≤ 2( √2c + 2) 
+
+√n ∥α∥2
+
+
+
+∥β∥2
+
+  1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥xi∥22
+
+ 12 +   1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥W(0) xi∥22
+
+ 12
+
+
+
+, (4.5) where α = ( α1, . . . , α m) and β = ( β1, . . . , β m). The space G1 ignores the correlations among different 
+
+vj and wj since it imposes component-wise constraints. As a comparison, we impose the Frobenius constraint on V and W − W(0) , which preserves the correlation. The Frobenius-norm constraint is a more natural choice due to the implicit regularization methods: gradient methods prefer models close to the initialization and the closeness is often measured by the Frobenius norm [40, 41]. For example, the work [41, 44, 47] showed that ∥W(t) −W(0) ∥F is bounded for iterates {W(t)} produced by gradient methods applied to shallow and deep neural networks. Furthermore, the complexity bound in Eq. (4.5) involves ∥W(0) xi∥2. If we initialize w(0)  
+
+> j
+
+∼ N (0 , I ) (standard Gaussian distribution), then ∥W(0) xi∥2
+
+grows with the order of √m. Therefore, the bound in Eq. (4.5) still enjoys an implicit square-root dependency on m, which is not appealing for overparameterized models with a large m.The work [32] considered the space G with a Lγ -smooth activation function and c = 1 (for bi-nary classification problems, it suffices to consider a real-valued prediction function), and derived the following complexity bound 
+
+RS (G) = eO
+
+ RW RV bx(Gγ + Lγ )(1 + ∥W(0) ∥σ bx)
+
+√n
+
+
+
+, (4.6) where it was assumed that bx = sup x ∥x∥2. For Gaussian initialization, the norm ∥W(0) ∥σ grows with the order of √m + √d [49]. Then, the bound in Eq. (4.6) still enjoys a square-root dependency on m.The square-root dependency on m is due to the inclusion of ∥W(0) ∥σ in the bounds derived in [32, 39]. As a comparison, we remove the term ∥W(0) ∥σ in our Rademacher complexity bound. In this way, we improve the existing implicit square-root dependency on m to a logarithmic dependency. Furthermore, the work [39] considered the specific ReLU activation function, while the work [32] imposed a critical smoothness assumption on the activation function. We extend these discussions to general Lipschitz activation functions. Moreover, the existing initialization-dependent [32, 39] analyses use the Frobenius norm to measure the distance from initialization. In comparison to these results, we replace the Frobenius norm with the path-norm, which is smaller. 
+
+Remark 4 (Idea and Novelty) . A key challenge in the analysis is to handle the constraint in terms of initialization, due to which the homogeneity property does not apply. Our basic idea to estimate the Rademacher complexity is to decompose it into the following two terms 
+
+nRS (G) ≤ Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2≤a]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
++ Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+) := I1 + I2,
+
+6where I[·] is an indicator function, returning 1 if the argument holds and 0 otherwise. For I1, we use Schwarz’s inequality and the constraint ∥V∥F ≤ RV to get 
+
+I1 ≤ RV
+
+ mX
+
+> j=1
+> c
+
+X
+
+> k=1
+
+Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤a
+
+ nX
+
+> i=1
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)2 12
+
+.
+
+The term Eσ sup w:∥w−w(0)  
+
+> j∥2≤a
+
+  P ni=1 σik 
+
+ γ(x⊤ 
+
+> i
+
+w)−γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+) 2 is a second-moment of Rademacher complexity, and we control it by the Efron-Stein inequality. Our idea to control I2 is to rewrite it as follows 
+
+I2 = Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj ∥wj − w(0)  
+
+> j
+
+∥2I[∥wj −w(0)  
+
+> j∥2>a ]
+> n
+
+X
+
+> i=1
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/∥wj − w(0)  
+
+> j
+
+∥2
+
+≤ Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+|vkj |∥ wj − w(0)  
+
+> j
+
+∥2 max  
+
+> j∈[m]
+
+max  
+
+> k∈[c]
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+> n
+
+X
+
+> i=1
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/∥wj − w(0)  
+
+> j
+
+∥2 .
+
+Note Pmj=1 
+
+Pck=1 vkj ∥wj − w(0)  
+
+> j
+
+∥2 is the path-norm and then it suffices to estimate (we assume c = 1 here for simplicity) 
+
+I3 := Eσ sup 
+
+> W
+
+max  
+
+> j∈[m]
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+> n
+
+X
+
+> i=1
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/∥wj − w(0)  
+
+> j
+
+∥2 ,
+
+which is achieved by a peeling trick. Note that I3 involves a supremum over W ∈ W and a maximum over j ∈ [m]. Our key idea to handle this supremum and maximum is to relate it to the Rademacher complexity of a union of function spaces. Specifically, we define rk = 2 k−1a for k ∈ [K] with K := 1 + ⌈log 2(RW /a )⌉, and introduce 
+
+Hk,j =
+
+n
+
+x 7 →  γ(x⊤w)−γ(x⊤w(0)  
+
+> j
+
+)/∥w−w(0)  
+
+> j
+
+∥2 : w ∈ Rd, r k < ∥w−w(0)  
+
+> j
+
+∥2 ≤ rk+1 
+
+o
+
+, k ∈ [K], j ∈ [m].
+
+Then, we can control I3 by the Rademacher complexity of the union of Hk,j . We show RS
+
+ Hk,j 
+
+ ≤
+
+> 3Gγ
+> n
+
+  P ni=1 ∥xi∥22
+
+ 12 , which is then used to control I3 by existing Rademacher complexity bounds of a union of function spaces [34]. The construction of Hk,j depends on the initialization, which is a key to handle the initialization-dependent constraint. We combine the bounds on I1 and I2 to the decomposition, which implies complexity bounds in Theorem 1. The detailed proof is given in Section 6.3. The following theorem gives lower bounds on Rademacher complexities. For simplicity, we consider binary classification with c = 1 and the ReLU activation function. This shows that our upper bounds in Theorem 1 are tight up to a logarithmic factor. The proof is given in Section 6.3. Our basic idea is to relate the complexity of SNNs to the complexity of function spaces with only a single neuron, the latter of which can be further related to the complexity of linear function spaces by the simple observation that t = γ(t) − γ(−t) if γ is the ReLU activation function. 
+
+Theorem 2 (Lower Bounds) . Let r0 = min j∈[m] ∥w(0)  
+
+> j
+
+∥2, c = 1 and γ be the ReLU activation. If 
+
+RW ≥ r0 and G is defined in Eq. (3.3) , then 
+
+RS (G) ≥ (RW − r0)RV
+
+2√2n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 .
+
+Remark 5. Lower bounds of Rademacher complexity for neural networks have been studied in the literature [5, 39], which, however, focused on the case with W(0) = 0 and different hypothesis spaces. For example, if W(0) = 0, it was shown that 
+
+RS (G1) ≳
+
+Pmj=1 αj βj
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 .
+
+7# Reference Activation Bound D(1) [6] Piecewise linear eO(√dm ) −
+
+(2) [4] Lipschitz eO ∥W∥∞,1∥V∥∞,1
+
+ ✓
+
+(3) [37] ReLU eO  P mj=1 
+
+Pck=1 |vkj |∥ wj ∥2
+
+ −
+
+(4) [17] ReLU eO ∥W∥F ∥V∥F
+
+ ✓
+
+(5) [5] Lipschitz eO ∥W∥σ ∥V − V(0) ∥1,2 + ∥W − W(0) ∥1,2∥V∥σ
+
+ ✓
+
+(6) [38] ReLU eO ∥W∥σ ∥V − V(0) ∥F + √m∥W − W(0) ∥F ∥V∥σ
+
+ −
+
+(7) [39] ReLU eO ∥W(0) ∥σ ∥V∥F + ∥W − W(0) ∥F ∥V∥F + √m ✓
+
+(8) [32] Lipschitz, smooth eO ∥W − W(0) ∥F ∥V∥F (∥W(0) ∥σ + 1)  −
+
+(9) [13] Lipschitz eO ∥W(0) ∥σ ∥V∥F + ∥W − W(0) ∥F ∥V∥F
+
+ −
+
+(10) Thm 3 Lipschitz eO  P mj=1 
+
+Pck=1 |vkj |∥ wj − w(0)  
+
+> j
+
+∥2
+
+ ✓
+
+Table 1: Comparison with existing generalization bounds for two-layer networks with constant number of outputs. For the column ‘D’, ‘ ✓’ means data-dependent bounds, while ‘ −’ means data-independent bounds. We ignore a factor of ∥X∥F /n for data-dependent bounds, and a factor of sup x ∥x∥2/√n
+
+for data-independent bounds (note ∥X∥F /n ≤ sup x ∥x∥2/√n). The path-norm can be smaller than 
+
+∥W − W(0) ∥F ∥V∥F by a factor of 1 /√m. Existing bounds include ∥W(0) ∥σ , which can scale as the order of √m and is removed in our analysis. The lower bounds in [5] were developed for W(0) = 0 and constraints expressed by the spectral norm. We extend these discussions to lower bounds on initialization-dependent hypothesis spaces with constraints expressed by the Frobenius norm. The condition RW ≥ r0 is mild as r0 refers to a single neuron with the smallest norm. Our Rademacher complexity bounds directly imply generalization bounds, which are expressed in terms of the Frobenius norm of X := ( x1, . . . , xn) ∈ Rd×n and the path-norm of the distance from initialization. The proof of Theorem 3 is given in Section 6.4. We impose a Lipschitzness assumption on the loss function. Popular Lipschitz loss functions include the multinomial logistic loss ℓy (t) = log   P  
+
+> k∈[c]
+
+exp( tj − ty ) and the multi-class margin-based loss [25]. We hide logarithmic factors in eO(·). 
+
+Definition 3 (Lipschitzness) . Let G > 0. We say a vector-valued function g : Rc 7 → R is G-Lipschitz continuous if 
+
+g(t1, . . . , t c) − g(t′
+
+> 1
+
+, . . . , t ′
+
+> c
+
+) ≤ G  cX
+
+> j=1
+
+(tj − t′ 
+
+> j
+
+)2 12 .
+
+Theorem 3 (Generalization Bounds) . Assume ℓy (·) is G-Lipschitz continuous and ℓy (Ψ W,V(x)) ∈
+
+[0 , b ] almost surely. Then, with probability at least 1 − δ the following inequality holds uniformly for all 
+
+(W, V)
+
+F (W, V) − FS (W, V) = eO
+
+ GG γ κ(W, V)∥X∥F
+
+n + b
+
+ log(1 /δ )
+
+n
+
+ 12 
+
+.
+
+## 4.2 Comparison with Existing Generalization Bounds 
+
+We now compare our generalization bounds with existing results. For simplicity, we ignore the constants G and Gγ , and also the term b  log(1 /δ )
+
+> n
+
+ 12 here. Then, our bound in Theorem 3 takes the following simple form 
+
+F (W, V) − FS (W, V) = eO
+
+ κ(W, V)∥X∥F
+
+n
+
+
+
+. (4.7) The work [4, 6, 17, 37] considered initialization-independent hypothesis spaces. Specifically, the pa-per [6] studied the VC dimension of neural networks with piecewise linear activation functions and 8derived bounds of order eO(sup x ∥x∥2dm/ √n). The work [4, 17] derived norm-based capacity bounds for neural networks, where the bounds depend on the product of the norm of W and V. The work [37] introduced the standard path-norm, and derived complexity bounds in terms of the path-norm with 
+
+W(0) = 0. As illustrated in [16, 39], the norm of these matrices can be significantly larger than the distance from the initialization matrix. The proof techniques used in [4, 17, 37] do not allow for getting bounds with norms measured from initialization. For example, the analysis in [17] crucially relies on the positive homogeneity of the ReLU function, and one cannot use this homogeneity property if we consider either a general Lipschitz activation function or initialization-dependent spaces. Therefore, one has to introduce new techniques to get tighter bounds depending on the distance from initialization. The work [5] used the Maurey sparsification lemma to derive the following generalization bounds 
+
+F (W, V) − FS (W, V) = eO
+
+ ∥X∥F
+
+n
+
+
+
+∥W∥σ ∥V − V(0) ∥1,2 + ∥W − W(0) ∥1,2∥V∥σ
+
+ 
+
+. (4.8) A key term in this bound is ∥W−W(0) ∥1,2∥V∥σ , which is replaced by ∥W−W(0) ∥F ∥V∥F in Eq. (4.7). Note that ∥V∥σ and ∥V∥F differs at most by a factor of √c, which is a small constant. On the other hand, ∥W−W(0) ∥1,2 can be larger than ∥W−W(0) ∥F by a factor of √m. Therefore, it admits a square-root dependency on m and yields a loose bounds when m is large. The work [38] took a PAC-Bayes approach and the associated bound involves √m∥W − W(0) ∥F ∥V∥σ , which again admits a square-root dependency on m. The work [39] introduced a new decomposition to control the Rademacher complexity of SNNs with the ReLU activation, and showed 
+
+F (W, V) − FS (W, V) = eO
+
+ ∥X∥F
+
+n
+
+
+
+∥W(0) ∥σ ∥V∥F + √c∥W − W(0) ∥F ∥V∥F + √m
+
+ 
+
+. (4.9) It is clear that our bound in Eq. (4.7) improves Eq. (4.9) by removing the term ∥W(0) ∥σ ∥V∥F + √m,and replacing the term ∥W − W(0) ∥F ∥V∥F with κ(W, V). If we consider Gaussian initialization, i.e., 
+
+w(0)  
+
+> j
+
+∼ N (0 , I ) for all j ∈ [m], then we have ∥W(0) ∥σ ≈ √m + √d [49] and this bound is not appealing for overparameterized networks with a large m. Furthermore, by Schwarz’s inequality, we have 
+
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+|vkj |∥ wj − w(0)  
+
+> j
+
+∥2 ≤
+
+ mX
+
+> j=1
+
+  cX
+
+> k=1
+
+|vkj |2 12  mX
+
+> j=1
+
+∥wj − w(0)  
+
+> j
+
+∥22
+
+ 12
+
+≤
+
+
+
+c
+
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+v2
+
+> kj
+
+ 12
+
+∥W − W(0) ∥F = c 12 ∥W − W(0) ∥F ∥V∥F . (4.10) Therefore, the path-norm is always smaller than the product of the Frobenius norms and √c. In the extreme case, we can have κ(W, V) ≪ c 12 ∥W − W(0) ∥F ∥V∥F . For example, consider c = 1, 
+
+V = (1 /√m, . . . , 1/√m), wj − w(0)  
+
+> j
+
+= 0 if j̸ = 1. Then, we have κ(W, V) = 1√m ∥w1 − w(0) 1 ∥2 and 
+
+∥W − W(0) ∥F ∥V∥F = ∥w1 − w(0) 1 ∥2. Therefore, there is a gap by a factor of √m between κ(W, V)and ∥W − W(0) ∥F ∥V∥F . Finally, the work [39] only considered the ReLU activation function, which is extended to general Lipschitz activation functions here. The more recent work [32] considered Lipschitz and smooth activation functions with γ(0) = 0 and 
+
+c = 1, and got 
+
+F (W, V) − FS (W, V) = eO
+
+ sup x ∥x∥2
+
+√n
+
+
+
+∥W − W(0) ∥F ∥V∥F (∥W(0) ∥σ + 1) 
+
+ 
+
+. (4.11) First, our bound in Eq. (4.7) improves Eq. (4.11) by removing the factor ∥W(0) ∥σ + 1, which can scale as the order of √m for Gaussian initialization. Second, the analysis in [32] applies to smooth activation functions, which does not apply to the ReLU activation function. We remove the smoothness assumption. Third, the bound in Eq. (4.11) is not data-dependent in the sense of involving the factor of sup x ∥x∥2/√n, which is replaced by a data-dependent term ∥X∥F /n in Eq. (4.7). The work [13] used the approximate description length to develop generalization bounds for c = 1 
+
+F (W, V) − FS (W, V) = eO
+
+ sup x ∥x∥2
+
+√n
+
+
+
+∥W(0) ∥σ ∥V∥F + ∥W − W(0) ∥F ∥V∥F
+
+ 
+
+. (4.12) 9Again, this bound is data-independent, involves ∥W(0) ∥σ and depends on the product of the Frobenius norm. We remove the term ∥W(0) ∥σ ∥V∥F in Eq. (4.12) and replaces the Frobenius norm by the path-norm, which can be much smaller. Furthermore, the work [13] studied generalization by approximation description length and did not develop Rademacher complexity bounds for SNNs. As a comparison, we develop Rademacher complexity bounds with a mild dependency on the width. We summarize the comparison in Table 1. 
+
+# 5 Empirical Studies 
+
+In this section, we conduct empirical evaluations on binary classification tasks on the MNIST (d = 784 , n = 60000) and ijcnn1 ( d = 22 , n = 49900) datasets to consolidate our theoretical studies. The ijcnn1 dataset is selected from LibSVM data repository [9]. 
+
+## 5.1 Experimental Setup 
+
+For MNIST, we resize the image from 28 ×28 to 32 ×32 and consider a binary classification problem of identifying whether a handwritten digit is 1 or 7. We have 6742 images with label 1, and 6265 images with label 7, resulting a binary classification problem with sample size n = 6742 + 6265 = 13007. We train two-layer ReLU neural networks of varying widths, where the number of hidden units m ranges from 2 6 to 2 18 . The network is trained using the binary cross-entropy with logits loss, defined as 
+
+LBCE (W, V) = − 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+h
+
+yi log σ(Ψ W,V(xi)) + (1 − yi) log(1 − σ(Ψ W,V(xi))) 
+
+i
+
+, (5.1) where yi ∈ { 0, 1} represents the true labels, Ψ W,V(xi) denotes the network output, and σ(z) = 1/(1 + e−z ) is the sigmoid function. We optimize this loss using stochastic gradient descent (SGD) with a mini-batch size of 256, momentum of 0 .9, and an initial learning rate of 0 .001. Each model is trained until the training error is less than 0 .1 or the number of epochs reaches 20. A similar setup is used for binary classification on the ijcnn1 dataset, except that the initial step sizes are chosen as 0.001, which was determined by a grid search to minimize training loss. We initialized the first layer with Kaiming Gaussian distribution and fixed the weights in the second layer to ±1/√m, with the sign chosen at random, for simplicity. For both datasets, we have flatten the input into a one-dimensional vector and apply ℓ2-normalization, ensuring the Euclidean norm of the input equals 1. Considering the generalization bounds of the trained model, we map the labels from {0, 1} to {− 1, 1} and choose the 1-Lipschitz loss as 
+
+ℓy (Ψ W,V(x)) = 
+
+
+
+0 if yΨW,V(x) > 11 − yΨW,V(x) if yΨW,V(x) ∈ [0 , 1] 1 if yΨW,V(x) < 0,
+
+where y ∈ {− 1, 1} denotes the true labels. The experiments were completed using the PyTorch framework on NVIDIA RTX4060 GPUs. Five trials were conducted with different random seeds to eliminate interference. 
+
+## 5.2 Observations and Comparison 
+
+Figure 1a shows the relationship between the spectral norm of the bottom-layer weight matrix, 
+
+∥W(0) ∥σ , and the number of hidden units m. We initialized the model weights using four distinct schemes: uniform distribution over [0 , 1], standard Gaussian distribution, Kaiming uniform distribution and Kaiming Gaussian distribution. Empirically, we observe that this spectral norm exhibits a positive dependency on m across various initialization schemes, which is in alignment with the previous analysis, that is, if we consider the standard Gaussian initialization, then ∥W(0) ∥σ grows with the order of √m + √d. Unlike prior works [32, 39], our theoretical analysis eliminates the dependency on ∥W(0) ∥σ
+
+in the generalization error bounds, thereby improving the square-root dependency on m to a logarithmic one. With Kaiming Gaussian initialization, Figure 1b compares the evolution of standard path-norm 10 (a) Spectral norm of ∥W(0) ∥ under four initializa-tion schemes. 
+
+> (b) A comparison between standard path norm and path norm (Definition 2).
+
+Figure 1: Behavior of ∥W(0) ∥σ and path norm with respect to the number of hidden units m on the MNIST dataset. The gray area represents the value range under different random trials. (i.e., W(0) = 0) [36, 37, 51] and the path-norm (Definition 2) over SNNs of increasing sizes. This observation demonstrates that our path-norm is significantly smaller than the standard path-norm and insensitive to the model width, showing that the distance from initialization can be substantially smaller than the norm of the model. This justifies the effectiveness of incorporating the distance from initialization in the generalization analysis. 
+
+Figure 2: Dominant terms in the generalization bounds summarized in Table 1 on MNIST dataset. The gray area represents the value range under different random trials. Figure 2 compares dominant terms in the generalization bounds as stated in Table 1. It shows that the path norm in Definition 2 remains substantially smaller and less sensitive to the growth of 
+
+m compared to other complexity measures used in the existing generalization analyses. The results illustrate the advantage of incorporating the initialization-dependent path-norm in the generalization analysis, which consequently explain the improved generalization guarantees for SNNs, especially if m
+
+is large. To further show the strength of our generalization bounds, we present a comparison of our gener-alization bounds with existing ones by incorporating all relevant terms and constants. In particular, we use Eq. (6.17) as our exact generalization bound 2, and compare it with the exact bounds in [4– 6, 17, 38, 39]. For the standard path-norm, we use the following generalization bound as a direct    
+
+> 2The constant √2 in the first term of the right-hand side of Eq. (6.17) can be removed since we consider binary classification, i.e., c= 1, and the bound in Lemma 10 can be improved by a factor of 1 /√2.
+
+11 (a) MNIST (b) ijcnn1 
+
+Figure 3: The comparison of existing generalization bounds with all the terms and constants across the MNIST and ijcnn1 datasets. The label corresponds to the index number in Table 1. The gray area represents the value range under different random trials. SPN means generalization bounds based on standard path norm, i,e., Eq. (5.2), and PN means our generalization bounds based on path norm, i.e., Eq. (6.17). corollary of Eq. (4.2) and the peeling arguments 
+
+F (W, V) − FS (W, V) ≤ 4 κs(W, V) + 1   nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + (5.2) 3
+
+ log(2( ∥W−W(0) ∥F +1)( ∥W−W(0) ∥F +2)( ∥V∥F +1)( ∥V∥F +2)( κs(W, V)+1)( κs(W, V)+2) /δ )2n
+
+ 12
+
+,
+
+where κs(W, V) = Pmj=1 |vj |∥ wj ∥2 is the standard path-norm. The experimental results shown in Figure 3 demonstrate that our bound not only exhibits minimal dependence on model width, but also significantly outperforms existing bounds. Moreover, out of all the existing studies, ours is the only one that remains non-vacuous across all settings, consistently maintaining a value below 1. This is remarkable since the networks are highly overparameterized. For example, for the MNIST dataset, the number of parameters is more than md = 2 18 · 1024 ≈ 2 · 10 8, which is much larger than the sample size n = 13007. 
+
+# 6 Proof of Generalization Bounds 
+
+## 6.1 Necessary Lemmas 
+
+To prove Theorem 1, we first introduce some necessary lemmas. The following lemma gives the Efron-Stein inequality to control the variance of a general function of random variables. 
+
+Lemma 4 (Efron-Stein Inequality) . Consider g : Zn 7 → R. Let Z1, . . . , Z n be independent random variables and eZ = g(Z1, . . . , Z n). Then 
+
+Var( eZ) ≤
+
+> n
+
+X
+
+> i=1
+
+E( eZ − Ei[ eZ]) 2,
+
+where Ei[ eZ] = E eZ|Z1, . . . , Z i−1, Z i+1 , . . . , Z n
+
+.
+
+The following lemma gives a contraction principle to remove nonlinear Lipschitz functions in esti-mating Rademacher complexities. 
+
+Lemma 5 (Contraction Lemma [4]) . Suppose ψ : R 7 → R is G-Lipschitz. Then the following inequality holds for any eF
+
+Eσ sup   
+
+> f∈eF
+> n
+
+X
+
+> i=1
+
+σiψ f (xi) ≤ GEσ sup   
+
+> f∈eF
+> n
+
+X
+
+> i=1
+
+σif (xi).
+
+12 The following lemma uses the Efron-Stein Inequality to estimate an ℓ2 version of Rademacher complexities. 
+
+Lemma 6. Let γ(·) be Gγ -Lipschitz. For any a ≥ 0 and w(0) ∈ Rd, we have 
+
+Eσ sup 
+
+> w:∥w−w(0) ∥2≤a
+
+ nX
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) )2
+
+≤ 5a2G2
+
+> γn
+
+X
+
+> i=1
+
+∥xi∥22.
+
+Proof. We define g : {+1 , −1}n 7 → R as 
+
+g(σ1, . . . , σ n) = sup 
+
+> w:∥w−w(0) ∥2≤a
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) )
+
+and eZ = g(σ1, . . . , σ n). For simplicity, we simplify sup w:∥w−w(0) ∥2≤a[·] as sup w[·] in the following analysis. We know 
+
+eZ − Ek[ eZ] = sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) − Ek
+
+h
+
+sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) i
+
+= 12
+
+
+
+sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) − sup 
+
+> w
+
+X
+
+> i∈[n]: i̸=k
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) +  γ(x⊤ 
+
+> k
+
+w) − γ(x⊤ 
+
+> k
+
+w(0) ) 
+
++ 12
+
+
+
+sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) − sup 
+
+> w
+
+X
+
+> i∈[n]: i̸=k
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) −  γ(x⊤ 
+
+> k
+
+w) − γ(x⊤ 
+
+> k
+
+w(0) ) 
+
+,
+
+where Ek[·] = E[·| σj : j̸ = k]. If σk = 1, then we know 
+
+eZ − Ek[ eZ]
+
+= 12 sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) − sup 
+
+> w
+
+X
+
+> i∈[n]: i̸=k
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) −  γ(x⊤ 
+
+> k
+
+w) − γ(x⊤ 
+
+> k
+
+w(0) )
+
+≤ 12 sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) − X
+
+> i∈[n]: i̸=k
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) −  γ(x⊤ 
+
+> k
+
+w) − γ(x⊤ 
+
+> k
+
+w(0) )
+
+≤ 12 sup 
+
+> w
+
+γ(x⊤ 
+
+> k
+
+w) − γ(x⊤ 
+
+> k
+
+w(0) ) + γ(x⊤ 
+
+> k
+
+w) − γ(x⊤ 
+
+> k
+
+w(0) ) ≤ Gγ sup 
+
+> w
+
+x⊤ 
+
+> k
+
+w − x⊤ 
+
+> k
+
+w(0) ≤ aG γ ∥xk∥2,
+
+where we have used the Lipschitzness of γ and the elementary inequality for any h, ˜h : W 7 → R
+
+sup 
+
+> w
+
+h(w) − sup 
+
+> w
+
+˜h(w) ≤ sup 
+
+> w
+
+|h(w) − ˜h(w)|. (6.1) Similarly, we can also show that eZ − Ek[ eZ] ≤ aG γ ∥xk∥2 if σk = −1. Therefore, we always have 
+
+eZ − Ek[ eZ] ≤ aG γ ∥xk∥2. We plug this inequality back into Lemma 4, and derive 
+
+E eZ2 −  E[ eZ]2 = Var( eZ) ≤
+
+> n
+
+X
+
+> k=1
+
+Eσ
+
+( eZ − Ek[ eZ]) 2 ≤ a2G2
+
+> γn
+
+X
+
+> i=1
+
+∥xi∥22.
+
+Furthermore, by the standard result E sup f ∈F | Pni=1 σif (xi)| ≤ 2E sup f ∈{ 0}∪F 
+
+Pni=1 σif (xi) [17] and Lemma 5, we know 
+
+E[ eZ] = E sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) ) ≤ 2E sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0) )
+
+= 2 E sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σiγ(x⊤ 
+
+> i
+
+w) ≤ 2Gγ E sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σix⊤ 
+
+> i
+
+w
+
+= 2 Gγ E sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σix⊤ 
+
+> i
+
+(w − w(0) ) ≤ 2Gγ E sup 
+
+> w
+> n
+
+X
+
+> i=1
+
+σixi 2
+
+∥w − w(0) ∥2
+
+≤ 2aG γ E
+
+> n
+
+X
+
+> i=1
+
+σixi 2
+
+≤ 2aG γ
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 ,
+
+13 where we have used the following inequality due to the concavity of x 7 → √x
+
+Eσ
+
+> n
+
+X
+
+> i=1
+
+σixi 2 ≤
+
+
+
+Eσ
+
+> n
+
+X
+
+> i=1
+
+σixi
+
+> 22
+
+ 12
+
+=
+
+
+
+Eσ
+
+> n
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+⟨σixi, σ j xj ⟩
+
+ 12
+
+=   nX
+
+> i=1
+
+∥xi∥22
+
+ 12 . (6.2) We combine the above inequalities together and derive 
+
+E eZ2 ≤ a2G2
+
+> γn
+
+X
+
+> i=1
+
+∥xi∥22 +
+
+
+
+2aG γ
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12
+
+2
+
+= 5 a2G2
+
+> γn
+
+X
+
+> i=1
+
+∥xi∥22.
+
+The proof is completed. The following lemma gives an estimate of the path-norm. 
+
+Lemma 7. Let W and V be defined in Eq. (3.4) . Then, we have 
+
+sup 
+
+> W∈W ,V∈V
+
+κ(W, V) = c 12 RW RV .
+
+Proof. By the Schwarz’s inequality, we derive 
+
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+|vkj |∥ wj − w(0)  
+
+> j
+
+∥2 ≤
+
+ mX
+
+> j=1
+
+  cX
+
+> k=1
+
+|vkj |2 12  mX
+
+> j=1
+
+∥wj − w(0)  
+
+> j
+
+∥22
+
+ 12
+
+≤
+
+
+
+c
+
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+v2
+
+> kj
+
+ 12
+
+∥W − W(0) ∥F = c 12 ∥W − W(0) ∥F ∥V∥F ≤ c 12 RW RV . (6.3) Furthermore, we can choose V with vkj = RV /√cm for all k ∈ [c], j ∈ [m], and W with ∥wj −w(0)  
+
+> j
+
+∥2 =
+
+RW /√m for all j ∈ [m]. It is clear that W ∈ W and V ∈ V . Furthermore, we have 
+
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+|vkj |∥ wj − w(0)  
+
+> j
+
+∥2 = RVmX
+
+> j=1
+
+√c
+
+√mRW
+
+√m = c 12 RW RV .
+
+We combine the above two inequalities and get the stated bound. The following elementary lemma controls the expectation of a random variable in terms of its tail probability. We present the proof for completeness. 
+
+Lemma 8. Let X be a random variable. Then, E[X] ≤ R ∞ 
+
+> 0
+
+Pr {X > a }da.Proof. Define eX = max {X, 0}. Then, by the standard result on the expectation of a nonnegative random variable, we know 
+
+E[X] ≤ E[ eX] = 
+
+Z ∞
+
+> 0
+
+Pr { eX > a }da. 
+
+It is clear that Pr {max {X, 0} > a } = Pr {X > a } for any a ≥ 0. The stated bound then follows directly. 
+
+## 6.2 Multiple Rademacher Complexity 
+
+Our analysis will encounter a variant of Rademacher complexity which we call the multiple Rademacher complexity. The difference is that there is a maximum over k ∈ [c]. If c = 1, it is clear that it recovers the standard Rademacher complexity. 
+
+Definition 4 (Multiple Rademacher Complexity) . Let G be a class of real-valued functions. Let 
+
+S = {z1, . . . , zn}, and σik be independent Rademacher variables for i ∈ [n], k ∈ [c]. Then, we define the multiple Rademacher complexity as 
+
+RcS (G) = 1
+
+n Eσ sup 
+
+> g∈G
+
+max 
+
+> k∈[c]
+> n
+
+X
+
+> i=1
+
+σik g(zi).
+
+14 The following lemma controls the multiple Rademacher complexity for a finite union of function classes. The case with c = 1 has been considered in [34]. The proof follows directly from [34]. 
+
+Lemma 9. Let S = {z1, . . . , zn} and Fj be a class of functions from Z to R for each j ∈ [m]. Then 
+
+RcS
+
+  ∪j∈[m] Fj
+
+ ≤ max  
+
+> j∈[m]
+
+RS (Fj ) + 2 √2
+
+
+
+sup   
+
+> f∈∪ jFj
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+f 2(zi)
+
+ 12  log( mc )
+
+n
+
+ 12 
+
+1 + 12 log( mc )
+
+
+
+.
+
+Proof. For simplicity, we define B =   sup f ∈∪ j Fj
+
+> 1
+> n
+
+Pni=1 f 2(zi) 12 . For any j ∈ [m], k ∈ [c], define 
+
+Fjk = 1
+
+n sup  
+
+> f∈F j
+> n
+
+X
+
+> i=1
+
+σik f (zi).
+
+Then, according to Theorem 4 in [34], we have for any s > 0Pr 
+
+n
+
+Fjk − Eσ [Fj,k ] ≥ s
+
+o
+
+≤ exp 
+
+
+
+− ns 2
+
+8B2
+
+
+
+.
+
+A union bound shows that Pr 
+
+n
+
+max  
+
+> j∈[m],k ∈[c]
+
+Fjk − max  
+
+> j∈[m],k ∈[c]
+
+Eσ [Fj,k ] ≥ s
+
+o
+
+≤ mc · exp 
+
+
+
+− ns 2
+
+8B2
+
+
+
+.
+
+It then follows from Lemma 8 that 
+
+E max  
+
+> j∈[m],k ∈[c]
+
+Fjk 
+
+ ≤
+
+Z ∞
+
+> 0
+
+Pr 
+
+n
+
+max  
+
+> j∈[m],k ∈[c]
+
+Fjk > a 
+
+o
+
+da
+
+=
+
+Z max j∈[m],k ∈[c] Eσ [Fj,k ]+ δ
+
+> 0
+
+Pr 
+
+n
+
+max  
+
+> j∈[m],k ∈[c]
+
+Fjk > a 
+
+o
+
+da +
+
+Z ∞   
+
+> max j∈[m],k ∈[c]Eσ[Fj,k ]+ δ
+
+Pr 
+
+n
+
+max  
+
+> j∈[m],k ∈[c]
+
+Fjk > a 
+
+o
+
+da
+
+≤ max  
+
+> j∈[m],k ∈[c]
+
+Eσ [Fj,k ] + δ +
+
+Z ∞
+
+> δ
+
+Pr 
+
+n
+
+max  
+
+> j∈[m],k ∈[c]
+
+Fjk > max  
+
+> j∈[m],k ∈[c]
+
+Eσ [Fj,k ] + a
+
+o
+
+da
+
+≤ max  
+
+> j∈[m],k ∈[c]
+
+Eσ [Fj,k ] + δ + mc 
+
+Z ∞
+
+> δ
+
+exp 
+
+
+
+− na 2
+
+8B2
+
+
+
+da, 
+
+where we have used the inequality that the probability of any event is no larger than 1. It was shown that R ∞ 
+
+> δ
+
+exp( −a2/(2 b))d a ≤ bδ exp( −δ2/(2 b)) for any b ≥ 0 (Mill’s inequality) [34]. We apply this inequality and get 
+
+E max  
+
+> j∈[m],k ∈[c]
+
+Fjk 
+
+ ≤ max  
+
+> j∈[m],k ∈[c]
+
+Eσ [Fj,k ] + δ + mc · 4B2
+
+nδ exp 
+
+
+
+− δ2n
+
+8B2
+
+
+
+.
+
+We choose δ = 2B(2 log( mc )) 12 
+
+> √n
+
+and get 
+
+mc · 4B2
+
+nδ exp 
+
+
+
+− δ2n
+
+8B2
+
+
+
+= mc · 4B2
+
+√2n2B log 12 (mc ) exp 
+
+
+
+− 8B2 log( mc )n
+
+8B2n
+
+
+
+=
+
+√2mcB 
+
+pn log( mc ) exp   − log( mc ) =
+
+√2B
+
+pn log( mc ) .
+
+We combine the above two inequalities and get 
+
+E max  
+
+> j∈[m],k ∈[c]
+
+Fjk 
+
+ ≤ max  
+
+> j∈[m],k ∈[c]
+
+Eσ [Fj,k ] + 2√2B log 12 (mc )
+
+√n +
+
+√2B
+
+pn log( mc ) .
+
+The proof is completed. 15 6.3 Proof of on Rademacher Complexity Bounds 
+
+We are now ready to present the proofs for Rademacher complexity bounds. 
+
+Proof of Theorem 1. Note for g = Ψ W,V, we have gk(x) = P 
+
+> j∈[m]
+
+vkj γ(x⊤wj ). Then, by the defini-tion of vector-valued Rademacher complexity, we know 
+
+RS (G) = 1
+
+n Eσ sup 
+
+> W,V
+> n
+
+X
+
+> i=1
+> c
+
+X
+
+> k=1
+> m
+
+X
+
+> j=1
+
+σik vkj γ(x⊤ 
+
+> i
+
+wj ).
+
+Let a ∈ (0 , R W ) be a real number to be determined later. We decompose the Rademacher complexity into two terms as follows 
+
+nRS (G) = Eσ sup 
+
+> W,V
+> n
+
+X
+
+> i=1
+> c
+
+X
+
+> k=1
+> m
+
+X
+
+> j=1
+
+vkj σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+= Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+ I[∥wj −w(0)   
+
+> j∥2≤a]
+
++ I[∥wj −w(0)  
+
+> j∥2>a ]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+≤ Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2≤a]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
++ Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+), (6.4) where we have used the subadditivity of supremum. For the first term, by Schwarz’s inequality and the concavity of x 7 → √x, we know 
+
+Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2≤a]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+≤ Eσ sup 
+
+> W,V
+
+ mX
+
+> j=1
+> c
+
+X
+
+> k=1
+
+v2
+
+> kj
+
+ 12  mX
+
+> j=1
+> c
+
+X
+
+> k=1
+
+ nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2≤a]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)2 12
+
+≤ RV Eσ sup 
+
+> W
+
+ mX
+
+> j=1
+
+I[∥wj −w(0)  
+
+> j∥2≤a]
+> c
+
+X
+
+> k=1
+
+ nX
+
+> i=1
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)2 12
+
+≤ RV
+
+ mX
+
+> j=1
+
+Eσ sup 
+
+> W
+
+I[∥wj −w(0)  
+
+> j∥2≤a]
+> c
+
+X
+
+> k=1
+
+ nX
+
+> i=1
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)2 12
+
+≤ RV
+
+ mX
+
+> j=1
+> c
+
+X
+
+> k=1
+
+Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤a
+
+ nX
+
+> i=1
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)2 12
+
+.
+
+It then follows from Lemma 6 that 
+
+Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2≤a]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+≤ RV
+
+
+
+mc · 5a2G2
+
+> γn
+
+X
+
+> i=1
+
+∥xi∥22
+
+ 12
+
+= (5 cm ) 12 aR V Gγ
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 . (6.5) 16 We now consider the second term in the decomposition (6.4), which can be bounded as follows 
+
+Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+= Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj ∥wj − w(0)  
+
+> j
+
+∥2I[∥wj −w(0)  
+
+> j∥2>a ]
+> n
+
+X
+
+> i=1
+
+σik 
+
+γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+∥wj − w(0)  
+
+> j
+
+∥2
+
+≤ Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+|vkj |∥ wj − w(0)  
+
+> j
+
+∥2 max  
+
+> j∈[m]
+
+max  
+
+> k∈[c]
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+> n
+
+X
+
+> i=1
+
+σik 
+
+γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+∥wj − w(0)  
+
+> j
+
+∥2
+
+≤ sup 
+
+> W,V
+
+κ(W, V)Eσ sup 
+
+> W
+
+max  
+
+> j∈[m]
+
+max  
+
+> k∈[c]
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+> n
+
+X
+
+> i=1
+
+σik 
+
+γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+∥wj − w(0)  
+
+> j
+
+∥2
+
+≤
+
+
+
+sup 
+
+> W,V
+
+κ(W, V)
+
+
+
+Eσ max  
+
+> j∈[m]
+
+max  
+
+> k′∈[c]
+
+sup  
+
+> w∈Rd:a< ∥w−w(0)
+> j∥2≤RW
+> n
+
+X
+
+> i=1
+
+σik ′
+
+γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+∥wj − w(0)  
+
+> j
+
+∥2
+
+, (6.6) where we have used the inequality ∥wj − w(0)  
+
+> j
+
+∥2 ≤ ∥ W − W(0) ∥F ≤ RW . Define rk = 2 k−1a for 
+
+k = 1 , . . . , K , where K = 1 + ⌈log 2(RW /a )⌉. Then, it is clear that rK ≥ RW . For any k ∈ [K] and 
+
+j ∈ [m], introduce 
+
+Hk,j =
+
+n
+
+x 7 →  γ(x⊤w) − γ(x⊤w(0)  
+
+> j
+
+)/∥w − w(0)  
+
+> j
+
+∥2 : w ∈ Rd, r k < ∥w − w(0)  
+
+> j
+
+∥2 ≤ rk+1 
+
+o
+
+,
+
+eHk,j =
+
+n
+
+x 7 → −  γ(x⊤w) − γ(x⊤w(0)  
+
+> j
+
+)/∥w − w(0)  
+
+> j
+
+∥2 : w ∈ Rd, r k < ∥w − w(0)  
+
+> j
+
+∥2 ≤ rk+1 
+
+o
+
+.
+
+It then follows from Eq. (6.6) and the definition of multiple Rademacher complexity that 1
+
+n Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+≤ sup 
+
+> W,V
+
+κ(W, V) · RcS
+
+
+
+∪k∈[K],j ∈[m]
+
+ Hk,j ∪ eHk,j 
+
+
+
+. (6.7) For any h ∈ ∪ k∈[K],j ∈[m](Hk,j ∪ eHk,j ) indexed by w, by the Gγ -Lipschitzness of γ, we know 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+h2(xi) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+
+
+γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)
+
+2
+
+/∥w − w(0)  
+
+> j
+
+∥22 ≤ G2
+
+> γ
+
+n
+
+> n
+
+X
+
+> i=1
+
+ x⊤ 
+
+> i
+
+(w − w(0)  
+
+> j
+
+)2/∥w − w(0)  
+
+> j
+
+∥22
+
+= G2
+
+> γ
+
+n (w − w(0)  
+
+> j
+
+)⊤
+
+> n
+
+X
+
+> i=1
+
+xix⊤ 
+
+> i
+
+(w − w(0)  
+
+> j
+
+)/∥w − w(0)  
+
+> j
+
+∥22 ≤ G2
+
+> γ
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+xix⊤ 
+
+> iσ
+
+, (6.8) where the last inequality follows from the definition of the spectral norm. Furthermore, there holds 17 (note x/b ≤ max {x/b 1, x/b 2} if b ∈ [b1, b 2]) 
+
+nRS
+
+ Hk,j 
+
+ = Eσ sup   
+
+> w:rk<∥w−w(0)
+> j∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/∥w − w(0)  
+
+> j
+
+∥2
+
+≤ Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤rk+1
+
+max 
+
+n nX
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/r k,
+
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/r k+1 
+
+o
+
+≤ Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/r k + Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+)/r k+1 
+
+= 3
+
+rk+1 
+
+Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σi
+
+ γ(x⊤ 
+
+> i
+
+w) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+) = 3
+
+rk+1 
+
+Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σiγ(x⊤ 
+
+> i
+
+w)
+
+≤ 3Gγ
+
+rk+1 
+
+Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σix⊤ 
+
+> i
+
+w = 3Gγ
+
+rk+1 
+
+Eσ sup  
+
+> w:∥w−w(0)
+> j∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σix⊤ 
+
+> i
+
+(w − w(0)  
+
+> j
+
+)= 3Gγ
+
+rk+1 
+
+Eσ sup 
+
+> w:∥w∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σix⊤ 
+
+> i
+
+w ≤ 3Gγ rk+1 
+
+rk+1 
+
+Eσ sup 
+
+> w:∥w∥2≤rk+1
+> n
+
+X
+
+> i=1
+
+σixi 2 ≤ 3Gγ
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 ,
+
+where we have used the standard result RS
+
+ {max {f1, f 2} : f1 ∈ F 1, f 2 ∈ F 2} ≤ RS (F1) + RS (F2), Lemma 5 and Eq. (6.2). Similarly, we also have 
+
+nRS
+
+  eHk,j 
+
+ ≤ 3Gγ
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 , ∀j ∈ [m], k ∈ [K].
+
+We then plug Eq. (6.8) and the above inequality back into Lemma 9 (a finite union of 2 mK function spaces), and get 
+
+RcS
+
+
+
+∪k∈[K],j ∈[m]
+
+ Hk,j ∪ eHk,j 
+
+
+
+≤ 3Gγ
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + 2 √2
+
+
+
+G2
+
+> γ
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+xix⊤ 
+
+> iσ
+
+ 12  log(2 mcK )
+
+n
+
+ 12 
+
+1 + 12 log(2 mcK )
+
+
+
+.
+
+By Eq. (6.7), the second term in the decomposition (6.4) can be bounded by 1
+
+n Eσ sup 
+
+> W,V
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+vkj nX
+
+> i=1
+
+I[∥wj −w(0)  
+
+> j∥2>a ]
+
+σik 
+
+ γ(x⊤ 
+
+> i
+
+wj ) − γ(x⊤ 
+
+> i
+
+w(0)  
+
+> j
+
+) ≤
+
+Gγ sup 
+
+> W,V
+
+κ(W, V)
+
+ 3
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + 2 √2 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+xix⊤
+
+> i
+> 12
+> σ
+
+ log(2 mcK )
+
+n
+
+ 12 
+
+1 + 12 log(2 mcK )
+
+ 
+
+.
+
+We plug the above inequality and Eq. (6.5) back into Eq. (6.4), and get 
+
+RS (G) ≤ (5 cm ) 12 aR V Gγ
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 +
+
+Gγ sup 
+
+> W,V
+
+κ(W, V)
+
+ 3
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + 2 √2 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+xix⊤
+
+> i
+> 12
+> σ
+
+ log(2 mcK )
+
+n
+
+ 12 
+
+1 + 12 log(2 mcK )
+
+ 
+
+.
+
+We choose a = sup W,V κ(W, V)/(cmR 2 
+
+> V
+
+) 12 and derive 
+
+RS (G) ≤ Gγ sup 
+
+> W,V
+
+κ(W, V)
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 +2 √2 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+xix⊤
+
+> i
+> 12
+> σ
+
+ log(2 mcK )
+
+n
+
+ 12 
+
+1+ 12 log(2 mcK )
+
+ 
+
+.
+
+Eq. (4.3) follows since K = 1 + ⌈log 2(RW /a )⌉ and a = sup W,V κ(W, V)/(cmR 2 
+
+> V
+
+) 12 .We now turn to Eq. (4.4). According to Lemma 7, we know sup W,V κ(W, V) = c 12 RW RV . We plug this choice back into Eq. (4.3), and get Eq. (4.4). 18 We now prove Theorem 2 on lower bounds of Rademacher complexities. 
+
+Proof of Theorem 2. Define B = {w ∈ Rd : ∥w∥2 ≤ RW − r0} and 
+
+G2 =
+
+n
+
+x 7 → RV γ(w⊤x) : w ∈ B
+
+o
+
+.
+
+We first show that G2 ⊆ G . Indeed, let j∗ = arg min j∈[m] ∥w(0)  
+
+> j
+
+∥2. Then, for any w′ with ∥w′∥2 ≤
+
+RW − r0, we can define W = ( w⊤ 
+
+> 1
+
+, . . . , w⊤
+
+> m
+
+)⊤ and V = ( v1, . . . , v m) as follows 
+
+wj =
+
+(
+
+w(0)  
+
+> j
+
+, if j̸ = j∗
+
+w′, otherwise and vj =
+
+(
+
+0, if j̸ = j∗
+
+RV , otherwise .
+
+It then follows that ΨW,V(x) = X
+
+> j∈[m]
+
+vj γ(x⊤wj ) = vj∗ γ(x⊤wj∗ ) = RV γ(x⊤w′).
+
+Furthermore, it is clear that 
+
+∥W − W(0) ∥F =
+
+ X 
+
+> j∈[m]
+
+∥wj − w(0)  
+
+> j
+
+∥22
+
+ 12
+
+= ∥wj∗ − w(0)  
+
+> j∗
+
+∥2 ≤ ∥ w′∥2 + ∥w(0)  
+
+> j∗
+
+∥2 ≤ RW − r0 + r0 = RW .
+
+This shows that any function in G2 can be realized by a function in G. It then follows that RS (G2) ≤
+
+RS (G). We now control RS (G2) from below. For any a ∈ R, we define a+ = max {a, 0} and a− =max {− a, 0}. It is clear that a = a+ − a− for any a. Therefore, we know 
+
+Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σiw⊤xi = Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi
+
+
+
+(w⊤xi)+ − (w⊤xi)−
+
+
+
+= Eσ sup 
+
+> w∈B
+
+ nX
+
+> i=1
+
+σi(w⊤xi)+ −
+
+> n
+
+X
+
+> i=1
+
+σi(w⊤xi)−
+
+
+
+≤ Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi(w⊤xi)+ + Eσ sup 
+
+> w
+
+−
+
+> n
+
+X
+
+> i=1
+
+σi(w⊤xi)−
+
+= Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi max {w⊤xi, 0} + Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi max {− w⊤xi, 0},
+
+where we have used the subadditivity of supremum and the symmetry of Rademacher variables. Note that w ∈ B implies that −w ∈ B. Therefore, we have 
+
+Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi max {w⊤xi, 0} = Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi max {− w⊤xi, 0}.
+
+It then follows that 2Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi max {w⊤xi, 0} ≥ Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σiw⊤xi = Eσ sup 
+
+> w∈B
+
+w⊤ nX
+
+> i=1
+
+σixi
+
+
+
+= Eσ sup 
+
+> w∈B
+
+∥w∥2
+
+> n
+
+X
+
+> i=1
+
+σixi 2
+
+= ( RW − r0)Eσ
+
+> n
+
+X
+
+> i=1
+
+σixi 2
+
+≥ RW − r0
+
+√2
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 ,
+
+where we have used the Khitchine-Kahane inequality Eσ ∥ Pni=1 σivi∥2 ≥ 2− 12
+
+ Pni=1 ∥vi∥22
+
+ 12 . The third equality above holds since B is an Euclidean ball centered at the origin and therefore the supre-mum is attained when w and u are aligned, yielding sup w∈B w⊤u = sup w∈B ∥w∥2∥u∥2. This shows the stated bound as follows 
+
+RS (G) ≥ RS (G2) = RV
+
+n Eσ sup 
+
+> w∈B
+> n
+
+X
+
+> i=1
+
+σi max {w⊤xi, 0} ≥ (RW − r0)RV
+
+2√2n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 .
+
+The proof is completed. 19 6.4 Proof of Theorem 3 
+
+In this section, we prove Theorem 3 on generalization bounds. To this aim, we first introduce a contraction lemma on vector-valued Rademacher complexities. The factor √2 can be removed if c = 1. 
+
+Lemma 10 ([33]) . Let S = {zi}ni=1 ∈ Z n. Let F be a class of functions f : Z 7 → Rc and hi : Rc 7 → R
+
+be G-Lipschitz. Then 
+
+Eσ∼{± 1}n
+
+h
+
+sup  
+
+> f∈F
+
+X
+
+> i∈[n]
+
+σi(hi ◦ f )( zi)
+
+i
+
+≤ √2GEσ∼{± 1}nc 
+
+h
+
+sup  
+
+> f∈F
+
+X
+
+> i∈[n]
+
+X
+
+> j∈[c]
+
+σij fj (zi)
+
+i
+
+.
+
+We then apply Lemma 10 to derive generalization bounds when learning with a fixed hypothesis space 
+
+GRW ,R V ,R κ := 
+
+n
+
+x 7 → ΨW,V(x) : ( W, V) ∈ K RW ,R V ,R κ
+
+o
+
+, (6.9) where 
+
+KRW ,R V ,R κ =
+
+n
+
+(W; V) ∈ Rm×d × Rc×m : ∥W − W(0) ∥F ≤ RW , ∥V∥F ≤ RV , κ (W, V) ≤ Rκ
+
+o
+
+.
+
+Proposition 11. Assume ℓy (·) is G-Lipschitz continuous and ℓy (Ψ W,V(x)) ∈ [0 , b ] almost surely. Let 
+
+G be defined in Eq. (3.3) . Then, with probability at least 1 − δ the following inequality holds uniformly for all (W, V) ∈ G RW ,R V ,R κ
+
+F (W, V) − FS (W, V) ≤ 2√2GG γ Rκ
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + c′
+
+> m
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
++ 3 b
+
+ log(2 /δ )2n
+
+ 12
+
+,
+
+where c′ 
+
+> m
+
+= 2 √2 1 + 12 log 2(2 mc )
+
+ log 12
+
+ 2mc  log 2 max  2RW RV (cm ) 12 
+
+> Rκ
+
+, 2m 12
+
+ .Proof. For brevity, we let K := KRW ,R V ,R κ . A standard result in Rademacher complexity analysis gives the following bound with probability at least 1 − δ [39] sup 
+
+> (W,V)∈K
+
+F (W, V)−FS (W, V) ≤ 2RS
+
+n 
+
+(x, y ) 7 → ℓy (Ψ W,V(x)) : ( W, V) ∈ K 
+
+o 
+
++3 b
+
+ log(2 /δ )2n
+
+ 12
+
+.
+
+(6.10) By the G-Lipschitzness of ℓ, we can control RS
+
+  (x, y ) 7 → ℓy (Ψ W,V(x)) : ( W, V) ∈ K  by Lemma 10 as follows 
+
+RS
+
+
+
+(x, y ) 7 → ℓy (Ψ W,V(x)) : ( W, V) ∈ K 
+
+
+
+≤ √2GRS
+
+ GRW ,R V ,R κ
+
+. (6.11) By Eq. (4.3), we know that 
+
+RS
+
+ GRW ,R V ,R κ
+
+ ≤ Gγ sup 
+
+> W,V
+
+κ(W, V)
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + cm
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
+, (6.12) where cm = 2 √2 1 + 12 log(2 mc )
+
+ log 12
+
+ 2mc  log 2
+
+ 2RW RV (cm ) 12 / sup W,V κ(W, V) . We now control sup W,V κ(W, V) from below by considering two cases. 
+
+• If Rκ ≥ c 12 RW RV , then Lemma 7 shows that sup W∈W ,V∈V κ(W, V) = c 12 RW RV (the constraint 
+
+κ(W, V) ≤ Rκ does not take effect in this case by Eq. (6.3)). 
+
+• We now consider the case Rκ < c 12 RW RV . In this case, we can choose W with ∥wj − w(0)  
+
+> j
+
+∥2 =
+
+RW /√m and V with vkj = Rκ/(√mcR W ) for all j ∈ [m], k ∈ [c]. Then we know 
+
+κ(W, V) = 
+
+> m
+
+X
+
+> j=1
+> c
+
+X
+
+> k=1
+
+Rκ
+
+√mcR W
+
+RW
+
+√m = Rκ.
+
+Furthermore, it is clear that ∥W − W(0) ∥F = RW and 
+
+∥V∥F = √mc Rκ
+
+√mcR W
+
+= Rκ
+
+√cR W
+
+≤ RV .
+
+That is, the above constructed ( W, V) ∈ K and therefore sup (W,V) κ(W, V) = Rκ.20 We combine the above two cases, and get that sup (W,V) κ(W, V) = min Rκ, c 12 RW RV and 
+
+RW (cmR 2 
+
+> V
+
+) 12
+
+sup W,V κ(W, V) = max 
+
+n RW (cmR 2 
+
+> V
+
+) 12
+
+Rκ
+
+, RW (cmR 2 
+
+> V
+
+) 12
+
+c 12 RW RV
+
+o
+
+= max 
+
+n RW (cmR 2 
+
+> V
+
+) 12
+
+Rκ
+
+, m 12
+
+o
+
+.
+
+We plug the above inequality back into Eq. (6.12) and get 
+
+RS
+
+ GRW ,R V ,R κ
+
+ ≤ Gγ Rκ
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + c′
+
+> m
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
+.
+
+We combine the above inequality, Eq. (6.10) and Eq. (6.11) together, and get sup 
+
+> W,V
+
+F (W, V) − FS (W, V) ≤ 2√2GRS
+
+ GRW ,R V ,R κ
+
+ + 3 b
+
+ log(2 /δ )2n
+
+ 12
+
+≤ 2√2GG γ Rκ
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + c′
+
+> m
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
++ 3 b
+
+ log(2 /δ )2n
+
+ 12
+
+.
+
+The proof is completed. 
+
+Proof of Theorem 3. For any r1, r 2, r 3 ∈ N, define 
+
+Gr1,r 2,r 3 =
+
+n
+
+x 7 → ΨW,V(x) : ∥W − W(0) ∥F ≤ r1, ∥V∥F ≤ r2, κ (W, V) ≤ r3
+
+o
+
+(6.13) and 
+
+cr1,r 2 = 2 √2
+
+
+
+1 + 12 log(2 mc )
+
+
+
+log 12
+
+ 2mc  log 2 max 2r1r2(cm ) 12 , 2m 12
+
+ .
+
+For any r1, r 2, r 3 ∈ N, we apply Proposition 11 with G = Gr1,r 2,r 3 to get the following inequality with probability at least 1 − δ/ (r1(r1 + 1) r2(r2 + 1) r3(r3 + 1)) sup   
+
+> W,V:∥W−W(0) ∥F≤r1,∥V∥F≤r2,κ (W,V)≤r3
+
+F (W, V) − FS (W, V) ≤
+
+2√2GG γ r3
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + cr1,r 2
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
++3 b
+
+ log(2 r1(r1 + 1) r2(r2 + 1) r3(r3 + 1) /δ )2n
+
+ 12
+
+,
+
+(6.14) where we use the inequality r3 ≥ 1 to control c′ 
+
+> m
+
+in Proposition 11. By the union bounds of probability, we know that Eq. (6.14) holds simultaneously for all r1, r 2, r 3 ∈ N with probability at least 1 − X
+
+> r1∈N
+
+X
+
+> r2∈N
+
+X
+
+> r3∈N
+
+δr1(r1 + 1) r2(r2 + 1) r3(r3 + 1) = 1 − δ
+
+ X 
+
+> r1∈N
+
+1
+
+r1(r1 + 1) 
+
+ X 
+
+> r2∈N
+
+1
+
+r2(r2 + 1) 
+
+ X 
+
+> r3∈N
+
+1
+
+r3(r3 + 1) 
+
+
+
+≥ 1 − δ. (6.15) We now assume that Eq. (6.14) holds simultaneously for all r1, r 2, r 3 ∈ N. For any W, V, let r′
+
+> 1
+
+, r ′
+
+> 2
+
+and r′ 
+
+> 3
+
+be the smallest indices such that Ψ W,V ∈ G r′ 
+
+> 1,r ′
+> 2,r ′
+> 3
+
+. Then, it is clear that 
+
+r′ 
+
+> 1
+
+− 1 ≤ ∥ W − W(0) ∥F ≤ r′
+
+> 1
+
+, r′ 
+
+> 2
+
+− 1 ≤ ∥ V∥F ≤ r′
+
+> 2
+
+, r′ 
+
+> 3
+
+− 1 ≤ κ(W, V) ≤ r′
+
+> 3
+
+. (6.16) 21 It then follows that 
+
+F (W, V) − FS (W, V)
+
+≤ 2√2GG γ r′
+
+> 3
+
+ 3+ √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + cr′
+
+> 1,r ′
+> 2
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
++3 b
+
+ log(2 r′
+
+> 1
+
+(r′ 
+
+> 1
+
++1) r′
+
+> 2
+
+(r′ 
+
+> 2
+
++1) r′
+
+> 3
+
+(r′ 
+
+> 3
+
++1) /δ )2n
+
+ 12
+
+≤ 2√2GG γ (κ(W, V) + 1) 
+
+ 3 + √5
+
+n
+
+  nX
+
+> i=1
+
+∥xi∥22
+
+ 12 + c∥W−W(0) ∥F +1 ,∥V∥F +1 
+
+Pni=1 xix⊤
+
+> i
+> 12
+> σ
+
+n
+
+
+
++3b
+
+ log(2( ∥W−W(0) ∥F +1)( ∥W−W(0) ∥F +2)( ∥V∥F +1)( ∥V∥F +2)( κ(W, V)+1)( κ(W, V)+2) /δ )2n
+
+ 12
+
+.
+
+(6.17) The stated bound then follows directly by noting that ∥X∥F =   P ni=1 ∥xi∥22
+
+ 12 and Pni=1 xix⊤  
+
+> iσ
+
+≤∥X∥2 
+
+> F
+
+.
+
+# 7 Conclusion 
+
+In this paper, we present initialization-dependent generalization bounds for SNNs with a general Lipschitz activation function. Our analyses improve the existing bounds from two aspects. First, it removes the dependency on the spectral norm of the initialization matrix, which often grows as a square-root function of the width (e.g., Gaussian initialization). Second, the existing initialization-dependent analyses give bounds in terms of the product of the Frobenius norm, which is improved to the path-norm. Unlike existing lower bounds focusing on W(0) = 0, we also develop lower bounds for initialization-dependent SNNs. Our upper and lower bounds match up to a logarithmic factor. We make a comprehensive comparison with existing generalization bounds for SNNs, which shows a consistent improvement. There remain several interesting questions for further studies. First, we only consider SNNs in our generalization analysis. A natural direction is to investigate whether our analyses can be extended to develop initialization-dependent bounds for DNNs. Second, our lower bounds are established for ReLU networks. It is interesting to develop similar lower bounds for neural networks with general Lipschitz activation functions. Third, we only consider fully connected neural networks. It is interesting to investigate initialization-dependent bounds for other neural networks such as convolutional neural networks [53]. 
+
+# References 
+
+[1] Z. Allen-Zhu, Y. Li, and Y. Liang. Learning and generalization in overparameterized neural networks, going beyond two layers. In Advances in Neural Information Processing Systems , volume 32, pages 6158– 6169, 2019. [2] S. Arora, R. Ge, B. Neyshabur, and Y. Zhang. Stronger generalization bounds for deep nets via a compression approach. In International Conference on Machine Learning , pages 254–263. PMLR, 2018. [3] S. Arora, S. Du, W. Hu, Z. Li, and R. Wang. Fine-grained analysis of optimization and generalization for overparameterized two-layer neural networks. In International Conference on Machine Learning , pages 322–332, 2019. [4] P. Bartlett and S. Mendelson. Rademacher and gaussian complexities: Risk bounds and structural results. 
+
+Journal of Machine Learning Research , 3:463–482, 2002. [5] P. L. Bartlett, D. J. Foster, and M. J. Telgarsky. Spectrally-normalized margin bounds for neural networks. In Advances in Neural Information Processing Systems , pages 6240–6249, 2017. [6] P. L. Bartlett, N. Harvey, C. Liaw, and A. Mehrabian. Nearly-tight vc-dimension and pseudodimension bounds for piecewise linear neural networks. Journal of Machine Learning Research , 20(63):1–17, 2019. [7] P. L. Bartlett, P. M. Long, G. Lugosi, and A. Tsigler. Benign overfitting in linear regression. Proceedings of the National Academy of Sciences , 117(48):30063–30070, 2020. [8] O. Bousquet and A. Elisseeff. Stability and generalization. Journal of Machine Learning Research , 2 (Mar):499–526, 2002. 
+
+22 [9] C.-C. Chang and C.-J. Lin. Libsvm: a library for support vector machines. ACM Transactions on Intelligent Systems and Technology , 2(3):27, 2011. [10] Z. Chen, Y. Cao, Q. Gu, and T. Zhang. A generalized neural tangent kernel analysis for two-layer neural networks. Advances in Neural Information Processing Systems , 33:13363–13373, 2020. [11] Z. Chen, Y. Cao, D. Zou, and Q. Gu. How much over-parameterization is sufficient to learn deep relu networks? In International Conference on Learning Representation , 2021. [12] C.-Y. Chuang, Y. Mroueh, K. Greenewald, A. Torralba, and S. Jegelka. Measuring generalization with optimal transport. Advances in Neural Information Processing Systems , 34:8294–8306, 2021. [13] A. Daniely and E. Granot. On the sample complexity of two-layer networks: Lipschitz vs. element-wise lipschitz activation. In International Conference on Algorithmic Learning Theory , pages 505–517. PMLR, 2024. [14] P. Deora, R. Ghaderi, H. Taheri, and C. Thrampoulidis. On the optimization and generalization of multi-head attention. Transactions on Machine Learning Research , 2024. [15] S. S. Du, X. Zhai, B. Poczos, and A. Singh. Gradient descent provably optimizes over-parameterized neural networks. In International Conference on Learning Representations , 2018. [16] G. K. Dziugaite and D. M. Roy. Computing nonvacuous generalization bounds for deep (stochastic) neural networks with many more parameters than training data. arXiv preprint arXiv:1703.11008 , 2017. [17] N. Golowich, A. Rakhlin, and O. Shamir. Size-independent sample complexity of neural networks. In 
+
+Conference On Learning Theory , pages 297–299. PMLR, 2018. [18] M. Hardt, B. Recht, and Y. Singer. Train faster, generalize better: Stability of stochastic gradient descent. In International Conference on Machine Learning , pages 1225–1234, 2016. [19] H. He and Z. Goldfeld. Information-theoretic generalization bounds for deep neural networks. IEEE Transactions on Information Theory , 71(8):6227–6247, 2025. [20] K. Ji, Y. Zhou, and Y. Liang. Understanding estimation and generalization error of generative adversarial networks. IEEE Transactions on Information Theory , 67(5):3114–3129, 2021. [21] Z. Ji and M. Telgarsky. Polylogarithmic width suffices for gradient descent to achieve arbitrarily small test error with shallow relu networks. In International Conference on Learning Representations , 2019. [22] Y. LeCun, Y. Bengio, and G. Hinton. Deep learning. Nature , 521(7553):436–444, 2015. [23] A. Ledent, W. Mustafa, Y. Lei, and M. Kloft. Norm-based generalisation bounds for deep multi-class convolutional neural networks. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 35, pages 8279–8287, 2021. [24] Y. Lei and Y. Ying. Fine-grained analysis of stability and generalization for stochastic gradient descent. In International Conference on Machine Learning , pages 5809–5819, 2020. [25] Y. Lei, T. Yang, Y. Ying, and D.-X. Zhou. Generalization analysis for contrastive representation learning. In International Conference on Machine Learning , pages 19200–19227, 2023. [26] Y. Lei, P. Wang, Y. Ying, and D.-X. Zhou. Optimization and generalization of gradient descent for shallow relu networks with minimal width. Journal of Machine Learning Research , 27(34):1–35, 2026. [27] Y. Li, M. E. Ildiz, D. Papailiopoulos, and S. Oymak. Transformers as algorithms: Generalization and stability in in-context learning. In International Conference on Machine Learning , pages 19565–19594, 2023. [28] Y. Li, Y. Lei, Z.-C. Guo, and Y. Ying. Optimal rates for generalization of gradient descent for deep relu classification. In Advances in Neural Information Processing Systems , 2025. [29] Z. Li, C. Ma, and L. Wu. Complexity measures for neural networks with general activation functions using path-based norms. arXiv preprint arXiv:2009.06132 , 2020. [30] C. Liu, L. Zhu, and M. Belkin. On the linearity of large non-linear models: when and why the tangent kernel is constant. Advances in Neural Information Processing Systems , 33:15954–15964, 2020. [31] F. Liu, L. Dadi, and V. Cevher. Learning with norm constrained, over-parameterized, two-layer neural networks. Journal of Machine Learning Research , 25(138):1–42, 2024. [32] R. Magen and O. Shamir. Initialization-dependent sample complexity of linear predictors and neural networks. Advances in Neural Information Processing Systems , 36:7632–7658, 2023. [33] A. Maurer. A vector-contraction inequality for rademacher complexities. In International Conference on Algorithmic Learning Theory , pages 3–17, 2016. [34] A. Maurer, M. Pontil, and B. Romera-Paredes. An inequality with applications to structured sparsity and 
+
+23 multitask dictionary learning. In Conference on Learning Theory , pages 440–460. PMLR, 2014. [35] V. Nagarajan and J. Z. Kolter. Generalization in deep networks: The role of distance from initialization. 
+
+arXiv preprint arXiv:1901.01672 , 2019. [36] B. Neyshabur, R. R. Salakhutdinov, and N. Srebro. Path-SGD: Path-normalized optimization in deep neural networks. Advances in Neural Information Processing Systems , 28:2422–2430, 2015. [37] B. Neyshabur, R. Tomioka, and N. Srebro. Norm-based capacity control in neural networks. In Conference on Learning Theory , pages 1376–1401. PMLR, 2015. [38] B. Neyshabur, S. Bhojanapalli, and N. Srebro. A pac-bayesian approach to spectrally-normalized margin bounds for neural networks. In International Conference on Learning Representations , 2018. [39] B. Neyshabur, Z. Li, S. Bhojanapalli, Y. LeCun, and N. Srebro. Towards understanding the role of over-parametrization in generalization of neural networks. In International Conference on Learning Rep-resentations , 2019. [40] S. Oymak and M. Soltanolkotabi. Overparameterized nonlinear learning: Gradient descent takes the shortest path? In International Conference on Machine Learning , pages 4951–4960. PMLR, 2019. [41] S. Oymak and M. Soltanolkotabi. Toward moderate overparameterization: global convergence guarantees for training shallow neural networks. IEEE Journal on Selected Areas in Information Theory , 1(1):84–105, 2020. [42] R. Parhi and R. D. Nowak. Banach space representer theorems for neural networks and ridge splines. 
+
+Journal of Machine Learning Research , 22(43):1–40, 2021. [43] D. Richards and I. Kuzborskij. Stability & generalisation of gradient descent for shallow neural networks without the neural tangent kernel. Advances in neural information processing systems , 34:8609–8621, 2021. [44] M. Soltanolkotabi, A. Javanmard, and J. D. Lee. Theoretical insights into the optimization landscape of over-parameterized shallow neural networks. IEEE Transactions on Information Theory , 65(2):742–769, 2018. [45] T. Suzuki, H. Abe, and T. Nishimura. Compression based bound for non-compressed network: unified generalization error analysis of large compressible deep neural network. In International Conference on Learning Representations , 2020. [46] H. Taheri and C. Thrampoulidis. Generalization and stability of interpolating neural networks with minimal width. Journal of Machine Learning Research , 25(156):1–41, 2024. [47] H. Taheri, C. Thrampoulidis, and A. Mazumdar. Sharper guarantees for learning neural network classifiers with gradient methods. In International Conference on Learning Representations , 2025. [48] V. Vapnik. The nature of statistical learning theory . Springer, 2013. [49] R. Vershynin. High-dimensional probability: An introduction with applications in data science , volume 47. Cambridge university press, 2018. [50] P. Wang, Y. Lei, D. Wang, Y. Ying, and D.-X. Zhou. Generalization guarantees of gradient descent for shallow neural networks. Neural Computation , 37(2):344–402, 2025. [51] Y. Yang and D.-X. Zhou. Nonparametric regression using over-parameterized shallow relu neural networks. 
+
+Journal of Machine Learning Research , 25(165):1–35, 2024. [52] C. Zhang, S. Bengio, M. Hardt, B. Recht, and O. Vinyals. Understanding deep learning (still) requires rethinking generalization. Communications of the ACM , 64(3):107–115, 2021. [53] D.-X. Zhou. Universality of deep convolutional neural networks. Applied and Computational Harmonic Analysis , 48(2):787–794, 2020. 
+
+24

@@ -1,0 +1,557 @@
+Title: Transformer See, Transformer Do: Copying as an Intermediate Step in Learning Analogical Reasoning
+
+URL Source: https://arxiv.org/pdf/2604.06501v1
+
+Published Time: Thu, 09 Apr 2026 00:23:12 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+Preprint. Under review. 
+
+# Transformer See, Transformer Do: Copying as an Intermediate Step in Learning Analogical Reasoning 
+
+Philipp Hellwig 1, Willem Zuidema 2, Claire Stevenson 1∗& Martha Lewis 2∗
+
+> 1
+
+Psychological Methods, 2Institute for Logic, Language and Computation University of Amsterdam 
+
+philipp.hellwig@student.uva.nl , {zuidema, c.e.stevenson, m.a.f.lewis}@uva.nl 
+
+## Abstract 
+
+Analogical reasoning is a hallmark of human intelligence, enabling us to solve new problems by transferring knowledge from one situation to another. Yet, developing artificial intelligence systems capable of robust human-like analogical reasoning has proven difficult. In this work, we train transformers using Meta-Learning for Compositionality (MLC) on an ana-logical reasoning task (letter-string analogies) and assess their generaliza-tion capabilities. We find that letter-string analogies become learnable when guiding the models to attend to the most informative problem elements induced by including copying tasks in the training data. Furthermore, gen-eralization to new alphabets becomes better when models are trained with more heterogeneous datasets, where our 3-layer encoder-decoder model outperforms most frontier models. The MLC approach also enables some generalization to compositions of trained transformations, but not to com-pletely novel transformations. To understand how the model operates, we identify an algorithm that approximates the model’s computations. We verify this using interpretability analyses and show that the model can be steered precisely according to expectations derived from the algorithm. Fi-nally, we discuss implications of our findings for generalization capabilities of larger models and parallels to human analogical reasoning. 
+
+## 1 Introduction 
+
+Analogical reasoning is a process where a reasoner recognizes the relation between objects, events or properties, and can apply that relation to new instances. For instance, successful analogical reasoning is needed to predict “ roots ” in the simple riddle “ body is to feet, like tree is to...? ”. Analogical reasoning is seen as a core component of human cognition, enabling us to transfer knowledge to new tasks and facilitating abstraction (Gentner & Hoyos, 2017). Transformer-based Large Language Models (LLMs) can solve analogical reasoning tasks to some degree (Webb et al., 2023); however, the abilities of LLM on such tasks are highly context dependent (Hodel & West, 2024; Lewis & Mitchell, 2024; Stevenson et al., 2025), echoing results that show reduced performance on a wide range of tasks that lie outside of the training distribution (McCoy et al., 2024; Wu et al., 2024; Chollet et al., 2025). Humans, including children, can generalize to new contexts for analogical reasoning tasks (Brown & Kane, 1988; Doumas et al., 2022; Stevenson et al., 2025; Lewis & Mitchell, 2024). A key factor thought to be behind this human ability is that humans can use knowledge acquired from earlier tasks to learn new tasks: we are capable of meta-learning , or learning to learn (Wang, 2021). This facilitates fast and efficient learning when little information is available. In this paper, we build on a simple but general form of analogical reasoning, as proposed by Hofstadter & Mitchell (1994), that uses letter-string analogies (e.g., "If abc changes to abe, what should rst change to?"). We furthermore build on a formalization of meta-learning proposed by Lake & Baroni (2023), that can be seen as the route to in-context learning . We 
+
+> ∗
+
+shared senior authorship 
+
+1
+
+> arXiv:2604.06501v1 [cs.LG] 7 Apr 2026
+
+Preprint. Under review. combine both traditions to investigate whether meta-learning can improve the ability of transformer-based models to discover general solutions, that generalize in systematic ways over the alphabets and analogical patterns shown during training. We develop a suite of datasets that tests analogical reasoning via one- and few-shot letter-string analogy problems (Section 3.2). We train small encoder-decoder transformers on this dataset (see Figure 1, details in appendix A), and systematically evaluate how well these models learn the training task and how well they generalize to various targets, including new shuffled alphabets, new combinations of seen analogical transformations, or entirely new transformations. 1
+
+Our results show that these models can be trained to solve letter-string analogies using meta-learning (Table 2), outperforming most frontier LLMs, and generalizing very well to new alphabets and moderately well to new combinations. However, we find that the models struggle to generalize to new transformations (Section 4). In a number of detailed computational experiments we study the conditions for successful generalization to alterna-tive alphabets, and highlight the facilitating role that including copy tasks in training has to avoid shortcut learning, as well as the importance of enough variation in the alphabets during training. Finally, we look inside our successful models, and perform a (mechanistic) interpretability analysis that gives surprisingly detailed insights into how the models perform their task. We do not train LLMs, but we discuss how our understanding of how small transformers learn to solve letter-string analogies holds lessons for how to study and improve LLMs’ analogical reasoning abilities. 
+
+## 2 Background and Related Work 
+
+Analogy has been a topic of research for decades (Gentner, 1983; Hofstadter & Mitchell, 1994; Hummel & Holyoak, 1997). Computational models of analogy have been developed for multiple domains, and approaches to modelling analogy include structure mapping (Gentner, 1983), the CopyCat project (Hofstadter & Mitchell, 1994), and methods that extract and construct relations (Doumas et al., 2008). More recently, LLMs’ ability to process analogy has been debated (Webb et al., 2023; Hodel & West, 2024; Stevenson et al., 2025; Lewis & Mitchell, 2024), and approaches including Meta-analogical Contrastive Learning (Kim et al., 2020), model-based reinforcement learning (Lee et al., 2024), program synthesis (Li et al., 2024), graph representations and semantic mapping theory have been proposed (Crouse et al., 2021; Ling et al., 2022). 
+
+Letter-string analogies , introduced by Hofstadter & Mitchell (1994), form an interesting task to study analogical reasoning in language models and humans, given that they are text-based, require little domain knowledge and can be used to study abstraction, generalization and compositionality in both humans and models (Stevenson et al., 2025; Lewis & Mitchell, 2024; Hofstadter, 1983). Letter-string analogies take place in the context of a given alphabet, and consist of an example that illustrates how a string of letters is transformed to a new string of letters (e.g., a b c d → a b c e ), followed by a query (e.g. i j k l → ?) where the agent must apply the transformation to the new string analogous to the example. For this particular task, the most commonly given answer is i j k m (“replace the last letter with the next letter in the alphabet”); however, alternate rules also exist such as i j k e (“replace the last letter with e”). 
+
+Meta-Learning is the process of training models to learn how to learn . Given the breadth of the definition, meta-learning encompasses many different approaches (Hospedales et al., 2022), such as memory augmented neural-networks (Santoro et al., 2016), meta-reinforcement learning (Duan et al., 2016; Liu et al., 2021), and model-agnostic meta-learning (MAML) (Finn et al., 2017). The meta-learning method we apply in this study is called Meta Learning for Compositionality (MLC) (Lake & Baroni, 2023). MLC works similarly to MAML and claims to generalize in a human-like and systematic fashion. 
+
+> 1Our suite of datasets will be shared along with all code in a GitHub repository.
+
+2Preprint. Under review. Lake & Baroni (2023) used MLC to train models on a grammar-learning task where rules had to be deduced to transform an input sequence of pseudowords to an output sequence of colored dots, given a set of examples (i.e., primitives and functions). For example, "Input: dax = • ; lug = •; wif = •; dax fep = • • • ; lug fep = • • • ; Query: wif fep ? Output: • • • ". The authors characterized this procedure as meta-learning because the model had to learn how to solve this type of task, rather than learning only the specific task. Lake & Baroni (2023) report performance of up to 100% accuracy on this task. Additionally, the models also managed to solve novel functions that implemented previously unseen transformations. 
+
+Meta-Learning for Analogy. We investigate whether using MLC helps transformers learn to solve letter-string analogies. We incorporate the meta-learning aspect by using different permuted alphabets (Lewis & Mitchell, 2024). However, an additional challenge for letter-string analogies compared to the Lake & Baroni (2023) grammar-learning task, is that in our task the transformation cannot be deduced from the provided primitives and functions, but must be inferred from the example in the context of the given alphabet (i.e., in-context learning). Furthermore, many frontier models struggle with transformations that are easy for humans (e.g., Example: d f e g → d e f g Query: m l n o → ? Answer: l m n o ) (Lewis & Mitchell, 2024). Therefore, the question arises whether the MLC approach improves transformer performance on transformations that frontier models typically struggle with. 
+
+## 3 Method 
+
+3.1 Architecture and Training 
+
+We used the same model architecture (a standard sequence-to-sequence transformer) as in Lake & Baroni (2023). To adapt the model to letter-string analogies, the encoder’s vocabulary consists of the 26 letters of the English alphabet ( a, b, c, d, . . . , z ), a padding token (PAD), a token to separate examples from each other ( |), and a token ( →) to show how an input string of letters transforms to an output string of letters. The decoder’s alphabet is the same as the encoder’s except for the tokens ( |, →) and instead, the decoder’s vocabulary will contain a start-of-sequence- and an end-of-sequence token ( →, EOS). d EOS dcca             
+
+> ➝a
+> Decoder Output
+> Layer 1 Layer 2 Layer 3 ... h1h2h8Layer 1 Layer 2 Layer 3
+> Encoder
+> Mul �-Head A �n. (8x) embed self-a �en �on masked self-a �en �on cross-a �en �on MLP unembedding
+> Input b c d a b c d e f ... z g h i ➝f h i ||alphabet example query
+
+Figure 1: A forward pass through the model, with an example letter-string analogy task. For an illustration of a forward pass through the MLC model, see Figure 1. Each letter is represented by a 128-dimensional embedding. The encoder and decoder consist of 3 attention layers with 8 heads each. In between each multi-head attention block sits a 512-dimensional feed-forward layer. After the final layer of the decoder comes a final feed-forward layer that shrinks the dimensionality to the size of the vocabulary which is used as the logits in a softmax probability distribution used for next token predictions. All MLC models were implemented in PyTorch (Paszke et al., 2019), using the Transformer class for the encoder and decoder. We trained the models using a batch size of 32. Initial hyperparameter selection (learning rate, epochs, model size) had minimal impact on performance, therefore, to keep results 3Preprint. Under review.                                                      
+
+> Seen Transformations in Training Transformation Example
+> Extend (Ext) a b c →a b c d Successor (Succ) a b c →a b d Predecessor (Pred) b c d →a c d Remove Redundant (RmRed) a b b c →a b c Fix a b w d →a b c d Sort a d c b →a b c d Sort + Group (Gp) d d c c b b →b b c c d d RmRed + Interleave (IL) a x b x b x c →a x b x c RmRed + Succ a b b c →a b d Fix + Ext a b w d →a b c d e
+> New Compositions of Seen Transformations Transformation Example
+> RmRed + Sort a d d c b →a b c d Ext + Pred b c d →a c d e Fix + IL a f b f w →a f b f c Ext + Gp a a b b →a a b b c c Ext + Ext + Succ a b c →a b c d f Fix + Pred + Succ b c w e →a c d f
+> Novel Transformations Transformation Example
+> Reverse (Rev) a b c →c b a Shift a b c →d e f Replicate (Rep) a b c →a b c a b c
+
+Table 1: The full list of transformations used in this study. Transformation examples are shown for the standard alphabet only. ‘+’ is used as a shorthand to describe successive 
+
+application of multiple transformations. The left side contains transformations that the models are trained on; the right column contains transformations that models hadn’t seen during training (compositional and novel). comparable, we kept the training configuration as close as possible to the original MLC paper (Lake & Baroni, 2023). This includes: learning rate of 0.001 with linear decay applied after each epoch and dropout of 0.1. Training runs converged relatively quickly, so we shortened the training duration from 50 epochs used in Lake & Baroni (2023) to 20 epochs. 
+
+3.2 Data Generation 
+
+We generate a dataset of letter-string analogy problems split into training, validation, in-distribution test and out-of-distribution test. Each split comprises a number of trans-formations combined with a number of different alphabets. As illustrated in the example below, an individual task is composed of an alphabet, an example input-output pair and a query input where the model has to predict the correct continuation that completes the query analogically to the example. 
+
+a b c d ... z | {z }
+
+> alphabet
+
+| g h i → f h i 
+
+| {z }
+
+> example
+
+| b c d |{z} 
+
+> query
+
+→ ?
+
+Alphabets and Transformations Since most transformations depend on which alphabet is used, we use multiple permuted alphabets to generate our datasets (based on Lewis & Mitchell (2024) with 0-, 2-, 5-, 10-, and 20 permutations to the standard alphabet). For our training split, we generated examples by sampling a substring of the alphabet (lengths 2 to 6) and applying a training transformation to it (shown in Table 1, left). To generate the queries, we shuffled the examples and only retained query and example pairs that differed. This procedure generated 230,000 tasks per dataset, 180,000 of which were randomly as-signed to the training set, 25,000 to the validation and in-distribution test set respectively. Along with our in-distribution test, we also evaluate how well models generalize to out-of-distribution tests : (1) how well they generalize to problems that are based on new alphabets, not contained in the training data, and (2) whether the trained models can solve new transformations: we test them on 6 combinations of seen transformations (compo-sitional transformations) and 3 unseen transformations (novel transformations), listed in Table 1, right. 
+
+Dataset Variants 
+
+Copy Tasks Inspired by Lake & Baroni (2023), we study the effects of including copy tasks in the training data, where the example and the query are the same. In this alternative dataset 4Preprint. Under review. (roughly twice as large, at 400,000), half of the tasks are copy tasks, while the example input and query input differ for the other half. 
+
+Number of Training Alphabets To assess how crucial the number of alphabets is, we created multiple datasets where number of alphabets ranged from 20 to 400 different permuted alphabets. To isolate the effect of increasing the number of permuted alphabets, we held the overall dataset size constant (400,000 training tasks). 
+
+Few-shot Learning To check how and whether the number of examples affects performance, we gradually increased the number of examples the model was given for each task from 1 to 5. However, increasing the number of examples resulted in slightly worse performance of our models (see Appendix A for details). 
+
+## 4 Behavioral Results 
+
+For all of the following results, we evaluated the MLC models with frozen weights. We obtained predictions from the models by sampling the token with the largest probability at each prediction step until the EOS token was sampled or until the response length exceeded the longest target in the batch. copy number seen transform new transform tasks seen α’s seen α new α seen α new α
+
+✗ 20 59.7 29.5 11.3 4.1 
+
+✓ 20 90.7 33.3 10.1 3.9 
+
+✓ 200 96.8 94.0 13.1 12.3 
+
+Table 2: Performance comparison on in- and out-of distribution test sets. Results are split based on differ-ing factors during training. Accuracies are averaged over 10 replication runs (highest averages in bold). Full set of results, including additional variants and 95% bootstrapped confidence intervals in appendix A. 
+
+α=alphabet. 0.0 0.5 1.0 Accuracy Llama 17B Instruct GPT 4.1 Llama 70B Instruct Claude Sonnet 4 GPT 5.2 Gemini 2.5 Flash copy, 200 alph. GPT OSS 120B model type LLM MLC 
+
+Figure 2: Our best model (green) outperforms most LLMs (grey) on the aggregated dataset (Table 2). 20 60 100 140 200 400 Seen Alphabets in Training 0.0 0.2 0.4 0.6 0.8 1.0 Accuracy 
+
+> alphabets seen new
+
+Figure 3: Increasing the number of seen alphabets in training leads to better gen-eralization to new alphabets (red and blue lines converge). Bands indicate 95% bootstrapped confidence intervals with 10 replications. 
+
+Including copy tasks facilitates learning. We find that including copy tasks in the dataset gives the models a considerable boost in per-formance on seen alphabets and seen transfor-mations (Table 2 first row compared to second row). However, performance still declined con-siderably for tasks that were generated from new permuted alphabets (from 90.7 to 33.3%) and ac-curacy on new transformations stayed fairly low in general. Overall, the MLC models that were trained using copy tasks still generalized poorly to new contexts. 
+
+Models can generalize to novel alphabets, with sufficient variation at training time. Our re-sults indicate that increasing the number of al-phabets in training improves generalization to new alphabets and new transformations: Figure 3 shows that when the number of alphabets seen in training are increased, accuracies on seen- and new alphabets converge to similarly high accuracies. Furthermore, our best training run (200 alphabets and copy tasks) outperforms most frontier models on our dataset (Figure 2). 5Preprint. Under review. Ext Succ Pred RmRed Fix Sort Sort + Gp RmRed + IL RmRed + Succ Fix + Ext RmRed + Sort Ext + Pred Fix + IL Ext + Gp Ext + Ext + Succ Fix + Pred + Succ Rev Shi �
+
+> Rep Transforma �on 97.5% 97.1% 93.9% 100.0% 89.5% 95.7% 95.6% 100.0% 96.8% 91.2% 43.7% 47.4% 39.0% 6.1% 0.2% 0.0% 1.1% 0.0% 0.0%
+
+Accuracy by Transforma �on Type Type seen comp. novel 
+
+Figure 4: Averaged accuracies split by transformation with the best performing models with 10 replication runs (trained on a dataset with 200 permuted alphabets with copy tasks). 
+
+Models struggle with generalizing to new transformations. Figure 4 shows how well the models trained on a dataset with 200 permuted alphabets perform on each transfor-mation. Even though the compositional transformations are not specifically optimized for, the model learned to correctly solve some of the transformations composed of two seen transformations. However, transformations composed of three seen transformations and novel transformations were not learned. Our model does outperform all frontier models on compositional transformations (see Appendix F). 
+
+## 5 Interpretability Analyses 
+
+The effect of including copy tasks Why do we see a large performance boost when training with copy tasks? A key difference between training with and without copy tasks is the formation of matching heads (reminiscent of the induction heads in LLMs; Olsson et al., 2022). Figure 5 shows the average attention scores of the heads of layer 2 in the encoder. Here, we see low attention scores between tokens of the example input-output pairs when training without copy tasks (center). In contrast, we observe a pattern of high attention scores between matching example input-output pairs when copy tasks are included (right). c d e f → c d e gSource cdef
+
+> →
+> cdegDes �na �on
+
+Trained without copy tasks         
+
+> cdef→cdegSource cdef
+> →
+> cdegDes �na �on
+
+Trained with copy tasks  
+
+> 0.00 0.05 0.10 0.15 0.20 0.25
+> Encoder Layer 2 Compute averaged a�en �on scores across heads for the example
+
+Figure 5: Models trained without copy tasks do not show information flow between example input and output (i.e., near-zero attention weights); models trained with copy tasks do. 
+
+Obtaining a mechanistic understanding of the induced algorithm How do the trained transformers mechanistically solve the tasks? To better understand the induced algorithm, it is useful to first briefly consider a simple, symbolic algorithm for the predecessor task: 6Preprint. Under review. 0 (Initialization) Input: string s = alphabet|ex_in>ex_out|query 
+
+Example: abcdefghij|ghi>fhi|bcd 
+
+1 (Matching) Get indices of ex_in , ex_out , and query in alphabet .Call these ex_in inds , ex_out inds , and query inds 
+
+Example: ghi 7 →[6, 7, 8] ; fhi 7 →[5, 7, 8] ; bcd 7 →[1, 2, 3] ;2 (Compute transformation) Compute: 
+
+ans inds =concat( [ex_out inds [0] -ex_in inds [0] +query inds [0] ], query inds [1:]) 
+
+Example: ans inds = concat([5 - 6 + 1], [ 2, 3] = [0, 2, 3] 
+
+3 (Apply transformation) Index into alphabet with ans inds to obtain ans .Example: alphabet[0, 2, 3] 7 →acd 
+
+By implementation in RASP-L (Zhou et al., 2024), we find that it is possible for a transformer to carry out this algorithm (Appendix G). We can then ask: does our trained model compute 
+
+predecessor this way? We studied the trained transformers using a variety of methods, includingattention vi-sualization and interchange interventions. We found that the induced algorithm can be understood in great detail. Here we discuss evidence for equivalents of each of the 4 steps above, continuing with the predecessor transformation as a running example, with the standard alphabet, the example g h i → f h i and query b c d →, which the model must complete with a c d .
+
+Initialization We identify multiple heads in layer 1 of the encoder that have characteristic patterns of attention. In particular, the separator tokens ( |, →) show high attention weights with large sections of the input, which results in vertical stripes (see Figure 6, lower part). We hypothesize that the attention heads may implement role assignment in this phase through position comparisons. Since we use positional encoding in our transformers, the position of each token in the sequence is present in their vector representations. When a token attends to a separator, part of the vector representation of the separator (relative to the V matrix and the attention score a) is added to its representation. The MLP component could then compare the parts of the vector representations that correspond to the position of the token and the separator and identify whether this token comes before or after it in the sequence. If this process really occurs in these heads, we would expect that after these heads have been processed, token representations separate more cleanly based on their role. We test this hypothesis by training a principal component analysis (PCA) with two components on residual stream activations across all layers of the encoder. Afterwards, we apply this PCA to the vector representations on a test set of tasks before and after layer 1 of the encoder. In Figure 6, we group tokens according to their roles and visualize them using kernel density estimates. We see that the alphabet, example-in, example-out and query already cluster to some degree before the first layer but cluster much more clearly after the first layer (in particular, the example-out no longer overlaps with the example-in and the query). 
+
+Matching We find that a single attention head #7 in layer 2 of the encoder implements the matching operation: the same letters match with each other if they have different roles, otherwise they match with themselves leading to high attention scores in these token-pairs. We verify the causal role of this head in the outputs of the model using attention pattern patching (using the package NNSight (Fiotto-Kaufman et al., 2025)), as detailed in figure 7. 
+
+Compute mapping and Apply mapping The Compute mapping step is implemented in the 3rd layer of the decoder, inside the residual stream for the tokens of the example-output. The Apply mapping step happens in the decoder cross-attention. The decoder is initialized with the token →; in the first layer, this token attends to the first token of the query ( b). In the second layer, it attends to the first token of the example-output ( f ). The process is depicted in Figure 8. To test whether our analysis is correct, we carried out one more diagnostic experiment. We investigated whether the residual stream representations in the encoder’s 3rd layer for the example-out tokens are invariant to the identity of the first token of the example output (i.e., 7Preprint. Under review. b c d a b c ... z g h i ➝ f h i | |alphabet example query Layer 1 
+
+Encoder    
+
+> embed abc |➝|
+
+Source |
+
+> ➝
+> |Des �na �on
+
+A�n. Head #3 abc | ➝ |Source |
+
+> ➝
+> |
+
+A�n. Head #4 abc | ➝ |Source |
+
+> ➝
+> |
+
+A�n. Head #7 0.0 0.2 0.4 0.6 0.8 1.0     
+
+> −4−3−2−10
+
+PC1 02PC2   
+
+> −2−10
+
+PC1 0
+
+> −1
+> −2PC2
+> role alphabet example (in) example (out) query
+
+... ... ... 
+
+Figure 6: Illustration of the initialization step (where role assignment happens) in the model. The upper part shows that the representations separate more cleanly after the first layer of the encoder. This is likely induced by the attention heads in the lower part of the figure. Model outputs are fully consistent with patched a �en �on head (10 runs each)   
+
+> successor predecessor other/inconsistent
+
+Consistent with transformation 0246810 Count  run  
+
+> standard patched
+> Layer 1 Layer 2
+
+Encoder 
+
+a c d 
+
+Output b c d a b c ... z g h i ➝ f h i | |
+
+Standard run (predecessor task) Layer 1 Layer 2 Encoder b c e Output ... h1h7h8
+
+Successor task: b c d a b c ... z g h i ➝g h j | |QK OV Layer 1 Layer 2 Encoder 
+
+b c e 
+
+b c d a b c ... z g h i ➝ f h i | |... h1h7h8
+
+Patched run 
+
+QK OV Output 
+
+Patch a�en �on pa �ern 
+
+Figure 7: Results from our attention pattern patching . A single attention head in the second encoder layer implements the matching operation of the algorithm. We demonstrate the effects of this head are causal , by replacing the standard attention matrix Apred with Asucc 
+
+produced by a successor task. the letter f in our running example) across predecessor tasks, as these must be invariant if they are to represent the computed mapping. This is indeed the case, as evidenced by cosine similarity close to 1 for all comparisons (Figure 8, bottom-left). 8Preprint. Under review. Encoder            
+
+> ➝adccadEOS
+> b c d a b c ... z g h i ➝fh i ||0.0 0.2 0.4 0.6 0.8 1.0 Cosine Similarity 020 Frequency
+
+le �er representa �on is invariant across pred tasks 
+
+compare encoder outputs 
+
+of le �er that changes in the example (bold) 
+
+across pred tasks           
+
+> x y z a b c ... z d e f g ➝ce f g ||b c d a b c ... z g h i ➝fh i ||...
+
+10 pred tasks Decoder cross-a �en �on 
+
+> →
+> Des �na �on abcdefghijklmnopqrstuvwxyz|ghi
+> →
+> fhi|bcdSource
+> Layer 1
+> →
+> Des �na �on abcdefghijklmnopqrstuvwxyz|ghi
+> →
+> fhi|bcd
+> Layer 2
+> →
+> Des �na �on abcdefghijklmnopqrstuvwxyz|ghi
+> →
+> fhi|bcd
+> Layer 3
+
+Figure 8: The Compute mapping and Apply mapping steps of the algorithm. The encoder builds an invariant representation for the predecessor transformation and stores it in the first letter of the example output (left). This representation is then used in the decoder cross-attention (layer 2) to move attention from letter ’b’ (layer 1) to letter ’a’ (layer 3) of the decoder. 
+
+## 6 Discussion & Conclusions 
+
+We examined whether meta-learning for compositionality (MLC, Lake & Baroni, 2023) can help small transformer models solve letter-string analogies, finding that our MLC trained model can (i) reliably solve trained analogy transformations, (ii) generalize robustly to novel alphabets when trained on sufficiently heterogeneous data, and (iii) generalize to some compositions of trained transformations, but (iv) still fails on entirely novel transformations. Mechanistic interpretability analyses show that our models implement a relatively simple, algorithmic procedure for solving the analogies. Our results complement work showing that transformer-based LLMs can solve letter-string analogies, but in a highly context-dependent way. However, where LLMs struggle with novel alphabets and complex compositions of transformations (e.g., Webb et al., 2023; Hodel & West, 2024; Lewis & Mitchell, 2024; Stevenson et al., 2025), our work shows that the MLC approach mitigates some of these shortcomings, where our best model outperforms most frontier LLMs. Mechanistically, our models implement an algorithm akin to word2vec-style vector arith-metic, also observed in LM analogical reasoning (Merullo et al., 2023). This provides a complementary, more controlled demonstration that transformer architectures can internal-ize simple, interpretable relational algorithms. Classical theories in cognitive science characterize analogical reasoning as involving two key processes: forming abstractions and mapping relations (Gentner, 1983; Gentner & Hoyos, 2017; Petersen et al., 2026). Our models instantiate computational analogues of these steps: the learned algorithm operates over abstract relational transformations defined over string positions rather than specific letters, paralleling the abstraction step in which reasoners construct relational schemas that transcend instances (Gentner & Hoyos, 2017). The model then maps example input–output pairs to the query by aligning structural roles (e.g., “first letter”, “successor”) and transferring the inferred transformation, mirroring Gentner’s notion of mapping from base to target while preserving relational structure (Falkenhainer et al., 1989). Despite focusing on small models and toy analogies, our findings suggest that larger models could acquire more human-like analogical reasoning by combining next-token pretraining 9Preprint. Under review. with meta-learning curricula that stress relational abstraction and mapping over varied symbol systems. 
+
+## 7 Acknowledgements 
+
+We would like to thank Gustaw Opiełka for his helpful comments on the analysis sec-tion in this paper as well as Michael Hanna for his advice on the implementation of the interpretability analyses. ML thanks Patrick Gemmell for extensive discussions on RASP. 
+
+## References 
+
+Ann L Brown and Mary Jo Kane. Preschool children can learn to transfer: Learning to learn and learning from example. Cognitive Psychology , 20(4):493–523, October 1988. ISSN 0010-0285. doi: 10.1016/0010-0285(88)90014-X. Francois Chollet, Mike Knoop, Gregory Kamradt, and Bryan Landers. ARC Prize 2024: Technical Report, January 2025. Maxwell Crouse, Constantine Nakos, Ibrahim Abdelaziz, and Ken Forbus. Neural Analog-ical Matching. Proceedings of the AAAI Conference on Artificial Intelligence , 35(1):809–817, May 2021. ISSN 2374-3468. doi: 10.1609/aaai.v35i1.16163. Leonidas A. A. Doumas, John E. Hummel, and Catherine M. Sandhofer. A theory of the discovery and predication of relational concepts. Psychological Review , 115(1):1–43, 2008. ISSN 1939-1471. doi: 10.1037/0033-295X.115.1.1. Leonidas A. A. Doumas, Guillermo Puebla, Andrea E. Martin, and John E. Hummel. A theory of relation learning and cross-domain generalization. Psychological Review , 129(5): 999–1041, 2022. ISSN 1939-1471. doi: 10.1037/rev0000346. Yan Duan, John Schulman, Xi Chen, Peter L. Bartlett, Ilya Sutskever, and Pieter Abbeel. RL$^2$: Fast Reinforcement Learning via Slow Reinforcement Learning, November 2016. Brian Falkenhainer, Kenneth D Forbus, and Dedre Gentner. The structure-mapping engine: Algorithm and examples. Artificial intelligence , 41(1):1–63, 1989. Chelsea Finn, Pieter Abbeel, and Sergey Levine. Model-Agnostic Meta-Learning for Fast Adaptation of Deep Networks. In Proceedings of the 34th International Conference on Machine Learning , pp. 1126–1135. PMLR, July 2017. Jaden Fried Fiotto-Kaufman, Alexander Russell Loftus, Eric Todd, Jannik Brinkmann, Koyena Pal, Dmitrii Troitskii, Michael Ripa, Adam Belfki, Can Rager, Caden Juang, Aaron Mueller, Samuel Marks, Arnab Sen Sharma, Francesca Lucchetti, Nikhil Prakash, Carla E. Brodley, Arjun Guha, Jonathan Bell, Byron C Wallace, and David Bau. NNsight and NDIF: Democratizing access to foundation model internals. In The Thirteenth Interna-tional Conference on Learning Representations , 2025. URL https://openreview.net/forum? id=MxbEiFRf39 .Dedre Gentner. Structure-mapping: A theoretical framework for analogy. Cognitive Science ,7(2):155–170, April 1983. ISSN 0364-0213. doi: 10.1016/S0364-0213(83)80009-3. Dedre Gentner and Christian Hoyos. Analogy and Abstraction. Topics in Cognitive Science , 9 (3):672–693, 2017. ISSN 1756-8765. doi: 10.1111/tops.12278. Damian Hodel and Jevin West. Response: Emergent analogical reasoning in large language models, May 2024. Douglas R. Hofstadter. Metamagical Themas. Scientific American , 248(5):16–E18, 1983. ISSN 0036-8733. 10 Preprint. Under review. Douglas R. Hofstadter and Melanie Mitchell. The Copycat project: A model of mental fluidity and analogy-making. In Analogical Connections , Advances in Connectionist and Neural Computation Theory, Vol. 2., pp. 31–112. Ablex Publishing, Westport, CT, US, 1994. ISBN 978-1-56750-039-4. Timothy Hospedales, Antreas Antoniou, Paul Micaelli, and Amos Storkey. Meta-Learning in Neural Networks: A Survey. IEEE Transactions on Pattern Analysis and Machine Intelligence ,44(9):5149–5169, September 2022. ISSN 1939-3539. doi: 10.1109/TPAMI.2021.3079209. John E. Hummel and Keith J. Holyoak. Distributed representations of structure: A theory of analogical access and mapping. Psychological Review , 104(3):427–466, 1997. ISSN 1939-1471. doi: 10.1037/0033-295X.104.3.427. Tamar Johnson, Mathilde ter Veen, Rochelle Choenni, Han van der Maas, Ekaterina Shutova, and Claire E Stevenson. Do large language models solve verbal analogies like children do? In Proceedings of the 29th Conference on Computational Natural Language Learning , pp. 627–639. Association for Computational Linguistics, July 2025. doi: 10.18653/v1/2025.conll-1.40. Youngsung Kim, Jinwoo Shin, Eunho Yang, and Sung Ju Hwang. Few-shot Visual Reasoning with Meta-Analogical Contrastive Learning. In Advances in Neural Information Processing Systems , volume 33, pp. 16846–16856. Curran Associates, Inc., 2020. Brenden M. Lake and Marco Baroni. Human-like systematic generalization through a meta-learning neural network. Nature , 623(7985):115–121, November 2023. ISSN 1476-4687. doi: 10.1038/s41586-023-06668-3. Jihwan Lee, Woochang Sim, Sejin Kim, and Sundong Kim. Enhancing Analogical Reasoning in the Abstraction and Reasoning Corpus via Model-Based RL, August 2024. Martha Lewis and Melanie Mitchell. Evaluating the Robustness of Analogical Reasoning in Large Language Models. Transactions on Machine Learning Research , November 2024. ISSN 2835-8856. Wen-Ding Li, Keya Hu, Carter Larsen, Yuqing Wu, Simon Alford, Caleb Woo, Spencer M. Dunn, Hao Tang, Michelangelo Naim, Dat Nguyen, Wei-Long Zheng, Zenna Tavares, Yewen Pu, and Kevin Ellis. Combining Induction and Transduction for Abstract Reason-ing, December 2024. Chen Ling, Tanmoy Chowdhury, Junji Jiang, Junxiang Wang, Xuchao Zhang, Haifeng Chen, and Liang Zhao. DeepGAR: Deep Graph Learning for Analogical Reasoning. In 2022 IEEE International Conference on Data Mining (ICDM) , pp. 1065–1070, November 2022. doi: 10.1109/ICDM54844.2022.00132. Evan Z. Liu, Aditi Raghunathan, Percy Liang, and Chelsea Finn. Decoupling Exploration and Exploitation for Meta-Reinforcement Learning without Sacrifices. In Proceedings of the 38th International Conference on Machine Learning , pp. 6925–6935. PMLR, July 2021. R. Thomas McCoy, Shunyu Yao, Dan Friedman, Mathew D. Hardy, and Thomas L. Grif-fiths. Embers of autoregression show how large language models are shaped by the problem they are trained to solve. Proceedings of the National Academy of Sciences , 121(41): e2322420121, October 2024. doi: 10.1073/pnas.2322420121. Jack Merullo, Carsten Eickhoff, and Ellie Pavlick. Language models implement simple word2vec-style vector arithmetic. In North American Chapter of the Association for Computa-tional Linguistics , 2023. URL https://api.semanticscholar.org/CorpusID:258887799 .Catherine Olsson, Nelson Elhage, Neel Nanda, Nicholas Joseph, Nova DasSarma, Tom Henighan, Ben Mann, Amanda Askell, Yuntao Bai, Anna Chen, et al. In-context learning and induction heads. arXiv preprint arXiv:2209.11895 , 2022. 11 Preprint. Under review. Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban Desmaison, An-dreas Kopf, Edward Yang, Zachary DeVito, Martin Raison, Alykhan Tejani, Sasank Chilamkurthy, Benoit Steiner, Lu Fang, Junjie Bai, and Soumith Chintala. PyTorch: An Im-perative Style, High-Performance Deep Learning Library. In Advances in Neural Information Processing Systems , volume 32. Curran Associates, Inc., 2019. Molly R Petersen, Claire E Stevenson, and Lonneke van der Plas. Modelling analogies and analogical reasoning: Connecting cognitive science theory and nlp research. Transactions of the Association for Computational Linguistics , preprint, 2026. URL https://arxiv.org/ pdf/2509.09381 .Adam Santoro, Sergey Bartunov, Matthew Botvinick, Daan Wierstra, and Timothy Lillicrap. Meta-Learning with Memory-Augmented Neural Networks. In Proceedings of The 33rd International Conference on Machine Learning , pp. 1842–1850. PMLR, June 2016. Claire E. Stevenson, Alexandra Pafford, Han L. J. van der Maas, and Melanie Mitchell. Can Large Language Models generalize analogy solving like children can?, October 2025. Jane X Wang. Meta-learning in natural and artificial intelligence. Current Opinion in Behavioral Sciences , 38:90–95, April 2021. ISSN 2352-1546. doi: 10.1016/j.cobeha.2021.01.002. Taylor Webb, Keith J. Holyoak, and Hongjing Lu. Emergent analogical reasoning in large language models. Nature Human Behaviour , 7(9):1526–1541, September 2023. ISSN 2397-3374. doi: 10.1038/s41562-023-01659-w. Zhaofeng Wu, Linlu Qiu, Alexis Ross, Ekin Akyürek, Boyuan Chen, Bailin Wang, Najoung Kim, Jacob Andreas, and Yoon Kim. Reasoning or Reciting? Exploring the Capabilities and Limitations of Language Models Through Counterfactual Tasks. In Kevin Duh, Helena Gomez, and Steven Bethard (eds.), Proceedings of the 2024 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technolo-gies (Volume 1: Long Papers) , pp. 1819–1862, Mexico City, Mexico, June 2024. Association for Computational Linguistics. doi: 10.18653/v1/2024.naacl-long.102. Hattie Zhou, Arwen Bradley, Etai Littwin, Noam Razin, Omid Saremi, Joshua M Susskind, Samy Bengio, and Preetum Nakkiran. What algorithms can transformers learn? a study in length generalization. In The Twelfth International Conference on Learning Representations ,2024. 
+
+## A Detailed Results on Training Conditions 
+
+Batching Methods In addition to the training conditions mentioned in the main text, we also experimented with different batching strategies during training. These included 
+
+random batching, where tasks were drawn randomly to construct a batch (default condition), batching by alphabet , where tasks were drawn randomly with the alphabet held constant for each task in the batch, and some other variations. Batching methods had a negligible impact (see A), therefore we report aggregated results over multiple batching methods. In Table 3, we present a more detailed overview of our training experiments. For our initial training regimes (20 training alphabets with- and without copy tasks), we used four different batching strategies. When we gradually increased the number of training alphabets, we only retained random batching as a baseline and batching by alphabet since it gave the best results in our previous experiment. For each level, we conducted 5 replication runs. Batching by alphabet with 200 permuted alphabets in the training set gave the best results in terms of generalization to new transformation while still showing good performance on seen transformations (Table 3, last row). Batching by alphabet led to slightly better generalization to new transformations although the performance was quite similar across batching methods. 12 Preprint. Under review. copy  num. seen  batching method  accuracy seen transform. (%)  accuracy new transform. (%) tasks  alphabets  seen alphabets  new alphabets  seen alphabets  new alphabets 
+
+> ✗ 20 random  63.0  [56.8, 72.5]  30.0  [28.4, 32.6]  11.8  [11.0, 12.9]  4.2  [3.9, 4.6]
+> transformation  59.5  [56.7, 61.9]  26.6  [25.2, 28.1]  10.8  [10.1, 11.8]  3.7  [3.5, 3.8]
+> alphabet  56.4  [56.1, 56.9]  28.9  [28.4, 29.3]  10.7  [9.7, 11.9]  4.0  [3.7, 4.3]
+> transform. & alph.  56.1  [55.3, 56.8]  28.7  [27.6, 29.6]  9.2  [8.0, 10.2]  3.6  [3.3, 4.1]
+> ✓ 20 random  91.2  [90.0, 92.8]  34.2  [32.7, 35.7]  10.1  [9.8, 10.3]  4.0  [3.9, 4.0]
+> transformation  92.6  [89.1, 96.0]  31.4  [27.0, 35.4]  10.7  [9.7, 11.8]  3.9  [3.3, 4.9]
+> alphabet  90.2  [89.7, 90.7]  32.4  [31.2, 33.4]  10.0  [9.6, 10.5]  3.8  [3.5, 4.1]
+> transform. & alph.  89.7  [89.3, 89.9]  33.5  [31.2, 35.4]  9.5  [9.0, 10.0]  3.6  [3.2, 3.9]
+> ✓ 200  random  97.7  [93.7, 99.9]  94.5  [86.3, 99.4]  10.4  [8.7, 12.0]  9.8  [7.9, 11.6]
+> alphabet  95.8  [87.3, 100.0]  93.4  [80.6, 99.9]  15.8  [8.7, 22.6]  14.8  [8.1, 21.6]
+
+Table 3: Comparison of different batching methods, including copy tasks in the training set, and increasing the number of seen alphabets during training. Accuracies are averaged over five replication runs (highest averages per column in bold). Numbers in square brackets signify 95% bootstrapped confidence intervals. 13 Preprint. Under review. 
+
+## B Failure modes when training without copy tasks 
+
+Transformation Outcome Prop. (%) predecessor applied succ 76.4 correct 14.9 other incorrect 8.7 successor applied pred 85.1 correct 14.9 Table 4: Performance of one of the models trained without copy tasks on predecessor- and successor tasks. For almost all errors, the model applies the other transformation, suggesting that the model cannot distinguish between the two transformations. The fact that the models trained without copy tasks do not use the information contained in the example is further evidenced by their poor performance on predecessor- and successor tasks. For example, the model that used random batching had an accuracy of 14.9% accuracy on successor- and predecessor tasks (see Table 4). Most of the errors on predecessor tasks arise because the model applied the successor rule instead. Similarly, for all of the errors on predecessor tasks, the model applied the predecessor transformation. This likely occurs because the query inputs of both of these transformations are sorted subsequences of the alphabet (e.g., c d e → c d f and c d e → b d e respectively) and the query input length matches the query output length. If the model only uses the information contained in the query input to make its predictions, misclassifying predecessor transformations as successor transformations and vice versa is a logical consequence. 14 Preprint. Under review. 
+
+## C Study of Attention Patterns 
+
+We found similar attention patterns when analyzing the best MLC model trained with tasks from 200 permuted alphabets. Figure 9 shows the attention matrices for the examples in the second encoder layer. Each transformation is plotted separately, averaged over 20 tasks. Letters of the example output strongly attend to the same letter in the example input. For instance, the predecessor subplot ("pred") contains 5 letters in the input sequence as well as 5 letters in the output sequence (e.g., f g h i j → e g h i j ). In the bottom left quadrant, attention values are large for all elements of the input sequence except the first one, since it changes, for example, from f in the example input to e in the example output. 
+
+Figure 9: The best performing model forms distinct attention patterns for the example of each transformation type in the second encoder layer. For new transformations, (c) denotes compositional ones and (n) denotes novel ones. Where applicable, positions at which the transformation was applied were held constant across tasks of the same transformation. Even for new transformations where the model performs poorly, the model shows char-acteristic attention patterns for each transformation (Figure 9. One example is the reverse transformation (e.g., a b c d e → e d c b a ). The last letter of the example output attends to the first letter of the example input and so on (resulting in an ’X’ pattern). This suggests that these patterns alone are insufficient for good performance. 15 Preprint. Under review. 
+
+## D Few-shot Training 
+
+We trained models with increasing numbers of examples (from 1 to 5) on the dataset with 20 permuted alphabets (copy tasks included). Figure 10 and Table 5 show that increasing the number of examples worsens the overall accuracy of 62.5% when trained with one example per task to an overall accuracy of 37.1% when trained with 5 examples per task. 
+
+Figure 10: Validation accuracy declines when providing the model with more examples to solve each task. examples Accuracy (%) 1 62.5 2 53.7 3 36.2 4 35.2 5 37.1 Table 5: Overall accuracies of models trained with increasing number of examples per task. 16 Preprint. Under review. 
+
+## E Elimination Step & Human Comparison 
+
+The model eliminates token representations of letters that are not required in the mapping step Beside the three steps we discuss in the paper (role assignment, matching, and compute & apply mapping), we also observed an elimination step that occurs in the final layer of the encoder. As illustrated in Figure 11, representations of letters that attend strongly to the EOS token (left) are wiped out in the outputs of the layer (right). Layer 1 Layer 2 Encoder Layer 3 ... h1h11h7h8b c d a b c ... z g h i ➝ f h i | |            
+
+> a b c d e f g h i j k l m n o p q r s t u v w x y z | g h i →g h j | b c d EOS source abcdefghijklmnopqrstuvwxyz|ghi
+> →
+> ghj|bcdEOS des �na �on
+> Hidden Dimensions abcdefghijklmnopqrstuvwxyz|ghi
+> →
+> ghj|bcdEOS Token Representa �ons
+> 0.1 0.2 0.3 0.4 0.5 −2−1012
+
+Token Representa �ons a �er Layer 3 A�n. Head #8 
+
+Figure 11: Elimination step of the model where token representations that attend to the EOS token (left) are subsequently wiped out (right). 
+
+Analogical reasoning steps of MLC models and humans overlap We identify parallels between the matching step of the models from Section 5 and human analogy solving. Based on Johnson et al. (2025), we describe the similarities to human analogical reasoning steps in Figure 12. In particular, find that (1) encoding relevant information of the domains and (2) searching for and retrieving relationships and similarities between elements closely align with the attention patterns from head #7 in the second layer of the encoder (Figure 12, left). Humans: searching and retrieving relationships and similarities between the analogy elements in the base domain Transformer: encode information about similarities between elements in A and B. In the example: strong attention weights between 'hi' in 'ghi' and 'hi' in 'fhi' 
+
+Step 2 
+
+Humans: encode relevant information about the base and target domains. Transformer: encode information about place in alphabet. In the example: attention from the example letter strings to their counterparts in the alphabet. 
+
+Step 1 
+
+Layer 1 Layer 2 Encoder b c d a b c ... z g h i ➝ f h i | |... h1h11h7h8
+
+Figure 12: Comparison between matching step and human steps in analogical reasoning. 17 Preprint. Under review. 
+
+## F LLM versus MLC models by Transformation Type 
+
+As can be seen in Figure 13 our best MLC model, Copy 200 - trained with copy tasks on 200 alphabets, outperforms all frontier models on trained (compositional) transformations (blue coloured bars). For three of the four unseen compositional transformations with two trained transformations (purple coloured bars with 2 transformations) our model performs at or above the level of the best-performing frontier models (GPT-OSS models). However, for the "Extend and Group" transformation our models lag behind most frontier models. Also, for unseen compositions of three trained transformations our model also performs under par, indicating that our model cannot handle the increased complexity of applying three successive transformations. For transformations that are completely novel to our models (orange coloured bars), we see that our model does not perform as well as the frontier models. However, also note, that these transformations (i.e., reverse, replicate and shift) are common tasks for frontier models. 
+
+Figure 13: Frontier LLM performance by Transformation Type compared to our MLC trained models. 18 Preprint. Under review. 
+
+## G RASP-L implementation of predecessor analogy  
+
+> 1
+
+import np_rasp as rsp  
+
+> 23
+
+# Input string  
+
+> 4
+
+s = " abcdefghij | ghi > fhi | bcd "  
+
+> 56
+
+# Convert chars to ascii ints  
+
+> 7
+
+def tn ( txt ):  
+
+> 8
+
+return [ ord (t) for t in txt ]  
+
+> 910
+
+## One layer  
+
+> 11
+
+# Build selectors ( QK circuits ). These are probably general to all tasks  
+
+> 12
+
+ppslct = rsp . select (k= tn (s) , q= tn ( '| ')* len (s) , pred = rsp . equals , causal = False )  
+
+> 13
+
+gtslct = rsp . select (k= tn (s) , q= tn ( '>')* len (s) , pred = rsp . equals , causal = False )  
+
+> 14
+
+smslct = rsp . select (k= tn (s) , q= tn (s) , pred = rsp . equals , causal = False )  
+
+> 15 16
+
+# Find the index of the first character after each separator  
+
+> 17
+
+x1_ind = rsp . aggr ( ppslct , v= rsp . indices (s) +1 , reduction = ' min ') 
+
+> 18
+
+x2_ind = rsp . aggr ( gtslct , v= rsp . indices (s) +1 , reduction = ' min ') 
+
+> 19
+
+qy_ind = rsp . aggr ( ppslct , v= rsp . indices (s) +1 , reduction = ' max ') 
+
+> 20 21
+
+# Get first occurrence of each element of string  
+
+> 22
+
+# Example output for s = " abcdefghij | ghi > fhi | bcd "  
+
+> 23
+
+# [ 0 1 2 3 4 5 6 7 8 9 10 6 7 8 14 5 7 8 10 1 2 3]  
+
+> 24
+
+fstind = rsp . aggr ( smslct , v= rsp . indices (s) , reduction = ' min ') 
+
+> 25 26
+
+## Next layer  
+
+> 27
+
+# Locates x1 , x2 , and qy in alphabet  
+
+> 28
+
+x1slct = rsp . select (k= rsp . indices ( fstind ) , q= x1_ind , pred = rsp . equals , causal = False )  
+
+> 29
+
+x2slct = rsp . select (k= rsp . indices ( fstind ) , q= x2_ind , pred = rsp . equals , causal = False )  
+
+> 30
+
+qyslct = rsp . select (k= rsp . indices ( fstind ) , q= qy_ind , pred = rsp . equals , causal = False )  
+
+> 31 32
+
+x1_fst = rsp . aggr ( x1slct , v= fstind , reduction = ' mean ') 
+
+> 33
+
+x2_fst = rsp . aggr ( x2slct , v= fstind , reduction = ' mean ') 
+
+> 34
+
+qy_fst = rsp . aggr ( qyslct , v= fstind , reduction = ' mean ') 
+
+> 35 36
+
+# Compute transformation of first element of query  
+
+> 37
+
+# Corresponds to MLP operation  
+
+> 38
+
+out_ind = x2_fst - x1_fst + qy_fst  
+
+> 39 40
+
+## Next layer  
+
+> 41
+
+# Note that comparison is not exact because RASP -L does not yet support decoder and cross - att  
+
+> 42
+
+# Build component attention matrices id , o_slct , cpslct and combine using logical operations  
+
+> 43
+
+id = rsp . select (k= rsp . indices (s) , q= rsp . indices (s) , pred = rsp . equals , causal = True )  
+
+> 44
+
+o_slct = rsp . select (k= rsp . indices (s) , q= out_ind , pred = rsp . equals , causal = True )  
+
+> 45
+
+cpslct = rsp . select (k= rsp . indices (s) , q= qy_ind , pred = rsp .gt , causal = True )  
+
+> 46 47
+
+# Build attention matrix . This is a different shape but comparable with last layer of decoder .  
+
+> 48
+
+o_slct = ( o_slct | cpslct ) & id  
+
+> 49 50
+
+# Non - zero elements of out1 correspond to desired output  
+
+> 51
+
+out = rsp . aggr ( o_slct , v= tn (s) , default =0 , reduction = ' mean ') 
+
+> 52 53
+
+# Viewing output NB not RASP , just convenience  
+
+> 54
+
+# Outputs ['a ', 'c ', 'd '] 
+
+> 55
+
+out_view = [ chr (c) for c in out if c != 0]  
+
+> 56
+
+print (f" Nonzero output : { out_view }") 
+
+19 Preprint. Under review. 
+
+Figure 14: Attention patterns for first layer of RASP program, locating the separators and computing where elements of the input are equal 
+
+Figure 15: Attention patterns for second layer of RASP program, locating relevant items for the transformation 
+
+> (a) Attention pattern for last layer of RASP program. This is similar to last layer of decoder, albeit with a different shape
+> (b) Attention pattern for same-as with full alphabet. High similarity to matching head in our trained transformer.
+
+Figure 16: Attention patterns for RASP program 20

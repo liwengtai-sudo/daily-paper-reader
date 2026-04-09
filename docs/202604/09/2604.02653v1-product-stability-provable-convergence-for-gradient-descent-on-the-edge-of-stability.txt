@@ -1,0 +1,1966 @@
+Title: Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability
+
+URL Source: https://arxiv.org/pdf/2604.02653v1
+
+Published Time: Mon, 06 Apr 2026 00:20:47 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Eric Gan 1
+
+## Abstract 
+
+Empirically, modern deep learning training of-ten occurs at the Edge of Stability (EoS), where the sharpness of the loss exceeds the threshold below which classical convergence analysis ap-plies. Despite recent progress, existing theoretical explanations of EoS either rely on restrictive as-sumptions or focus on specific squared-loss–type objectives. In this work, we introduce and study a structural property of loss functions that we term product-stability. We show that for losses with product-stable minima, gradient descent applied to objectives of the form (x, y ) 7 → l(xy ) can prov-ably converge to the local minimum even when training in the EoS regime. This framework sub-stantially generalizes prior results and applies to a broad class of losses, including binary cross entropy. Using bifurcation diagrams, we charac-terize the resulting training dynamics, explain the emergence of stable oscillations, and precisely quantify the sharpness at convergence. Together, our results offer a principled explanation for stable EoS training for a wider class of loss functions. 
+
+## 1. Introduction 
+
+In classical analysis of gradient descent (GD), convergence is usually proved under the condition that the learning rate η
+
+is less than 2 
+
+> λ
+
+, where λ, known as the sharpness, denotes the maximum eigenvalue of the Hessian. Under this assump-tion, the loss decreases monotonically as gradient descent converges to the local minimum. However, recent empiri-cal observations have shown that modern machine learning models do not operate in this regime. In particular, Cohen et al. (2022) provided extensive evidence that during train-ing the sharpness rises to above 2 
+
+> η
+
+, violating the classical assumption, and then oscillates around 2 
+
+> η
+
+. Meanwhile, the loss behaves non-monotonically, yet consistently decreases 
+
+> 1
+
+Independent Researcher. Correspondence to: Eric Gan 
+
+<egan8@ucla.edu >.
+
+Preprint. April 6, 2026. 
+
+in the long run. This phenomenon, termed Edge of Stability (EoS) , indicates that new analysis incorporating higher order information is necessary to capture the training dynamics of gradient descent in practice. As a result, the surprising EoS phenomenon has attracted significant attention. One line of work constructs minimal-ist examples in which EoS training provably happens and the training dynamics can be thoroughly studied (Chen & Bruna, 2023; Ahn et al., 2023; Zhu et al., 2023; Song & Yun, 2023). However, existing works either require nonstandard assumptions or apply to specific functions modeled after the squared loss. Thus, rigorous analysis of EoS training dynamics for classification losses, such as the cross entropy loss, remains open. In this work, we analyze a quantity which we call the 
+
+product-stability . This quantity was first discovered in Chen & Bruna (2023), where it was used to prove the existence of two step fixed points of GD updates. These are pairs of points (x1, x 2) such that the GD iterates cycle between them, namely applying one step of gradient descent maps x1 to x2
+
+and vice versa. We uncover a much richer story, proving that for loss functions l with product-stable minima, minimizing 
+
+l with respect to the parameter product (x, y ) 7 → l(xy ) via gradient descent can converge to a stationary point when starting in a region where λ > 2 
+
+> η
+
+. The notion of product stability captures a broad class of functions, including the binary cross entropy loss, and generalizes multiple prior results. Our contributions are as follows: • We define the notion of product-stability and use it to prove convergence in the EoS regime for functions of the form l(xy ) with product-stable minima. • We use the notion of bifurcation diagrams (Song & Yun, 2023) to present a general pattern in the training dynamics which results in the aforementioned conver-gence and precisely quantify the sharpness at conver-gence. • We show how the notion of product-stability captures practical functions such as binary cross entropy and unifies multiple previous assumptions in the literature under a single framework. 1
+
+> arXiv:2604.02653v1 [cs.LG] 3 Apr 2026 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability
+
+• We explore how the notion of product stability can be applied to deep models trained on real-world datasets. 
+
+## 2. Related Work 
+
+Sharpness. In the literature, low sharpness and flat minima have been associated with better generalization properties (Hochreiter & Schmidhuber, 1997). And several works have verified an empirical correlation between sharpness and generalization (Keskar et al., 2017; Jiang et al., 2019). Moreover, the SAM algorithm showed that explicitly reg-ularizing the sharpness can improve generalization (Foret et al., 2021). 
+
+Edge of Stability. Since the Edge of Stability behavior was observed in Cohen et al. (2022), many works have focused on discovering the theoretical underpinnings behind this phenomenon. Damian et al. (2023) argue that the third order term in the Taylor expansion contributes to the stabilization of the sharpness. Arora et al. (2022) explore the EoS phe-nomenon as a result of deterministic flow along the manifold of minimizers for special loss functions of the form √L or for normalized gradient descent. Wang et al. (2022); Liang & Mont ´ufar (2025) prove EoS convergence for quadratic losses of the form (xy − a)2. Ma et al. (2022) explore a multiscale loss structure with subquadratic property. Closely related to our work are several results that provide rigorous analysis of training dynamics in minimalist settings. Zhu et al. (2023) analyze loss of the form (x2y2 − 1) 2,where they show a sharpness adaptivity property which is not present in the vanilla quadratic loss. Ahn et al. (2023); Song & Yun (2023) prove EoS convergence for losses of the form l(xy ), assuming that l is convex, even, Lipschitz, and satisfies a certain subquadratic property. Wang et al. (2023) also analyze EoS convergence of l(xy ) for some specific forms of l based on a concept called degree of regularity. Our work generalizes these results by using a much less restrictive assumption based around the notion of product-stability. Chen & Bruna (2023) use the quantity that we call product-stability to prove the existence of two-step fixed points for GD in the EoS regime, but do not explore further. Concurrent work by Mulayoff & Stich (2026) generalizes product-stability to the multivariate case. 
+
+Large Learning Rate. A related line of work studies the training dynamics of gradient descent using large learning rate. Wu et al. (2023; 2024); Zhang et al. (2025) study gradient descent on logistic regression for linearly separable data. In this case, the minimizer is at infinity, where the loss has vanishing sharpness. This means that (at least in this setting) EoS is a transient phenomenon as the sharpness will eventually be small enough to leave the EoS regime. Similarly, Cai et al. (2024) analyze an Edge of Stability phase and a stability phase for two layer nonlinear networks with logistic loss. These settings are different from our work, where we show convergence while the sharpness stays very close to 2 
+
+> η
+
+. Andriushchenko et al. (2023); Even et al. (2023) analyze the implicit regularization of large step sizes in diagonal linear networks. However, these works also do not relate the learning rate and sharpness via the EoS threshold 
+
+ηλ = 2 .
+
+## 3. Preliminaries 
+
+Let l : R → R be a loss function. We focus on the objective 
+
+L : R2 → R given by 
+
+L(x, y ) := l(xy ) (1) We use l′, l ′′ , l (3) , l (4) to denote the first through fourth derivatives of l, respectively, and use ∇n to denote the 
+
+n-th derivative tensor for multivariate functions. Gradient descent with learning rate η defines the update rules 
+
+xt+1 = xt − η ∂L
+
+∂x = xt − ηl ′(xtyt)yt (2) 
+
+yt+1 = yt − η ∂L
+
+∂y = yt − ηl ′(xtyt)xt (3) Denote z(x, y ) = xy, s (x, y ) = x2 +y2, where we drop the dependence on x and y when clear. Our analysis focuses on dynamics in the (s, z ) phase space. Interpreting the (x, y )
+
+parameterization as a two layer, single neuron linear model, 
+
+z is the output of the model and the input to the loss function. It is not hard to check that if l has a minimum at z∗, then L
+
+has a manifold of minima along the hyperbola z(x, y ) = z∗.The quantity s is intrinsically related to the sharpness of L
+
+by the following lemma: 
+
+Lemma 3.1. The trace of the Hessian of L is given by 
+
+tr( ∇2L) = l′′ (z)s. If l′(z) = 0 , then the sharpness of L is also given by λ = tr( ∇2L) = l′′ (z)s.
+
+In particular, for a given value of z, s can be viewed as a scaling factor for the sharpness based on the specific (x, y )
+
+parameterization. As a result, we call s the sharpness multi-plier . Moreover, observe that for any fixed z we can have arbitrarily large s by rescaling x and y. In particular, there exist minima with arbitrarily large sharpness along the min-imizing manifold. 1
+
+We start our analysis in the EoS regime assuming that the GD iterates are near a minimum with sharpness slightly greater than 2 
+
+> η
+
+. Classical analysis shows that even when initialized arbitrarily close to the optimum, gradient descent will not converge to the sharp minima, instead driving iter-ates farther away. For a broad class of functions, we show that this is not the end of the story. 
+
+> 1Dinh et al. (2017) observe that this property holds for any neural network with positive homogeneity.
+
+2Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+## 4. Convergence on the Edge of Stability 
+
+Our analysis centers around a quantity which we term the 
+
+product-stability :
+
+Definition 4.1. Let f : R → R have continuous fifth derivatives. The product-stability of f at z ∈ R is defined as 
+
+αf (z) = 3( f (3) (z)) 2 − f (4) (z)f ′′ (z) (4) If αf (z) > 0, then we say f is product-stable at z.
+
+Intuition. The product stability captures higher order infor-mation about the sharpness of f around z. Positive values indicate stability, while negative values indicate instability. At a local minimum where f ′′ (z) > 0, the above defini-tion implies that a negative fourth derivative makes f more stable. Indeed, a negative fourth derivative corresponds to a negative quadratic term in the Taylor expansion of f ′′ .Excluding all other products, this makes the sharpness at z
+
+greater than the sharpness in a neighborhood around z. This can be related to certain “subquadratic” assumptions from previous work (Ahn et al., 2023; Ma et al., 2022; Song & Yun, 2023). In addition, our definition also reveals that a large magnitude third derivative also contributes to stability. This intuitively can be thought of as a precise quantification of a more general effect observed in (Damian et al., 2023), where the third order term tends to decrease sharpness when running gradient descent. 
+
+4.1. Two-step Iterates 
+
+Chen & Bruna (2023) used the notion of product stability to prove that there exist fixed points of the two step GD update when the learning rate is slightly larger than 2 
+
+> λ
+
+. Here we state a slightly stronger version of their theorem in which we prove that the two step iterates converge to these fixed points: 
+
+Theorem 4.2. Let l ∈ C 5 have a local minimum at z∗ with 
+
+l′′ (z∗) > 0, α l(z∗) > 0. Then there exists σ, τ > 0 such that for all η ∈ ( 2 
+
+> l′′ (z∗)
+
+, 2+ τl′′ (z∗) ], there exists z− 
+
+> η
+
+< z ∗ < z +
+
+> η
+
+such that for GD iterates given by 
+
+at+1 = at − ηl ′(at) (5) 
+
+with initialization, 
+
+0 < |a0 − z∗| ≤ σ
+
+one of the sequences {a2t}, {a2t+1 } converges to z− 
+
+> η
+
+, and the other converges to z+ 
+
+> η
+
+.
+
+Proof Outline. Consider the change induced by a two step gradient update 
+
+Dη (a) = l′(a) + l′(a − ηl ′(a)) 
+
+A Taylor expansion of l around z∗ gives the approximation 
+
+Dη (a) ≈ (2 − ηl ′′ (z∗)) l′′ (z∗)( a − z∗) (6) 
+
++ 12 l(3) (z∗)(1 − ηl ′′ (z∗))(2 − ηl ′′ (z∗))( a − z∗)2
+
++
+
+"
+
+16 l(4) (z∗)(1 − ηl ′′ (z∗))(1 + (1 − ηl ′′ (z∗)) 2)
+
+− 12 η(l(3) (z∗)) 2(1 − ηl ′′ (z∗)) 
+
+#
+
+(a − z∗)3
+
+When a is very close to z∗, the first order term dominates. Since ηl ′′ (z∗) > 2, the coefficient of the first term is nega-tive. This means that the iterates move away from z∗, and corresponds to the traditional analysis that z∗ is unstable. However, notice that both the first and second order term have product (2 − ηl ′′ (z∗)) . Since we assume η is not too much larger than 2 
+
+> l′′ (z0)
+
+, this term is small. So there exists a region where the third order term dominates. The notion of product stability is constructed precisely to ensure that the third coefficient is positive, and a simple intermediate value argument shows that there exists a point with Dη (z) = 0 ,namely a fixed point of the two step update. Further analysis shows that these points are unique, stable minima and the landscape is not too sharp ( |D′ 
+
+> η
+
+(z)| < 2 
+
+> η
+
+), which suffices to prove that two step GD converges to these points. 
+
+4.2. Convergence under Reparameterization 
+
+While the above theorem guarantees that the GD iterates will not diverge, we still do not obtain true convergence as the iterates will oscillate around the minimum with period two. Our main result proves that true convergence can be achieved simply by reparameterizing the loss in the form 
+
+l(xy ):
+
+Theorem 4.3. Let l ∈ C 5 have a local minimum at z∗ with 
+
+l′′ (z∗) > 0, α l(z∗) > 0. Then there exists η0, σ, τ > 0 such that for all 0 < η ≤ η0, minimizing the objective 
+
+L(x, y ) = l(xy )
+
+via gradient descent with learning rate η and initialization 
+
+|z(x0, y 0) − z∗| ≤ σ, (7) 
+
+2 ≤ ηl ′′ (z∗)s(x0, y 0) ≤ 2 + τ (8) 
+
+converges. 
+
+In the remainder of this section, we outline a simple non-constructive proof of the above theorem. In Section 5, we present a detailed analysis of the training dynamics that result in convergence. In Section 6, we discuss what func-tions satisfy our definition of product-stability and how it relates to assumptions from prior work. Complete proofs are deferred to Appendix A. 3Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Figure 1. EoS Dynamics in the xy Plane. Iterates start on the right near a high sharpness minima. They quickly diverge away from the sharp minima before drifting towards a flatter minima on the left. 
+
+4.3. Outline of Convergence Proof Bounding the iterates. Combining Equations (2) and (3) gives 
+
+zt+1 = zt − ηs tl′(zt) + η2zt(l′(zt)) 2
+
+In the EoS regime the last term is negligible so 
+
+zt+1 = zt − ηs tl′(zt)(1 + O(η2)) . (9) That is, zt approximates running gradient descent directly on l with adaptive learning rate γt = ηs t. Note that the EoS initialization Equation (8) implies that ηs 0 is slightly larger than 2 
+
+> l′′ (z0)
+
+. By controlling the change in st, we can leverage Theorem 4.2 to guarantee that zt remains in a given bounded region. 
+
+From boundedness to convergence. Again using Equa-tions 2 and 3, we have 
+
+x2 
+
+> t+1
+
+− y2 
+
+> t+1
+
+= ( x2 
+
+> t
+
+− y2 
+
+> t
+
+)(1 − η2(l′(zt)) 2)
+
+Since zt remains bounded, so does l′(zt), and hence for suf-ficiently small η, we have 0 ≤ 1 − η2(l′(zt)) 2 ≤ 1. There-fore the above defines a convergent series. This implies that either x2 
+
+> t
+
+− y2 
+
+> t
+
+→ 0 or l′(zt) → 0. But for sufficiently small η the EoS initialization (Equation (8)) implies that one of x0, y 0 is very large in magnitude and the other is very small, and we show that GD cannot close this gap. Hence 
+
+l′(zt) → 0. Combined with the boundedness of zt and the fact that z∗ is an isolated minimum in R, this is sufficient to imply convergence. 
+
+## 5. Training Dynamics 
+
+While the previous section gives a clean convergence proof, the proof is nonconstructive and does not elucidate the train-ing dynamics which leads to convergence. Here, we uncover a general mechanism of how gradient descent converges around product-stable minima on the edge of stability. Our analysis is based on the notion of bifurcation diagrams (Song & Yun, 2023). 
+
+5.1. Bifurcation Diagrams 
+
+For η ∈ ( 2 
+
+> l′′ (z∗)
+
+, 2+ τl′′ (z∗) ], we can use Theorem 4.2 to define maps η 7 → z+ 
+
+> η
+
+and η 7 → z− 
+
+> η
+
+from a learning rate η to the two-step fixed points of GD on l(z) with the given learning rate with z− 
+
+> η
+
+< z ∗ < z + 
+
+> η
+
+. This is the (period-2) bifurcation diagram and denote its branches by Z+(η), Z −(η). We have shown that GD when trained on l with fixed learning rate slightly greater than 2 
+
+> l′′ (z∗)
+
+, will settle into a state where it oscillates between corresponding points on the diagram. Here we present some basic properties of the bifurcation diagram: 
+
+Lemma 5.1. With l as in Theorem 4.2, there exists τ > 
+
+0 such that for each branch in the period-2 bifurcation diagram Z±(η) defined on ( 2 
+
+> l′′ (z∗)
+
+, 2+ τl′′ (z∗) ], the following are true 1. Z± have continuous fifth derivatives. 2. Z± are monotonic. 3. Z± → z∗ as η → 2 
+
+> l′′ (z∗)
+
+.
+
+We can also define an inverse ˆZ which takes a given z in the neighborhood of z∗ and maps it to the learning rate η
+
+for which it is a fixed point. That is, ˆZ satisfies 
+
+l′(z) + l′(z − ˆZ(z)l′(z)) = 0 
+
+We illustrate the bifurcation diagram in Figure 2. 
+
+5.2. Training Dynamics of the Factored Model 
+
+We are now ready to analyze the training dynamics on the original objective L. Following the previous section, our analysis focuses on two step updates. 
+
+Approaching the Bifurcation Diagram. Recall Equa-tion (9), which shows that zt behaves like training with GD directly on l with adaptive learning rate γt = ηs t. The two step update for st, ignoring higher orders terms, is given by 
+
+st+2 ≈ st − 4η(l′(zt) + l′(zt+1 )) zt (10) 
+
++ η2  (l′(zt)) 2 + 4 l′(zt)l′(zt+1 ) + ( l′(zt+1 )) 2 st
+
+Now st = Θ( 1 
+
+> η
+
+) while zt = Θ(1) , so st+2 −st 
+
+> st
+
+= O(η2).That is, st does not change much over individual iterations. Therefore the effective learning rate γt is roughly constant, 4Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+(a) Loss (b) Sharpness (c) Training Dynamics MLSq 1,2 (Equation (12)) 
+
+(d) Loss (e) Sharpness (f) Training Dynamics BCE 23
+
+(Equation (11)) 
+
+Figure 2. Training dynamics of gradient descent with binary cross entropy loss (Lemma 6.1) and multilayer squared loss (Lemma 6.2), under the assumptions of Theorem 5.2. a) shows the training loss, which oscillates between two tracks corresponding to each branch of the period 2 bifurcation diagram. b) shows the sharpness, which converges to just under the EoS threshold λ = 2 
+
+> η
+
+. c) shows the dynamics in the (γ, z ) phase space. For a variety of learning rates and initializations, one can observe Phase I, where the iterates approach the bifurcation diagram (dashed line), and Phase II, where the iterates follow the bifurcation diagram towards the EoS threshold γ = 2
+
+> l′′ (z∗)
+
+(dotted line). 
+
+and we can use the results from Theorem 4.2. This gives rise to the first phase, where zt approaches to within O(η2)
+
+the bifurcation diagram while st remains approximately constant. 
+
+Decreasing Sharpness Multiplier. Once zt is close to the bifurcation diagram, we enter a new phase, where we must consider the long term drift of the sharpness multiplier. Since we are close to the bifurcation diagram defined by two step fixed points, we have l′(zt) + l′(zt+1 ) = O(η2) ≈ 0,so Equation (10) becomes 
+
+st+2 ≈ st(1 + 2 η2l′(zt)l′(zt+1 )) 
+
+Due to the oscillatory nature of single steps, l′(zt) and 
+
+l′(zt+1 ) have opposite signs. Therefore, during this phase, the iterates track the bifurcation diagrams in the direction of decreasing s. This holds all the way until zt is very close to z∗ and st is slightly smaller than 2 
+
+> ηl ′′ (z∗)
+
+.
+
+Convergence. Now that the iterates are close to z∗ and the sharpness is below the EoS threshold, we show that the iterates converge linearly to the minimum. Our formal analysis, presented in Appendix B, allows us to precisely characterize the sharpness at convergence. 
+
+Theorem 5.2. Let l ∈ C 5 have a local minimum at z∗ with 
+
+l′′ (z∗) > 0, α l(z∗) > 0. Then there exists η0, σ, τ, δ > 0
+
+with δ < τ such that for all 0 < η ≤ η0, minimizing the objective 
+
+L(x, y ) = l(xy )
+
+via gradient descent with learning rate η and initialization 
+
+|z(x0, y 0) − z∗| ≤ σ, 
+
+2 + δ ≤ ηl ′′ (z∗)s(x0, y 0) ≤ 2 + τ
+
+results in final sharpness 
+
+λ = 2
+
+η − 3( l′′ (z∗)) 4
+
+αl(z∗) η + O(η 53 ).
+
+The theorem shows that the final sharpness is slightly less than the EoS threshold of 2 
+
+> η
+
+, demonstrating the phenomenon of sharpness adaptivity (Zhu et al., 2023). We note that Ahn et al. (2023); Zhu et al. (2023); Song & Yun (2023) showed similar results under different, more restrictive assumptions. In Section 6, we will find that their results are in fact special cases of the above theorem. Compared to Theorem 4.3, there is an additional condition requiring a gap δ between the initial sharpness multiplier s0
+
+and the EoS threshold. This gives space for the previously described EoS dynamics to take effect instead of having the 5Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+iterates directly leave the EoS regime. We show that this condition is required in Figure 3. Interestingly, the correction term for the final sharpness depends directly on the product-stability. This underscores the important role of product-stability in EoS training. 
+
+5.3. Summary 
+
+By analyzing the two-step GD dynamics, we have divided the training trajectory into three phases: • Phase I . Iterates rapidly approach the bifurcation dia-gram while st remains roughly constant. • Phase II . Iterates slowly drift along the bifurcation diagram in the direction of decreasing st until reaching a neighborhood of the EoS minima. • Phase III . Iterates converge linearly with zt → z∗ and limiting sharpness λ = 2 
+
+> η
+
+− Θ( η).Figure 2 shows the training dynamics in the (γ, z ) phase space for various functions, learning rates, and initializa-tions. We can clearly observe Phase I and Phase II, where the iterates approach the bifurcation diagram and then drift in the direction of decreasing γ. In Figure 4, we zoom in on the end of training, where we can see the Phase III conver-gence and the limiting sharpness. Theorem 5.2 accurately predicts the sharpness at convergence. 
+
+## 6. Discussion 
+
+In the previous sections, we proved that minimizing func-tions of the form l(xy ) when l has a product-stable mini-mum can converge when trained with GD on the edge of stability, and provided a detailed analysis of the dynamics that lead to convergence. In this section, we explore what types of functions l have minima that satisfy the definition of product-stability. Indeed, we find that our notion of product-stability is applicable to practical losses such as binary cross entropy and generalizes assumptions from previous work on EoS training.        
+
+> Figure 3. EoS training dynamics for l=MLSq 1,2(Equation (12)) when started very close to the EoS threshold. The iterates do not converge to the final sharpness predicted by Theorem 5.2, showing that the δgap is required.
+
+6.1. Binary Cross Entropy 
+
+The cross entropy loss and its variants are the most common classification losses used in modern applications. We define the binary cross entropy loss (BCE) by BCE q (z) = −[q log σ(z) + (1 − q) log(1 − σ(z))] (11) where σ is the sigmoid function and we allow soft labels 
+
+q ∈ [0 , 1] so that the loss can have finite minima with non-vanishing sharpness. We show that the BCE loss is product-stable everywhere. 
+
+Lemma 6.1. For all q ∈ [0 , 1] and for all z ∈
+
+R, α BCE q (z) > 0.
+
+To our knowledge, the notion of product-stability is the first which can prove EoS convergence for generic cross entropy-type losses with finite minima. 
+
+6.2. Squared Loss and the Impact of Depth 
+
+The squared loss l(z) = ( z − a)2 is common in regres-sion settings and popular in theoretical analysis due to its tractability. In the EoS regime, Wang et al. (2022); Liang & Mont ´ufar (2025) prove that gradient descent on (xy − a)2
+
+converges with learning rate up to 4 
+
+> λ
+
+. One may note that the squared loss has product-stability α = 0 everywhere, so Theorem 4.3 does not apply. Interestingly, Zhu et al. (2023) show that GD dynamics on this vanilla squared loss exhibits behavior inconsistent with empirical observation—most notably that the point to which GD converges has sharpness significantly less than 2 
+
+> η
+
+. In-stead, Zhu et al. (2023) analyze the function (x2y2 − 1) 2,which can be thought of as squared loss with a four layer network where two of the parameters are initialized to the same value x and the other two are initialized to y. They prove EoS convergence for this function with limiting sharp-ness just below the EoS threshold, and use this to argue that network depth contributes to the EoS phenomenon (note that the switch from l(z) to l(xy ) can itself be seen as in-creasing the depth from 1 to 2 layers). One can generalize their construction to consider 2n-layer networks with corre-sponding loss (xnyn − a)2. We show that product-stability can prove EoS convergence for this entire class of functions 
+
+> 2
+
+:
+
+Lemma 6.2. Let a > 0 and define the multilayer squared loss 
+
+MLSq a,n (z) = ( zn − a)2 (12) 
+
+For n ≥ 2, α MLSq a,n (a 1 
+
+> n
+
+) > 0.
+
+Zhu et al. (2023) prove their result by analyzing the two step gradient dynamics in a multi-phase structure conceptually 
+
+> 2Wang et al. (2023) also analyze loss functions of this form, but under different initialization.
+
+6Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability        
+
+> (a) MLSq 1,2(Equation (12)) (b) BCE 23
+> (Equation (11))
+> Figure 4. End of training dynamics for the runs in Figure 2. One can observe Phase III of the training dynamics, where the iterates converge to z∗. The limiting sharpness is just below the EoS threshold and very close to the value predicted by Theorem 5.2.
+
+similar to our analysis in Section 5. The notion of product-stability allows us to abstract the analysis and apply it to a broad class of loss functions. 
+
+6.3. Subquadratic Losses 
+
+Ahn et al. (2023) proves EoS convergence for functions of the form l(xy ) under the following assumption: 
+
+Assumption 6.3 (Ahn et al. (2023)) . l is convex, even, 1-Lipschitz, and of class C2 with l′′ (0) = 1 . Moreover, there exists β > 1 and c > 0 such that for all z̸ = 0 ,
+
+l′(z)
+
+z ≤ 1 − c|z|β 1{| z| ≤ c} (13) Equation (13) implies that the loss is “subquadratic”, namely that the sharpness decays in a neighborhood around the min-imum at z = 0 . Similar subquadratic assumptions are also made in Ma et al. (2022); Song & Yun (2023). Assuming sufficient differentiability, one can check that the previous assumption requires that l(3) (0) = 0 and l(4) (0) < 0. This immediately implies that the minimum satisfies the defini-tion of product-stability. 
+
+Lemma 6.4. If l ∈ C5 satisfies Assumption 6.3, then 
+
+αl(0) > 0.
+
+Thus, the notion of product-stability can be seen as a gen-eralization of subquadratic-ness. While subquadratic-ness requires that the third derivative be exactly 0—a restrictive condition that is unlikely to be satisfied except in certain spe-cially crafted scenarios—product-stability captures a much broader and more realistic class of functions. 
+
+6.4. Degree of Regularity 
+
+Wang et al. (2023) analyze EoS convergence based on a no-tion which they call degree of regularity. For the following specific class of functions with good degree of regularity, they prove convergence with limiting sharpness near the EoS threshold 
+
+la(z) = Ca(log( ez−1 + 1) + log( e1−z + 1)) a (14) where 0 < a ≤ 1 is the degree of regularity and Ca is a constant. We show that this class of functions has product-stable minima. 
+
+Lemma 6.5. Let 0 < a ≤ 1 and la as in Equation (14) .Then αla (1) > 0.
+
+While Wang et al. (2023) argue that degree of regularity is a qualitative condition for EoS convergence (i.e. good regularity does not guarantee convergence), product stability defines a precise sufficient condition for convergence. 
+
+## 7. Real World Models 
+
+In this section, we explore how the notion of product-stability can be applied to overparameterized deep learning models on real world datasets. We train a fully connected tanh network with 2 hidden layers of width 200 on a two class, 5,000 example subset of CIFAR-10 (Krizhevsky et al., 2009). We use learning rates η = 0 .05 , 0.02 , leading to EoS thresholds at 2 
+
+> η
+
+= 40 , 100 , respectively. In both scenarios, training enters the EoS regime with sharpness greater than the EoS threshold. Just as Chen & Bruna (2023) used the product stability to prove the existence of two step fixed points for scalar functions, Mulayoff & Stich (2026) derive a generalized notion to prove the same in higher dimensions. We adopt their notion to define the multivariate product stability .
+
+Definition 7.1. Let f : Rd → R have continuous fifth derivatives and z ∈ Rd. Suppose that ∇2f (z) is positive definite and has a unique maximal eigenvalue corresponding unit eigenvector vmax . The multivariate product-stability of 
+
+f at z is defined as 
+
+αf (z) = ∇3f (z)[ vmax ]2[q] − ∇ 4f (z)[ vmax ]4
+
+7Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability            
+
+> (a) Train Loss (b) Sharpness (c) Product Stability
+> Figure 5. Training dynamics of fully-connected tanh network on CIFAR-10. a) shows the training loss, which consistently decreases over long timescales. The loss is also oscillating while in the EoS regime, see Figure 6 for zoomed in view. b) shows the sharpness, with the dotted lines representing the EoS threshold. Training enters the EoS regime where the sharpness oscillates around the EoS threshold. c)
+> shows the product-stability calculated using directional derivatives along the direction of maximal sharpness. The product-stability is positive, indicating stability.
+
+where q = 3 ∇2f (z)−1 ∇3f (z)[ vmax ]2.In our experiments, we use the pseudoinverse to handle the scenario where the Hessian ∇2f (z) may be singular. Details are presented in Section D. In Figure 5, we observe that when the sharpness oscillates around the EoS threshold, the multivariate product-stability has a large positive value. This can help indicate why train-ing remains stable in the EoS regime. 
+
+## 8. Conclusion 
+
+In this work, we rediscover the notion of product-stability and highlight its role in the dynamics of EoS training. We prove that a loss l with product-stable minima, combined with the parameterization l(xy ), is sufficient to prove con-vergence when training with gradient descent on the edge of stability. Furthermore, we show a predictable pattern in the training dynamics of such functions which allows us to pinpoint the sharpness at convergence. The notion of product-stability generalizes previous assumptions in the literature, and paves the way for future analysis in less re-strictive and more complex settings. There are still many open questions. Since our notion of product-stability depends only on the derivatives at the min-imum, our analysis is inherently local. Under what condi-tions a global analysis of GD dynamics can be performed remains unresolved. A consequence of this fact is that this work does not address the progressive sharpening phe-nomenon by which deep learning models enter the EoS regime. Fully understanding if and how complex neural network loss landscapes satisfy product-stability type condi-tions also remains a question. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Ahn, K., Bubeck, S., Chewi, S., Lee, Y. T., Suarez, F., and Zhang, Y. Learning threshold neurons via the ”edge of stability”, 2023. URL https://arxiv.org/abs/ 2212.07469 .Andriushchenko, M., Varre, A. V., Pillaud-Vivien, L., and Flammarion, N. SGD with large step sizes learns sparse features. In Krause, A., Brunskill, E., Cho, K., En-gelhardt, B., Sabato, S., and Scarlett, J. (eds.), Pro-ceedings of the 40th International Conference on Ma-chine Learning , volume 202 of Proceedings of Machine Learning Research , pp. 903–925. PMLR, 23–29 Jul 2023. URL https://proceedings.mlr.press/ v202/andriushchenko23b.html .Arora, S., Li, Z., and Panigrahi, A. Understanding gradient descent on edge of stability in deep learning, 2022. URL 
+
+https://arxiv.org/abs/2205.09745 .Cai, Y., Wu, J., Mei, S., Lindsey, M., and Bartlett, P. L. Large stepsize gradient descent for non-homogeneous two-layer networks: Margin improvement and fast opti-mization, 2024. URL https://arxiv.org/abs/ 2406.08654 .Chen, L. and Bruna, J. Beyond the edge of stability via two-step gradient updates, 2023. URL https://arxiv. org/abs/2206.04172 .Cohen, J. M., Kaur, S., Li, Y., Kolter, J. Z., and Talwalkar, A. Gradient descent on neural networks typically occurs 8Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+at the edge of stability, 2022. URL https://arxiv. org/abs/2103.00065 .Damian, A., Nichani, E., and Lee, J. D. Self-stabilization: The implicit bias of gradient descent at the edge of stabil-ity, 2023. URL https://arxiv.org/abs/2209. 15594 .Dinh, L., Pascanu, R., Bengio, S., and Bengio, Y. Sharp minima can generalize for deep nets, 2017. URL https: //arxiv.org/abs/1703.04933 .Even, M., Pesme, S., Gunasekar, S., and Flammarion, N. (s)gd over diagonal linear networks: Implicit regularisa-tion, large stepsizes and edge of stability, 2023. URL 
+
+https://arxiv.org/abs/2302.08982 .Foret, P., Kleiner, A., Mobahi, H., and Neyshabur, B. Sharpness-aware minimization for efficiently improving generalization, 2021. URL https://arxiv.org/ abs/2010.01412 .Hochreiter, S. and Schmidhuber, J. Flat minima. Neural Computation , 9(1):1–42, 01 1997. ISSN 0899-7667. doi: 10.1162/neco.1997.9.1.1. URL https://doi.org/ 10.1162/neco.1997.9.1.1 .Jiang, Y., Neyshabur, B., Mobahi, H., Krishnan, D., and Ben-gio, S. Fantastic generalization measures and where to find them, 2019. URL https://arxiv.org/abs/ 1912.02178 .Keskar, N. S., Mudigere, D., Nocedal, J., Smelyanskiy, M., and Tang, P. T. P. On large-batch training for deep learning: Generalization gap and sharp minima, 2017. URL https://arxiv.org/abs/1609.04836 .Krizhevsky, A., Hinton, G., et al. Learning multiple layers of features from tiny images. 2009. Liang, S. and Mont ´ufar, G. Gradient descent with large step sizes: Chaos and fractal convergence region, 2025. URL 
+
+https://arxiv.org/abs/2509.25351 .Ma, C., Kunin, D., Wu, L., and Ying, L. Beyond the quadratic approximation: the multiscale structure of neural network loss landscapes, 2022. URL https: //arxiv.org/abs/2204.11326 .Mulayoff, R. and Stich, S. U. On the stability of non-linear dynamics in gd and sgd: Beyond quadratic poten-tials, 2026. URL https://arxiv.org/abs/2602. 14789 .Song, M. and Yun, C. Trajectory alignment: Understanding the edge of stability phenomenon via bifurcation the-ory, 2023. URL https://arxiv.org/abs/2307. 04204 .Wang, Y., Chen, M., Zhao, T., and Tao, M. Large learning rate tames homogeneity: Convergence and balancing ef-fect, 2022. URL https://arxiv.org/abs/2110. 03677 .Wang, Y., Xu, Z., Zhao, T., and Tao, M. Good regular-ity creates large learning rate implicit biases: edge of stability, balancing, and catapult, 2023. URL https: //arxiv.org/abs/2310.17087 .Wu, J., Braverman, V., and Lee, J. D. Implicit bias of gradient descent for logistic regression at the edge of stability, 2023. URL https://arxiv.org/abs/ 2305.11788 .Wu, J., Bartlett, P. L., Telgarsky, M., and Yu, B. Large step-size gradient descent for logistic loss: Non-monotonicity of the loss improves optimization efficiency, 2024. URL 
+
+https://arxiv.org/abs/2402.15926 .Zhang, R., Wu, J., Lin, L., and Bartlett, P. L. Minimax optimal convergence of gradient descent in logistic re-gression via large and adaptive stepsizes, 2025. URL 
+
+https://arxiv.org/abs/2504.04105 .Zhu, X., Wang, Z., Wang, X., Zhou, M., and Ge, R. Under-standing edge-of-stability training dynamics with a min-imalist example, 2023. URL https://arxiv.org/ abs/2210.03294 .9Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+## A. Proofs 
+
+A.1. Preliminaries 
+
+Here we provide a glossary of shorthand notation used throughout the proofs. All of these can have subscript t to denote the value at time t.
+
+z = xy s = x2 + y2
+
+γ = ηs g = l′(z)
+
+ht = g2 
+
+> t+1
+
++ 4 gt+1 gt + gt
+
+We use Big-O notation to capture dependencies on η and |z − z∗| (equivalently g) as both quantities go to zero. Exact constants will depend on the loss function l and choices of σ, τ, δ from Theorem 4.3 and Theorem 5.2 when relevant. Now we present basic facts about the two step updates 
+
+Proposition A.1. We have the following two step update formulas 
+
+zt+2 − zt = η2htzt − η(gt+1 + gt)(1 + η2gt+1 gt)st + η4g2
+
+> t+1
+
+g2 
+
+> t
+
+zt (15) 
+
+st+2 − st = η2htst − 4η(gt+1 + gt)(1 + η2gt+1 gt)zt + η4g2
+
+> t+1
+
+g2 
+
+> t
+
+st (16) 
+
+A.2. Proof of Theorem 4.2 
+
+We start off with a few lemmas. 
+
+Lemma A.2. Let 
+
+c3(η) = l(4) (z∗)6 (1 − ηl ′′ (z∗))(1 + (1 − ηl ′′ (z∗)) 2) − η(l(3) (z∗)) 2(1 − ηl ′′ (z∗)) 2
+
+Then there exists τ0 > 0 such that c3 = min 2  
+
+> l′′ (z∗)≤η≤2+ τ0
+> l′′ (z∗)
+
+{c3,η } > 0.Proof. If l(4) (z∗) < 0 then both terms of c3(η) are positive and bounded away from 0. If l(4) (z∗) = 0 , then Equation (4) implies l(3) (z∗)̸ = 0 , hence the second term in c3(η) is positive and bounded away from 0. If l(4) (z∗) > 0, observe that β := 3( l(3) (z∗)) 2 
+
+> l′′ (z∗)l(4) (z∗)
+
+> 1. Then there exists τ0 > 0 such that (1 + τ0)(1 + (1 + τ0)2) = 1 + β.Now 
+
+c3(η) ≥ − l(4) (z∗)6 (1 + τ0)(1 + (1 + τ0)2) + η(l(3) (z∗)) 2(1) 2
+
+≥ − l(4) (z∗)6 (1 + τ0)(1 + (1 + τ0)2) + (l(3) (z∗)) 2
+
+l′′ (z∗)
+
+≥ − l(4) (z∗)6 (1 + β) + (l(3) (z∗)) 2
+
+l′′ (z∗)= l(4) (z∗)6 (−(2 + β − 1) + 2 β)= β − 1
+
+This proves the claim. We now prove Theorem 4.2. 10 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Proof. We present the proof for z+ 
+
+> η
+
+. A symmetric argument works for z− 
+
+> η
+
+.Since l′′ (z∗) > 0, we can choose a bounded interval I = [ z1, z 2] containing z∗ such that l′′ (zt), l ′′ (zt+1 ) > 0 for zt ∈ I .Let K1 = 124 max z∈I {| l(5) (z)|} , such that 
+
+l′(z) = l′′ (z∗)( z − z∗) + l(3) (z∗)2 (z − z∗)2 + l(4) (z∗)6 (z − z∗)3 + M (z)( z − z∗)4
+
+where |M (z)| ≤ K1. Then with Dη (z) as defined in Equation (6), we have 
+
+Dη (z) = l′(z) + l′(z − ηl ′(z)) = (2 − ηl ′′ (z∗)) l′′ (z∗)( z − z∗)+ l(3) (z∗)2 (1 − ηl ′′ (z∗))(2 − ηl ′′ (z∗))( z − z∗)2
+
++
+
+ l(4) (z∗)6 (1 − ηl ′′ (z∗))(1 + (1 − ηl ′′ (z∗)) 2) − η(l(3) (z∗)) 2(1 − ηl ′′ (z∗)) 2
+
+
+
+(z − z∗)3
+
++ M2(η, z )( z − z∗)4
+
+where |M2(η, z )| ≤ K2 for some constant K2. For shorthand let c1(η), c 2(η), c 3(η) denote the first three coefficients, respectively. We can also write 
+
+D′ 
+
+> η
+
+(z) = c1(η) + 2 c2(η)( z − z∗) + 3 c3(η)( z − z∗)2 + M3(η, z )( z − z∗)3
+
+where |M3(η, z )| ≤ K3 for some constant K3.We claim that we can choose τ0 > 0 such that c3 = min 2  
+
+> l′′ (z∗)≤η≤2+ τ0
+> l′′ (z∗)
+
+{c3,η } > 0. Indeed, if l(4) (z∗) < 0 then both terms of c3(η) are positive. If l(4) (z∗) = 0 , then Equation (4) implies l(3) (z∗)̸ = 0 , hence the second term in c3(η) is positive. If l(4) (z∗) > 0, observe that β := 6( l(3) (z∗)) 2 
+
+> l′′ (z∗)l(4) (z∗)
+
+> 2. Then there exists τ0 > 0 such that (1 + τ0)(1 + (1 + τ0)2) = 2 + β−22 .Now 
+
+c3(η) ≥ − l(4) (z∗)6 (1 + τ0)(1 + (1 + τ0)2) + η(l(3) (z∗)) 2(1) 2
+
+≥ − l(4) (z∗)6 (1 + τ0)(1 + (1 + τ0)2) + (l(3) (z∗)) 2
+
+l′′ (z∗)
+
+≥ − l(4) (z∗)6 (2 + β − 22 ) + (l(3) (z∗)) 2
+
+l′′ (z∗)= l(4) (z∗)6 (−(2 + β − 22 ) + β)= 12 (β − 2) 
+
+This proves the claim. Set uη = z∗ + min 
+
+ c1,η  
+
+> 4c2,η
+
+,
+
+r c1,η  
+
+> 4c3,η
+
+, 3
+
+r c1,η 
+
+> 4K2
+
+
+
+. Then Dη (z) < 0 for z∗ < z ≤ uη .Define C3 = max 2  
+
+> l′′ (z∗)≤η≤2+ α0
+> l′′ (z∗)
+
+{c3(η)}. Choose 
+
+z4 = z∗ + min 
+
+
+
+c3
+
+4K2
+
+, c3
+
+4K3
+
+,
+
+s
+
+l′′ (z∗)12 C3
+
+, z 2 − z∗
+
+ ,τ = min 
+
+
+
+1, τ 0, c3(z4 − z∗)2)4l′′ (z∗) , c3(z4 − z∗)) 4|l(3) (z∗)|
+
+
+
+11 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+We show Dη (z4) > 0. Indeed, for η sufficiently close to 2 
+
+> l′′ (z∗)
+
+, we have that c1(η), c 2(η) are arbitrarily small so 
+
+Dη (z+) = c1(η)( z+ − z∗) + c2(η)( z+ − z∗)2 + c3(η)( z+ − z∗)3 + M2(η, z +)( z+ − z∗)4
+
+> c 3(z+ − z∗)3 − | c1(η)( z+ − z∗)| − | c2(η)( z+ − z∗)2| − K2(z+ − z∗)4
+
+> 0
+
+Thus by IVT, there exists uη < z + 
+
+> η
+
+< z 4 with Dη (x+ 
+
+> η
+
+) = 0 . This proves the existence of the two-step fixed points. Additionally, for any z ∈ [z∗, z +] with Dη (z) = 0 , we have 
+
+D′ 
+
+> η
+
+(z) = c1(η) + 2 c2(η)( z − z∗) + 3 c3(η)( z − z∗)2 + M3(η, z )( z − z∗)3
+
+= −c1(η) + c3(η)( z − z∗)2 + M3(η, z )( z − z∗)3 − 2M2(η, z )( z − z∗)3
+
+> −c1(η) + c3(η)( z − z∗)2 − K3(z − z∗)3 − 2K2(z − z∗)3
+
+> 0
+
+This implies two things • By the implicit function theorem, z+ 
+
+> η
+
+is uniquely defined. • z+ 
+
+> η
+
+is a local minimum of the two step loss landscape. Finally for z∗ < z ≤ z+
+
+|D′ 
+
+> η
+
+(z)| = |c1(η) + 2 c2(η)( z+ − z∗) + 3 c3(η)( z+ − z∗)2 + M3(η, z )( z − z∗)3| (17) 
+
+≤ 3c3(z+ − z∗)2 + |c1(η)| + |2c2(η)( z+ − z∗)| + K3(z+ − z∗)3
+
+≤ 4c3(z+ − z∗)2
+
+≤ l′′ (z∗)3
+
+≤ l′′ (z∗)2 + τ
+
+≤ 1
+
+η
+
+Thus the Descent Lemma (Lemma A.6) implies convergence of the two step updates to z+ 
+
+> η
+
+.
+
+A.3. Proof of Lemma 5.1 
+
+We can prove Lemma 5.1 as a corollary of the previous theorem. 
+
+Proof. Since we showed that D′ 
+
+> η
+
+(z+ 
+
+> η
+
+) > 0 and Dη (z) has continuous fifth derivative, the Implicit Function Theorem implies that zη has continuous fifth derivative. Now note that 
+
+∂η Dη (z) = −l′(z)l′′ (z − ηl ′(z)) 
+
+Now l′′ is always positive by assumption, and l′(z+ 
+
+> η
+
+) > 0, so the implicit function theorem implies that (z+)′ never changes sign, i.e. z+(η) is monotonic. Finally, for η sufficiently close to 2 
+
+> l′′ (z0)
+
+choose 
+
+z4,η = z∗ + max 
+
+(
+
+2
+
+s
+
+c1(η)
+
+c3(η) , 4 c2(η)
+
+c3(η)
+
+)
+
+≤ z4
+
+Then Dη (z4,η ) > 0, which gives z∗ < z + 
+
+> η
+
+< z 4,η . Since z4,η → z∗ as η → 2 
+
+> l′′ (z0)
+
+, we have z+ 
+
+> η
+
+→ z∗ by the Squeeze Theorem. 12 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+A.4. Proof of Theorem 4.3 
+
+We first start off with some lemmas: 
+
+Lemma A.3. The following equation holds for all t ≥ 0:
+
+x2 
+
+> t+1
+
+− y2 
+
+> t+1
+
+= ( x2 
+
+> t
+
+− y2 
+
+> t
+
+)(1 − η2(l′(zt)) 2)
+
+Proof. From Equation (2) and Equation (3), we have 
+
+x2 
+
+> t+1
+
+= x2 
+
+> t
+
+− 2ηz tl′(zt) + η2(l′(zt)) 2y2
+
+> t
+
+y2 
+
+> t+1
+
+= y2 
+
+> t
+
+− 2ηz tl′(zt) + η2(l′(zt)) 2x2
+
+> t
+
+Adding the two equations gives the result. 
+
+Lemma A.4. The following equation holds for all t ≥ 0:
+
+s2 
+
+> t+1
+
+− 4z2 
+
+> t+1
+
+= ( s2 
+
+> t
+
+− 4z2 
+
+> t
+
+)(1 − η2(l′(zt)) 2)2
+
+Proof. Observe that 
+
+s2 
+
+> t
+
+− 4z2 
+
+> t
+
+= ( x2 
+
+> t
+
++ y2 
+
+> t
+
+)2 − 4xtyt
+
+= ( x2 
+
+> t
+
+− y2 
+
+> t
+
+)2
+
+The result follows from the previous lemma. We also need a few lemmas to extend our analysis to the regime where the sharpness is below the EoS threshold. 
+
+Lemma A.5. Suppose that αl(z∗) > 0. Then there exists ρ > 0 such that if η ∈ [ 2−ρl′′ (z∗) , 2 
+
+> l′′ (z∗)
+
+], then |D′ 
+
+> η
+
+(z)| ≤ 1 
+
+> η
+
+.Proof. Observe that 
+
+c3( 2
+
+l′′ (z0) ) = − L(4) (z)3 + (l(3) (z∗)) 2
+
+l′′ (z∗)= αl(z∗)
+
+l′′ (z∗)
+
+> 0.
+
+By continuity there exists ρ0 such that c3 > αl(z∗)2l′′ (z∗) on [ 2−ρl′′ (z∗) , 2 
+
+> l′′ (z∗)
+
+]. Then a similar argument to Equation (17) gives the desired result. We now prove Theorem 4.3: 
+
+Proof. Let τ0, σ 0 be as guaranteed in Theorem 4.2, and set τ = τ0 
+
+> 2
+
+, σ = σ0. We can assume σ is sufficiently small such that 
+
+l′′ (z) > 0 on [z∗ − σ, z ∗ + σ]. That is l is convex over the interval and z∗ is the unique minimum. We first show zt remains bounded. Specifically, we prove by induction that the following jointly hold: • ηs tl′′ (z0) ≤ 2 + τ0
+
+> l′′ (z∗)
+
+• |zt − z∗| ≤ σ
+
+13 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+We can assume the base cases t = 0 , 1 hold by construction. Assume the inductive hypothesis holds up to time t, then by Lemma A.4, for η sufficiently small we have 
+
+s2 
+
+> t+2
+
+− 4z2 
+
+> t+2
+
+≤ s20 − 4z20
+
+s2 
+
+> t+2
+
+≤ s20 + 4( z2 
+
+> t+2
+
+− z20 )
+
+≤
+
+ 2 + α
+
+> 2
+
+ηl ′′ (z∗)
+
+2
+
++ (2 σ)2
+
+≤
+
+ 2 + αηl ′′ (z∗)
+
+2
+
+Denote z+ = z∗ + σ. We have ∂γ (Dγ (z)) = −l′(z)l′′ (z − γl ′(z)) . Since l′′ is positive over the region and l′(z) > 0 for 
+
+z > z ∗, we have that Dγ (z+) is a decreasing function of γ. This implies 
+
+zt − γtDγt (zt) ≤ zt − γtD 2+ αl′′ (z∗)
+
+(zt)
+
+Additionally, from the proof of Theorem 4.2, we have |∂z D 2+ αl′′ (z∗)
+
+(z)| < ( 2+ αl′′ (z∗) )−1 < γ −1 
+
+> t
+
+, so z 7 → z − γtD 2+ αl′′ (z∗)
+
+(z) is increasing. Hence 
+
+zt − γtD 2+ αl′′ (z∗)
+
+(zt) ≤ z+ − γtD 2+ αl′′ (z∗)
+
+(z+)
+
+It follows that for η sufficiently small we have that 
+
+zt+2 = zt + η2(g2 
+
+> t+1
+
++ 4 gt+1 gt + g2 
+
+> t
+
+)zt − η(gt+1 + gt)(1 + η2gt+1 gt)st + η4g2
+
+> t+1
+
+g2 
+
+> t
+
+zt
+
+≤ zt − γtDγt (zt) + |η2(g2 
+
+> t+1
+
++ 4 gt+1 gt + g2 
+
+> t
+
+)st| + |γt(gt+1 + gt − Dγt (zt)) |
+
++ |η3(gt+1 + gt)gt+1 gtst| + |η4g2
+
+> t+1
+
+g2 
+
+> t
+
+st|≤ z+ − γt
+
+
+
+f 2+ αL′′ (z∗)
+
+(z+) + O(η)
+
+
+
+≤ z+.
+
+A symmetric argument proves that zt+2 ≥ z∗ − σ.This completes the induction. Now recall from Lemma A.3 that 
+
+x2 
+
+> t+1
+
+− y2 
+
+> t+1
+
+= ( x2 
+
+> t
+
+− y2 
+
+> t
+
+)(1 − η2(l′(zt)) 2)
+
+For sufficiently small η, we have 0 ≤ 1 − η2(l′(zt)) 2 ≤ 1. Therefore the above forms a convergent series. This implies that either l′(zt) → 0 or x2 
+
+> t
+
+− y2 
+
+> t
+
+→ 0.Case 1: l′(zt) → 0. Combined with the boundedness of zt and the fact that z∗ is an isolated minimum in R, this immediately implies convergence of zt to z∗.Case 2: x2 
+
+> t
+
+− y2 
+
+> t
+
+→ 0. Letting L be the Lipschitz constant of l′ on [z∗ − σ, z ∗ + σ], for any ϵ > 0 we can assume there exists a time t0 where st = p(x2 
+
+> t
+
+− y2 
+
+> t
+
+)2 + 4 z2 
+
+> t
+
+≤ 1 
+
+> ηL
+
+− ϵ for all t ≥ t0. But using Equation (9) and local convexity, there exists αt with 0 < α t < 1 such that 
+
+zt+1 − z∗ = (1 − αt)( zt − z∗)
+
+namely zt converges monotonically. 
+
+A.5. Descent Lemma 
+
+Here we give a formal statement of the Descent Lemma for reference. 14 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Lemma A.6 (Descent Lemma) . Let f : Rn → R be continuously differentiable, and suppose that its gradient ∇f is 
+
+L-Lipschitz continuous, i.e., 
+
+∥∇ f (x) − ∇ f (y)∥ ≤ L∥x − y∥ for all x, y ∈ Rn.
+
+Then, for all x, y ∈ Rn, we have 
+
+f (y) ≤ f (x) + ∇f (x)⊤(y − x) + L
+
+2 ∥y − x∥2.
+
+## B. Analysis of Training Dynamics 
+
+We start by characterizing a few useful functions for our analysis. 
+
+Lemma B.1. Define ˆZ as the inverse the bifurcation diagrams Z±, with ˆZ(z∗) = 2 
+
+> l′′ (z∗)
+
+. Then ˆZ is twice continuously differentiable with 
+
+ˆZ′(z∗) = 0 ˆZ′′ (z∗) = 2αl(z∗)3( l′′ (z∗)) 3
+
+Proof. It suffices to check the behavior at z∗. Continuity of ˆZ follows from Lemma 5.1. By construction ˆZ satisfies D ˆZ(z)(z) = 0 . Taking the implicit derivative, we find that 
+
+ˆZ′(z∗) = − c2( ˆZ(z∗)) 
+
+c′
+
+> 1
+
+( ˆZ(z∗)) = 0(l′′ (z∗)) 2 = 0 
+
+and 
+
+ˆZ′′ (z∗) = − 2c3( ˆZ(z∗)) + 2 c′
+
+> 2
+
+( ˆZ(z∗)) ˆZ′(z∗) + c′′  
+
+> 3
+
+( ˆZ(z∗))( ˆZ′(z∗)) 2
+
+c′
+
+> 1
+
+( ˆZ(z∗)) = − 2c3( ˆZ(z∗)) 
+
+c′
+
+> 1
+
+( ˆZ(z∗)) =
+
+> 2αl(z∗)3l′′ (z∗)
+
+(l′′ (z∗)) 2
+
+= 2αl(z∗)3( l′′ (z∗)) 3
+
+Lemma B.2. Letting o(z) = z − ˆZ(z)l′(z), define 
+
+Φ( z) = 
+
+   
+
+> −ˆZ′(z)l′(z)z
+> 
+> l′′ (o(z))+ 2ˆZ(z)
+> 
+> +2 l′(z)ˆZ′(z)l′′ (o(z))
+
+, z̸ = z∗, 
+
+> 3( l′′ (z∗)) 3
+> αl(z∗)
+
+, z = z∗.
+
+(18) 
+
+Then Φ is twice continuously differentiable. Proof. It suffices to check the continuity at the hole z = z∗. By Lemma B.1, we have ˆZ(z∗) = 2 
+
+> l′′ (z∗)
+
+and 
+
+ˆZ′(z) = 2αl(z∗)3( l′′ (z∗)) 3 (z − z∗) + O(|z − z∗|2)
+
+15 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Also l′′ (o(z∗)) = l′′ (z∗) and l′(z) = l′′ (z∗)( z − z∗) + O(|z − z∗|2). It follows that 
+
+lim 
+
+> z→z∗
+
+Φ( z) = 2l′′ (z∗)( z − z∗) + O(|z − z∗|2) 
+
+> 2αl(z∗)3( l′′ (z∗)) 3
+
+(z − z∗)l′′ (z∗) + O(|z − z∗|2)= 3( l′′ (z∗)) 3
+
+αl(z∗)
+
+B.1. Phase I 
+
+The following Lemma shows that GD iterates approach the bifurcation diagram. 
+
+Lemma B.3. Under the conditions of Theorem 5.2, there exists T0 such that the following holds: 
+
+| ˆZ(zT ) − γT | = O(η2) (19) 
+
+γT − 2
+
+l′′ (z∗) ≥ δ
+
+2
+
+Proof. By definition of ˆZ, we have 
+
+l′(zt) + l′(zt − ˆZ(zt)l′(zt)) = 0 
+
+Therefore, by the mean value theorem there exists θt such that 
+
+gt + gt+1 = −l′(zt − ˆZ(zt)gt) + l′(zt − γtgt + η2g2 
+
+> t
+
+zt)= l′′ (θt)gt( ˆZ(zt) − γt) + l′′ (θt)η2g2 
+
+> t
+
+zt
+
+Then from Equation (15), we have 
+
+zt+2 − zt = −γt(gt + gt+1 ) + η2(htzt − (gt + gt+1 )gtgt+1 γt) + O(η4g2 
+
+> t
+
+) (20) 
+
+= −γtl′′ (θt)gt( ˆZ(zt) − γt) + O(η2g2 
+
+> t
+
+)
+
+Now using the Mean Value Theorem on ˆZ gives 
+
+ˆZ(zt+2 ) = ˆZ(zt) + ˆZ′(ζt)
+
+h
+
+−γtl′′ (θt)gt( ˆZ(zt) − γtgt)
+
+i
+
++ O(η2g2 
+
+> t
+
+)
+
+On the other hand, by equation Equation (16) we have 
+
+γt+2 − γt = O(η2g2 
+
+> t
+
+)
+
+Combining the previous two equations gives 
+
+ˆZ(zt+2 ) − γt+2 = (1 − ˆZ′(ζt)γtl′′ (θt)gt)( ˆZ(zt) − γt) + O(η2g2 
+
+> t
+
+)
+
+We split into two cases: Case 1: ˆZ(zt) + Kη 2 < γ t.Indeed, looking at Equation (20), we know that −γtl′′ (θt)gt( ˆZ(zt) − γt) has the same sign as zt − z∗. Moreover, using Lemma B.1, observe that ˆZ′(ζt)γtl′′ (θt)gt = Θ( g2 
+
+> t
+
+), so we can choose K sufficiently large such that there exists constant 
+
+C1 such that ˆZ(zt+2 ) − γt+2 ≤  1 − C1g2
+
+> t
+
+ ( ˆZ(zt) − γt) (21) The second inequality implies that | ˆZ(zt) − γt| is monotonically decreasing, hence bounded. Moreover, Equation (20) now implies that |zt − z∗| is increasing, so g2 
+
+> t
+
+does not vanish. Then there exists T0 such that | ˆZ(zt) − γt| ≤ Kη 2.16 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Now Equation (21) implies that 
+
+( ˆZ(z0) − γ0) − ( ˆZ(zT0 ) − γT0 ) = X( ˆZ(zt) − γt) − ( ˆZ(zt+2 ) − γt+2 )
+
+≥ C1
+
+X g2 
+
+> t
+
+( ˆZ(zt) − γt)
+
+≥ C1Kη 2 X g2
+
+> t
+
+On the other hand γt+2 − γt = O(η2g2 
+
+> t
+
+), so there exists C2 such that 
+
+|γT0 − γ0| ≤ X |γt+2 − γt|≤ X C2η2g2
+
+> t
+
+≤ C2
+
+C1K [( ˆZ(z0) − γ0) − ( ˆZ(zT0 ) − γT0 )] 
+
+Choosing K sufficiently large guarantees that this quantity is less than δ 
+
+> 2
+
+, as desired. Case 2: ˆZ(zt) − Kη 2 > γ t.By induction we assume that |γt − 2 
+
+> l′′ (z∗)
+
+| ≥ δ 
+
+> 2
+
+. Then |zt − z∗| ≥ Z±( 2 
+
+> l′′ (z0
+
++ ϵ 
+
+> 2
+
+) so ˆZ′(ζt)γtl′′ (θt)gt is lower bounded by some constant c. It follows that Equation (19) holds at time T = O(log 1 
+
+> η
+
+). Now that γt+2 − γt = O(η2), so 
+
+γT ≥ γ0 − X
+
+> t
+
+|γt+2 − γt|
+
+= 2
+
+l′′ (z0) + δ − O(η2 log 1
+
+η )
+
+≥ 2
+
+l′′ (z0) + δ
+
+2
+
+B.2. Phase II 
+
+Now we provide a more precise characterization of how GD iterates follow the bifurcation diagram. 
+
+Lemma B.4. Under the conditions of Theorem 5.2, there exists C such that if gt ≥ Cη 2, then 
+
+ˆZ(zt+2 ) − γt+2 − η2Φ( zt+2 ) = (1 − ˆZ′(zt)γtl′′ (ot)gt)( ˆZ(zt) − γt + η2Φ( z)) + O(η4gt)
+
+Proof. By definition of ˆZ, we have 
+
+l′(zt) + l′(zt − ˆZ(zt)l′(zt)) = 0 
+
+Therefore, we have 
+
+gt + gt+1 = −l′(zt − ˆZ(zt)gt) + l′(zt − γtgt + η2g2 
+
+> t
+
+zt)= l′′ (ot)( ˆZ(zt)gt − γtgt + η2g2 
+
+> t
+
+zt) + O(η4g2 
+
+> t
+
+)= O(η2gt)
+
+Then from Equation (15), we have 
+
+zt+2 − zt = −γt(gt + gt+1 ) + η2(htzt − (gt + gt+1 )gtgt+1 γt) + O(η4g2 
+
+> t
+
+)= −γtl′′ (ot)( ˆZ(zt)gt − γtgt + η2g2 
+
+> t
+
+zt) − 2η2g2 
+
+> t
+
+zt + O(η4g2 
+
+> t
+
+)= −γtl′′ (ot)gt( ˆZ(zt) − γt) − η2g2 
+
+> t
+
+zt(γtl′′ (ot) + 2) + O(η4g2 
+
+> t
+
+)= O(η2gt)
+
+17 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+where we additionally used the simplification that ht = ( gt + gt+1 )2 + 2 gtgt+1 = −2g2 
+
+> t
+
++ O(η2g2 
+
+> t
+
+).Now a Taylor expansion of ˆZ gives 
+
+ˆZ(zt+2 ) = ˆZ(zt) + ˆZ′(zt)
+
+h
+
+−γtl′′ (ot)gt( ˆZ(zt) − γt) − η2g2 
+
+> t
+
+zt(γtl′′ (ot) + 2) 
+
+i
+
++ O(η4g2 
+
+> t
+
+)
+
+On the other hand, by equation Equation (16) we have 
+
+γt+2 − γt = η2(htγt − 4( gt+1 + gt)zt) + O(η4g2 
+
+> t
+
+) (22) 
+
+= −2η2g2 
+
+> t
+
+γt − 4η2l′′ (ot)gt( ˆZ(zt) − γt)zt + O(η4g2 
+
+> t
+
+)
+
+Combining the previous two equations gives 
+
+ˆZ(zt+2 )−γt+2 = (1 − ˆZ′(zt)γtl′′ (ot)gt +4 η2l′′ (ot)gtzt)( ˆZ(zt)−γt)+ η2g2
+
+> t
+
+
+
+− ˆZ′(zt)zt(γtl′′ (ot) + 2) + 2 γt
+
+
+
++O(η4g2 
+
+> t
+
+)
+
+Using gt ≥ Cη 2, we can simplify the former to 
+
+ˆZ(zt+2 ) − γt+2 = (1 − ˆZ′(zt)γtl′′ (ot)gt)( ˆZ(zt) − γt) + η2g2
+
+> t
+
+
+
+− ˆZ′(zt)zt(γtl′′ (ot) + 2) + 2 γt
+
+
+
++ O(η4gt)
+
+Now by Lemma B.2 and Equation (20), Φ( zt+2 ) − Φ( zt) = O(η2g2 
+
+> t
+
+), and we have 
+
+ˆZ(zt+2 ) − γt+2 − η2Φ( zt+2 ) = (1 − ˆZ′(zt)γtl′′ (ot)gt)( ˆZ(zt) − γt) + η2g2
+
+> t
+
+
+
+− ˆZ′(zt)zt(γtl′′ (ot) + 2) + 2 γt
+
+
+
+− η2Φ( zt) + O(η4gt)= (1 − ˆZ′(zt)γtl′′ (ot)gt)( ˆZ(zt) − γt + η2Φ( z)) + O(η4gt)
+
+where we replaced 2 = 2γt 
+
+> ˆZ(zt)
+
++ O(η2).The following lemma characterizes the claim of decreasing sharpness during Phase II. 
+
+Lemma B.5. Suppose that | ˆZ(zt) − γt| = O(η2). Then there exists C such that if gt ≥ Cη 2, then 
+
+γt+2 ≤ γt
+
+Proof. The statement γt+2 ≤ γt follows from Equation (22), as the first term on the right hand side is negative with magnitude Θ( η2g2 
+
+> t
+
+) while the other terms have order at most O(η4gt).We now leverage Lemma B.4 to get a better approximation of the GD trajectory. 
+
+Lemma B.6. Under the conditions of Theorem 5.2, there exists T1 such that the following hold 
+
+| ˆZ(zT1 ) − γT1 − η2Φ( zT1 )| = O(η4) (23) 
+
+γT1 − 2
+
+l′′ (z∗) ≥ δ
+
+4
+
+Proof. By Lemma B.3, there exists T0 such that 
+
+| ˆZ(zT0 ) − γT0 | = O(η2)
+
+γT0 − 2
+
+l′′ (z∗) ≥ δ
+
+2
+
+18 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+We can assume by induction that γt − 2 
+
+> l′′ (z∗)
+
+≥ δ 
+
+> 4
+
+holds, so zt − z∗ is bounded away from 0. It follows that ˆZ′(zt)γtl′′ (ot)gt
+
+is bounded away from 0. Then by Lemma B.4 and a similar argument to Case 2 of Lemma B.3, we conclude that 
+
+| ˆZ(zT1 ) − γT1 − η2Φ( zT1 )| = O(η4) holds at time T1 = T0 + O(log 1 
+
+> η
+
+) and 
+
+γT1 ≥ γT0 − X
+
+> t
+
+|γt+2 − γt|
+
+= 2
+
+l′′ (z0) + δ
+
+2 − O(η2 log 1
+
+η )
+
+≥ 2
+
+l′′ (z0) + δ
+
+4
+
+This proves the lemma. 
+
+Lemma B.7. Under the conditions of Theorem 5.2, there exists T2 such that the following hold 
+
+| ˆZ(zT2 ) − γT2 − η2Φ( zT2 )| = O(η 83 ) (24) 
+
+|zT2 − z∗| = O(η 43 )
+
+Proof. By Lemma B.6, we can find T1 such that 
+
+| ˆZ(zT1 ) − γT1 − η2Φ( zT1 )| ≤ Dη 83
+
+Now applying Lemma B.4, we have 
+
+| ˆZ(zt+2 ) − γt+2 − η2Φ( zt+2 )| ≤ | (1 − ˆZ′(zt)γtl′′ (ot)gt)( ˆZ(zt) − γt + η2Φ( z)) | + D1η4gt
+
+≤ (1 − ˆZ′(zt)γtl′′ (ot)gt)) Dη 83 + D1η4|gt|
+
+Now we can choose C large enough such that while |zt − z∗| ≥ Cη 43 , we have ( ˆZ′(zt)γtl′′ (ot)gt)Dη 83 + D1η4|gt| ≤ 0, so Equation (24) holds by induction. Now suppose for the sake of contradiction |zt − z∗| ≥ Cη 43 holds for all t. Then by Equation (10), γt will continue to decrease exponentially. But if γt is sufficiently smaller than 2 
+
+> l′′ (z∗)
+
+, then Equation (24) cannot hold. We conclude that there exists some time T2 where both the stated conditions are satisfied. 
+
+B.3. Phase III 
+
+From Phase II, we have tracked the GD iterates until very close to the minimum. We show that from this point onwards the iterates converge linearly. 
+
+Lemma B.8. Under the conditions of Theorem 5.2, zt converges to z∗ and the γt converges to 2 
+
+> l′′ (z∗)
+
+− η2Φ( z∗) + O(η 83 ).Proof. By Lemma B.7, there exists time T2 such that 
+
+| ˆZ(zT2 ) − γT2 − η2Φ( zT2 )| = O(η 83 )
+
+|zT2 − z∗| = O(η 43 )
+
+Suppose at some time t the above two conditions are satisfied. By Lemma B.1, we have | ˆZ(zt) − ˆZ(z∗)| = O(|zt − z∗|2) = 
+
+O(η 83 ). And by Lemma B.2 we have |Φ( zt) − Φ( z∗)| = O(|zt − z∗|) = O(η 43 ). Therefore 
+
+γt = ˆZ(zt) − η2Φ( zt) + O(η 83 )= ˆZ(z∗) − η2Φ( z∗) + O(η 83 )= 2
+
+l′′ (z∗) − η2Φ( z∗) + O(η 83 )
+
+19 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Now a Taylor expansion of l′ gives 
+
+l′(zt) = l′′ (z∗)( zt − z∗) + O(|zt − z∗|2)
+
+Assume by induction that ˆZ(zt) − γt − η2Φ( z∗) = O(η 83 ). Then from Equation (20), we have 
+
+zt+2 − zt = −γtl′′ (θt)gt( ˆZ(zt) − γt) + O(η2g2 
+
+> t
+
+)= −γtl′′ (θt)l′′ (z∗)( zt − z∗)η2Φ( z∗) + O(η 83 |zt − z∗|) + O(η2|zt − z∗|2)
+
+zt+2 − z∗ = (1 − η2γtl′′ (θt)l′′ (z∗)Φ( z∗))( zt − z∗) + O(η 83 |zt − z∗|) + O(η2|zt − z∗|2)
+
+For sufficiently small η, there exists constant C such that 
+
+zt+2 − z∗ = (1 − Cη 2)( zt − z∗)
+
+It follows that zt converges linearly to z∗.Finally, from Equation (16) we have 
+
+γT − γT2 ≤ X
+
+> t
+
+|γt+2 − γt|≤ X
+
+> t
+
+C1η2|zt − z∗|2
+
+≤ X
+
+> t
+
+C1η2(( zT2 − z∗)(1 − Cη 2)) 2t
+
+= O(|(zT2 − z∗|2)= O(η 83 ).
+
+This completes the proof 
+
+B.4. Proof of Theorem 5.2 
+
+We now show Theorem 5.2 as an immediate consequence of Lemma B.8 
+
+Proof. By Lemma B.8, at convergence we have 
+
+ηs = 2
+
+l′′ (z∗) − η2Φ( z∗) + O(η 83 ).
+
+Rearranging gives 
+
+sl ′′ (z∗) = 2
+
+η − ηl ′′ (z∗)Φ( z∗) + O(η 53 )
+
+By Lemma 3.1, this is precisely the sharpness at the local minimum. Substituting the value of Φ( z∗) gives the desired result. 
+
+## C. Proof of Lemmas in Section 6 
+
+C.1. Proof of Lemma 6.1 
+
+Proof. Let s = σ(z). Then BCE ′ 
+
+> q
+
+(z) = s − q
+
+BCE ′′  
+
+> q
+
+(z) = s(1 − s)
+
+BCE (3)  
+
+> q
+
+(z) = s(1 − s)(2 − s)
+
+BCE (4)  
+
+> q
+
+(z) = s(1 − s)(1 − 6s − 6s2)
+
+20 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Then 
+
+αBCE q (z) = 2 s2(1 − s)2(3 s2 − 3s + 1) > 0.
+
+C.2. Proof of Lemma 6.2 
+
+Proof. We have MLSq ′
+
+> n
+
+(z) = 2( zn − a)( nz n−1)
+
+MLSq ′′ 
+
+> n
+
+(z) = 2 n[( n − 1) zn−2(zn − a) + nz 2n−2]
+
+MLSq (3)  
+
+> n
+
+(z) = 2 n[( n − 1)( n − 2) zn−3(zn − a) + 3 n(n − 1) z2n−3]
+
+MLSq (4)  
+
+> n
+
+(z) = 2 n[( n − 1)( n − 2)( n − 3) zn−4(zn − a) + ( n − 1)(7 n − 6) z2n−4]
+
+Set z∗ = a 1 
+
+> n
+
+. Then 
+
+αMLSq a,n (z∗) = 3  6n2(n − 1) z2n−3
+
+> ∗
+
+2 − (2 n2z2n−2 
+
+> ∗
+
+)(2 n(n − 1)(7 n − 6) z2n−4
+
+> ∗
+
+= 4 n3(n − 1)(27 n2 − 34 n + 6) x4n−60
+
+> 0
+
+C.3. Proof of Lemma 6.5 
+
+Proof. Since scaling the loss by a constant does not affect the product-stability, WLOG assume Ca = 1 .Let g(z) = log( ez + 1) + log( e−z + 1) , such that la(z) = ( g(z − 1)) a. Denoting u = ez , v = e−z
+
+g′(z) = u
+
+1 + u − v
+
+1 + vg′′ (z) = u
+
+(1 + u)2 + v
+
+(1 + v)2
+
+g(3) (z) = u(1 − u)(1 + u)3 − v(1 − v)(1 + v)3
+
+g(4) (z) = u(1 − 4u + u2)(1 + u)4 − v(1 − 4v + v2)(1 + v)4
+
+Thus we have g(0) = 2 log 2 , g ′(0) = 0 , g ′′ (0) = 12 g(3) (z) = 0 , g (4) (z) = − 14 .Now another calculation shows 
+
+f ′(z) = a g (z − 1) a−1 g′(z − 1) 
+
+f ′′ (z) = a
+
+h
+
+(a − 1) g(z − 1) a−2 (g′(z − 1)) 2 + g(z − 1) a−1 g′′ (z − 1) 
+
+i
+
+f (3) (z) = a
+
+h
+
+(a − 1)( a − 2) g(z − 1) a−3 (g′(z − 1)) 3
+
++ 3( a − 1) g(z − 1) a−2 g′(z − 1) g′′ (z − 1) + g(z − 1) a−1 g(3) (z − 1) 
+
+i
+
+f (4) (z) = a
+
+h
+
+(a − 1)( a − 2)( a − 3) g(z − 1) a−4 (g′(z − 1)) 4
+
++ 6( a − 1)( a − 2) g(z − 1) a−3 (g′(z − 1)) 2 g′′ (z − 1) + 3( a − 1) g(z − 1) a−2 (g′′ (z − 1)) 2
+
++ 4( a − 1) g(z − 1) a−2 g′(z − 1) g(3) (z − 1) + g(z − 1) a−1 g(4) (z − 1) 
+
+i
+
+21 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Then 
+
+f ′′ (1) = a
+
+2 (2 log 2) a−1
+
+f (3) (1) = 0 
+
+f (4) (1) = a
+
+4 (−(2 log 2) a−1 + 3( a − 1)(2 log 2) a−2)
+
+We conclude that 
+
+αla (1) = a2
+
+8 (2 log 2) 2a−3(2 log 2 − 3( a − 1)) > 0
+
+## D. Experimental Setup 
+
+D.1. Calculating the Multivariate Product Stability 
+
+We provide the following code for calculating the multivariate product stability. 
+
+def get_hvp(closure, params, vec, create_graph=False): loss = closure() grads = torch.autograd.grad(loss, params, create_graph=True) flat_grads = torch.cat([g.reshape(-1) for g in grads]) hvp = torch.autograd.grad( flat_grads, params, grad_outputs=vec, create_graph=create_graph )hvp_flat = torch.cat([h.reshape(-1) for h in hvp]) return hvp_flat if create_graph else hvp_flat.detach() def pseudo_inverse_cg(closure, params, b, iters=50, tol=1e-8): """ Computes x = Hˆ+ b using CGLS. This gives the minimum-norm solution even if H is singular. """ x = torch.zeros_like(b) # r = b - Hx r = b.clone() # s = HˆT r (Hessian is symmetric) s = get_hvp(closure, params, r, create_graph=False) p = s.clone() norm_s_old = torch.dot(s, s) for _ in range(iters): Hp = get_hvp(closure, params, p, create_graph=False) denom = torch.dot(Hp, Hp) + 1e-12 alpha = norm_s_old / denom x = x + alpha * p r = r - alpha * Hp 
+
+22 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+# convergence check if torch.norm(r) < tol: break s = get_hvp(closure, params, r, create_graph=False) norm_s_new = torch.dot(s, s) beta = norm_s_new / (norm_s_old + 1e-12) p = s + beta * pnorm_s_old = norm_s_new return xdef compute_robust_stability(model, loss_fn, data, target): params = [p for p in model.parameters() if p.requires_grad] def closure(): logits = model(data) return loss_fn(logits, target) # ---------------------------# 1. Power iteration # ---------------------------v = torch.randn(sum(p.numel() for p in params)) v /= (torch.norm(v) + 1e-9) for _ in range(30): hv = get_hvp(closure, params, v, create_graph=False) v = hv / (torch.norm(hv) + 1e-9) # ---------------------------# higher-order # ---------------------------loss = closure() grads = torch.autograd.grad(loss, params, create_graph=True) flat_grads = torch.cat([g.reshape(-1) for g in grads]) hvp_v = torch.autograd.grad( flat_grads, params, grad_outputs=v, create_graph=True )hvp_v_flat = torch.cat([h.reshape(-1) for h in hvp_v]) phi = torch.dot(hvp_v_flat, v) # g3 g3_list = torch.autograd.grad(phi, params, create_graph=True) g3 = torch.cat([g.reshape(-1) for g in g3_list]) # ---------------------------# 3. CG solve # ---------------------------h_inv_g3 = pseudo_inverse_cg(closure, params, g3.detach()) term1 = 3 * torch.dot(g3.detach(), h_inv_g3) # ---------------------------# 4. 4th derivative # ---------------------------d4_list = torch.autograd.grad(torch.dot(g3, v), params) d4 = torch.dot(torch.cat([d.reshape(-1) for d in d4_list]), v) return (term1 - d4).item() 
+
+23 Product-Stability: Provable Convergence for Gradient Descent on the Edge of Stability 
+
+Figure 6. Loss Oscillation in EoS Regime. Zoomed in version of Figure 5a, showing that the loss is oscillating in the EoS regime. 
+
+24

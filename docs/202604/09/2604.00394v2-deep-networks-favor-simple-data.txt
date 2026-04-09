@@ -1,0 +1,220 @@
+Title: Deep Networks Favor Simple Data
+
+URL Source: https://arxiv.org/pdf/2604.00394v2
+
+Published Time: Fri, 03 Apr 2026 00:22:50 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# Deep Networks Favor Simple Data 
+
+Weyl Lu 1, Chenjie Hao 1, and Yubei Chen 1
+
+UC Davis, USA 
+
+Abstract. Estimated density is often interpreted as indicating how typ-ical a sample is under a model. Yet deep models trained on one dataset can assign higher density to simpler out-of-distribution (OOD) data than to in-distribution test data. We refer to this behavior as the OOD anomaly. Prior work typically studies this phenomenon within a single architecture, detector, or benchmark, implicitly assuming certain canon-ical densities. We instead separate the trained network from the density estimator built from its representations or outputs. We introduce two es-timators: Jacobian-based estimators and autoregressive self-estimators, making density analysis applicable to a wide range of models. Applying this perspective to a range of models, including iGPT, Pixel-CNN++, Glow, score-based diffusion models, DINOv2, and I-JEPA, we find the same striking regularity that goes beyond the OOD anomaly: 
+
+lower-complexity samples receive higher estimated density, while higher-complexity samples receive lower estimated density . This ranking appears within a test set and across OOD pairs such as CIFAR-10 and SVHN, and remains highly consistent across independently trained models. To quantify these rankings, we introduce Spearman rank corre-lation and find striking agreement both across models and with external complexity metrics. Even when trained only on the lowest-density (most complex) samples — or even a single such sample — the resulting models still rank simpler images as higher density. These observations lead us beyond the original OOD anomaly to a more general conclusion: deep networks consistently favor simple data. Our goal is not to close this question, but to define and visualize it more clearly. We broaden its empirical scope and show that it appears across architectures, objectives, and density estimators. 
+
+# 1 Introduction 
+
+The Puzzle. Train a deep model on CIFAR-10, and ask it which images look more probable. One might expect the model to favor the data distribution it was trained on. Yet likelihood-based models have long displayed a disturbing habit: they can assign higher density to visually simpler out-of-distribution data, such as SVHN, than to the CIFAR-10 test images themselves [10]. This behavior is often treated as a peculiarity of a particular detector, architecture, or benchmark. We believe that interpretation is too narrow. The real puzzle is not merely that likelihood sometimes fails as an OOD score. The deeper puzzle is that, across remarkably different deep networks, high estimated density keeps concentrating on simple data .
+
+> arXiv:2604.00394v2 [cs.LG] 2 Apr 2026
+
+2 W. Author et al. 
+
+Fig. 1: Density rankings on the CIFAR-10 test set. For each model, CIFAR-10 test images are sorted by estimated density (high → low) and visualized through stratified samples along this ranking. Top: base models trained on the full training set. 
+
+Middle (LDT10): models retrained on the lowest-density training subset (the lowest 10% of training samples). Bottom (LDT1): models trained on a single lowest-density example. Across all settings the ranking consistently progresses from simple to com-plex images (even under single-sample training). All base models identify the same training image (CIFAR-10 id 29920) as the lowest-density sample; the corresponding LDT10 subset examples and the LDT1 example are shown on the right bottom. Deep Networks Favor Simple Data 3
+
+This paper starts from a simple empirical observation. If we rank CIFAR-10 test images from high to low estimated density, then across many independently trained deep models, the top-ranked images tend to be visually simple: smoother backgrounds, stronger low-frequency structure, larger homogeneous regions, and fewer intricate local details. The bottom-ranked images tend to be the oppo-site. More surprisingly, different models often induce almost the same ranking. Autoregressive image models, flow-based models, score-based diffusion models, and even representation learners frequently agree on which samples are “easy” and which are “hard.” The familiar CIFAR-10 versus SVHN effect is therefore not the whole story. It is only the most visible cross-dataset manifestation of a broader within-dataset ranking. Existing work has illuminated important aspects of this problem without fully exhausting it. Nalisnick et al . showed that deep generative models can assign higher likelihood to OOD data and analyzed this effect through local second-order expansions around the data mean [10]. Subsequent work explained parts of the phenomenon through architectural inductive bias in normalizing flows [9], through the mismatch between density and typicality in high dimen-sions [11], through input complexity and compression-based corrections [18], and through uncertainty-aware or ratio-based detectors such as model ensembles and likelihood ratios [5,6,16]. These are valuable advances. But taken together, they still leave open a more basic question: why do deep networks, across architectures and training paradigms, keep assigning higher density to simpler samples in the first place? 
+
+Our starting point is conceptual. A trained deep network should not be casually identified with one unique, canonical sample density. A network is a learned mapping; a density estimate is a statistical object constructed from that mapping. The distinction matters. Related work has studied several forms of simplicity bias in deep learning, including a bias toward simple input–output functions in function space [21], pitfalls where SGD can over-rely on the sim-plest predictive features [19], and frequency/spectral biases where networks fit low-frequency components earlier or more readily [2, 15, 22]. These notions are important but not identical to the phenomenon we define here: our notion of simplicity is operationalized at the sample level through the density rankings induced by network-based estimators. Once we separate the network from the density estimator built from it, many seemingly unrelated results fall into a com-mon pattern. In this paper, we study network-induced density estimators : ways of assigning a density score to an input by using either the model’s explicit fac-torization or its learned feature geometry. This viewpoint is deliberately broader than the standard likelihood literature, and it lets us compare models that are usually discussed in separate communities. We focus on two estimator families. The first is Jacobian-based estimation .Here a sample is mapped to a latent or feature space equipped with a simple reference distribution, and its input-space density is estimated through a local Jacobian volume term; standard flow likelihood is the square, invertible special case, while more general feature maps yield a rectangular Jacobian estimator 4 W. Author et al. 
+
+defined through singular-value volume correction [1, 3, 13]. This perspective also covers diffusion and score-based models through their continuous-flow interpreta-tion, or equivalently through score integration [20]. The second is autoregressive self-estimation , where the model directly factorizes the probability of a sequence into conditional probabilities over pixels or tokens, as in PixelCNN, iGPT, and GPT-style language models [4, 12, 14]. One estimator is externally induced from the network’s geometry; the other is internally provided by the model itself. Together, they give us a unified way to ask how different deep networks rank samples by density. Viewed through these estimators, a striking empirical law emerges. Across all tested families, estimated density is systematically anti-correlated with sample complexity. The law appears within a single in-distribution test set and does not require OOD data to be visible. It also appears across datasets, where it recovers the classical OOD anomaly as a special case: simpler OOD datasets can outrank more complex in-distribution ones. This is not limited to a single architecture, modality, or training objective. We observe it in autoregressive image generators, flow-based models, score-based diffusion models, self-supervised representation learners such as DINOv2 and I-JEPA, and autoregressive language models. The consistency of the induced rankings is one of the strongest pieces of evidence in our study. For CIFAR-10, independently trained models within the same family produce highly similar sample rankings, with strong Spearman and Kendall correlations across runs. This remains true not only for fully trained models but also under severe data restriction. If we first use a trained model to identify the lowest-density, most complex tail of the training set, and then retrain using only that 10% subset, the new model still reconstructs a similar ranking over test samples. More strikingly, in our most extreme experiment, even training on a single low-density sample can still produce a nontrivial ranking that aligns with the broader simplicity ranking. These results suggest that the effect is not merely caused by the presence of many simple training examples. Rather, the ranking appears to reflect a deeper bias in how deep networks organize data once they are trained at all. We also find one notable caveat: DINOv2 is less consistent on CIFAR-10 than the other families, which we attribute to the strong mismatch between CIFAR-10 resolution and the much higher-resolution regime of DINOv2 pretraining. What, then, is the right way to think about the classical OOD phenomenon? Our answer is that the OOD likelihood anomaly is not the main event. It is the visible tip of a larger regularity: deep networks prefer simple data . In image space this preference aligns with low-frequency structure, reduced fine-scale variability, and lower external complexity measures; in text, it appears as high-likelihood but semantically impoverished or structurally repetitive strings. Once viewed in this way, many earlier “fixes” become easier to interpret. Methods based on likelihood ratios, compression-based background statistics, or model uncertainty often improve OOD detection precisely because they partially cancel or invert the underlying simplicity ranking, rather than because they fully recover a uniquely correct notion of semantic density. Deep Networks Favor Simple Data 5
+
+Our goal in this paper is therefore modest in one sense and ambitious in another. We do not claim to provide a final theory of why this happens. But we do aim to define the phenomenon more clearly, broaden its empirical scope, and show that it is far more universal than the literature has typically acknowledged. Specifically, we make the following contributions: 
+
+– We introduce a unified estimator viewpoint that separates a trained deep net-work from the density estimator induced by its outputs or learned features, allowing autoregressive, flow-based, diffusion/score-based, and representation-learning models to be studied in a common framework. 
+
+– We show that across all tested models, estimated density is consistently anti-correlated with sample complexity, both within in-distribution datasets and across classical in-distribution / out-of-distribution pairs. 
+
+– We demonstrate strong rank consistency across independently trained mod-els using Spearman and Kendall correlations, and show that this consis-tency persists under severe data restriction, including retraining on only the lowest-density 10% of the training set and, in an extreme setting, on a single low-density sample. 
+
+– We argue that the classical OOD likelihood anomaly should be understood not as an isolated failure mode of specific likelihood models, but as a special case of a broader simplicity preference of deep networks. The rest of the paper develops this view. We first formalize the density estima-tors used throughout the paper. We then present the empirical phenomenology across models, datasets, and training regimes. Finally, we discuss why a pref-erence for simple data may arise so broadly, and why existing OOD fixes may succeed without addressing the underlying phenomenon itself. 
+
+# 2 Density Estimators, Rankings, and Complexity Measures 
+
+This section introduces the three ingredients used throughout the analysis: den-sity estimators, the rankings they induce, and external measures of image com-plexity. Given a trained network fθ and a density estimator E, each image x receives a score sθ, E (x). The analysis focuses on the ranking induced by this score rather than on absolute density values. This density ranking is the primary observable in the paper: while the numerical scales of different estimators are often incom-parable, the relative ranking of samples can be consistently compared across models, training settings, and external complexity measures. 
+
+2.1 Density estimators 
+
+We adopt a different viewpoint from much of the likelihood literature. Rather than assuming that each model comes with a single canonical density, the trained network and the density estimator derived from it are treated as two separate 6 W. Author et al. 
+
+objects. A model provides representations or conditional predictions, while a density estimator is constructed from these quantities. This separation makes it possible to analyze a wide range of architectures under a common framework. Two estimators are used throughout the paper: Jacobian-based estimators, which derive density-like scores from feature geom-etry, and autoregressive self-estimators, where the model directly factorizes the data likelihood. 
+
+Jacobian-based estimators For invertible flow models, density is obtained exactly by change of variables. If z = fθ (x) is an invertible square map and 
+
+p0(z) is a tractable base density, then 
+
+log ˆ p(x) = log p0(fθ (x)) + log | det Jfθ (x)|. (1) This is the standard flow likelihood [8]. The same geometric idea extends beyond square invertible maps. For a gen-eral representation z = fθ (x) ∈ Rm, let σ1, . . . , σ r denote the nonzero singular values of the Jacobian. We use the local log-volume term 
+
+log vol( Jfθ (x)) = 
+
+> r
+
+X
+
+> i=1
+
+log σi
+
+ Jfθ (x), (2) which reduces to log | det J| in the square case. Combined with a simple reference density in feature space (e.g., a Gaussian), this yields a Jacobian-based density estimator for representation models. Balestriero et al. [1] first applied this idea to a class of representation-learning models by assuming Gaussian feature embeddings and extracting density from the associated Jacobian geometry. Our use of the estimator is broader: we apply the same Jacobian-based construction to arbitrary networks, including models whose outputs or representations were not originally designed for density esti-mation (and even to models whose primary density estimator is autoregressive). Moreover, the Gaussian assumption is not essential for the ranking behavior studied here. Empirically we find that a much weaker condition suffices: the vari-ability of the feature-space log-density term is small compared to the Jacobian log-volume term. Under this regime the Jacobian contribution dominates the induced ranking. This observation will be discussed in more detail in Sec. 3.5. For general encoders, the resulting quantity is treated as a principled density 
+
+estimator rather than necessarily a normalized density. Score-based diffusion models admit density evaluation through the stan-dard score-based likelihood route, equivalently through the probability-flow / score-integration formulation [20]. In the experiments, Diffusion refers to the ImageNet-64 pretrained score-based diffusion model released with Dual Score Matching [7]. When applied to CIFAR-10, high-resolution models such as DI-NOv2, I-JEPA, and Diffusion receive bicubically upsampled inputs before density estimation. Deep Networks Favor Simple Data 7
+
+Autoregressive self-estimators Autoregressive models provide an intrinsic density estimator through conditional factorization. For an image rasterized into a sequence x = ( x1, . . . , x T ),
+
+log ˆ pAR (x) = 
+
+> T
+
+X
+
+> t=1
+
+log pθ (xt | x<t ). (3) This applies directly to autoregressive image models such as PixelCNN++ and iGPT [4, 17]. Unlike Jacobian-based estimators, the density score here is produced intrinsically by the model through next-pixel prediction. 
+
+2.2 Ranking and rank correlation 
+
+Given an evaluation set D = {xi}Ni=1 , each model–estimator pair induces a den-sity ranking rm(xi) obtained by sorting images from highest to lowest estimated density. This density ranking is the primary observable throughout the paper. 
+
+To compare two rankings ra and rb, we use Spearman rank correlation 
+
+ρs(a, b ) = corr  ra(xi), r b(xi)Ni=1 . (4) A value close to 1 indicates that two methods produce nearly identical rank-ings, values near 0 indicate weak agreement, and negative values indicate re-versed rankings. Spearman correlation provides a common language for compar-ing density estimators, external complexity measures, and modified estimators throughout the paper. Two correlation visualizations will be used repeatedly. In Fig. 2, each lower-triangular entry shows the Spearman correlation between the full-dataset rank-ings produced by two models or proxies. In Fig. 3, each panel corresponds to one architecture family and compares rankings across training regimes: Base 
+
+uses the full CIFAR-10 training set, LDT10 retrains on the lowest-density 10% 
+
+subset of the training data, LDT1 retrains on the single lowest-density training image, and UT denotes the randomly initialized untrained model. 
+
+2.3 External complexity measures 
+
+To relate density rankings to image complexity, we introduce two external prox-ies. The first is JPEG complexity , defined as the negative compressed length of the JPEG representation so that larger values correspond to simpler images. The second is a gradient-based proxy, 
+
+cgrad (x) = − log 
+
+
+
+1 + TV(gray( x)) 
+
+
+
+, (5) where TV(gray( x)) is the sum of the mean absolute horizontal and vertical differences of the grayscale image. Both proxies are signed so that larger values correspond to simpler images. Positive Spearman correlation with these measures therefore indicates that a model ranks simpler images as higher density. 8 W. Author et al. 
+
+# 3 Deep networks favor simple data 
+
+3.1 Base models reveal the same simple-to-complex axis 
+
+The cleanest place to start is not OOD detection but within-dataset ranking. The 
+
+top row of Fig. 1 sorts CIFAR-10 test images by estimated density for five base models. Across I-JEPA, Diffusion, iGPT, PixelCNN++, and Glow, the same vi-sual progression appears again and again: higher-density images are smoother, cleaner, and more compressible, whereas lower-density images are busier, more textured, and compositionally irregular. This is already stronger than the clas-sical OOD anomaly. Even inside one nominal test distribution, different model families rank samples along a similar simple-to-complex axis. The middle row of Fig. 1 shows that this axis is not tied to training on the full dataset. After retraining on the lowest-density 10% of CIFAR-10 training images (LDT10), iGPT, PixelCNN++, and Glow still rank evaluation images from simple to complex. The bottom row reveals an even more extreme case: after training on a single lowest-density image (LDT1), iGPT and Glow continue to produce a recognizable ranking over the full test set. In all three base-model families, the lowest-density CIFAR-10 training image selected by the base model is the same training example, id 29920. This makes the single-sample result especially stark: the model is trained to overfit one complex image and still ends up preferring many unseen simple images. 
+
+3.2 Interpreting the correlation maps 
+
+Figure 2 summarizes the full-dataset ranking agreement. Read each entry as fol-lows: pick a row and a column; the number in their intersection is the Spearman correlation between the two induced rankings. Thus, to ask whether two mod-els sort CIFAR-10 in the same way, inspect their intersection. To ask whether a model follows an external notion of simplicity, inspect its intersection with JPEG or gradient complexity. Several facts are immediate from Fig. 2. First, excluding the DINOv2 row / column, the inter-model agreement is uniformly positive and often strong: I-JEPA correlates 0.46 with Diffusion and 0.49 with iGPT; Diffusion correlates 
+
+0.89 with PixelCNN++ and 0.75 with iGPT; PixelCNN++ and iGPT corre-late 0.75 . These are substantial agreements between models with very different architectures, training objectives, and density estimators. Second, the external complexity proxies line up with the model-induced rank-ings. Looking at the JPEG-complexity row / column in Fig. 2, the correlations are 0.58 with I-JEPA, 0.76 with Diffusion, 0.90 with PixelCNN++, and 0.73 
+
+with iGPT. The gradient-complexity row / column shows the same trend, with correlations 0.59 , 0.49 , 0.55 , and 0.73 respectively. These numbers should not be read as proving that JPEG compression or gradient total variation is the fi-nal answer. They are only proxies. What matters is that independently designed external complexity measures recover essentially the same sample ranking .Deep Networks Favor Simple Data 9 
+
+> Fig. 2: Spearman correlations between rankings induced by the base models and by external complexity proxies. The lower triangle is shown. Positive values mean two methods rank CIFAR-10 images in a similar rank from simple / high-density to complex / low-density. The row / column labeled “Glow+JPEG complexity” is the JPEG-based correction inspired by Serra et al. [18].
+
+Third, the JPEG-based correction inspired by Serra et al. [18] does not elim-inate the phenomenon. Inspect the “Glow+JPEG complexity” row / column in Fig. 2: it still correlates 0.98 with PixelCNN++, 0.86 with Diffusion, 0.77 with iGPT, and 0.96 with JPEG complexity itself. In other words, the corrected es-timator remains strongly aligned with the same underlying simple-to-complex direction. It can alter an OOD decision boundary without removing the bias. The one conspicuous exception is DINOv2 on CIFAR-10. Its row / column is close to zero against Diffusion ( −0.05 ), PixelCNN++ ( −0.07 ), and iGPT (−0.02 ), and only moderately positive against I-JEPA ( 0.42 ). We return to this caveat in Sec. 3.4. 10 W. Author et al.  
+
+> Fig. 3: Spearman correlations between rankings induced by different training settings within each architecture family. Base uses the full CIFAR-10 training set, LDT10 uses only the lowest-density 10% of the training set, LDT1 uses only the single lowest-density image, and UT is the untrained network. Each LDT setting is shown at two widely separated checkpoints to reduce the chance of reporting a transient undertrained state.
+
+3.3 Low-density retraining and single-sample training 
+
+Figure 3 is the key quantitative test of whether the ranking is merely inherited from the full dataset or actively regenerated by training. Each panel compares training settings within one architecture family. The first row / column of each panel compares the untrained model (UT) to trained checkpoints. The remaining entries compare Base, LDT10, and LDT1 rankings. The left panel of Fig. 3 shows that iGPT is remarkably stable. Base correlates 
+
+0.80 and 0.94 with the two LDT10 checkpoints, and 0.96 and 0.94 with the two LDT1 checkpoints. Thus, once iGPT has trained at all, even a single complex training image is enough to regenerate almost the same ranking axis. The right panel shows the same phenomenon for Glow. Base correlates 1.00 
+
+with both LDT10 checkpoints and still correlates 0.89 and 0.84 with the two LDT1 checkpoints. This is a striking result: the exact flow likelihood computed after single-image training continues to rank unseen CIFAR-10 images almost the same way as the full-dataset model. PixelCNN++ is the interesting exception. In the middle panel, Base cor-relates 0.91 and 0.98 with the two LDT10 checkpoints, so the low-density-tail experiment still preserves the global ranking. But Base correlates only 0.13 with each LDT1 checkpoint. Thus the single-sample regime breaks the ranking for PixelCNN++, even though the broader LDT10 result survives. We suspect that the convolutional autoregressive architecture is especially prone to overfitting local appearance statistics of the single image, particularly color and texture. This interpretation is consistent with the qualitative strip in Fig. 4, where the single-sample PixelCNN++ model ranks images more by superficial resemblance to the training image than by the broader simplicity axis. The UT row / column in Fig. 3 clarifies what is and is not innate. For iGPT and PixelCNN++, the untrained model is essentially uncorrelated with the trained ranking (Base correlations 0.03 and 0.02 respectively), so the preference is Deep Networks Favor Simple Data 11   
+
+> Fig. 4: PixelCNN++ after training on a single lowest-density image. Unlike iGPT and Glow, the single-sample PixelCNN++ ranking no longer follows the global simplicity ranking from the base model. The failure is already visible quantitatively in the middle panel of Fig. 3 and is shown qualitatively here.
+> Fig. 5: DINOv2 on bicubically upsampled CIFAR-10. Compared with the other models, the density bins display a much weaker monotone progression from simple to complex. This is consistent with the weak DINOv2 row / column in Fig. 2.
+
+not present at initialization. Glow is different: the untrained Glow model already has a moderate correlation of 0.48 with Base, and even higher correlations with the single-sample checkpoints ( 0.70 and 0.75 ). Glow therefore seems to possess an architectural simplicity bias that training subsequently sharpens. These results matter because they directly challenge a common tacit assump-tion: that a fitted density estimator primarily reflects the probability density of the training distribution. In the LDT10 and especially the LDT1 experiments, the model never sees the simple images it ends up preferring. No adversarial construction is needed. On natural data alone, the learned density ranking can be strongly decoupled from the empirical training distribution. 
+
+3.4 Higher-resolution models and the DINOv2 caveat 
+
+The DINOv2 behavior on CIFAR-10 deserves special discussion. To score CIFAR-10 with DINOv2, I-JEPA, and Diffusion, we bicubically upsample the images to the corresponding input resolution. I-JEPA and Diffusion still exhibit the ex-pected positive preference for simple images, but DINOv2 does not. This can already be seen in Fig. 2, where the DINOv2 row / column is weakly correlated with most other models. Figure 5 makes the CIFAR-specific DINOv2 behavior visible. Moving from the first density bin to the last does not produce the same monotone simple-to-complex progression seen in the other models. Our working interpretation is not that DINOv2 escapes the phenomenon in general, but that the combination of strong bicubic upsampling and DINOv2’s own inductive bias disrupts the CIFAR-10 ranking. The higher-resolution analysis on ImageNet-1K matches the main trend. As shown in Fig. 6a, Diffusion, I-JEPA, and DINOv2 exhibit clear positive inter-model rank agreement (Spearman ρs ≈ 0.54 –0.57 ), and their rankings also align 12 W. Author et al.          
+
+> (a) Highest-and lowest-density eagle images (ImageNet-1k/64) ranked by Diffusion, I-JEPA, and DINOv2. Across models, rankings exhibit a consistent simple-to-complex progression from left (high density) to right (low density).
+> (b) Spearman rank correla-tions between model rankings on the same eagle subset.
+
+Fig. 6: Density rankings on the ImageNet eagle subset. Left: qualitative rankings pro-duced by Diffusion, I-JEPA, and DINOv2 show a consistent simple-to-complex ranking of images. Right: Spearman rank correlations confirm substantial agreement between the rankings produced by different models. 
+
+Fig. 7: Glow likelihood decomposition on CIFAR-10, with samples sorted by log p(x)
+
+in descending order. 
+
+Fig. 8: A tiny Gaussian perturbation de-stroys the classical OOD advantage of SVHN under Glow. 
+
+with JPEG-based complexity ( ρs ≈ 0.51 –0.66 ). Fig. 6b further visualizes a single ImageNet-1K class: across all three models, high-density ranks concentrate on cleaner, simpler instances, while low-density ranks shift toward more cluttered and textured images. In contrast to the CIFAR-10 behavior in Fig. 5, DINOv2 is not an outlier at ImageNet-1K resolution, supporting the interpretation that the CIFAR-10 discrepancy is driven by dataset–resolution interaction rather than a counterexample to the broader claim. 
+
+3.5 Jacobian term dominates the ranking 
+
+For flow models, density decomposes into a base-density term and a Jacobian term as in Eq. (1). Figure 7 shows that, on Glow / CIFAR-10, the sample ranking is almost entirely controlled by the Jacobian term. Sorting images by log p(x)
+
+yields a Spearman correlation of 0.9975 with log |Jdet |, but only 0.5880 with 
+
+log p(z). The correlation between log p(z) and log |Jdet | is only 0.5366 .Figure 7 also gives an intuition for why Jacobian-based estimators remain informative even when the reference density is only approximate. In high di-Deep Networks Favor Simple Data 13 
+
+mension, if the latent reference distribution is close to isotropic Gaussian, then 
+
+log p(z) depends mainly on ∥z∥ and varies relatively little because most samples lie on a thin shell. The Jacobian log-volume term is not subject to the same concentration effect and can dominate the ranking. We do not claim that this argument is universal or sufficient by itself, only that in our experiments the ranking of log p(x) is empirically much closer to the ranking of the Jacobian term than to the ranking of the latent reference term. This observation also helps motivate why JEPA-style Jacobian scores can work in practice even when the latent distribution is only approximately Gaussian [1]. 
+
+3.6 Revisiting the OOD anomaly under small perturbations 
+
+Figure 8 examines the robustness of the OOD likelihood ranking using a simple perturbation experiment. Glow trained on CIFAR-10 assigns higher likelihood to SVHN test images, reproducing the well-known phenomenon that models can prefer simpler out-of-distribution data. However, adding a very small Gaussian perturbation to SVHN ( σ2 = 0 .0064 ) completely removes this advantage and shifts the noisy SVHN distribution below CIFAR-10. To place this observation in context, recall that Nalisnick et al. [10] analyzed the original OOD anomaly using a second-order expansion of the log-density around a point x0:
+
+log p(x; θ) ≈ log p(x0; θ)+ ∇x0 log p(x0; θ)⊤(x−x0)+ 12 (x−x0)⊤∇2 
+
+> x0
+
+log p(x0; θ)( x−x0).
+
+Comparing two data distributions p∗ and q and taking expectations yields 
+
+Eq [log p(x; θ)] − Ep∗ [log p(x; θ)] ≈ 12 Tr  ∇2 
+
+> x0
+
+log p(x0; θ)( Σq − Σp∗ ) ,
+
+which under diagonal approximations reduces to a comparison of channel-wise variances. Under this interpretation, datasets with smaller variance are ex-pected to receive higher likelihood; since SVHN has lower channel-wise variance than CIFAR-10, the analysis predicts that SVHN should obtain higher expected log density. Our perturbation experiment directly tests this explanation. The added noise barely changes the variance statistics emphasized above: SVHN pixel variance shifts only from 0.05023 to 0.05027 , while CIFAR-10 remains substantially larger (0.06262 ), and the channel-wise ranking is unchanged. Yet the likelihood ranking reverses completely. Variance differences therefore cannot explain the anomaly: a local second-order expansion of the density around dataset means is far too coarse to capture the behavior of real data. 
+
+# 4 Conclusion 
+
+The evidence in this paper supports one central claim: density estimators built from trained deep networks consistently favor simple data . This 14 W. Author et al. 
+
+claim is intentionally broader than any one architecture or benchmark. It covers intrinsic autoregressive likelihoods, exact flow likelihoods, score-based diffusion likelihoods, and Jacobian-based estimators on learned representations. It is vis-ible within one dataset, across the classical CIFAR-10 / SVHN OOD pair, after retraining on only the lowest-density 10% of the training set, and even after training on a single lowest-density sample. Two implications deserve emphasis. First, the distinction between a trained network and the density estimator built from it is not merely philosophical. It is operationally necessary. Once the observable is the induced sample ranking rather than a single canonical density, models that are usually treated as in-comparable fall into the same empirical pattern. Second, many existing “fixes” for OOD likelihood — uncertainty correction, ratio-based correction, or external complexity adjustment — should be interpreted with care. They can improve detection while leaving the underlying ranking largely intact. We do not claim to have solved why this happens. Our most cautious reading is that the classical OOD likelihood anomaly is not the main phenomenon but only its most visible surface. The larger regularity is that, once trained, deep networks repeatedly allocate high estimated density to low-complexity images. Explaining why that ranking is regenerated across architectures, estimators, and even severely restricted training sets remains an open problem. Deep Networks Favor Simple Data 15 
+
+# References 
+
+1. Balestriero, R., Ballas, N., Rabbat, M., LeCun, Y.: Gaussian embeddings: How jepas secretly learn your data density (2025). https://doi.org/10.48550/arXiv. 2510.05949 
+
+2. Belrose, N., Pope, Q., Quirke, L., Mallen, A., Dury, B., Fern, X.: Neural networks learn statistics of increasing complexity (2024). https://doi.org/10.48550/ arXiv.2402.04362 
+
+3. Caterini, A.L., Loaiza-Ganem, G., Pleiss, G., Cunningham, J.P.: Rectangular flows for manifold learning. In: Advances in Neural Information Processing Systems (2021) 4. Chen, M., Radford, A., Child, R., Wu, J., Jun, H., Luan, D., Sutskever, I.: Gen-erative pretraining from pixels. In: International Conference on Machine Learning (2020) 5. Choi, H., Jang, E., Alemi, A.A.: Waic, but why? generative ensembles for robust anomaly detection (2018). https://doi.org/10.48550/arXiv.1810.01392 
+
+6. Gangal, V., Arora, A., Einolghozati, A., Gupta, S.: Likelihood ratios and gener-ative classifiers for unsupervised out-of-domain detection in task-oriented dialog. In: Proceedings of the AAAI Conference on Artificial Intelligence. pp. 7764–7771 (2020) 7. Guth, F., Kadkhodaie, Z., Simoncelli, E.P.: Learning normalized image densities via dual score matching (2025). https://doi.org/10.48550/arXiv.2506.05310 
+
+8. Kingma, D.P., Dhariwal, P.: Glow: Generative flow with invertible 1x1 convolu-tions. In: Advances in Neural Information Processing Systems (2018) 9. Kirichenko, P., Izmailov, P., Wilson, A.G.: Why normalizing flows fail to detect out-of-distribution data. In: Advances in Neural Information Processing Systems (2020) 10. Nalisnick, E., Matsukawa, A., Teh, Y.W., Gorur, D., Lakshminarayanan, B.: Do deep generative models know what they don’t know? In: International Conference on Learning Representations (2019) 11. Nalisnick, E., Matsukawa, A., Teh, Y.W., Lakshminarayanan, B.: Detecting out-of-distribution inputs to deep generative models using typicality (2019). https: //doi.org/10.48550/arXiv.1906.02994 
+
+12. van den Oord, A., Kalchbrenner, N., Vinyals, O., Espeholt, L., Graves, A., Kavukcuoglu, K.: Conditional image generation with PixelCNN decoders. In: Ad-vances in Neural Information Processing Systems (2016) 13. Papamakarios, G., Nalisnick, E., Rezende, D.J., Mohamed, S., Lakshminarayanan, B.: Normalizing flows for probabilistic modeling and inference. Journal of Machine Learning Research 22 (57), 1–64 (2021), https://jmlr.org/papers/v22/19-1028. html 
+
+14. Radford, A., Wu, J., Child, R., Luan, D., Amodei, D., Sutskever, I.: Language models are unsupervised multitask learners. Tech. rep., OpenAI (2019) 15. Rahaman, N., Baratin, A., Arpit, D., Draxler, F., Lin, M., Hamprecht, F.A., Ben-gio, Y., Courville, A.: On the spectral bias of neural networks. In: International Conference on Machine Learning (2019) 16. Ren, J., Liu, P.J., Fertig, E., Snoek, J., Poplin, R., DePristo, M., Dillon, J., Laksh-minarayanan, B.: Likelihood ratios for out-of-distribution detection. In: Advances in Neural Information Processing Systems (2019) 17. Salimans, T., Karpathy, A., Chen, X., Kingma, D.P.: Pixelcnn++: Improving the PixelCNN with discretized logistic mixture likelihood and other modifications. In: International Conference on Learning Representations (2017) 16 W. Author et al. 18. Serrà, J., Álvarez, D., Gómez, V., Slizovskaia, O., Núñez, J.F., Luque, J.: Input complexity and out-of-distribution detection with likelihood-based generative mod-els. In: International Conference on Learning Representations (2020) 19. Shah, H., Tamuly, K., Raghunathan, A., Jain, P., Netrapalli, P.: The pitfalls of simplicity bias in neural networks. In: Advances in Neural Information Processing Systems (2020) 20. Song, Y., Sohl-Dickstein, J., Kingma, D.P., Kumar, A., Ermon, S., Poole, B.: Score-based generative modeling through stochastic differential equations. In: Interna-tional Conference on Learning Representations (2021) 21. Valle-Pérez, G., Camargo, C.Q., Louis, A.A.: Deep learning generalizes because the parameter-function map is biased towards simple functions. In: International Conference on Learning Representations (2019) 22. Xu, Z.Q.J., Zhang, Y., Luo, T., Xiao, Y., Ma, Z.: Frequency principle: Fourier analysis sheds light on deep neural networks (2019). https://doi.org/10.48550/ arXiv.1901.06523
