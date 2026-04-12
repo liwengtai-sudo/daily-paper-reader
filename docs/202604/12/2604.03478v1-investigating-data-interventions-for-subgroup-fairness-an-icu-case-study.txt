@@ -1,0 +1,652 @@
+Title: Investigating Data Interventions for Subgroup Fairness: An ICU Case Study
+
+URL Source: https://arxiv.org/pdf/2604.03478v1
+
+Published Time: Tue, 07 Apr 2026 00:17:42 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+# INVESTIGATING DATA INTERVENTIONS FOR 
+
+# SUBGROUP FAIRNESS : A N ICU C ASE STUDY 
+
+Erin Tan 
+
+University of California, Berkeley 
+
+Judy Hanwen Shen 
+
+Stanford University 
+
+Irene Y. Chen 
+
+University of California, Berkeley 
+
+## ABSTRACT 
+
+In high-stakes settings where machine learning models are used to automate decision-making about individuals, the presence of algorithmic bias can exacer-bate systemic harm to certain subgroups of people. These biases often stem from the underlying training data. In practice, interventions to “fix the data” depend on the actual additional data sources available—where many are less than ideal. In these cases, the effects of data scaling on subgroup performance become volatile, as the improvements from increased sample size are counteracted by the intro-duction of distribution shifts in the training set. In this paper, we investigate the limitations of combining data sources to improve subgroup performance within the context of healthcare. Clinical models are commonly trained on datasets com-prised of patient electronic health record (EHR) data from different hospitals or admission departments. Across two such datasets, the eICU Collaborative Re-search Database and the MIMIC-IV dataset, we find that data addition can both help and hurt model fairness and performance, and many intuitive strategies for data selection are unreliable. We compare model-based post-hoc calibration and data-centric addition strategies to find that the combination of both is important to improve subgroup performance. Our work questions the traditional dogma of “better data” for overcoming fairness challenges by comparing and combining data- and model-based approaches. 
+
+## 1 INTRODUCTION 
+
+When machine learning algorithms are used to guide real-world decision making, they are at risk of reproducing disparities found in the training data (Chen et al., 2018; Chouldechova, 2017; Angwin et al., 2022). The majority of technical advancement has focused on model interventions that remedy the learned disparities of the model (H´ ebert-Johnson et al., 2018; Agarwal et al., 2018). Many have also called for sociotechnical approaches such as abstaining from using AI (Solarova et al., 2022; Dressel & Farid, 2018; Binns et al., 2018) or system approaches such as collecting more data (Chen et al., 2018; Drukker et al., 2023; Chen, 2023). “Improving the data,” in particular, has been frequently suggested as a vague, catch-all solution to the problem (Arora et al., 2023; Huang et al., 2024). However, there is a gap between broad suggestions of data remedies and what is effective in practice. There are three main challenges that practitioners face when translating between the promise of better data and practical methods of data addition. First, the best method of addition is task-dependent; the success of an approach in one method does not guarantee success on another dataset (Rommel et al., 2022). Second, we are restricted by the quality of the available data. The limitations of the dataset do not exist because practitioners choose to use suboptimal data, but because better data is simply unavailable. Third, the effect of data changes on subgroups as well as the general population must be considered. Due to the first challenge—that data limitations are task dependent—we narrow our focus on the case study of intensive care unit (ICU) data in particular. Bias in healthcare is particularly consequential, as disparities may translate into unequal treatment quality (Mittermaier et al., 2023), delayed or missed diagnosis (Seyyed-Kalantari et al., 2021a;b), or increased costs of care (Obermeyer et al., 1
+
+> arXiv:2604.03478v1 [cs.LG] 3 Apr 2026
+
+ICLR 2026 Workshop: Principled Design for Trustworthy AI 2019). Moreover, we find clinical EHR datasets to be well-representative of the second and third challenges described above. To combat the lack of quality data, EHR datasets are often aggregated across multiple sources (e.g. multiple hospitals or admission departments); this strategy allows for larger dataset sizes, yet effective methods for achieving better data quality remain unclear. Finally, EHR datasets contain heterogeneous patient subgroups, so the notion of better data may depend on the subgroup in question. Grounding our work in this domain allows us to better isolate the impact of specific data interventions, although we emphasize that our methods can be applied to any multi-source dataset. Our work focuses on the specific goal of improving subgroup performance through data interven-tions. Specifically, our contributions are: • We review the landscape of data interventions for fairness, identifying a gap between rec-ommended data solutions and available algorithms. • We evaluate and compare existing data interventions for subgroup performance and find that they are not effective across two datasets—the eICU Collaborative Research Database and MIMIC-IV. We identify mean discrepancy as a key barrier to success for data addition. • We compare data-centric approaches with post-hoc model calibration and identify a hybrid approach best improves subgroup performance. 
+
+## 2 RELATED WORK 
+
+Data Perspectives on Fairness Pre-processing fairness interventions address biases that exist within the training data (Pessach & Shmueli, 2021; Zhioua et al., 2025). These biases may arise as a result of systematic faults in data collection, where collection methods inherently under-represent certain groups or promote differences in data quality, labeling procedure, or missingness. When biases exist in the data, they are near-impossible to correct using in-process or post-processing in-terventions alone (Chen et al., 2018; Rolf et al., 2021). “Adding more data” does not account for practical realities—in most cases, we can assume that in-distribution data has already been exhausted. Additionally, new data may be drawn from a bi-ased distribution, such that adding more samples from the same distribution can amplify those dis-parities (Zhioua et al., 2025). Adding data from external data sources yields unpredictable out-comes, as the counteracting effects from increased sample size and introduction of distribution shift work against one another (Shen et al., 2024; Wang et al., 2022). Fairness under distribu-tion shifts is generally evaluated by quantifying the worst-case performance within a set of potential shifts (Cherian & Cand` es, 2024; Wang et al., 2022). Distributionally-robust optimization (DRO) uses this notion by directly optimizing worst-case subgroup performance under distribution shift during training (Rahimian & Mehrotra, 2022). Parallel work in invariant learning aims to dis-cover more generalizable patterns in data which remain stable across environments, but these are in-process methods (Arjovsky et al., 2020; Sarhan et al., 2020). 
+
+Data Interventions Data interventions for subgroup fairness are most commonly evaluated in the single-source setting. In general, the goal of all these data interventions is to mitigate the prob-lem of imbalanced class distributions, a common cause of sample size bias and under-representation bias (Zhioua et al., 2025). These include sampling-based techniques, such as over-sampling from mi-nority classes (Idrissi et al., 2022; Chawla et al., 2002) or under-sampling from majority classes (Lin et al., 2017). Standard over-sampling selects samples from the minority group to duplicate, which helps in adding more data, but does not offer any new information and is prone to overfitting the minority distribution. Newer methods use generative models, such as variational autoencoders, to add synthetic data, which work better on high-dimensional data than sampling (Wan et al., 2017). Another approach to balancing subgroups is reweighing, which assigns importance weights to train-ing instances, such that minority examples are given greater influence over the loss function to equalize the contributions of all subgroups (Calders et al., 2009; Kamiran & Calders, 2011). 
+
+Calibration Calibration is one way to combat algorithmic bias—for all individuals receiving a predicted probability of p, ensure that a p fraction of them are positive samples in actuality. When 2ICLR 2026 Workshop: Principled Design for Trustworthy AI (c) 
+
+> Black
+
+(d)     
+
+> Other
+> 0.036
+> -0.04 -0.035
+> 0.024
+> 0.03
+> -0.041
+> 0.023
+> 0.11
+> -0.034
+> -0.034
+> -0.085
+> 0.039
+> 0.04
+> 0.04
+> 0.036
+> -0.0018
+> -0.0016 0.013
+> -0.031
+> -0.051 -0.02
+> 0.047
+> -0.0018
+> -0.035
+> 0.031
+> -0.0093
+> 0.019
+> 0.00
+> 0.025
+> 0.029
+> 0.032
+> 0.0081
+> 0.017
+> -0.041
+> Train
+> Hospital
+> Combination
+> 167
+> 300
+> 458  420
+> 264
+> --0.02
+> 0.0021
+> -0.0095 -0.0016
+> 0.019
+> -0.018
+> -0.021
+> --0.04
+> 0.0059
+> -0.033
+> -0.035
+> 0.017
+> -0.005
+> -0.046
+> 73
+> 264
+> 420
+> 458
+> 300
+> 167
+> Test
+
+Hospital    
+
+> 0.038
+> 0.081
+> -0.034
+> -0.034
+> -0.018
+> -0.028
+> 0.02
+> 0.028
+> -0.0044 -0.017
+> -0.034
+> 0.011
+> 0.065
+> 0.00
+> -0.00097
+> 0.081
+> 0.046
+> -0.034
+> -0.066
+> -0.0022
+> 7161
+> Train
+> Hospital
+> Combination 300
+> 458
+> 420
+> 264
+> -0.02
+> -0.00097
+> 0.11 0.012 -0.034
+> 0.03
+> 0.023
+> -0.0058
+> 0.14
+> -0.0054
+> -0.034
+> -0.027
+> -0.0073
+> -0.04
+> 73
+> 264
+> 420
+> 458
+> 300
+> 167
+> Test
+
+Hospital 
+
+> Train  Hospital
+> Combination
+> 167  300  458  420  264
+
+(a) 
+
+> Overall
+
+(b)   
+
+> White
+> 0.022
+> -0.03
+> 0.022
+> 0.018 0.018
+> 0.0028
+> 0.04
+> 2
+> 0.021
+> -0.029
+> 0.03
+> 0.021
+> 0.023
+> -0.0049
+> 0.04
+> 0.025
+> -0.0011
+> 0.038
+> 0.011
+> -0.024
+> -0.032
+> -0.02
+> 0.027
+> -0.0091
+> 0.013
+> 0.024
+> -0.0083
+> 0.021
+> 0.00
+> 0.013 -0.0091
+> 0.0075
+> 0.0079
+> 0.0097
+> -0.023
+> -0.02
+> 0.015
+> 0.016
+> 0.033
+> 0.026
+> -0.0013
+> 0.0013
+> -0.0032
+> -0.016
+> 0.001
+> 0.0079
+> 0.01
+> -0.015
+> -0.04
+> 73
+> 264
+> 420
+> 458
+> 300
+> 167
+> Test
+
+Hospital   
+
+> Train
+> Hospital
+> Combination
+> 167
+> 300
+> 458  420
+> 264
+> 0.024 -0.00044
+> 0.047
+> 0.013
+> -0.023
+> -0.032
+> -0.02
+> 0.026
+> -0.0076
+> 0.017
+> 0.024
+> -0.0088
+> 0.0052
+> 0.00
+> 0.015
+> -0.011
+> 0.00091
+> 0.011 0.014
+> -0.027
+> -0.02
+> 0.022
+> 0.019
+> 0.036
+> 0.034
+> -0.00025
+> -0.0042
+> -0.0025
+> -0.015
+> 0.0021
+> 0.0077
+> --0.04
+> 0.016
+> -0.014
+> 73
+> 264
+> 420
+> 458
+> 300
+> 167
+> Test
+> Hospital
+
+Figure 1: Change in Overall and subgroup-level accuracy after W HOLE -S OURCE data addition (Logistic Regression). The change in Overall performance (a) does not reflect equally upon changes in performance across subgroups. For example, we observe that adding data from any source to Target Hospital 458 improves overall accuracy. While this change is reflected across the White (b) and Black (c) subgroups, the Other (d) subgroup experiences near-uniform decreases in test performance as a result of data addition. Scaling data directly from the Target Hospital (diagonal of each plot) generally yields improvements in overall and subgroup accuracy, but is typically not the best -performing data addition choice. 
+
+we satisfy this constraint for all subgroups across some sensitive attribute (e.g. race or gender), we ensure that the model predictions give meaningful estimates of uncertainty for all individuals. Generally, model calibration is performed in post-processing by learning a 1-dimensional trans-formation function ϕ : [0 , 1] → [0 , 1] mapping the uncalibrated model predictions f (x) to their calibrated form ϕ(f (x)) . For example, Isotonic Regression (Zadrozny & Elkan, 2002) is a non-parametric calibration technique which learns a monotonically non-decreasing ϕ. We use Isotonic Regression in our experiments to compare pre-processing and post-processing interventions. 
+
+## 3 PROBLEM SETUP 
+
+Our goal is to improve the performance of a target subgroup using data interventions. In a real-world setting, our primary options for increasing data are to either 1) generate synthetic samples or 2) add out-of-distribution samples from external sources. In this work, we focus on the latter. In this section, we establish a formal framework for examining the impact of multi-source data addition on model fairness across subgroups. 3ICLR 2026 Workshop: Principled Design for Trustworthy AI We begin with a model fDtrain (Dtest ) : X 7 → { 0, 1} that is trained on dataset Dtrain = {(xi, y i)}ntrain 
+
+> i=1
+
+and evaluated on Dtest = {(xi, y i)}ntest 
+
+> i=1
+
+, where we consider a binary target variable: y ∈ { 0, 1}. We also have some discrete sensitive attribute A within our feature set X (e.g. race) which we can use to stratify our datasets into subgroups (e.g. by race: Asian, Black, White). We identify some target subgroup a′ ∈ A whose performance we would specifically like to improve, and use Da′ 
+
+> test
+
+to denote the subset of Dtest where A = a′. Let 0 < t < 1 represent the prediction threshold such that if the probability outputted by fDtrain (Xi) ≥ t, then the predicted label ˆy = 1 , and 0 otherwise. Then, for any model f and subgroup a we define the empirical subgroup accuracy as Acc (f, a ) = 1
+
+|Da
+
+> test
+
+|
+
+X
+
+> (x,y )∈Da
+> test
+
+1 − | y − 1[f (x) ≥ t]| (1) In our setup, we assume that the model class and complexity are fixed, such that our only avail-able levers for improving subgroup accuracy are to modify Dtrain by adding data from exter-nal sources, denoted S1, S2, . . . , Sn. Each source i has some available dataset, denoted Di,which is drawn from the source distribution Si. Formally, our goal is to find a dataset D∗ =
+
+Dtrain ∪ Sni=1 ziDi, where z ∈ { 0, 1}n which optimizes the subgroup accuracy over fixed tar-get subgroup a′. D∗ is assembled by adding datasets from zero or more available sources to Dtrain .One way to compose D∗ is by greedily selecting i∗, the next source to add from. 
+
+i∗ = arg max  
+
+> i
+
+Acc (fDtrain +Di (Da′
+
+> test
+
+)) (2) Our goal with this work is to better understand the characteristics of datasets that are most informa-tive for composing D∗ efficiently. 
+
+## 4 EXPERIMENTS 
+
+4.1 DATASETS 
+
+We evaluate our methods on two datasets: the eICU Collaborative Research Database (Pollard et al., 2018; Goldberger et al., 2000) and the MIMIC-IV dataset (Johnson et al., 2023a; Goldberger et al., 2000) and use patient ethnicity as the sensitive attribute of interest. The eICU dataset contains 200,859 patient unit encounters in 208 hospitals across the US. We in-clude 12 hospitals, each with over 2000 patients. Each of these hospitals is treated as its own data source. 1 MIMIC-IV contains 546,028 patient admissions from over 265,000 unique patients to var-ious departments in the facility, including the emergency unit, intensive care unit, and urgent care. We treat each admission department as a different data source. 2
+
+4.2 MODELS AND EVALUATION 
+
+We investigated three models prominent in prior work van de Water et al. (2024): a Logistic Re-gression (LR) model, a tree-based Light Gradient Boosting Machine (LGBM) model, and a Long Short-Term Memory (LSTM) model. We used the same set of features for all models and used 5-fold validation for all results reported. We evaluate subgroup accuracy and AUC (reported in the Appendix). Accuracy is defined in Equa-tion 1. We additionally define subgroup AUC over Dtest , which can be partitioned into D0 and D1,representing the subsets of negative and positive samples, respectively: AUC (f, a ) = 1
+
+|Da 
+
+> 0
+
+|| Da 
+
+> 1
+
+|
+
+X  
+
+> xi∈Da
+> 0,x j∈Da
+> 1
+
+1[f (xj ) > f (xi)] (3) 
+
+> 1
+
+The demographic information for eICU can be found in Table 2 in the Appendix. 
+
+> 2
+
+The demographic information for MIMIC can be found in Table 3 in the Appendix. We also include additional results from experiments using the MIMIC-IV dataset for the task of in-hospital mortality prediction in the Appendix. 
+
+4ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 2: Change in subgroup ratio vs. Change in subgroup test accuracy after W HOLE -S OURCE data addition on the eICU Dataset. 
+
+4.3 DATA ADDITION EXPERIMENTS 
+
+To test our data addition heuristics, we performed three types of experiments, detailed in this section. • B ASELINE : For each source and model class, we train on 1000 samples and test on 400 
+
+samples. Change in performance is measured with respect to the B ASELINE .• W HOLE -S OURCE : For each data source, we train a model on the combined training set of the 1000 samples from the test data source, as well as 1000 samples from the additional data source. As a control, we also train a model on 2000 samples for each test source. • S UBGROUP -L EVEL : To the existing test data source of 1000 data points, we add only a subset of a source Dai without adding all other subgroups in Di. Additional samples are capped at 1000 , although the vast majority of subgroups are smaller. 
+
+## 5 LIMITATIONS OF EXISTING DATA ADDITION METHODS 
+
+We motivate the need for informed data selection heuristics by exploring the complex realities of fairness under data addition. Figure 1 shows the change in overall and subgroup accuracies after WHOLE -S OURCE data addition compared to the B ASELINE .Our key observation is that the effects of data addition vary across subgroups. For example, for Target Hospital 458 , addition of any data source improves the Overall, White, and Black accuracies but worsens outcomes for the Other subgroup. Similarly, for Target Hospital 420 , predictor accuracy for Overall and White subgroups improved by data addition with the Black and Other subgroups sometimes suffered significantly worsened accuracies. This is even the case where more data from the same source is added. These findings show that it is 1) necessary to view the effects of data interventions (e.g. addition) at a subgroup level and 2) that it is not always beneficial to add all available data into your training set when subgroup performance matters. We need to make careful data decisions by considering the effects on different subgroups, but it remains unclear how to improve subgroup performance in this setting. In the following subsections, we investigate several common data selection strategies, showing that they are not effective in improving subgroup performance in our settings. 
+
+Data Balancing The first set of informed data selection strategies we evaluated seeks to improve the presence of the target subgroup within the training dataset (Cohen et al., 2021). Traditionally, subgroup balancing is performed either by oversampling from minority classes (Chawla et al., 2002) or undersampling majority classes (Lin et al., 2017). The intuition for data balancing via selection is that, for some minority group a′, we select the dataset Di∗ that maximizes the representation of a′. Let |Di| denote the total number of samples 5ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 3: Change in subgroup accuracy as a function of samples added in S UBGROUP -L EVEL data addition (see Section 4 for details). Across nearly all combinations of subgroups and Test Hospitals, we find that adding more samples does not necessarily lead to larger performance gains. These visualizations lead to the conclusion that naive subgroup balancing is an uninformative data selection heuristic. 
+
+available from source Si. We investigate two different selection criteria to perform data balancing via addition: 1. Adding sources with the highest proportion of samples from the target subgroup 
+
+i∗ = arg max 
+
+> i
+
+|Da′ 
+
+> i
+
+||Di|
+
+2. Adding sources with the greatest number of samples from the target subgroup 
+
+i∗ = arg max  
+
+> i
+
+|Da′ 
+
+> i
+
+|
+
+In Figure 2, we plot the changes in subgroup ratio after W HOLE -S OURCE data addition against the change in subgroup performance. The ratio of a subgroup within a dataset is computed as Ratio (D, a ) = |Da||D| , so that we define the change in subgroup ratio as ∆Ratio (Dtrain , D added , a ) = 
+
+Ratio (Dtrain ∪added , a ) − Ratio (Dtrain , a ).We did not observe a statistically significant relationship in 2 across any subgroup; increasing the ratio of a subgroup does not reliably improve subgroup performance in isolation. To test the second heuristic—choosing the source with the most available samples for the target subgroup—we examine the change in performance after S UBGROUP -L EVEL data addition. The results are presented in Figure 3, where we find that the quantity of available subgroup data within a source is not meaningful for determining how data addition will steer subgroup performance. Through our first two data selection methods—selecting the sources with the greatest number and highest ratio of samples from the test subgroup, respectively—we found that simply increasing the representation of samples from the test subgroup does not necessarily yield positive results if the data itself is uninformative about the target. 
+
+Distribution Matching One critical observation from Figure 3 is that it suggests it is more im-portant to understand the test distribution rather than the just the added source distribution, as some test sources generally benefit from any type of data scaling (e.g. Hospital 443, 252), whereas oth-ers exhibit minimal or negative effects from any out-of-distribution scaling (e.g. Hospital 199, 73). Thus, the next data selection method we evaluate chooses the sources which are most similar to the test distribution. Intuitively, this should yield desirable outcomes because we minimize the amount of distribution shift while still scaling the number of training samples. We employ the subgroup similarity score proposed in Shen et al. as a heuristic to quantify the distance between two source distributions. Given that Da 
+
+> test
+
+∼ S a 
+
+> target
+
+= P and Di ∼ S i = Q for any external source i, we derive a binary predictor sP Q : X → [0 , 1] where datapoints belonging to distribution P are assigned label 1 and points in Q are assigned label 0. Intuitively, if P and Q are 6ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 4: Subgroup similarity score (using features and labels) vs. Change in subgroup test accuracy for the White (left) and Black (right) subgroups (eICU). The scores are computed using only the patients from the target subgroup in each source. These performance changes result from S UBGROUP -L EVEL data addition. We do not observe statistically significant correlations in any Test Hospital for either subgroup. 
+
+similarly distributed, s should output probabilities around 0.5 (random guessing) on an empirical test set containing points from P . If P and Q are very different, sP Q should output probabilities closer to 1. Thus, we can use as a heuristic for distributional similarity the expected value of the predictor probability on P while assuming a uniform probability for the empirical samples from P :SCORE XY = E(x,y )∈P [sP Q (x, y )] (4) Applying our similarity score function to the subgroup case, we define the subgroup similarity score for a shared subgroup a between two sources to be: SCORE XY a = E(x,y )∈P [sP Q (x, y )|(x, y ) ∈ a] (5) We again consider the results from S UBGROUP -L EVEL data addition, this time from a distributional perspective. Using the subgroup similarity score introduced in Equation 5, we find no statistically significant correlation between the distributional similarity of an added source with the test source and the added source’s effect on subgroup test accuracy. This relationship, or lack thereof, is pre-sented in Figure 4. 
+
+## 6 MEAN CONSISTENCY : A B ARRIER TO EFFECTIVE DATA INTERVENTION 
+
+Following the findings in Section 5, we shift our focus away from demographic differences between datasets, and instead look at the base rates themselves. One drawback of enforcing existing no-tions of fairness is that they lead to theoretically-bound tradeoffs with the overall performance of the model (Corbett-Davies et al., 2017; Menon & Williamson, 2018). The incompatibility arises due to differing base rates between subgroups (Kleinberg et al., 2016; Zhao & Gordon, 2022; Zliobaite, 2015). This line of work implies that base rates should be examined when understanding the dis-parities induced by data. In our setting, we have the opportunity to favorably adjust subgroup base rates through data addition. More formally, we look at mean consistency, defined as the difference between a model’s predictive mean and the true mean of the test set. Concretely, we define the mean discrepancy between a learned predictor and a test dataset as follows: DISC (f, D ) = 1
+
+|D|
+
+X
+
+> (x,y )∈D
+
+1[f (x) ≥ t] − y (6) This expresses the difference between the average output label of a model f over a dataset D and the true average value of the labels in D.Using this measure, we hypothesize that large mean discrepancies between subgroups are one source of unfairness in our datasets of interest. This can be understood as a situation where one subgroup exhibits starkly different outcome rates compared to others, leading to an overall training dataset and subsequent model mean which are skewed from the subgroup label mean. The formal relationship between mean discrepancy (Equation 6) and accuracy (Equation 1) can be derived using the triangle inequality: 7ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 5: Mean consistency and subgroup performance: (a) Subgroup Mean Discrepancy (Eq. 6) vs. Subgroup Test Accuracy (Eq. 1). (b) Change in Subgroup Mean Discrepancy vs. Change in Subgroup Test Accuracy. Strong negative correlations are observed across all subgroups in (a), and in all minority subgroups in (b). 
+
+Figure 6: Difference in best-case subgroup performance (without calibration) and worst-case subgroup perfor-mance (with calibration) after W HOLE -S OURCE data addition. The overwhelming majority of subgroups show positive differences, supporting the idea that making informed choices for data addition is more important than calibrating post-hoc. 
+
+DISC (f, D ) ≤ 1
+
+|D|
+
+X
+
+> (x,y ∈D)
+
+1[f (x) ≥ t] − y
+
+≤ 1 − Acc (f, D )
+
+The mean discrepancy bounds the test accuracy, such that the greater the mean discrepancy of a model is, the lower its performance ceiling will be. This guarantee is empirically confirmed in Figure 5(a), where we exhibit a clean boundary line y = 1 − x. We find that this correlation transfers to the data addition scenario—in Figure 5(b), we plot a statistically significant correlation between the change in subgroup mean discrepancy after adding a data source with the resultant change in subgroup accuracy. This trend is seen across all ethnic subgroups. This finding provides strong evidence that mean discrepancy plays a key role in determining the effect of data addition on subgroup performance. The resultant data selection strategy is thus to add sources that correct the subgroup mean discrep-ancy exhibited over the base model. This leads to the following selection criteria: 
+
+i∗ = arg min  
+
+> i
+
+DISC (fDtrain +i , D a
+
+> test
+
+) − DISC (fDtrain , D a
+
+> test
+
+)
+
+Data-Centric vs. Post-Processing Interventions Our empirical results complement existing techniques that use calibration to achieve better subgroup performance. Next, we apply post-8ICLR 2026 Workshop: Principled Design for Trustworthy AI                                                              
+
+> Black Other White
+> W/o Cal. With Cal. W/o Cal. With Cal. W/o Cal. With Cal. Best 4.2% ±1.6 3.4% ±0.9 6.1% ±2.2 8.7% ±1.3 2.3% ±0.3 2.8% ±0.1 Median 0.6% ±2.6 1.5% ±1.1 1.2% ±3.2 0.1% ±1.7 0.7% ±0.9 2.2% ±0.1 Worst -4.1% ±2.8 -5.9% ±4.3 -3.4% ±2.8 -13.0% ±4.4 -3.4% ±2.7 1.2% ±0.4
+
+Table 1: Average change in subgroup accuracy for the Best, Median, and Worst W HOLE -S OURCE 
+
+data additions across all sources, with and without calibration. processing calibration via Isotonic Regression on models trained using W HOLE -S OURCE data ad-dition. In these experiments, we additionally withhold a validation set of 200 samples drawn from the same distribution (or mixture of distributions) as the training set. We use this data to perform calibration after training. In Figure 6, we compare the change in subgroup accuracy after optimal data selection against cal-ibration on sub-optimal data selection. We find that post-processing calibration is outperformed simply by choosing a better (or the best) available data source. However, we find that the combination of both data selection and calibration is generally most effective at improving subgroup performance. Table 1 summarizes the average change in subgroup accuracy for the best, median, and worst available data sources with and without calibration. We find that the combination of data addition with calibration, on average, yields the highest best-case outcomes, along with better worst-case outcomes. Overall, we find that without intentional dataset selection that takes into account desired fairness outcomes, calibration alone does not guarantee improvement. Under this problem set-up where we have fine-grained control over dataset composition, we find it necessary to first make informed data addition choices in order to maximize the performance boost from post-processing calibration. 
+
+## 7 DISCUSSION 
+
+In this work, we investigate the landscape of data interventions for improving subgroup performance where multiple additional sources of data are available. Through comprehensive experiments across the eICU and MIMIC-IV datasets, we demonstrate that naive strategies for data addition, such as increasing subgroup representation or minimizing distribution shift, fail to reliably improve sub-group performance. We identify mean discrepancy as a key bottleneck of subgroup performance, and formalize mean consistency as a necessary criterion for successful data interventions. We compare data interventions with post-processing calibration (model interventions), and find that “fixing the data” is more important for improving subgroup performance than direct post-hoc cali-bration. When we combine both data selection and calibration, we observe the best possible perfor-mance across most subgroups. 7.1 LIMITATIONS & F UTURE WORK 
+
+Our experiments are purposefully narrowed to focus on ICU data using race as the sensitive attribute. This focus helps better isolate the the effects of data interventions on subgroup performance for a commonly task in clinical machine learning. Future works should investigate more tasks in the healthcare domain. Our ultimate hope is for a task-agnostic framework for the selection of data addition heuristics. Our work presents promising findings for deeper investigations into task-specific data selection heuristics. Making informed choices about training data is one of the most consequential steps of the machine learning pipeline. We hope our findings motivate deeper investigations into the prac-tical data decision-making process, and promote methods which are conscious of the unequal effects they can have on under-served and under-represented populations. 9ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+## REFERENCES 
+
+Alekh Agarwal, Alina Beygelzimer, Miroslav Dud´ ık, John Langford, and Hanna Wallach. A reduc-tions approach to fair classification. In International conference on machine learning , pp. 60–69. PMLR, 2018. Julia Angwin, Jeff Larson, Surya Mattu, and Lauren Kirchner. Machine bias. In Ethics of data and analytics , pp. 254–264. Auerbach Publications, 2022. Martin Arjovsky, L´ eon Bottou, Ishaan Gulrajani, and David Lopez-Paz. Invariant risk minimization, 2020. URL https://arxiv.org/abs/1907.02893 .Anmol Arora, Joseph Alderman, Joanne Palmer, Shaswath Ganapathi, Elinor Laws, Melissa Mc-Cradden, Lauren Oakden-Rayner, Stephen Pfohl, Marzyeh Ghassemi, Francis Mckay, Darren Treanor, Negar Rostamzadeh, Bilal Mateen, Jacqui Gath, Adewole Adebajo, Stephanie Kuku, Rubeta Matin, Katherine Heller, Elizabeth Sapey, and Xiaoxuan Liu. The value of standards for health datasets in artificial intelligence-based applications. Nature Medicine , 29, 10 2023. doi: 10.1038/s41591-023-02608-w. Reuben Binns, Max Van Kleek, Michael Veale, Ulrik Lyngs, Jun Zhao, and Nigel Shadbolt. ’it’s reducing a human being to a percentage’ perceptions of justice in algorithmic decisions. In Pro-ceedings of the 2018 Chi conference on human factors in computing systems , pp. 1–14, 2018. Toon Calders, Faisal Kamiran, and Mykola Pechenizkiy. Building classifiers with independency constraints. In 2009 IEEE International Conference on Data Mining Workshops , pp. 13–18, 2009. doi: 10.1109/ICDMW.2009.83. N. V. Chawla, K. W. Bowyer, L. O. Hall, and W. P. Kegelmeyer. Smote: Synthetic minority over-sampling technique. Journal of Artificial Intelligence Research , 16:321–357, June 2002. ISSN 1076-9757. doi: 10.1613/jair.953. URL http://dx.doi.org/10.1613/jair.953 .Irene Y. Chen, Fredrik D. Johansson, and David A. Sontag. Why is my classifier discrimi-natory? ArXiv , abs/1805.12002, 2018. URL https://api.semanticscholar.org/ CorpusID:44161332 .Zhisheng Chen. Ethics and discrimination in artificial intelligence-enabled recruitment practices. 
+
+Humanities and Social Sciences Communications , 10(1):1–12, 2023. John J. Cherian and Emmanuel J. Cand` es. Statistical inference for fairness auditing. Journal of Machine Learning Research , 25(149):1–49, 2024. URL http://jmlr.org/papers/v25/ 23-0739.html .Alexandra Chouldechova. Fair prediction with disparate impact: A study of bias in recidivism prediction instruments. Big Data , 5(2):153–163, 2017. doi: 10.1089/big.2016.0047. URL 
+
+https://doi.org/10.1089/big.2016.0047 . PMID: 28632438. Joseph Cohen, Tianshi Cao, Joseph Viviano, Chin-Wei Huang, Michael Fralick, Marzyeh Ghassemi, Muhammad Mamdani, Russ Greiner, and Y. Bengio. Problems in the deployment of machine-learned models in health care. Canadian Medical Association Journal , 193:cmaj.202066, 08 2021. doi: 10.1503/cmaj.202066. Sam Corbett-Davies, Emma Pierson, Avi Feller, Sharad Goel, and Aziz Huq. Algorithmic de-cision making and the cost of fairness. In Proceedings of the 23rd ACM SIGKDD Interna-tional Conference on Knowledge Discovery and Data Mining , KDD ’17, pp. 797–806, New York, NY, USA, 2017. Association for Computing Machinery. ISBN 9781450348874. doi: 10.1145/3097983.3098095. URL https://doi.org/10.1145/3097983.3098095 .Julia Dressel and Hany Farid. The accuracy, fairness, and limits of predicting recidivism. Sci-ence Advances , 4, 2018. URL https://api.semanticscholar.org/CorpusID: 13683547 .10 ICLR 2026 Workshop: Principled Design for Trustworthy AI Karen Drukker, Weijie Chen, Judy Wawira Gichoya, Nicholas P. Gruszauskas, Jayashree Kalpathy-Cramer, Sanmi Koyejo, Kyle Myers, Rui C. S´ a, Berkman Sahiner, Heather M. Whitney, Zi Zhang, and Maryellen Lissak Giger. Toward fairness in artificial intelligence for medical image analysis: identification and mitigation of potential biases in the roadmap from data collection to model de-ployment. Journal of Medical Imaging , 10, 2023. URL https://api.semanticscholar. org/CorpusID:258361453 .A. L. Goldberger, L. A. N. Amaral, L. Glass, J. M. Hausdorff, P. Ch. Ivanov, R. G. Mark, J. E. Mietus, G. B. Moody, C.-K. Peng, and H. E. Stanley. Phys-ioBank, PhysioToolkit, and PhysioNet: Components of a new research resource for complex physiologic signals. Circulation , 101(23):e215–e220, 2000. Circulation Electronic Pages: http://circ.ahajournals.org/content/101/23/e215.full PMID:1085218; doi: 10.1161/01.CIR.101.23.e215. Ursula H´ ebert-Johnson, Michael Kim, Omer Reingold, and Guy Rothblum. Multicalibration: Cal-ibration for the (computationally-identifiable) masses. In International Conference on Machine Learning , pp. 1939–1948. PMLR, 2018. Yu Huang, Jingchuan Guo, Wei-Han Chen, Hsin-Yueh Lin, Huilin Tang, Fei Wang, Hua Xu, and Jiang Bian. A scoping review of fair machine learning techniques when using real-world data. Journal of Biomedical Informatics , 151:104622, 2024. ISSN 1532-0464. doi: https://doi. org/10.1016/j.jbi.2024.104622. URL https://www.sciencedirect.com/science/ article/pii/S1532046424000406 .Badr Youbi Idrissi, Martin Arjovsky, Mohammad Pezeshki, and David Lopez-Paz. Simple data balancing achieves competitive worst-group-accuracy. In Bernhard Sch¨ olkopf, Caroline Uhler, and Kun Zhang (eds.), Proceedings of the First Conference on Causal Learning and Reasoning ,volume 177 of Proceedings of Machine Learning Research , pp. 336–351. PMLR, 11–13 Apr 2022. URL https://proceedings.mlr.press/v177/idrissi22a.html .Alistair E. W. Johnson, Lucas Bulgarelli, Lu Shen, Alvin Gayles, Ayad Shammout, Steven Horng, Tom J. Pollard, Sicheng Hao, Benjamin Moody, Brian Gow, Li-wei H. Lehman, Leo A. Celi, and Roger G. Mark. Mimic-iv, a freely accessible electronic health record dataset. Scientific Data , 10(1):1, Jan 2023a. ISSN 2052-4463. doi: 10.1038/s41597-022-01899-x. URL https: //doi.org/10.1038/s41597-022-01899-x .Alistair EW Johnson, Lucas Bulgarelli, Lu Shen, Alvin Gayles, Ayad Shammout, Steven Horng, Tom J Pollard, Sicheng Hao, Benjamin Moody, Brian Gow, et al. Mimic-iv, a freely accessible electronic health record dataset. Scientific data , 10(1):1, 2023b. Faisal Kamiran and Toon Calders. Data pre-processing techniques for classification without discrim-ination. Knowledge and Information Systems , 33, 10 2011. doi: 10.1007/s10115-011-0463-8. Jon M. Kleinberg, Sendhil Mullainathan, and Manish Raghavan. Inherent trade-offs in the fair determination of risk scores. CoRR , abs/1609.05807, 2016. URL http://arxiv.org/abs/ 1609.05807 .Wei-Chao Lin, Chih-Fong Tsai, Ya-Han Hu, and Jing-Shang Jhang. Clustering-based undersam-pling in class-imbalanced data. Information Sciences , 409-410:17–26, 2017. ISSN 0020-0255. doi: https://doi.org/10.1016/j.ins.2017.05.008. URL https://www.sciencedirect. com/science/article/pii/S0020025517307235 .Aditya Krishna Menon and Robert C. Williamson. The cost of fairness in binary classification. In Sorelle A. Friedler and Christo Wilson (eds.), Proceedings of the 1st Conference on Fairness, Accountability and Transparency , volume 81 of Proceedings of Machine Learning Research ,pp. 107–118. PMLR, 23–24 Feb 2018. URL https://proceedings.mlr.press/v81/ menon18a.html .Mirja Mittermaier, Marium M Raza, and Joseph C Kvedar. Bias in ai-based models for medical applications: challenges and mitigation strategies. NPJ Digital Medicine , 6(1):113, 2023. 11 ICLR 2026 Workshop: Principled Design for Trustworthy AI Ziad Obermeyer, Brian Powers, Christine Vogeli, and Sendhil Mullainathan. Dissecting racial bias in an algorithm used to manage the health of populations. Science , 366(6464):447–453, 2019. doi: 10.1126/science.aax2342. URL https://www.science.org/doi/abs/10.1126/ science.aax2342 .Dana Pessach and Erez Shmueli. Improving fairness of artificial intelligence algorithms in privileged-group selection bias data settings. Expert Systems with Applications , 185:115667, 2021. ISSN 0957-4174. doi: https://doi.org/10.1016/j.eswa.2021.115667. URL https: //www.sciencedirect.com/science/article/pii/S0957417421010575 .Tom J Pollard, Alistair E W Johnson, Jesse D Raffa, Leo A Celi, Roger G Mark, and Omar Badawi. The eICU Collaborative Research Database, a freely available multi-center database for critical care research. Scientific data , 5(1):1–13, 2018. Hamed Rahimian and Sanjay Mehrotra. Frameworks and results in distributionally robust optimiza-tion. Open Journal of Mathematical Optimization , 3:1–85, 2022. Esther Rolf, Theodora T Worledge, Benjamin Recht, and Michael Jordan. Representation matters: Assessing the importance of subgroup allocations in training data. In International Conference on Machine Learning , pp. 9040–9051. PMLR, 2021. C´ edric Rommel, Joseph Paillard, Thomas Moreau, and Alexandre Gramfort. Data augmentation for learning predictive models on eeg: a systematic comparison. Journal of Neural Engineering , 19 (6), 2022. ISSN 1741-2552. doi: 10.1088/1741-2552/aca220. URL http://dx.doi.org/ 10.1088/1741-2552/aca220 .Mhd Hasan Sarhan, Nassir Navab, Abouzar Eslami, and Shadi Albarqouni. Fairness by learning orthogonal disentangled representations. In Andrea Vedaldi, Horst Bischof, Thomas Brox, and Jan-Michael Frahm (eds.), Computer Vision – ECCV 2020 , pp. 746–761, Cham, 2020. Springer International Publishing. ISBN 978-3-030-58526-6. Laleh Seyyed-Kalantari, Guanxiong Liu, Matthew McDermott, Irene Chen, and Ghassemi Marzyeh. Chexclusion: Fairness gaps in deep chest x-ray classifiers. Pacific Symposium on Biocomputing ,2021a. Laleh Seyyed-Kalantari, Haoran Zhang, Matthew McDermott, Irene Chen, and Ghassemi Marzyeh. Underdiagnosis bias of artificial intelligence algorithms applied to chest radiographs in under-served patient populations. Nature Medicine , 27:2176–2182, 2021b. Judy Hanwen Shen, Inioluwa Deborah Raji, and Irene Y. Chen. The data addition dilemma. In Kaivalya Deshpande, Madalina Fiterau, Shalmali Joshi, Zachary Lipton, Rajesh Ranganath, and I˜ nigo Urteaga (eds.), Proceedings of the 9th Machine Learning for Healthcare Conference ,volume 252 of Proceedings of Machine Learning Research . PMLR, 16–17 Aug 2024. URL 
+
+https://proceedings.mlr.press/v252/shen24a.html .Sara Solarova, Juraj Podrouˇ zek, Mat´ uˇ s Mesarˇ c´ ık, Adrian Gavornik, and Maria Bielikova. Recon-sidering the regulation of facial recognition in public spaces. Ai and Ethics , 3:625 – 635, 2022. URL https://api.semanticscholar.org/CorpusID:250488188 .Robin van de Water, Hendrik Nils Aurel Schmidt, Paul Elbers, Patrick Thoral, Bert Arnrich, and Patrick Rockenschaub. Yet another icu benchmark: A flexible multi-center framework for clinical ml. In The Twelfth International Conference on Learning Representations , October 2024. Zhiqiang Wan, Yazhou Zhang, and Haibo He. Variational autoencoder based synthetic data gener-ation for imbalanced learning. In 2017 IEEE Symposium Series on Computational Intelligence (SSCI) , pp. 1–7, 2017. doi: 10.1109/SSCI.2017.8285168. Haotao Wang, Junyuan Hong, Jiayu Zhou, and Zhangyang Wang. How robust is your fair-ness? evaluating and sustaining fairness under unseen distribution shifts, 2022. URL https: //arxiv.org/abs/2207.01168 .12 ICLR 2026 Workshop: Principled Design for Trustworthy AI Bianca Zadrozny and Charles Elkan. Transforming classifier scores into accurate multiclass prob-ability estimates. In Proceedings of the Eighth ACM SIGKDD International Conference on Knowledge Discovery and Data Mining , KDD ’02, pp. 694–699, New York, NY, USA, 2002. Association for Computing Machinery. ISBN 158113567X. doi: 10.1145/775047.775151. URL 
+
+https://doi.org/10.1145/775047.775151 .Han Zhao and Geoffrey J Gordon. Inherent tradeoffs in learning fair representations. Journal of Machine Learning Research , 23(57):1–26, 2022. Sami Zhioua, Ruta Binkyte, Ayoub Ouni, and Farah Barika Ktata. On the origins of sampling bias: Implications on fairness measurement and mitigation, 2025. URL https://arxiv.org/ abs/2503.17956 .Indre Zliobaite. On the relation between accuracy and fairness in binary classification. 05 2015. 13 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+## A DATASETS 
+
+The demographic data for both datasets used in this study—eICU and MIMIC-IV— are presented in this section. For both datasets, the examined sensitive attribute was patient self-reported race. We also provide information on the data sources used to stratify each dataset. A.1 EICU C OLLABORATIVE RESEARCH DATABASE 
+
+Table 2 summarizes the subset of the eICU Collaborative Research Database used in this study. We treat different hospitals, denoted by a unique Hospital ID, as independent data sources. The full database includes 200,859 patient unit encounters in 208 hospitals across the US. For this study, we consider only the hospitals with over 2000 recorded patient encounters, a total of 12 data sources. Table 2: Subgroup information across hospitals with 2000 + patient encounters in the eICU Dataset 
+
+Count (Rate) Hos ID Total Asian Black Other White 
+
+73 4320 61 (0.01) 622 (0.15) 347 (0.08) 3221 (0.76) 167 2107 29 (0.01) 154 (0.07) 421 (0.20) 1503 (0.71) 188 2299 29 (0.01) 517 (0.22) 64 (0.03) 1689 (0.73) 199 2529 3 (0.001) 42 (0.02) 48 (0.02) 2434 (0.96) 243 2812 24 (0.009) 873 (0.31) 83 (0.03) 1831 (0.65) 252 2210 7 (0.003) 152 (0.07) 50 (0.02) 1993 (0.91) 264 3745 31 (0.009) 263 (0.07) 64 (0.02) 3299 (0.90) 300 2370 19 (0.008) 267 (0.11) 84 (0.04) 2000 (0.84) 338 2762 5 (0.002) 41 (0.01) 143 (0.05) 2568 (0.93) 420 3425 52 (0.02) 157 (0.05) 276 (0.08) 2940 (0.86) 443 2580 12 (0.005) 1352 (0.53) 83 (0.03) 1119 (0.44) 458 2456 34 (0.01) 747 (0.30) 132 (0.05) 1542 (0.63) A.2 MIMIC-IV The Medical Information Mart for Intensive Care (MIMIC)-IV contains data for over 65,000 patients admitted to an ICU and over 200,000 patients admitted to the emergency department between 2008-2022 at the Beth Israel Deaconess Medical Center in Boston, MA. In this dataset, we treat the patient’s admission department as their data source. All patient en-counters are categorized into three admission types: Emergency, Elective, and Urgent. Patient cir-cumstances are vastly different between the three departments, introducing sufficient distributional changes to justify their treatment as independent sources. Table 3 summarizes the demographic rates across sources in the dataset. Table 3: Subgroup information across admission types in the MIMIC-IV Dataset 
+
+Count (Rate) Adm Type Total Asian Black Hispanic Other White 
+
+Elective 3464 69 (0.02) 155 (0.045) 75 (0.021) 478 (0.138) 2687 (0.775) Emergency 21669 502 (0.023) 2155 (0.099) 741 (0.034) 2965 (0.137) 15306 (0.706) Urgent 746 12 (0.016) 17 (0.022) 16 (0.021) 318 (0.42) 383 (0.51) 14 ICLR 2026 Workshop: Principled Design for Trustworthy AI Table 4: Change in overall & subgroup performance after W HOLE -S OURCE data addition. 
+
+Sources Change in ACC ( ∆)Test Added Asian Black Hispanic Other White Overall 
+
+Elective Elective 0.001 0.006 ↑ 0.007 ↑ 0.006 ↑ -0.001 0.000 Elective Emergency 0.001 -0.001 0.010 ↑ -0.003 0.001 0.001 Elective Urgent -0.001 0.000 0.003 -0.003 0.002 -0.001 Emergency Elective -0.001 -0.005 ↓ -0.003 0.010 ↑ 0.000 -0.001 Emergency Emergency 0.002 -0.010 ↓ -0.004 0.020 ↑ 0.008 ↑ 0.001 Emergency Urgent -0.001 -0.021 ↓ -0.001 -0.003 0.001 -0.001 Urgent Elective 0.007 ↑ -0.001 -0.011 ↓ 0.007 ↑ 0.006 ↑ 0.009 ↑
+
+Urgent Emergency 0.005 ↑ -0.042 ↓ -0.018 ↓ 0.007 ↑ 0.016 ↑ -0.001 Urgent Urgent 0.002 -0.012 ↓ 0.018 ↑ 0.000 0.001 0.004 
+
+## B RESULTS FROM THE MIMIC-IV D ATASET 
+
+B.1 EXPERIMENT DETAILS 
+
+To confirm our findings in the eICU dataset, we conducted additional experiments on MIMIC-IV (Johnson et al., 2023b), a freely accessible electronic health record dataset. We predict binary in-hospital mortality using diagnosis codes, procedures, and lab measurements extracted from the patient record. In the database, there are 9 possible admission types, including urgent care, surgical same-day, and emergency ambulatory services. We group the admission types into three broad categories to ensure sufficient sample sizes in each—Urgent, Elective, and Emer-gency care. We treat each of these admission categories as an independent data “source”. Subgroups are patient self-reported race. B.2 RESULTS AND ANALYSIS 
+
+The results of our data addition experiments are shown in Table 4. Performance changes larger than 
+
+0.5% in either direction are denoted with a colored arrow. For models trained on combined datasets, we find large inconsistencies in the performance changes across subgroups. For example, we find that the overall accuracy in Urgent care is notably im-proved when adding data from Elective departments, primarily as a result of significant improve-ments among the Asian, Other, and White populations. However, this improvement is also at the expense of the Black and Hispanic populations, who face 0.1% and 1.1% decreases in test accuracy, respectively. The decline in Hispanic performance is larger than improvements to any subgroup, begging the question of whether this addition would be desirable. 
+
+Evaluation of Existing Data Addition Methods Tables 5 and 6 look at existing data addition strategies under the lens of fairness. They corroborate the results seen on the eICU dataset in Figures 2 and 3, respectively, showing that these data balancing strategies are ineffective at explaining the performance gaps between subgroups. 
+
+## C SUPPLEMENTAL FIGURES 
+
+In this section, we provide supplemental figures and results that were not included in the main paper. C.1 FULL RESULTS OF WHOLE -S OURCE DATA ADDITION 
+
+Figure 1 shows the full set of results measuring the change in accuracy after W HOLE -S OURCE data addition in the eICU dataset. The results are presented for overall as well as subgroup-level test accuracy. 15 ICLR 2026 Workshop: Principled Design for Trustworthy AI Table 5: Change in subgroup ratio and resulting change in subgroup accuracy after W HOLE -SOURCE data addition on the MIMIC-IV dataset. 
+
+Ethnicity Admission Type Added Source Rate Change Acc. Diff Correlation 
+
+Asian Elective Elective 0.000 0.006 
+
+r = −0.28 ,
+
+p = 0 .47 
+
+Elective Emergency 0.002 -0.001 Elective Urgent -0.002 0.000 Emergency Elective -0.002 -0.005 Emergency Emergency 0.000 -0.010 Emergency Urgent -0.004 -0.021 Urgent Elective 0.002 -0.001 Urgent Emergency 0.004 -0.042 Urgent Urgent 0.000 -0.012 Black Elective Elective 0.000 0.007 
+
+r = −0.20 ,
+
+p = 0 .61 
+
+Elective Emergency 0.027 0.010 Elective Urgent -0.011 0.003 Emergency Elective -0.027 -0.003 Emergency Emergency 0.000 -0.004 Emergency Urgent -0.038 -0.001 Urgent Elective 0.011 -0.011 Urgent Emergency 0.038 -0.018 Urgent Urgent 0.000 0.018 Hispanic Elective Elective 0.000 0.006 
+
+r = −0.05 ,
+
+p = 0 .89 
+
+Elective Emergency 0.006 -0.003 Elective Urgent -0.000 -0.003 Emergency Elective -0.006 0.010 Emergency Emergency 0.000 0.020 Emergency Urgent -0.006 -0.003 Urgent Elective 0.000 0.007 Urgent Emergency 0.006 0.007 Urgent Urgent 0.000 0.000 Other Elective Elective 0.000 -0.001 
+
+r = −0.62 ,
+
+p = 0 .08 
+
+Elective Emergency -0.001 0.001 Elective Urgent 0.144 0.002 Emergency Elective 0.001 0.000 Emergency Emergency 0.000 0.008 Emergency Urgent 0.145 0.001 Urgent Elective -0.144 0.006 Urgent Emergency -0.145 0.016 Urgent Urgent 0.000 0.001 White Elective Elective 0.000 0.000 
+
+r = 0 .58 ,
+
+p = 0 .10 
+
+Elective Emergency -0.035 0.001 Elective Urgent -0.131 -0.001 Emergency Elective 0.035 -0.001 Emergency Emergency 0.000 0.001 Emergency Urgent -0.096 -0.001 Urgent Elective 0.131 0.009 Urgent Emergency 0.096 -0.001 Urgent Urgent 0.000 0.004 16 ICLR 2026 Workshop: Principled Design for Trustworthy AI Table 6: Subgroup samples added and resulting change in subgroup accuracy after S UBGROUP -ONLY data addition on the MIMIC-IV dataset. 
+
+Ethnicity Admission Type Added Source Samples Added Acc. Diff Correlation 
+
+Asian Elective Elective 19 0.006 
+
+r = −0.24 ,
+
+p = 0 .54 
+
+Elective Emergency 23 -0.001 Elective Urgent 16 0.000 Emergency Elective 19 -0.005 Emergency Emergency 23 -0.010 Emergency Urgent 16 -0.021 Urgent Elective 19 -0.001 Urgent Emergency 23 -0.042 Urgent Urgent 16 -0.012 Black Elective Elective 44 0.007 
+
+r = −0.37 ,
+
+p = 0 .33 
+
+Elective Emergency 99 0.010 Elective Urgent 22 0.003 Emergency Elective 44 -0.003 Emergency Emergency 99 -0.004 Emergency Urgent 22 -0.001 Urgent Elective 44 -0.011 Urgent Emergency 99 -0.018 Urgent Urgent 22 0.018 Hispanic Elective Elective 21 0.006 
+
+r = 0 .33 ,
+
+p = 0 .38 
+
+Elective Emergency 34 -0.003 Elective Urgent 21 -0.003 Emergency Elective 21 0.010 Emergency Emergency 34 0.020 Emergency Urgent 21 -0.003 Urgent Elective 21 0.007 Urgent Emergency 34 0.007 Urgent Urgent 21 0.000 Other Elective Elective 137 -0.001 
+
+r = −0.36 ,
+
+p = 0 .34 
+
+Elective Emergency 136 0.001 Elective Urgent 426 0.002 Emergency Elective 137 0.000 Emergency Emergency 136 0.008 Emergency Urgent 426 0.001 Urgent Elective 137 0.006 Urgent Emergency 136 0.016 Urgent Urgent 426 0.001 White Elective Elective 775 0.000 
+
+r = 0 .23 ,
+
+p = 0 .55 
+
+Elective Emergency 706 0.001 Elective Urgent 513 -0.001 Emergency Elective 775 -0.001 Emergency Emergency 706 0.001 Emergency Urgent 513 -0.001 Urgent Elective 775 0.009 Urgent Emergency 706 -0.001 Urgent Urgent 513 0.004 17 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 7: Change in Overall and subgroup-level accuracy after W HOLE -S OURCE data addition. All results from abridged Figure 1. 
+
+C.2 PARETO FRONTIER 
+
+We want to evaluate whether our data-centric methods for fairness are able to bypass the commonly-studied tradeoff between subgroup performance and overall performance. In these figures, we plot the Pareto Frontier of W HOLE -S OURCE data addition in both the eICU and MIMIC-IV datasets. We do not observe any considerable tradeoff between overall and subgroup performance, a promising result. These results are visualized in 8. 
+
+Figure 8: Change in overall test accuracy vs change in subgroup test accuracy. The Pareto Frontier is plotted on each subfigure to visualize the tradeoff between fairness and performance. 
+
+## D AUC F IGURES 
+
+We strengthen the findings our eICU experiments by extending evaluation to additional performance metrics. This section reports the findings of data addition on overall and subgroup AUC, defined in 3. When sample sizes from minority groups are especially small, Zhioua et al. recommend using metrics which consider the tradeoff between sensitivity and specificity, such as AUC. D.1 RESULTS AND ANALYSIS 
+
+Figure 24 shows the change in AUC after data addition compared to the base results. Observing the plots, we see a similar phenomenon as Figure 1 where the performance changes due to data addition are unequally distributed across subgroups. Most notably, Test Hospital 167 is sees improvements in Overall AUC in all addition cases, whereas the Black subpopulation exhibits significant declines in performance in all cases. In order to compute a meaningful AUC, both positive and negative samples must be included in the validation set. For splits where a subgroup did not have both classes represented, we leave the AUC values empty. In Figures 9, 10, and 11, we find analogous results to Figures 2, 3, and 4, respectively. In these experiments, we evaluate existing data interventions for fairness and find that they are unreliable in 18 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 9: Change in subgroup ratio vs. Change in subgroup test AUC on the eICU dataset. Same experiment conditions as were used to produce 2. 
+
+Figure 10: Number of subgroup samples added vs. Change in subgroup test AUC on the eICU dataset. Same experiment conditions as were used to produce 3. the scenario of OOD data addition. We do not find statistically significant relationships between the change in subgroup AUC with the change in subgroup samples, subgroup rate, or with the similarity of the added data source. Lastly, we reproduce Figures 6 and 1 looking at subgroup AUC, the results of which are shown in 12 and 13, respectively. Although many samples are null, due to lack of positive samples in the validation set used for calibration, we still observe that performance gaps are generally positive. However, because the definition of calibration inherently includes accuracy, we do not observe as large of an effect on AUC as we did with accuracy. 
+
+Figure 11: Subgroup similarity score vs. Change in subgroup test AUC on the eICU dataset. Same experiment conditions as were used to produce 4. 19 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 12: Difference in best-case subgroup AUC (without calibration) and worst-case subgroup AUC (with calibration) on the eICU dataset. Same experiment conditions as were used to produce 6. 
+
+Figure 13: Difference in best-case subgroup AUC (with calibration) and worst-case subgroup AUC (with calibration) on the eICU dataset. Same experiment conditions as were used to produce 1. 20 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 14: Change in performance after W HOLE -S OURCE data addition using the Light Gradient Boosting Machine (LGBM) classifier on the eICU Dataset. 
+
+Figure 15: Change in Subgroup Rate vs. Change in Subgroup Accuracy after W HOLE -S OURCE 
+
+data addition, trained using an LGBM model. 
+
+## E EXTENDED MODEL CLASSES 
+
+This section shares the results and visualizations for all experiments conducted using Light Gradient Boosting Machine (LGBM) and Long Short-Term Memory (LSTM) models. The figures in the main paper are all showing the results using a Logistic Regression (LR) model. Each experiment was replicated on each model class. In general, it is observed that all model classes exhibit similar behavior under data addition. E.1 LIGHT GRADIENT BOOSTING MACHINE (LGBM) R ESULTS 
+
+The change in performance after W HOLE -S OURCE data addition is shown in Figure 14. We visual-ize the data addition combinations for all 12 hospitals used in the eICU Dataset. Results are shown for both accuracy and AUC at both the overall and subgroup levels. We also analyze the results of naive data selection strategies—maximizing subgroup rate, samples added, and similarity score—in Figures 15, 16, and 17, respectively. These are evaluated on the eICU dataset. We find that these existing data selection strategies are similarly ineffective when training an LGBM classifier. We compare data addition and calibration in 18, finding that, in all cases, informed data selection outperforms calibration as a fairness intervention strategy. Finally, in 19, we compare the combina-tion of data selection and calibration on an LGBM classifier. 21 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 16: Number of subgroup samples added vs. Change in Subgroup Accuracy after S UBGROUP -LEVEL data addition, trained using an LGBM model. 
+
+Figure 17: Subgroup Similarity Score between the test subgroup and added subgroup vs. Change in Subgroup Accuracy after S UBGROUP -L EVEL data addition, trained using an LGBM model. 
+
+Figure 18: Difference in best-case subgroup performance (without calibration) and worst-case sub-group performance (with calibration) after W HOLE -S OURCE data addition. Performance is evalu-ated on the eICU dataset using the subgroup accuracy metric and trained using an LGBM classifier. 22 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 19: Difference in best-case subgroup performance (with calibration) and worst-case subgroup performance (with calibration) after W HOLE -S OURCE data addition. Performance is evaluated on the eICU dataset using the subgroup accuracy metric and trained using an LGBM classifier. E.2 LSTM R ESULTS 
+
+The full set of results for W HOLE -S OURCE data addition using the Long Short-Term Memory (LSTM) model are presented in 20. In general, we find that the Overall accuracy is harmed by any out-of-distribution data addition, more so than is seen with the LR or LGBM models. This is not a necessarily unexpected result, as LSTMs rely more heavily on learned sequential dependen-cies and higher-order feature representations. Regardless, we still observe that the effects on Overall accuracy are not equally reflected across all subgroups. For example, adding data to Test Hospitals 338 and 199 are greatly helpful for improving Black subgroup accuracy despite minimal or negative changes to Overall accuracy. Similarly, we observe improvements to the Other subgroup of Hospital 443 under data addition, but minimal to negative differences among all other groups. We applied the same three naive data addition methods as in Section 5. The results are shown in Figures 21, 22, and 23. Interestingly, we observe that all three naive methods—increasing subgroup rate, sample size, and selecting the most similar sources—were informative for improving subgroup accuracy on the Black subgroup only. In each, we find a statistically significant relationship for the Black subpopulation. However, as these results were not seen consistently across all subgroups and model classes, we do not find that these methods overall are reliable strategies for improving subgroup performance on EHR datasets. 23 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 20: Change in Overall and Subgroup Accuracy after W HOLE -S OURCE data addition (LSTM). 24 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 21: Change in Subgroup Rate vs. Change in Subgroup Accuracy after W HOLE -S OURCE 
+
+data addition, trained using an LSTM model. 
+
+Figure 22: Number of subgroup samples added vs. Change in Subgroup Accuracy after S UBGROUP -LEVEL data addition, trained using an LSTM model. 
+
+Figure 23: Subgroup Similarity Score between the test subgroup and added subgroup vs. Change in Subgroup Accuracy after S UBGROUP -L EVEL data addition, trained using an LSTM model. 25 ICLR 2026 Workshop: Principled Design for Trustworthy AI 
+
+Figure 24: Change in Overall and Subgroup AUC by ethnicity group after W HOLE -S OURCE data addition on the eICU dataset. Experiments are identical to the ones used to produce 1. 26

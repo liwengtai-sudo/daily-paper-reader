@@ -1,0 +1,472 @@
+Title: Nonparametric Regression Discontinuity Designs with Survival Outcomes
+
+URL Source: https://arxiv.org/pdf/2604.03502v1
+
+Published Time: Tue, 07 Apr 2026 00:15:36 GMT
+
+Number of Pages: 27
+
+Markdown Content:
+# Nonparametric Regression Discontinuity Designs with Survival Outcomes 
+
+Maximilian Schuessler 
+
+maxsc@stanford.edu 
+
+Erik Sverdrup 
+
+erik.sverdrup@monash.edu 
+
+Robert Tibshirani 
+
+tibs@stanford.edu 
+
+Stefan Wager 
+
+swager@stanford.edu 
+
+April 7, 2026 
+
+Abstract 
+
+Quasi-experimental evaluations are central for generating real-world causal evi-dence and complementing insights from randomized trials. The regression disconti-nuity design (RDD) is a quasi-experimental design that can be used to estimate the causal effect of treatments that are assigned based on a running variable crossing a threshold. Such threshold-based rules are ubiquitous in healthcare, where predictive and prognostic biomarkers frequently guide treatment decisions. However, standard RD estimators rely on complete outcome data, an assumption often violated in time-to-event analyses where censoring arises from loss to follow-up. To address this issue, we propose a nonparametric approach that leverages doubly robust cen-soring corrections and can be paired with existing RD estimators. Our approach can handle multiple survival endpoints, long follow-up times, and covariate-dependent variation in survival and censoring. We discuss the relevance of our approach across multiple areas of applications and demonstrate its usefulness through simulations and the prostate component of the Prostate, Lung, Colorectal and Ovarian (PLCO) Cancer Screening Trial where our new approach offers several advantages, includ-ing higher efficiency and robustness to misspecification. We have also developed an open-source software package, rdsurvival , for the R language. 
+
+# 1 Introduction 
+
+The regression discontinuity design (RDD) is a quasi-experimental design used to es-timate causal effects from observational data. Specifically, the method can be applied when treatments are assigned based on a variable crossing a threshold (Thistlethwaite and Campbell, 1960; Imbens and Lemieux, 2008). In medicine, thresholds defined by clinical parameters frequently serve as decision rules for treatment assignment. De-spite their clinical utility, such thresholds create an artificial boundary: patients just above typically receive treatment, while those just below do not. Since individuals near the threshold are highly similar in observed and unobserved characteristics but differ 1
+
+> arXiv:2604.03502v1 [stat.ML] 3 Apr 2026
+
+minimally in the threshold-defining variable (and thus treatment exposure), RDD can estimate the causal effect of the intervention on outcomes of interest. 
+
+1.1 Threshold-based decision-making in medicine 
+
+The ubiquity of thresholds in medicine makes RDD a highly applicable study design. Figure 1 gives a stylized example of settings in which some prognostic variable serves as a decision rule for treatment. For example, age thresholds often determine who is eligible for a screening or prevention policy (Eyting et al., 2025). In general medicine, diabetes and hypertension diagnoses and treatment are based on HbA1c (ElSayed et al., 2024; Lemp et al., 2023) and systolic blood pressure (Members, 2025), respectively. In oncology, tumor-specific biomarkers often determine who should receive an additional therapy (Herbst et al., 2020). The widespread implementation of thresholds in clini-cal guidelines makes RDD a valuable quasi-experimental design to complement causal evidence from randomized controlled trials. This is particularly useful when trials do not reflect real-world patient populations or the exact clinical decisions that clinicians face in routine care (Degtiar and Rose, 2023). Additionally, RDDs can help evaluate thresholds that were established based on weak evidence or exploratory analyses. When clinical trials are practically or ethically infeasible, or when their results are inconclusive, quasi-experimental designs like RDD may then provide the best available evidence. The prostate component of the Prostate, Lung, Colorectal, and Ovarian (PLCO) Cancer Screening Trial (hereafter referred to as the PLCO trial) is a prime example of how an RDD can provide additional clinical evidence when results from a randomized trial are inconclusive. Prostate cancer is among the most common types of cancer, with approximately 1.5 million new cases and 400,000 deaths per year globally (Bray et al., 2024). Following a series of randomized controlled trials, the U.S. screening guidelines recommend that prostate cancer screening for men be determined on a case-by-case basis through shared decision-making between patient and clinician (Grossman et al., 2018). The PLCO trial investigated whether prostate cancer screening, consisting of a blood-based prostate specific antigen (PSA) test and a physical exam, offered a survival benefit compared to no screening (Andriole et al., 2009). The results from the trial remained inconclusive and controversial due to high rates of contamination in the control arm: while 50% of participants were randomized to treatment, the majority of patients in the control group reported having undergone at least one PSA test. To overcome this limitation, Shoag et al. (2015) propose a causal design that focuses on the receipt of prostate biopsy as part of the screening cascade in the treatment arm of the PLCO trial. Patients were eligible for this diagnostic surgical procedure if their PSA measurement exceeded 4.0 ng/mL. Patients at and below this threshold were not, resulting in a feasible regression discontinuity design. 
+
+1.2 Time-to-event outcomes 
+
+A particular statistical challenge in the PLCO trial and RDD in healthcare more broadly is the presence of right-censoring in settings with time-to-event outcomes. To assess the 2benefit of an intervention, practitioners are frequently interested in (long-term) survival endpoints such as overall survival, disease-specific survival, or time until a disease on-set/progression. The disease context of this study, prostate cancer, is often indolent, with a prolonged latency before events such as death or metastatic spread occur. As a result, right-censoring due to drop-out or loss to follow-up presents an important statis-tical challenge and its adjustment is highly relevant for the unbiasedness and precision of causal estimates. Traditionally, the most common approach to account for right-censoring is to use inverse probability of censoring weighting (IPCW, van der Laan and Robins (2003)). This approach weighs the observed events by their inverse probability of remaining in the study, i.e., being censored beyond a given time point, and discards the censored observations. RDDs are sensitive to sample size, so discarding observations can cause a substantial loss in power. Moreover, the IPCW approach is also prone to bias if the estimated censoring probabilities are inaccurate. In the context of RDDs specifically, Adeleke et al. (2022) suggest using accelerated failure models to address right-censoring. This approach replaces the regression models typically employed for estimating the effect at the threshold with time-to-event models that account for censoring. A drawback of this approach is that the regression model does not incorporate covariates. Cho et al. (2021) improve on this approach using dou-bly robust censoring corrections and pair these with the inferential approach of Calonico et al. (2014). This approach leverages both censoring and event models and thus yields unbiased results if either model is correctly specified (Robins et al., 1994; Tsiatis, 2006; van der Laan and Robins, 2003). A limitation of this solution is that it still depends on parametric assumptions in the working model for the survival and censoring distribu-tions. A more credible approach to survival analysis is to rely on flexible nonparametric machine learning methods that can incorporate information from patient-level covariates (van der Laan et al., 2011; Westling et al., 2024). This is relevant when a given study population is composed of several subgroups that exhibit covariate-specific survival and censoring patterns. Here, we extend this perspective to RDDs by estimating the nuisance components of the doubly robust censoring corrections using flexible machine learning models (Chernozhukov et al., 2018; van der Laan et al., 2011). This strategy leverages existing estimation and inference tools for RDDs (e.g., Armstrong and Koles´ ar (2018); Calonico et al. (2014); Ghosh et al. (2025)), but replaces the censored outcomes with pseudo-outcomes estimated from flexible nonparametric models. The use of pseudo-outcomes in place of unobserved variables has a rich history in both causal inference (e.g., Kennedy (2023)) and survival analysis (Andersen et al., 2017; Cho et al., 2021; Su et al., 2022). We demonstrate this approach in a detailed re-analysis of the prostate component of the Prostate, Lung, Colorectal, and Ovarian (PLCO) Cancer Screening Trial (Andriole et al., 2009; Prorok et al., 2000), suggesting that a nonparametric method may offer complementary insights and potentially more credible causal conclusions. Our analysis of the PLCO trial includes a large and heterogeneous cohort, where censoring patterns arecomplex and vary by the trial participants’ demographics and many other descriptors. 3This offers a rich application as real-world data such as electronic health records are often subject to considerable fluctuations by irregular data entries and updates, drift in the distribution of covariates and/or outcomes, or external shocks. In the presence of such variation, parametric assumptions are frequently violated, and causal estimates are prone to bias. This is further complicated by the fact that in real-world observational settings, where RDDs are most appealing, censoring rates are often substantially higher than in randomized controlled trials. An open source software package, rdsurvival for R (R Core Team, 2024), implements the proposed method. 0.0  0.2  0.4  0.6  0.8  1.0         
+
+> Running variable (e.g. prognostic score) Survival probability
+> 012345678
+
+Figure 1: Illustration of the canonical RD design. Survival is declining as the prognostic running variable increases. At the threshold (dashed line) an intervention is triggered, resulting in a substantial improvement in the prognosis. 
+
+# 2 Regression discontinuity designs with survival outcomes 
+
+For every unit i, we have access to a running variable Zi ∈ R that determines treatment eligibility via a certain threshold c ∈ R. In a “sharp” RD setting, the treatment Wi ∈{0, 1} is deterministically assigned for every unit for which the running variable exceeds this threshold, i.e., Wi = 1( Zi ≥ c). We are interested in the effect of a given treatment on a time-to-event Ti, e.g., the time from treatment assignment until death. 4By limiting our survival analysis up to a time horizon h, we are able to construct several effect measures. Two simple and interpretable estimands are the effect on i) h-month survival probability and ii) the impact on mean h-month survival, where 0 < h < 
+
+∞ is some chosen finite time point 1. For example, in a study where we have outcome data for up to 60 months following treatment assignment, we may determine an h up to 60 months based on domain expertise. An alternative to pre-specified horizons is to look at a feasible time point in a data-driven way, for example, by setting h to the 90-th percentile of observed follow-up times (Tian et al., 2020). Let Ti(1) and Ti(0) denote the potential outcomes (Imbens and Rubin, 2015) in the two treatment states for the i-th unit in the presence of control and treatment, respectively. For survival probabilities, the RD setting allows us to identify the following counterfactual difference for the population with a running variable Zi equal to the threshold c.
+
+Definition 1. The RD treatment effect on time-h survival probability is 
+
+πh = P [Ti(1) > h | Zi = c] − P [Ti(0) > h | Zi = c] . (1) The second estimand we consider is the effect on mean time-h survival. A purely mechanical issue we have to deal with when estimating mean survival times is the issue of truncation. In a study with a follow-up time of 60 months, we barely observe any patients past 60 months, and so it is reasonable to ask for the effect on at most mean 60-month survival. Truncated means formed this way are often referred to as restricted mean survival times (“RMST”; see e.g., Royston and Parmar (2013)). 
+
+Definition 2. The RD treatment effect on mean time-h survival (“RMST”) is 
+
+τ h = E [min( Ti(1) , h ) | Zi = c] − E [min( Ti(0) , h ) | Zi = c] . (2) A convenient property of survival functions is that the mean time-h survival is equal to the area under the survival curve up to time h, and so (2) can be seen as an effect measure that aggregates (1). The practical interpretation of these quantities is straight-forward, for example, in a medical setting where the survival outcome is cancer-free survival, and the running variable determines a treatment, then for h = 24, (1) quan-tifies the difference in survival probability past 2 years when receiving biopsy, and (2) quantifies the differential effect on mean 2-year survival when receiving a biopsy. Figure 2 gives a graphical representation of these quantities. 
+
+2.1 Estimation with observed outcomes 
+
+At first glance, it might be tempting to view the RD design as a special version of a localized randomized controlled trial where it suffices to compare mean outcomes on both  
+
+> 1These estimands are simple to interpret and estimate, as they are linear in the distribution of Ti.For more complex survival estimands in the RD setting, such as hazard ratios, see, e.g., Stoltenberg (2022).
+
+50.0  0.2  0.4  0.6  0.8  1.0 
+
+h (ho rizon) 
+
+> Su rvi val probability
+
+# −P [ T i(1) > h | Zi = c ] 
+
+# −P [ T i(0) > h | Zi = c ] 
+
+τh
+
+πh     
+
+> 0246810
+
+Figure 2: Illustration of the estimands πh and τ h. For the population with running variable Zi equal to the threshold c, πh is the vertical distance between to counterfactual survival curves P [Ti(w) > h | Zi = c], w ∈ { 0, 1}, at time point h, while τ h is the area between the counterfactual survival curves up to time point h.sides near the threshold. From an estimation perspective, this overlooks a core insight in many RDDs: the running variable (e.g., disease severity) is highly prognostic of the outcome (e.g., survival). In order to disentangle the gradual effect of the running variable on the outcome from the treatment effect, it is common to assume the conditional mean functions in (1) and (2) are continuous and that the running variable has continuous support around the threshold (Hahn et al., 2001; Imbens and Lemieux, 2008). πh is then identified by the following limit in terms of the observed time-to-event Ti
+
+πh = lim  
+
+> z↓c
+
+E [1( Ti > h ) | Zi = z] − lim  
+
+> z↑c
+
+E [1( Ti > h ) | Zi = z] ,
+
+where we’ve used the simple fact that P [Ti > h ] = E [1( Ti > h )]. The second estimand 
+
+τ h is identified by 
+
+τ h = lim  
+
+> z↓c
+
+E [min( Ti, h ) | Zi = z] − lim  
+
+> z↑c
+
+E [min( Ti, h ) | Zi = z] .
+
+These limits are commonly estimated using local linear regressions on each side of the discontinuity threshold c (Hahn et al., 2001), or, as advocated by Imbens and Wager (2019), through minimax optimal convex optimization. Given access to survival data 6with observed outcomes, it is straightforward to obtain estimates and confidence intervals of the parameters πh or τ h: simply call into a continuity-based RD estimator of our choice (e.g., rdrobust (Calonico et al., 2023), plrd (Ghosh et al., 2025), RDHonest (Koles´ ar, 2024)) with outcome equal to the argument in the expectation operator for the respective estimand: 1( Ti > h ) for (1) and min( Ti, h ) for (2). 
+
+2.1.1 Fuzzy RDs 
+
+These previous estimands and their interpretation naturally carry over to the “fuzzy RD” setting, where units above the treatment threshold c are more likely to receive treatment than those units below the threshold. Here, the treatment assignment Wi is not equal to 1( Zi ≥ c), but rather the treatment probability P [Wi = 1 | Zi] jumps at the value Zi = c. Depending on the application, the estimands πh and τ h can be interpreted as simple intention-to-treat (ITT) parameters, measuring the effect of being assigned 
+
+treatment, but not necessarily receiving it. Estimating these ITT parameters simply amounts to proceeding as in the previous paragraph, treating the estimation problem as a sharp RD, but modifying the interpretation of the result. We can also estimate local RD parameters that measure the effect of receiving treat-ment by invoking assumptions similar to those used in instrumental variables settings with imperfect compliance (Imbens and Lemieux, 2008). The interpretation of πh is then the same, but restricted to the compliers only (i.e., those units who receive treat-ment exactly when assigned treatment). We denote the jump in treatment probability by p = lim z↓c E [Wi | Zi = z] − lim z↑c E [Wi | Zi = z]. This local fuzzy counterpart to the estimand (1) is then identified by the following simple rescaling 
+
+eπh = πh
+
+p .
+
+The fuzzy RD estimand is not identified when the jump in treatment probability p is 0. It is also unstable when this probability difference is close to 0, highlighting an important role of the design stage when constructing fuzzy RD research designs. Section 4 gives an example of this design step by carefully defining the target population of eligible patients. Feir et al. (2016) and Noack and Rothe (2024) suggest Anderson-Rubin-type tests for conducting inference on local RD parameters that can be used in settings where 
+
+p is close to zero. For further discussion of RD estimation and inference see Cattaneo et al. (2024), Koles´ ar (2024), and Wager (2024, Ch. 8). 
+
+2.2 Estimation with right-censored outcomes 
+
+A challenge with many studies on survival outcomes is that we do not observe Ti for every unit i. Due to drop-out or loss to follow-up, the event time Ti is not observed for all units; instead we observe the time at which a unit is censored Ci.70200 400 600 800   
+
+> 30 60
+> Survival time (Months)
+> Frequency
+> Censored
+> Death
+> a
+> 0200 400 600 800
+> 30 60
+> Survival time (Months)
+> Frequency
+> Censored
+> Death
+> b
+
+Figure 3: The figure shows two scenarios with a total of around 70 months of follow-up. In the first scenario (panel a), censoring poses no challenge up to 28 months (dashed gray line). In the second scenario (panel b), estimating the effect on h = 60 months (dashed red line) involves remapping censoring and event times observed past h.
+
+Definition 3. Under right-censoring, we observe Yi = min( Ti, C i) where Ti is the sur-vival time and Ci the censoring time, along with a non-censoring indicator ∆ i = 1( Ti <Ci). This right-censoring pattern is ubiquitous in applications that use electronic medical records, registry data, or studies where patients are enrolled at different time points. Figure 3 illustrates what the data may look like in a hypothetical study with 60 months of follow-up time. Up until h = 28 we observe only events (e.g. deaths) for subjects in the study. Had we only been interested in the effect on survival up to 28 months, then this situation would pose no additional complications for us, since it is only after this time point that units are censored. Estimating an h = 28-month RD effect here only involves remapping every unit we tracked past h to h and treating them as observed: if we know they were censored in the future, we know they must have been alive at h.This situation becomes more challenging when asked about the effect of survival past 
+
+h = 30 months. If we are interested in the effect on h = 60 month (5-year) survival, for example, then there is a considerable number of patients that are censored. In Figure 3b, we have drawn a vertical line at which we remap everyone tracked past this point. Now, how do we address the estimation of (1) and (2) in this scenario? Simply ignoring these samples would in general lead to biased estimates. In order to obtain unbiased estimates, we need to account for the missingness pattern imposed by censoring. In order to do so, we first need to make some assumptions about the censoring mechanisms. To accommodate realistic clinical settings, we assume access to a set of d time-invariant 8patient characteristics Xi ∈ Rd observed at baseline. These could be clinical variables, such as disease severity (e.g. mitotic rate of a tumor), or demographics such as age, that we believe can be predictive of both survival and censoring. 
+
+Assumption 1. (Conditionally ignorable censoring). Conditional on covariates and the running variable, censoring is ignorable, 
+
+Ti ⊥⊥ Ci Xi, Z i.
+
+This ignorable censoring assumption is strong and non-testable, but standard in the literature (Fleming and Harrington, 2013). Note that, by conditioning on Xi, we allow for the censoring structure to vary according to some observable predictor variables, which alleviates a concern that not every patient is equally likely to be censored. Next, we need a more mechanical assumption that relates our chosen time point of interest h
+
+to the censoring process. The following assumption ensures that at the given time point 
+
+h, censoring has not completely masked all the clinically relevant information we care about. 
+
+Assumption 2. (Positivity). Some patients are never censored, there is an η > 0 such that for our horizon h of interest, 
+
+P [Ci > h | Xi = x, Z i = z] ≥ η for all x and z. 
+
+Note that these assumptions are essentially counterparts to the unconfoundedness 
+
+and overlap assumptions in an observational study (Rosenbaum and Rubin, 1983). The positivity assumption is typically easier to accommodate in survival settings since we can often pick a time horizon where positivity is not an issue and still obtain an interpretable estimand. In Figure 3, positivity is clearly an issue beyond h = 65 months due to considerable censoring and few observed events. Lowering the horizon to h = 60 yields an interpretable 60-month survival estimate that alleviates this concern. 
+
+Remark 1. In settings where Ti measures, for example, time until cancer progression, a competing event is something that precludes this event from happening, e.g., death from a heart attack. In these settings, the researcher can choose to interpret πh and τ h
+
+as either direct or total effects (Young et al., 2020), depending on whether competing events are defined as censoring events. See Rubin (2006) for further conceptualizations of causal effects in settings with competing events. 
+
+2.3 Accounting for censoring via weighting 
+
+Given these assumptions, it is conceptually straightforward to account for censoring with weighting. Given Definition 3, the probability we observe a unit (i.e., the unit is not censored) is 
+
+P [∆ i = 1 | Xi, Z i] = P [Ci > T i | Xi, Z i] .
+
+The idea of inverse probability of censoring weighting (IPCW) is to estimate (1) using the samples for which we observe the event time Ti, but up-weight them with weights 9equal to the inverse of the observation probabilities (van der Laan and Robins, 2003). Assumption 2 on positivity ensures that these inverse weights do not explode. The fol-lowing procedure outlines the steps (for ease of exposition, our focus will be on discussing the underpinnings of estimating πh , but note that the approach readily extends to τ h 2). 
+
+Algorithm 1. IPC-adjusted RD estimate for πh.1. Form estimates bSC (t) of the censoring process. This can be done by fitting a Kaplan-Meier curve using Yi as outcomes and 1 − ∆i as the censoring indicator. 2. Construct sample weights equal to wi = 1 / bSC (min( h, Y i)). 3. For the subset of samples with ∆ i = 1 or that are censored after h, call into an RD estimator with outcomes equal to 1( Yi > h ) and sample weights equal to wi.Return the estimated RD parameter and confidence intervals. The drawback of this approach is that we have to estimate the censoring probabil-ities, and the quality of these estimates completely determines our ability to success-fully account for censoring. A workhorse approach for this task is survival curves with Kaplan-Meier estimators. These, however, cannot easily account for possibly compli-cated censoring mechanisms that vary by patient characteristics, which can be highly relevant, as our conditioning on Xi and Zi implies. Figure 4 illustrates these complica-tions by showing estimated bias arising from censoring for IPCW-adjusted RD estimates and compares them with a more flexible approach (DR) described in the next section. On the left-hand side of Figure 4, the IPCW approach performs well because the sim-ulated censoring pattern is simple and follows a uniform distribution. This is something an unconditional Kaplan-Meier curve has little problem with estimating correctly. In the other simulation setting, the censoring pattern is more complicated, and the IPCW approach fails to successfully eliminate censoring effects. A second drawback is that in Step 3 of Algorithm 1 we are discarding all samples that are censored before h. Since RD estimation is data-intensive, reducing the number of observations can result in a sig-nificant loss of power. The doubly robust approach (DR), performs better by relying on flexible machine learning approaches to estimate survival curves conditional on ( Xi, Z i), which are used to construct “pseudo-outcomes” (Andersen et al., 2017; Steingrimsson et al., 2019) that take the place of the unknown complete-data outcomes Ti in the RD estimation. The next section elaborates on this strategy. 
+
+Remark 2. In Step 3 of Algorithm 1, we are effectively treating units that are tracked past h but eventually censored to be observed for the purpose of estimating πh. This is simply a consequence of Definition 1 and 2 in terms of a finite time point h: anything that happens after this time point is not relevant to us. A good practice in analyzing censored survival data is to plot a histogram of events by censoring and event status to assess how much censoring is affecting our estimand. If no censoring occurs before the time point of interest h, then there is no need to employ censoring corrections.            
+
+> 2Or any deterministic linear transformation of Tibounded by a finite horizon h.The Rpackage
+> rdsurvival supports both πhand τh.
+
+10 Uniform censoring Complex censoring    
+
+> IPC DR IPC DR
+> −0.2 −0.1 0.0 0.1 0.2
+> Censoring bias
+> Estimator
+> DR
+> IPC
+
+Figure 4: Example of bias using an IPCW approach compared with a more flexible dou-bly robust (DR) approach that uses nonparametric survival estimators, using simulation settings described in Section 3 (uniform censoring is “setting 1” and complicated cen-soring is “setting 2”) and a sample size of n = 5 , 000. The boxplots show censoring bias defined as the difference between an estimate ˆ πh using censor-corrections, and an esti-mate ˆ πh 
+
+> ∗
+
+using the uncensored complete-data Ti, from the same realization of n = 5 , 000 observations. 
+
+2.4 Doubly robust censoring corrections 
+
+The general problem in the preceding section is that the goal of consistent RD estima-tion hinges entirely on a single model to correctly specify and account for censoring. In real-world scenarios, it is often very hard or impossible to know what the underlying censoring process looks like. A key point to recognize in the previous section is its concep-tual relation to estimating an average treatment effect under unconfoundedness, where we can perform the confounding adjustment via either weighting (using a propensity score), a regression adjustment (using a conditional mean function), or a doubly robust combination of both (Robins et al., 1994). This doubly robust combination typically enjoys superior properties over using either approach alone (Bang and Robins, 2005; Ding, 2023; Wager, 2024). An exact analog for this doubly robust estimator to survival settings with censoring is via censoring robust transformations (Rubin and van der Laan, 2007; Tsiatis, 2006), where, in addition to estimates of the censoring process used for weighting, we utilize a regression counterpart in the form of estimates of the survival 11 curve P [Ti > t | Xi, Z i]. Given a continuity assumption on the censoring distribution, it is possible to con-struct generic censoring robust transformations for a large class of estimation problems (e.g., Tsiatis (2006)) that augment complete-data formulations with doubly robust cen-soring corrections 3. This is the approach Cui et al. (2023) takes to estimate conditional average treatment effects under right-censoring, and Cho et al. (2021) in estimating censoring doubly robust RDs (using parametric models for the censoring and survival process). As is often the case, working with continuous-time censoring is largely a mathematical convenience, but does not reflect the medical or administrative reality of the data. In our practical applications, censoring arises due to various data collection protocols (e.g., scheduled follow-up for registry data), electronic health record adminis-tration (e.g., irregular data pulls), or unexpected events (e.g., patients moving to another state). Rather than happening at a continuous rate, censoring processes take place at varying discrete steps during a fixed study period. Approaching censoring processes via covariate-conditional Kaplan-Meier curves on a continuous time grid is, therefore, problematic. Here, instead of relying on continuous-time censoring unbiased transformations, we use a version that accounts for discrete-time censoring. We assume that follow-up with individuals happens at pre-determined times t = {1, . . . , t max } and that we know the status of each patient. That is, we are able to ascertain if a patient is either alive or censored–and we are thus unable to observe the complete time-to-event due to loss to follow-up. We assume each unit i has a censoring time Ci = {1, . . . , +∞} , where +∞ denotes that the patient is never censored. Under this setup, then for the RD estimand (1), the goal is to derive a censoring doubly robust estimator for P [Ti > h ] = 
+
+E [1( Ti > h )]. To do so, we can leverage a doubly robust estimator for a discrete-time dynamic policy (Wager, 2024, Ch. 14). The idea involves recognizing that estimating 
+
+P [Ti > h ] is the same as estimating the value of a certain dynamic policy, where we appropriately interpret policy values as survival probabilities and propensity scores as censoring probabilities. For details, we refer to (Wager, 2024, Exercise 14), and here state the resulting doubly robust construction 4.Let ST (t; x, z ) = P [Ti > t | Xi = x, Z i = z] and SC (t; x, z ) = P [Ci > t | Xi = x, Z i = z]denote the survival curves for the survival and censoring process, respectively. Define                                     
+
+> 3Given the complete-data estimating equation ψcθ(Ti) = Ti−θfor a target parameter θdepending on the survival time Ti, a censoring-augmented estimating equation is given by the well-known transfor-mation ∆ iψcθ(Ti)/S C(Yi) + (1 −∆i)E[ψcθ(Ti)|Ti> Y i]/S C(Yi)−RYidS C(t)/S 2
+> C(t)E[ψcθ(Ti)|Ti> t ]dt .
+> 4Taking the limit as t→t+ 1 in (3) yields the familiar continuous-time expressions in Cui et al. (2023); Rubin and van der Laan (2007); Xu et al. (2023), which require estimating an integral involving the censoring hazard and censoring process. In contrast, (3) avoids this and remains consistent even with coarse time grids, where continuous-time estimators can suffer from discretization error (e.g., monthly time steps over a short follow-up).
+
+12 Hi = min( Yi, h ), and the following score 
+
+bΓi = bST (h; Xi, Z i)+ (3) 
+
+> Hi−1
+
+X
+
+> t=1
+
+1
+
+bSC (t; Xi, Z i)
+
+bST (h; Xi, Z i)
+
+bST (t; Xi, Z i) − bST (h; Xi, Z i)
+
+bST (t − 1; Xi, Z i)
+
+!
+
++max(∆ i, 1( Yi > h )) 
+
+bSC (Hi; Xi, Z i) 1( Yi > h ) − bST (h; Xi, Z i)
+
+bST (Hi − 1; Xi, Z i)
+
+!
+
+.
+
+If the curves bST (t; Xi, Z i) and bSC (t; Xi, Z i) are estimated sufficiently well, then Pni=1 bΓi
+
+is an efficient doubly robust estimate of P [Ti > h ]5. We can motivate debiased machine learning arguments for estimating bST (t; Xi, Z i) and bSC (t; Xi, Z i) by forming the score bΓi
+
+without using the i-th unit for estimating the survival or censoring process. This can be done using suitable cross-fold or sample-splitting constructions, or in the case of forests, out-of-bag predictions. This is the approach rdsurvival takes, by forming estimates using random survival forests (Ishwaran et al., 2008) as implemented in grf (Tibshirani et al., 2025). This effectively leverages random forests to deliver flexible and data-driven Kaplan-Meier (or Nelson-Aalen) curves that are conditional on ( Xi, Z i) and gives us the following approach to flexibly account for censoring. 
+
+Algorithm 2. Doubly robust censoring adjusted RD estimate for πh.1. Estimate the survival and censoring processes bST (t; Xi, Z i) and bSC (t; Xi, Z i) using flexible survival estimators, such as random survival forests. 2. Construct doubly robust scores bΓi given by (3) using out-of-bag estimates. 3. Call into an RD estimator using bΓi as outcomes and return estimate and confidence interval. The type of guarantees we can obtain with this doubly robust approach is that in Step 3 of Algorithm 2, by using outcomes bΓi we are doing asymptotically as well as if we had run Step 3 using the (infeasible) complete data outcomes 1( Ti > h ), i.e., we obtain confidence intervals that are valid for the given RD estimator. The formalization of this result follows from the approach in Armstrong (2020). 
+
+# 3 Simulation study 
+
+As indicated by Figure 4, the doubly robust approach is more effective at eliminating censoring effects than IPCW. To assess the practical performance of our approach more                                           
+
+> 5Asimilar doubly robust construction readily follows for E[min( Ti, h )] required for the RMST estimand (2); here, estimates of E[min( Ti, h )|Ti> t, X i, Z i]replaces terms of the form
+> bST(h;Xi, Z i)/bST(t;Xi, Z i) := P[Ti> h |Ti> t, X i, Z i]. These can be estimated via the area under the estimated survival function bST(t;x, z ).
+
+13 thoroughly, we undertake a simulation study to evaluate the performance of the estimator implemented in rdsurvival and verify that the doubly robust approach can reliably account for censoring across a range of scenarios. We consider four simulation settings where we generate n independent pre-treatment covariates Xi uniformly distributed on [0 , 1] d with d = 10, and the running variable Zi uniformly distributed on [0 , 1] with the treatment set to Wi = 1( Zi ≥ 0.5). The survival time Ti has a simple quadratic curvature in the running variable in all settings, but with varying degrees of censoring complications considered in Cui et al. (2023). In all settings, we consider estimating the effect of the treatment on both the survival probability and RMST at a given h. In Setting 1 , the survival time Ti follows a Poisson distribution with mean X21 + X3 + 6 + 2( √X1 − 0.3) + Z2 
+
+> i
+
++ 0 .9Wi and the censoring time is uniformly distributed on [1 , 15]. We consider a horizon parameter of h = 7. In Setting 2 , the survival time Ti follows the same Poisson distribution as in Setting 1 
+
+with mean X21 + X3 + 6 + 2( √X1 − 0.3) + Z2 
+
+> i
+
++ 0 .9Wi. The censoring process follows a Poisson distribution with mean 10 + log(1 + exp( X3)) − 1.5 · 1( Zi ≥ 0.5). We consider a horizon parameter of h = 9. In Setting 3 , Ti follows an accelerated failure time model with log( Ti) = 1 .8 + 0 .7√X2 + 0 .2X3 − 0.4√X4 − 0.5Z2 
+
+> i
+
++ 0 .75 Wi + ϵi, where 
+
+ϵi ∼ N (0 , 1). The censoring process is uniform on [0 , 50], and we consider a horizon of 
+
+h = 20. Finally, in Setting 4 Ti follows the same process as in Setting 3 , i.e. log( Ti) = 1.8+0 .7√X2 +0 .2X3 −0.4√X4 −0.5Z2 
+
+> i
+
++0 .75 Wi +ϵi. The censoring process follows a Cox model with parameters exp( −5.75 − 0.5√X2 + 0 .2X3 + 0 .3√X4Zi) and baseline hazard 2t. We consider a horizon of h = 15. For the settings with continuous distributions, we record simulated event times with 1 digit and fit survival curves on the grid of all recorded times. For each simulation setting, we use n = 5 , 000 and B = 1 , 000 Monte Carlo repetitions to estimate the survival probability and RMST at h, and calculate mean empirical coverage for πh and τ h using 95% confidence intervals, average interval length, and root mean squared error (RMSE) 
+
+q 1
+
+> B
+
+PBb=1 (τ − ˆτb)2. The doubly robust censoring corrections are estimated using random survival forests, which is the default option in 
+
+rdsurvival . For the RD estimator, we consider two approaches, plrd (Ghosh et al., 2025) and rdrobust (Calonico et al., 2023), using default options for both. These packages differ in their approach to constructing confidence intervals. plrd relies on “bias-aware” inference (Armstrong and Koles´ ar, 2018), while rdrobust relies on “bias-adjusted” inference (Calonico et al., 2014). The results in Table 1 show the coverage for both RD methods and survival estimands. In all settings, both RD methods achieve nominal coverage, with wider confidence intervals for rdrobust compared to plrd . In RDDs, it is natural to believe that the running variable has a gradual effect on the outcomes, as Figure 1 suggests. Estimators such as plrd utilize this structure to produce more efficient estimates (see Armstrong and Koles´ ar (2018), Wager (2024, Ch. 8) for an in-depth discussion). Operating Characteristics of DR Approach with Different RD Estimators 
+
+Setting Survival probability πh RMST τ h
+
+Coverage RMSE Length Coverage RMSE Length 
+
+rdrobust 
+
+1 0.94 0.09 0.33 0.94 0.19 0.70 2 0.95 0.08 0.29 0.95 0.26 1.01 3 0.95 0.07 0.26 0.94 0.99 3.58 4 0.95 0.08 0.28 0.95 0.69 2.61 
+
+PLRD 
+
+1 0.96 0.04 0.17 0.96 0.09 0.35 2 0.94 0.04 0.15 0.96 0.14 0.51 3 0.95 0.03 0.13 0.97 0.44 1.80 4 0.95 0.04 0.14 0.95 0.35 1.31 Table 1: Coverage of 95% confidence intervals for πh and τ h, RMSE, and average interval length for the four simulation settings described in Section 3. The number of Monte Carlo repetitions is 1,000. 
+
+# 4 Survival Outcomes in the PLCO Cancer Screening Trial for Prostate Cancer 
+
+To test our approach on a real data application, we consider the prostate cancer compo-nent of the U.S. Prostate, Lung, Colorectal, and Ovarian Cancer Screening Trial (PLCO) (Andriole et al., 2009; Prorok et al., 2000). This randomized controlled trial (RCT) was conducted from 1993 through 2001 and is among the most prominent studies aimed at assessing the benefits from prostate cancer screening (Andriole et al., 2009; Prorok et al., 2000). The trial included a total of 76,693 men aged 55 to 74 years at 10 U.S. centers who were randomized to either standard of care (control group) or annual screen-ing (treatment group). The latter included annual prostate-specific antigen testing and digital rectal examination (DRE). The PLCO trial provides an instructive example for how RDDs can complement the intention-to-treat (ITT) estimates from an RCT. Substantial contamination in the PLCO trial’s control arm diluted potential differences in outcomes and ultimately limited the interpretability of the trial. It turns out that RDD offers a practical workaround for inference: by restricting the analysis to the screening arm, one can exploit the threshold-based eligibility rules for downstream diagnostic procedures such as prostate biopsy. This is also the approach taken by Cho et al. (2021) and Shoag et al. (2015). Specifically, we used the PSA-based eligibility threshold for prostate biopsy to iso-late the effect of biopsy-based screening on survival outcomes in the screening arm 15 (n=38,343). Prostate biopsy is a diagnostic surgical procedure to determine whether a patient has prostate cancer. In the PLCO trial, patients with PSA levels greater than 4 ng/mL were considered eligible for prostate biopsy. While patients above this thresh-old are, on average, at a higher risk for having prostate cancer (American Urological Association, 2000), the use of PSA remains controversial due to its limited specificity, moderate predictiveness of disease severity, and intra-individual variability. The po-tential for detecting and treating indolent prostate tumors that would never become clinically apparent during a patient’s lifetime contributes to the screening controversy (Hamdy et al., 2023; Wilt et al., 2012). As a result, PSA-based thresholds for prostate biopsy are not strictly followed. The PLCO trial is no exception to that, resulting in a fuzzy RD design (Kasivisvanathan et al., 2018). From a methodological perspective, the PLCO trial offers a compelling use case for survival analysis as it contains multiple time-to-event outcomes, including prostate cancer-free survival and overall survival, and follow-up times of 11.5 years (Andriole et al., 2009) with post-trial follow-up. We define those outcomes as follows: prostate cancer-free survival is the number of days from ran-domization to the first occurrence of a cancer diagnosis, treating deaths and any loss to follow-up as censoring; overall survival (OS) is defined as the number of days from ran-domization to death from any cause. Since right-censoring can occur for both outcomes, the time-to-event is defined as the number of days from randomization to the event oc-currence (∆ i = 1), or to the last time the patient was confirmed to be event-free and alive (∆ i = 0). Finally, the long-term follow-up motivates the use of pretreatment covariates in our statistical analysis as covariate-dependent survival differences are likely to emerge. To account for distributional differences, we included several pretreatment covariates, including age, marital status, occupation, smoking status, positive family history for prostate cancer, body mass index (BMI), and various comorbidities (e.g., diabetes) and medications (e.g,. aspirin). These are reasonable prognostic covariates to incorporate in our censoring and outcome models. For exampnlle, age and a positive family history for prostate cancer are known risk factors and might explain subgroup-specific survival differences (Garraway et al., 2024; Raychaudhuri et al., 2025). To prepare the data, we removed all individuals in the control group. We further excluded all individuals with a suspicious result in the DRE since those patients were eligible for a prostate biopsy irrespective of their PSA result. We further limited our analysis to the first measurement of PSA and prostate biopsy, which turned our analysis into a static RDD. In a second step, we excluded all individuals who had a missing value for the first PSA measurement, a personal history of prostate cancer, or had undergone at least one PSA test before enrollment. From this cohort, we selected all individuals with a PSA below 10 ng/mL, resulting in a final analytic cohort of n = 17 , 351 for our RDD. 
+
+4.1 Data analysis 
+
+Our analysis begins by evaluating treatment uptake at the PSA threshold of 4 ng/mL to establish whether a meaningful discontinuity in treatment assignment is present. Figure 5 shows the distribution of PSA values (top) and the uptake in prostate biopsy utilization 16 at the critical threshold (bottom). Because the biopsy threshold of 4 ng/mL lies in the upper tail of the PSA distribution, relatively few patients fall within the vicinity of the threshold. In the first stage, we estimate a 0.177 (95% CI 0.09 to 0.264, p < 
+
+0.001) increase in the probability of receiving a prostate biopsy as patients cross the threshold. Although this uptake may appear moderate, a reasonable hypothesis is that many patients may delay their decision to undergo prostate biopsy in this first screening to a later cycle. Since screening is repeated annually in the PLCO trial in the first 6 years post-enrollment, we hypothesized that the number of cancer diagnoses might spike several times during the study period. Such periodic upticks with each screening round are plausible because histologic confirmation through biopsy establishes the diagnosis of prostate cancer, thereby resulting in higher cancer detection rates and shortening of the cancer-free interval. Figure 6 shows that cancer diagnoses spike following each screening cycle and then stabilize over the longer term. In contrast, mortality in Figure 6 b increases as expected over time as participants age and the risk of cancer-related death grows. Early mortality is more common among patients with a history of diabetes or stroke than among those without documented comorbidities at enrollment (Figure 7a-b). Similarly, event rates are much higher in patients at the age of 70 and above compared to younger cohorts below 60 years (Figure 7c-d). At the same time, the longer follow-up is associated with higher rates of partic-ipant dropout and right-censoring. To formally test for covariate-specific differences in the survival and censoring distributions, we conduct log-rank tests for both the event and censoring outcomes. There are significant differences in event distributions for pa-tients with both stroke and diabetes compared with those without ( p < 0.001), with at least one comorbidity compared with none ( p < 0.001), aged 70 or older compared with younger than 70 ( p < 0.001), and younger than 60 compared with aged 60 or older ( p < 0.001). These results are consistent for censoring distributions, except for patients with both stroke and diabetes versus those without ( p = 0 .135). Together, these covariate-dependent survival differences support an approach that is able to incorporate covariates in modeling both censoring and event distributions. Moreover, they are sug-gestive of distributional patterns in which traditional parametric assumptions such as proportional hazards might not necessarily hold (Grambsch and Therneau, 1994). To test this hypothesis, we assessed whether the Cox proportional hazards assumption was met. When investigating individuals around the threshold, the test result revealed that this assumption was violated globally ( χ2-test: p < 0.001), as well as at the covariate-specific level, including for age ( p < 0.001), weight ( p = 0 .005), history of coronary artery disease (CAD, p = 0 .002), and years of smoking ( p = 0 .003). A natural first positive control outcome for our RDD is to assess whether receipt of a prostate biopsy at the threshold leads to a shortened prostate cancer-free survival during the first screening cycle. Accordingly, we selected 10 months as our follow-up horizon, i.e. before the second screening takes place. Figure 8 shows the difference in prostate cancer-free survival at 10 months, expressed as a probability. There is a reduction in cancer-free survival, with an intention-to-treat (ITT) effect of -0.07 (95% CI: -0.15 to 17 → Eligible for prostate biopsy 0.00 0.25 0.50 0.75 Distribution of PSA Uptake of Prostate Biopsy as a Function of PSA     
+
+> Uptake at c = 4.01: Coef. = 0.186, 95% CI = 0.098 to 0.274, p < 0.001, n = 17351
+> 0.0 0.2 0.4 0.6 024.01 68PSA [ng/mL] Probability of Receiving Prostate Biopsy Sample Size 100 200 500 1,000
+
+Figure 5: Uptake of prostate biopsy as a function of the running variable PSA. The density and bar plots (top) shows the distribution and median (with IQR) of PSA. The red dashed line indicates the eligibility threshold for prostate biopsy and the solid lines the linear fits on each side of the threshold ( rdrobust ). 0) and of -0.42 (95% CI: -0.79 to -0.04) for the RD parameter. This is expected as the biopsy enables the detection of cancers before they become clinically symptomatic. Figure 8b shows the difference in overall survival at the threshold in restricted mean survival time at 15-year follow-up, with an ITT effect of -0.75 (95% CI: -11.95 to -10.46) months and RD parameter of -4.07 (95% CI: -66.33 to 55.22) months, suggesting that there is no significant survival benefit from prostate biopsy on overall survival in PLCO. In a next step, we hypothesized that as censoring rates increase, the DR approach will yield higher precision as it does not discard censored units during the estimation process. Figure 9 compares the RD Parameter when using an IPCW- versus DR-based approach to address censoring as we increased the horizon (and thus censoring). With increas-ing time horizons and correspondingly higher censoring rates, both approaches yield comparable point estimates, but the DR-based approach generates tighter confidence intervals. Finally, to test for positivity issues (and thus stability of the RD estimation), we plotted the probability of remaining uncensored against the running variable (Figure 10). At 15 years, most units have probabilities of remaining uncensored ≥ 0.8, indicating no positivity violations. Extending the horizon to 20 years lowers them, but the share of those ≤ 0.05 near the 4 ng/mL threshold remains negligible, confirming that our results pass this diagnostic step. 18 0250 500 750 1000        
+
+> 050 100 150 200
+> Survival time (Months)
+> Frequency
+> Censored
+> Cancer diagnosis
+> Cancer−free Survival
+> a
+> 0300 600 900 1200
+> 0100 200 300
+> Survival time (Months)
+> Censored
+> Death
+> Overall Survival
+> b
+
+Figure 6: Event and censoring distributions for prostate cancer-free and overall survival. The gray dashed lines mark the horizons used in our estimation. 
+
+# 5 Discussion 
+
+In this study, we presented a nonparametric, doubly robust approach that addresses right-censoring in RDDs with time-to-event data. We demonstrated the utility of this ap-proach in a large, heterogeneous cohort of the PLCO Cancer Screening Trial for prostate cancer. In this setting, censoring and event distributions were complex and showed vari-ation across demographic groups and participant-level descriptors, supporting the use of a nonparametric approach capable of incorporating covariate information. The applica-tion further illustrated how a quasi-experimental design can complement evidence from an RCT, helping to recover valid inference when randomization has been compromised due to contamination of the control group. The nonparametric, doubly robust properties of our approach are particularly relevant in real-world applications. In healthcare, for example, electronic health records often exhibit fluctuations due to irregular entries and updates, shifts in the distribution of covariates and/or outcomes, and external shocks. Such variation frequently complicates censoring mechanisms, leads to violations of para-metric model assumptions, and leaves causal estimates susceptible to bias. In observa-tional settings, where RDDs are most appealing, this is further complicated by censoring rates that are typically much higher than in randomized controlled trials. IPCW-based estimators may then experience notable efficiency losses. One benefit of our strategy is its modular design, allowing users to employ an RD estimator of their choice for each estimand. As new methods for RD estimation emerge, this modularity helps prevent our approach from becoming outdated and supports future methodological extensions. Future work may explore integrating our approach with other estimator classes, includ-ing hazard ratio estimators, and extending it to advanced competing risks settings. The 19 0.00 0.02 0.04 0.06    
+
+> 0100 200 300
+
+Survival time (Months) 
+
+> Censored
+> Death
+
+History of Diabetes or Stroke 
+
+a   
+
+> 0.00 0.02 0.04 0.06
+> 0100 200 300
+
+Survival time (Months) 
+
+> Censored
+> Death
+
+No Comorbidities 
+
+b  
+
+> 0.00 0.02 0.04 0.06
+> 0100 200
+
+Survival time (Months) 
+
+> Censored
+> Death
+
+Age Below 60y 
+
+c   
+
+> 0.00 0.02 0.04 0.06
+> 0100 200 300
+
+Survival time (Months) 
+
+> Censored
+> Death
+
+Age 70y and Above 
+
+dFigure 7: Distribution of events and right-censoring for overall survival stratified by subgroups. The density plots show the distribution of events and censoring for overall survival (OS). 20 Survival at c = 4.01 ITT param = −0.07, 95% CI = −0.15 to 0; RD param = −0.42, 95% CI = −0.79 to −0.04 
+
+0.5 0.6 0.7 0.8 0.9 1.0 
+
+0 2 4.01 6 8
+
+PSA [ng/mL] 
+
+> Survival Probability
+> Sample Size
+> 100
+> 500
+> 1,000
+
+Cancer−free Survival at 10−Month Follow−up 
+
+a
+
+> Survival at c = 4.01 ITT param = −0.75, 95% CI = −11.95 to 10.46; RD param = −4.07, 95% CI = −63.33 to 55.2
+
+100 150 
+
+0 2 4.01 6 8
+
+PSA [ng/mL] 
+
+> Restricted Mean Survival
+
+Overall Survival at 180−Month Follow−up 
+
+bFigure 8: Effect of prostate biopsy on survival endpoints. The dashed line indicates the eligibility threshold for prostate biopsy. The survival probabilities are estimated using doubly robust scores (3). The solid lines represent the bias-corrected linear model (rdrobust ) fit on each side of the threshold. −100 0100 
+
+10 11 12 13 14 15 16 17 18 19 20 
+
+Horizon (Years) 
+
+> Difference in Restricted Mean Survival (Months)
+
+DR 
+
+IPCW 
+
+Comparison of RD Parameter using IPCW vs DR Censoring Corrections 
+
+Figure 9: Effect of prostate biopsy on overall survival at varying time horizons. Point estimates with 95% confidence intervals for the RD parameter from rdrobust are shown at various time horizons. For each time point, the difference in restricted mean survival time (RMST) when estimated using IPCW and DR scores are presented side-by-side. 21 0 2 4 6 8 10 0.2  0.4  0.6  0.8  1.0      
+
+> 15−Year Follow−up PSA (ng/mL) Probability of Remaining Uncensored  Observed Censored
+> 0.05
+> 0246810 0.2  0.4  0.6  0.8  1.0
+> 20−Year Follow−up PSA (ng/mL)
+> Observed Censored
+> 0.05
+
+Figure 10: Relationship between the horizon h and units’ probabilities of remaining un-censored when analyzing overall survival. At the horizontal dashed line, the probability of remaining uncensored becomes critically low. Units below this line (red color) and near the threshold (vertical dashed line) may cause instabilities in the DR scores and thus RD estimates. results from the PLCO trial suggest that prostate biopsy may not confer a statistically significant overall survival benefit at 15 years of follow-up in the PLCO trial cohort of patients who undergo PSA screening for the first time. While this result does not offer a new finding, the context of the PLCO trial as a high-stakes application emphasizes the importance of nonparametric doubly robust approaches to increase confidence in causal estimates. This is particularly relevant when conclusions drawn from causal inference designs, such as regression discontinuity, are intended to inform clinical practice and other areas with potentially life-altering decisions. 
+
+# Acknowledgments 
+
+The authors thank the National Cancer Institute for access to NCI’s data collected by the Prostate, Lung, Colorectal and Ovarian (PLCO) Cancer Screening Trial (CDAS Project Number: PLCO-1625). M.Sc. was supported by a Stanford TRAM pilot grant, the Stanford Data Science Scholarship and the MAC3 Computation in Precision Health Fellowship. We would like to thank Stanford University and Stanford Research Comput-ing for providing computational resources and support that contributed to these research results. This work was partially supported by a Stanford Cancer Institute’s SCI Cancer Innovation award. R.T. was supported by NIH grant R01 GM134483 and NSF grant 19DMS1208164. S.W. was supported by NSF SES-2242876. 22 We are grateful to James Brooks for the valuable guidance on the analysis of the PLCO trial. 
+
+# References 
+
+Mariam O Adeleke, Gianluca Baio, and Aidan G O’Keeffe. Regression discontinuity designs for time-to-event outcomes: An approach using accelerated failure time mod-els. Journal of the Royal Statistical Society Series A: Statistics in Society , 185(3): 1216–1246, 2022. American Urological Association. Prostate-specific antigen (psa) best practice policy. american urological association (aua). Oncology (Williston Park) , 14:280, 2000. Per K Andersen, Elisavet Syriopoulou, and Erik T Parner. Causal inference in survival analysis using pseudo-observations. Statistics in Medicine , 36(17):2669–2681, 2017. Gerald L Andriole, E David Crawford, Robert L Grubb III, Saundra S Buys, David Chia, Timothy R Church, Mona N Fouad, Edward P Gelmann, Paul A Kvale, Douglas J Reding, et al. Mortality results from a randomized prostate-cancer screening trial. 
+
+New England journal of medicine , 360(13):1310–1319, 2009. Timothy B Armstrong and Michal Koles´ ar. Optimal inference in a class of regression models. Econometrica , 86(2):655–683, 2018. Heejung Bang and James M Robins. Doubly robust estimation in missing data and causal inference models. Biometrics , 61(4):962–973, 2005. Freddie Bray, Mathieu Laversanne, Hyuna Sung, Jacques Ferlay, Rebecca L Siegel, Is-abelle Soerjomataram, and Ahmedin Jemal. Global cancer statistics 2022: Globocan estimates of incidence and mortality worldwide for 36 cancers in 185 countries. CA: a cancer journal for clinicians , 74(3):229–263, 2024. Sebastian Calonico, Matias D Cattaneo, and Rocio Titiunik. Robust nonparametric confidence intervals for regression-discontinuity designs. Econometrica , 82(6):2295– 2326, 2014. Sebastian Calonico, Matias D. Cattaneo, Max H. Farrell, and Rocio Titiunik. rdrobust: Robust Data-Driven Statistical Inference in Regression-Discontinuity Designs , 2023. URL https://CRAN.R-project.org/package=rdrobust . R package version 2.2. Matias D Cattaneo, Nicol´ as Idrobo, and Roc´ ıo Titiunik. A practical introduction to regression discontinuity designs: Extensions . Cambridge University Press, 2024. Victor Chernozhukov, Denis Chetverikov, Mert Demirer, Esther Duflo, Christian Hansen, Whitney Newey, and James Robins. Double/debiased machine learning for treatment and structural parameters. The Econometrics Journal , 21(1):C1–C68, 01 2018. ISSN 1368-4221. 23 Youngjoo Cho, Chen Hu, and Debashis Ghosh. Analysis of regression discontinuity designs using censored data. Journal of Statistical Research , 55(1):225, 2021. Yifan Cui, Michael R Kosorok, Erik Sverdrup, Stefan Wager, and Ruoqing Zhu. Esti-mating heterogeneous treatment effects with right-censored data via causal survival forests. Journal of the Royal Statistical Society Series B: Statistical Methodology , 85 (2):179–211, 2023. https://doi.org/10.1093/jrsssb/qkac001 .Irina Degtiar and Sherri Rose. A review of generalizability and transportability. Annual Review of Statistics and Its Application , 10(1):501–524, 2023. Peng Ding. A First Course in Causal Inference . CRC Press, 2023. doi: 10.48550/arXiv. 2305.18793. Nuha A ElSayed, Grazia Aleppo, Raveendhara R Bannuru, Dennis Bruemmer, Billy S Collins, Laya Ekhlaspour, Jason L Gaglia, Marisa E Hilliard, Eric L Johnson, Kam-lesh Khunti, et al. 2. diagnosis and classification of diabetes: Standards of care in diabetes—2024. Diabetes Care , 47, 2024. Markus Eyting, Min Xie, Felix Michalik, Simon Heß, Seunghun Chung, and Pascal Geld-setzer. A natural experiment on the effect of herpes zoster vaccination on dementia. 
+
+Nature , 641(8062):438–446, 2025. Donna Feir, Thomas Lemieux, and Vadim Marmer. Weak identification in fuzzy regres-sion discontinuity designs. Journal of Business & Economic Statistics , 34(2):185–196, 2016. Thomas R Fleming and David P Harrington. Counting processes and survival analysis ,volume 625. John Wiley & Sons, 2013. Isla P Garraway, Sigrid V Carlsson, Yaw A Nyame, Jason L Vassy, Marina Chilov, Mark Fleming, Stanley K Frencher, Daniel J George, Adam S Kibel, Sherita A King, et al. Prostate cancer foundation screening guidelines for black men in the united states. 
+
+NEJM evidence , 3(5):EVIDoa2300289, 2024. Aditya Ghosh, Guido Imbens, and Stefan Wager. PLRD: Partially linear regression discontinuity inference. arXiv preprint arXiv:2503.09907 , 2025. Patricia M Grambsch and Terry M Therneau. Proportional hazards tests and diagnostics based on weighted residuals. Biometrika , 81(3):515–526, 1994. David C Grossman, Susan J Curry, Douglas K Owens, Kirsten Bibbins-Domingo, Aaron B Caughey, Karina W Davidson, Chyke A Doubeni, Mark Ebell, John W Epling, Alex R Kemper, et al. Screening for prostate cancer: Us preventive services task force recommendation statement. Jama , 319(18):1901–1913, 2018. Jinyong Hahn, Petra Todd, and Wilbert Van der Klaauw. Identification and estimation of treatment effects with a regression-discontinuity design. Econometrica , 69(1):201– 209, 2001. 24 Freddie C Hamdy, Jenny L Donovan, J Athene Lane, Chris Metcalfe, Michael Davis, Emma L Turner, Richard M Martin, Grace J Young, Eleanor I Walsh, Richard J Bryant, et al. Fifteen-year outcomes after monitoring, surgery, or radiotherapy for prostate cancer. New England Journal of Medicine , 388(17):1547–1558, 2023. Roy S Herbst, Giuseppe Giaccone, Filippo de Marinis, Niels Reinmuth, Alain Vergnene-gre, Carlos H Barrios, Masahiro Morise, Enriqueta Felip, Zoran Andric, Sarayut Geater, et al. Atezolizumab for first-line treatment of pd-l1–selected patients with nsclc. New England Journal of Medicine , 383(14):1328–1339, 2020. Guido Imbens and Stefan Wager. Optimized regression discontinuity designs. Review of Economics and Statistics , 101(2):264–278, 2019. Guido W Imbens and Thomas Lemieux. Regression discontinuity designs: A guide to practice. Journal of econometrics , 142(2):615–635, 2008. Guido W Imbens and Donald B Rubin. Causal inference in statistics, social, and biomed-ical sciences . Cambridge university press, 2015. Hemant Ishwaran, Udaya B. Kogalur, Eugene H. Blackstone, and Michael S. Lauer. Random Survival Forests. The Annals of Applied Statistics , 2(3), 2008. doi: 10.1214/ 08-AOAS169. Veeru Kasivisvanathan, Antti S Rannikko, Marcelo Borghi, Valeria Panebianco, Lance A Mynderse, Markku H Vaarala, Alberto Briganti, Lars Bud¨ aus, Giles Hellawell, Richard G Hindley, et al. Mri-targeted or standard biopsy for prostate-cancer di-agnosis. New England Journal of Medicine , 378(19):1767–1777, 2018. Edward H Kennedy. Towards optimal doubly robust estimation of heterogeneous causal effects. Electronic Journal of Statistics , 17(2):3008–3049, 2023. Michal Koles´ ar. Eco 539b: Econometric methods for causal inference (lecture slides). 
+
+https://github.com/kolesarm/539b , 2024. Michal Koles´ ar. RDHonest: Honest Inference in Regression Discontinuity Designs , 2024. URL https://CRAN.R-project.org/package=RDHonest . R package version 1.0.0. Julia M Lemp, Christian Bommer, Min Xie, Felix Michalik, Anant Jani, Justine I Davies, Till B¨ arnighausen, Sebastian Vollmer, and Pascal Geldsetzer. Quasi-experimental evaluation of a nationwide diabetes prevention programme. Nature , 624(7990):138– 144, 2023. Writing Committee Members. 2025 aha/acc/aanp/aapa/abc/accp/acpm/ags/ama/aspc/nma/pcna/sgim guideline for the prevention, detection, evaluation and management of high blood pressure in adults: A report of the american college of cardiology/american heart association joint committee on clinical practice guidelines. Circula-tion , 152(11):e114–e218, 2025. doi: 10.1161/CIR.0000000000001356. URL 
+
+https://www.ahajournals.org/doi/abs/10.1161/CIR.0000000000001356 .25 Claudia Noack and Christoph Rothe. Bias-aware inference in fuzzy regression disconti-nuity designs. Econometrica , 92(3):687–711, 2024. Philip C Prorok, Gerald L Andriole, Robert S Bresalier, Saundra S Buys, David Chia, E David Crawford, Ronald Fogel, Edward P Gelmann, Fred Gilbert, Marsha A Hasson, et al. Design of the prostate, lung, colorectal and ovarian (plco) cancer screening trial. 
+
+Controlled clinical trials , 21(6):273S–309S, 2000. R Core Team. R: A language and environment for statistical computing, 2024. https: //www.R-project.org/ .Ruben Raychaudhuri, Daniel W Lin, and R Bruce Montgomery. Prostate cancer: areview. JAMA , 2025. James M Robins, Andrea Rotnitzky, and Lue Ping Zhao. Estimation of regression coefficients when some regressors are not always observed. Journal of the American Statistical Association , 89(427):846–866, 1994. doi: 10.1080/01621459.1994.10476818. Paul R Rosenbaum and Donald B Rubin. The central role of the propensity score in observational studies for causal effects. Biometrika , 70(1):41–55, 1983. https: //doi.org/10.1093/biomet/70.1.41 .Patrick Royston and Mahesh KB Parmar. Restricted mean survival time: an alternative to the hazard ratio for the design and analysis of randomized trials with a time-to-event outcome. BMC medical research methodology , 13:1–15, 2013. Daniel Rubin and Mark J van der Laan. A doubly robust censoring unbiased transfor-mation. The international journal of biostatistics , 3(1), 2007. Donald B Rubin. Causal inference through potential outcomes and principal stratifica-tion: Application to studies with “censoring” due to death. Statistical Science , pages 299–309, 2006. Jonathan Shoag, Joshua Halpern, Brian Eisner, Richard Lee, Sameer Mittal, Christo-pher E Barbieri, and Daniel Shoag. Efficacy of prostate-specific antigen screening: Use of regression discontinuity in the plco cancer screening trial. JAMA oncology , 1 (7):984–986, 2015. Jon Arni Steingrimsson, Liqun Diao, and Robert L Strawderman. Censoring unbiased regression trees and ensembles. Journal of the American Statistical Association , 114 (525):370–383, 2019. Emil Aas Stoltenberg. Regression discontinuity design with right-censored survival data. 
+
+arXiv preprint arXiv:2210.02548 , 2022. Chien-Lin Su, Robert W Platt, and Jean-Fran¸ cois Plante. Causal inference for recurrent event data using pseudo-observations. Biostatistics , 23(1):189–206, 2022. 26 Donald L Thistlethwaite and Donald T Campbell. Regression-discontinuity analysis: An alternative to the ex post facto experiment. Journal of Educational psychology , 51(6): 309, 1960. Lu Tian, Hua Jin, Hajime Uno, Ying Lu, Bo Huang, Keaven M Anderson, and Lee-Jen Wei. On the empirical choice of the time window for restricted mean survival time. 
+
+Biometrics , 76(4):1157–1166, 2020. Julie Tibshirani, Susan Athey, Rina Friedberg, Vitor Hadad, David Hirshberg, Luke Miner, Erik Sverdrup, Stefan Wager, and Marvin Wright. grf: Generalized random forests, 2025. R package version 2.5.0. github.com/grf-labs/grf. Anastasios A Tsiatis. Semiparametric Theory and Missing Data , volume 4. Springer, 2006. doi: 10.1007/0-387-37345-4. Mark J van der Laan and James M Robins. Unified methods for censored longitudinal data and causality . Springer, 2003. Mark J van der Laan, Sherri Rose, Eric C Polley, and Mark J van der Laan. Super learn-ing for right-censored data. Targeted Learning: Causal Inference for Observational and Experimental Data , pages 249–258, 2011. Stefan Wager. Causal Inference: A Statistical Learning Approach . In preparation, 2024. 
+
+https://web.stanford.edu/~swager/causal_inf_book.pdf .Ted Westling, Alex Luedtke, Peter B Gilbert, and Marco Carone. Inference for treatment-specific survival curves using machine learning. Journal of the American Statistical Association , 119(546):1541–1553, 2024. Timothy J Wilt, Michael K Brawer, Karen M Jones, Michael J Barry, William J Aronson, Steven Fox, Jeffrey R Gingrich, John T Wei, Patricia Gilhooly, B Mayer Grob, et al. Radical prostatectomy versus observation for localized prostate cancer. New England Journal of Medicine , 367(3):203–213, 2012. Yizhe Xu, Nikolaos Ignatiadis, Erik Sverdrup, Scott Fleming, Stefan Wager, and Nigam Shah. Treatment heterogeneity with survival outcomes. In Handbook of matching and weighting adjustments for causal inference , pages 445–482. Chapman and Hall/CRC, 2023. Jessica G Young, Mats J Stensrud, Eric J Tchetgen Tchetgen, and Miguel A Hern´ an. A causal framework for classical statistical estimands in failure-time settings with competing events. Statistics in Medicine , 39(8):1199–1236, 2020. 27
