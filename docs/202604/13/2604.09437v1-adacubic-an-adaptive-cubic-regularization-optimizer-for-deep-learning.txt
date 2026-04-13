@@ -1,0 +1,5283 @@
+Title: AdaCubic: An Adaptive Cubic Regularization Optimizer for Deep Learning
+
+URL Source: https://arxiv.org/pdf/2604.09437v1
+
+Published Time: Mon, 13 Apr 2026 01:08:34 GMT
+
+Number of Pages: 50
+
+Markdown Content:
+Published in Transactions on Machine Learning Research (02/2026) 
+
+# AdaCubic: An Adaptive Cubic Regularization Optimizer for Deep Learning 
+
+Ioannis Tsingalis 1, Constantine Kotropoulos 1, and Corentin Briat 2
+
+> 1
+
+Aristotle University of Thessaloniki, Greece 
+
+> 2
+
+University of Applied Sciences Northwestern Switzerland, Muttenz, Switzerland Correspondence to tsingalis@csd.auth.gr 
+
+Reviewed on OpenReview: https://openreview.net/forum?id=pZBQ7J37lk 
+
+## Abstract 
+
+A novel regularization technique, AdaCubic , is proposed that adapts the weight of the cubic term. The heart of AdaCubic is an auxiliary optimization problem with cubic con-straints that dynamically adjusts the weight of the cubic term in Newton’s cubic regularized method. We use Hutchinson’s method to approximate the Hessian matrix, thereby reduc-ing computational cost. We demonstrate that AdaCubic inherits the cubically regular-ized Newton method’s local convergence guarantees. Our experiments in Computer Vision, Natural Language Processing, and Signal Processing tasks demonstrate that AdaCubic 
+
+outperforms or competes with several widely used optimizers. Unlike other adaptive algo-rithms that require hyperparameter fine-tuning, AdaCubic is evaluated with a fixed set of hyperparameters, rendering it a highly attractive optimizer in settings where fine-tuning is infeasible. This makes AdaCubic an attractive option for researchers and practitioners alike. To our knowledge, AdaCubic is the first optimizer to leverage cubic regularization in scalable deep learning applications. 
+
+https://github.com/iTsingalis/AdaCubic 
+
+## 1 Introduction 
+
+Deep Neural Networks (DNNs) have demonstrated strong performance across a variety of machine learn-ing tasks (Pouyanfar et al., 2018; Dargan et al., 2020). DNN models are non-convex (Jin et al., 2021; Danilova et al., 2022; Pooladzandi et al., 2022b). Accordingly, saddle points may arise during the opti-mization procedure (Bedi et al., 2021). In Dauphin et al. (2014), it is shown that the saddle points affect the efficiency of a DNN. Therefore, methods that avoid saddle points are necessary, as discussed next. The Cubic Regularized (CR) Newton’s method was introduced in (Nesterov & Polyak, 2006). This method effectively circumvents saddle points in a non-convex setting. The first research direction focuses on carefully selecting the regularization parameter for the cubic term. In Cartis et al. (2011a), an Adaptive Regularized Cubic (ARC) method is presented where the cubic regularization term is adapted dynamically, similarly to the radius in the Trust Region methods (Conn et al., 2000). To mitigate the computational burden of deriving the Hessian matrix and the gradient in ARC, Carmon & Duchi (2019) solves the CR sub-problem using gradient descent. Alternatively, one solves the cubic sub-problem using a subsampled gradient and a Hessian-vector product (Tripuraneni et al., 2018). In Kohler & Lucchi (2017), a subsampled scheme for the gradient and the Hessian matrix is exploited, achieving the same convergence rate as ARC. In Wang et al. (2020b), momentum information is utilized to improve the convergence rate of CR. Inspired by Fang et al. (2018), a recursive stochastic variance reduced CR method is proposed in Zhou & Gu (2020), yielding a 1
+
+> arXiv:2604.09437v1 [cs.LG] 10 Apr 2026
+
+Published in Transactions on Machine Learning Research (02/2026) 
+
+better convergence rate than that reported in (Tripuraneni et al., 2018). In Huang et al. (2022), the CR method was applied to solve unconstrained convex-concave saddle point problems. In a second research direction, it has been demonstrated that injecting a random perturbation whenever a saddle point is encountered can facilitate escape from saddle points. In Ge et al. (2015); Jin et al. (2017), both negative curvature and random perturbation are applied to Stochastic Gradient Descent ( SGD ) to escape saddle points. Within the same scope, in Allen-Zhu (2018); Royer & Wright (2018), it is shown that negative curvature and random perturbation can be used to find an ( ǫg , ǫ H )-stationary point faster than the first-order methods. A drawback of these methods is the need to compute the smallest eigenvalue of the Hessian matrix and the corresponding eigenvector. Several methods have been proposed to address this limitation. In Li (2019), it is shown that a perturbed version of Stochastic Recursive Gradient Descent, with-out using the Hessian matrix information, also converges to an ( ǫg , ǫ H )-stationary point. In Allen-Zhu & Li (2018); Zhang & Li (2021), a robust Hessian matrix power method is proposed to compute the negative cur-vature near saddle points, yielding faster convergence than the standard perturbed gradient descent methods. In Chen et al. (2022), to achieve a better convergence rate, the average movement of the iterates is controlled by a step-size shrinkage scheme (Li, 2019). In a third research direction, escaping saddle points relies on momentum information (Wang et al., 2021b). First-order methods with random initialization and momentum information are shown to be able to escape saddle points in (Sun et al., 2019). A greater momentum in SGD enlarges the projection to an escape direction, leading to a fast saddle point escape (Wang et al., 2020a). In Levy et al. (2021), a parameter-free recursive momentum method is proposed for non-convex optimization. In Wang et al. (2020a), it is shown that acceleration can be achieved for non-quadratic functions under Polyak-Łojasiewicz condition and non-convexity. In Wang et al. (2021a), it is presented that the momentum term accelerates the training of a one-layer-wide ReLU network. A fourth research direction employs variance reduction to escape saddle points. In Allen-Zhu & Hazan (2016), the minimization of the sum of smooth functions is studied, where variance reduction is applied to speed up convergence in both the stochastic and the deterministic case. A general variance-reduction estima-tion method is introduced that is not restricted to gradients (Fang et al., 2018). This method has been applied to numerous problems and has achieved convergence rates superior to those reported in (Allen-Zhu & Hazan, 2016). In Nguyen et al. (2017a), a recursive gradient estimator for convex optimization is introduced. The latter estimator is then extended to non-convex problems in (Nguyen et al., 2017b). In Ge et al. (2019), the first variance reduction technique not based on a separate negative curvature search subroutine is proposed. Last but not least, a second-order optimizer, called AdaHessian , has been introduced in (Yao et al., 2021). AdaHessian is based on the Adaptive Moments Estimation ( Adam ) optimizer (Kingma & Ba, 2015) and leverages Hutchinson’s method to approximate the curvature information with low computational cost (Bekas et al., 2007). The convergence rate of AdaHessian for a strongly convex and smooth loss function can be found in (Yao et al., 2021; Pooladzandi et al., 2022a). Based on the Hessian power , the convergence rate of AdaHessian for a strongly convex and smooth loss function matches that of either gradient descent or Newton’s method (Jahani et al., 2021; Sadiev et al., 2022). In this paper, we focus on the CR Newton method (Nesterov & Polyak, 2006) and propose a novel algorithm that dynamically adapts the weight of the cubic term in the cubic subproblem. The adaptation of the cubic term is achieved by utilizing an auxiliary cubically constrained optimization problem. The proposed algorithm, AdaCubic , leverages the advantages of CR theory and Hutchinson’s estimation technique. In more detail, the contributions of this paper are: • A novel method is proposed that automatically adapts the regularization parameter M in the cubic sub-problem and avoids saddle points. The primary theoretical contributions concerning the adap-tation of M are encapsulated in Lemma 2, Theorems 1 and 2, as well as the methodologies detailed in Algorithms 1 and 2. Figure 6, in Appendix A, depicts how the key lemmata, theorems, and corollaries are logically connected throughout Sections 2 to 4 and Appendices B.1 to B.13. • The proposed optimizer does not need the computation of Krylov sub-space Wang et al. (2020b); Zhou & Gu (2020); Kohler & Lucchi (2017) or the calculation of the smallest eigenvalue 2Published in Transactions on Machine Learning Research (02/2026) 
+
+Allen-Zhu & Li (2018); Allen-Zhu (2018); Park et al. (2020) to obtain an optimal solution. The optimal solution is obtained by leveraging Hutchinson’s method that approximates the diagonal of the Hessian matrix (Bekas et al., 2007). In this way, the proposed method exhibits low memory complexity. • The convergence rate of AdaCubic is established by exploiting the diagonal structure of the ap-proximate Hessian matrix, which is computed using data batches. This property makes AdaCubic 
+
+particularly appealing for deep learning applications. • AdaCubic is tested on Computer Vision, Natural Language Processing, and Signal Processing tasks, demonstrating a competitive or better performance when compared to SGD Robbins & Monro (1951), Adam Kingma & Ba (2015), and AdaHessian (Yao et al., 2021) optimizers. It should be noted that the parametrization of AdaCubic is performed by employing a well-known set of parameters used in Trust Region algorithms (Conn et al., 2000, Section 17.1). These parameters are used universally in experimental evaluations, thereby casting AdaCubic as an attractive optimizer when fine-tuning is prohibitive. The paper is organized as follows. Section 2 details the proposed optimization framework. The convergence analysis of the proposed optimization framework is demonstrated in Section 3. Section 4 presents the algo-rithms that compute the optimal solution of the proposed optimization framework in Section 2. Experimental results, computational complexity, and conclusions are presented in Sections 5, 6, and 7, respectively. 
+
+## 2 Proposed Optimization Framework 
+
+Outline. Section 2.1 introduces the fundamental definitions used throughout the paper, including the basic formulation of the CR method, which serves as a core building block of the proposed framework. Section 2.2 then introduces an auxiliary constrained optimization problem that forms the foundation of the 
+
+AdaCubic . The key intuition is to reformulate the classical CR method as a constrained problem in which the cubic regularization term appears explicitly as a constraint. By leveraging Lagrange multiplier theory, this reformulation yields an adaptive update mechanism that automatically adjusts the strength of the cubic regularization term in the CR method during optimization. To derive this update mechanism Lemmata 1, 2, Theorem 1, Corollary 1, and Theorem 2 are introduced. Lemma 1 establishes that the auxiliary constrained problem admits a global minimizer and ensures that each optimization step is well defined. Lemma 2 is used to establish Theorem 1, which in turn is used to derive Corollary 1. Corollary 1 shows that the auxiliary optimization problem is characterized by strong duality (Boyd & Vandenberghe, 2004, Section 5.4). The latter theoretical results are then combined to derive Theorem 2, which provides the basis to replace the fixed cubic regularization parameter of the CR method with an adaptive one and finally derive the AdaCubic optimizer presented in Section 4. 
+
+2.1 Preliminaries 
+
+To simplify notation, the iteration index k in xk ∈ Rd will be explicitly denoted when necessary. Otherwise, it will be suppressed. Let ∇2
+
+> x
+
+f (xk) and ∇xf (xk) be the Hessian matrix and the gradient of the function 
+
+f (xk) with respect to (w.r.t.) x. In the following, the subscript x in ∇2 
+
+> x
+
+and ∇x is omitted for simplicity, resulting in ∇2f (xk) and ∇f (xk), respectively. The spectrum of the symmetric d × d matrix ∇2f (xk ) is denoted by λ(∇2f (xk)) = {λi(∇2f (xk)) }di=1 . Suppose that the eigenvalues are sorted in descending order, i.e., 
+
+λ1(∇2f (xk)) ≥ · · · ≥ λd(∇2f (xk)) = λmin (∇2f (xk)) . (1) If ∇2f (xk ) is indefinite, i.e., 
+
+λd(∇2f (xk)) < 0 and λi(∇2f (xk )) > 0, i < d, (2) then f (x) is non-convex. The notations ∇2f (xk )  0 or ∇2f (xk) ≻ 0 indicate that the Hessian matrix is positive semi-definite or positive definite, respectively. Let ∂τ F be the partial derivative of a function 3Published in Transactions on Machine Learning Research (02/2026) 
+
+F : R → R w.r.t. the real-valued variable τ . Moreover, let ⊙ and ⊘ denote the element-wise product and division, respectively. In addition, let diag( ∇2f (xk)) = [[∇2f (xk)] 11 , . . . , [∇2f (xk)] dd 
+
+]T ∈ Rd be a column vector containing the diagonal elements of the Hessian matrix and Diag( ∇2f (xk)) = ∇2f (xk) ⊙ I a d × d
+
+stand for a diagonal matrix retaining the diagonal elements of the Hessian matrix, where I is the identity matrix. ‖·‖ 2 refers to the vector ℓ2 norm or to the spectral norm of a matrix. The d-dimensional vector of ones is denoted by 1d.A non-convex optimization problem is defined by min 
+
+> x∈Rd
+
+f (x) ∆
+
+= 1
+
+n
+
+> n
+
+∑
+
+> ℓ=1
+
+fℓ(x), (3) where f : Rd → R and fℓ : Rd → R are non-convex functions. Solving (3) is generally NP-Hard (Murty & Kabadi, 1987; Hillar & Lim, 2013). As a result, a reasonable goal is to find an ǫ-stationary point, i.e., an approximate local minimum, by checking ‖∇ f (x)‖2 ≤ ǫ, where ∇f (x) ∈ Rd is treated as a column vector. However, ǫ-stationary points can be non-degenerate saddle points (i.e., the Hessian matrix at all saddle points has negative eigenvalues) or even local extrema in non-convex optimization. To avoid saddle points, second-order methods are used to find an ( ǫg, ǫ H )-stationary point by checking 
+
+‖∇ f (x)‖2 ≤ ǫg and λmin 
+
+(
+
+∇2f (x)
+
+)
+
+≥ − ǫH , (4) where ǫg, ǫ H > 0, and λmin 
+
+(∇2f (x)) denotes the minimal eigenvalue of the Hessian matrix. CR technique is designed to avoid saddle points (Nesterov & Polyak, 2006). Starting from an arbitrary point x0, the update rule of CR that solves (3) is written as 
+
+sk+1 = arg min 
+
+> s∈Rd
+
+mM (s) (5) where 
+
+mM (s) ∆
+
+= f (xk) + ∇f (xk)T s + 1
+
+2 sT ∇2f (xk) s + M
+
+6 ‖s‖32 , (6) 
+
+xk+1 ∆
+
+= xk + sk+1 , and M > 0 is the regularization parameter that can be fixed or adap-tive (Nesterov & Polyak, 2006; Cartis et al., 2011a). In the following sections, the problem formulation and its solution are presented. 
+
+2.2 Problem Formulation 
+
+Auxiliary Problem. We are interested in developing an adaptive method for selecting M in (5). To do so, we introduce the auxiliary constrained optimization problem arg min 
+
+> s∈Rd
+
+ˆm(s) ∆
+
+= f (xk ) + ∇f (xk )T s + 1
+
+2 sT ∇2f (xk) s
+
+subject to gξ(s) ∆
+
+= 1
+
+6
+
+(
+
+‖s‖32 − ξ
+
+)
+
+≤ 0,
+
+(7) for ξ ≥ 0. The Lagrangian function of (7) is 
+
+Lξ(s, ν ) = f (xk) + ∇f (xk )T s + 1
+
+2 sT ∇2f (xk) s + ν
+
+6
+
+(
+
+‖s‖32 − ξ
+
+)
+
+, (8) where ν is the Lagrange multiplier. Let Ω = {s | gξ(s) ≤ 0}. The minimizer we are seeking in (7) lies either within the interior of Ω (i.e., gξ(s) < 0) or lies on the boundary of Ω (i.e., gξ(s) = 0). Lemma 1 is an immediate result of the previous discussion. 
+
+Lemma 1. A vector s∗ is a minimizer of ˆm(s) subject to ‖s∗‖32 ≤ ξ if and only if satisfies 
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
+s∗ = −∇ f (xk), (9) 4Published in Transactions on Machine Learning Research (02/2026) 
+
+∇2f (xk) + ν∗
+
+2 ‖s∗‖2 I  0, (10) 
+
+and ν∗ (‖s∗‖32 − ξ) = 0 , where ν∗ ≥ 0. If ∇2f (xk) + ν∗ 
+
+> 2
+
+‖s∗‖2 I ≻ 0, then the minimizer s∗ is unique. 
+
+The condition ν∗ (‖s∗‖32 − ξ) = 0 in Lemma 1 is called Complementary Slackness (CS) condition. The proof of Lemma 1 can be found in Appendix B.1. 
+
+Definition 1. For some ν ≥ 0, denote 
+
+Dν
+
+> ∆
+
+=
+
+{
+
+r | ∇ 2f (xk) + ν r 
+
+2 I ≻ 0, r > 0
+
+}
+
+. (11) Next, it is proven that problem (7) is characterized by strong duality. To do so, Lemma 2 and Theorem 1 are introduced. Lemma 2 is used as a preliminary result to prove Theorem 1. Corollary 1 establishes the strong duality of problem (7) as an immediate outcome of Theorem 1. 
+
+Lemma 2 (Proof in Appendix B.2) . For r ∈ Dν we have 
+
+min 
+
+> s∈Rd
+
+Lξ(s, ν ) = max 
+
+> r∈Dν
+
+Lξ(s(ν, r ), ν, r ), (12) 
+
+where 
+
+Lξ(s(ν, r ), ν, r ) = − 1
+
+2 ∇f (xk)T (
+
+∇2f (xk) + ν r 
+
+2 I
+
+)−1
+
+∇f (xk) − ν
+
+6 ξ − ν
+
+12 r3. (13) 
+
+For r ∈ Dν the direction 
+
+s(ν, r ) = −
+
+(
+
+∇2f (xk) + ν r 
+
+2 I
+
+)−1
+
+∇f (xk ), (14) 
+
+satisfies 
+
+Lξ(s(ν, r ), ν ) = Lξ(s(ν, r ), ν, r ) + 4
+
+3ν
+
+(
+
+r + 2 ‖s(ν, r )‖2
+
+)
+
+(
+
+r + ‖s(ν, r )‖2
+
+)2
+
+(
+
+∂r Lξ(s(ν, r ), ν, r )
+
+)2
+
+. (15) 
+
+For r∗ ∈ Dν that maximizes max r∈Dν Lξ(s(ν, r ), ν, r ),
+
+s(ν, r ∗) = −
+
+(
+
+∇2f (xk) + ν
+
+2 ‖s(ν, r ∗)‖2 I
+
+)−1
+
+∇f (xk) (16) 
+
+is the minimizer of min s∈Rd Lξ(s, ν ) in (12). 
+
+Theorem 1 (Proof in Appendix B.3) . We have 
+
+min 
+
+> s∈Rd
+
+max  
+
+> ν≥0
+
+Lξ(s, ν ) = max 
+
+> ν≥0, r ∈Dν
+
+Lξ(s(ν, r ), ν, r ), (17) 
+
+where Lξ(s(ν, r ), ν, r ) is defined in (13). For r ∈ Dν , the direction 
+
+s(ν, r ) = −
+
+(
+
+∇2f (xk) + ν r 
+
+2 I
+
+)−1
+
+∇f (xk ), (18) 
+
+satisfies 
+
+Lξ(s(ν, r ), ν ) = Lξ
+
+(s(ν, r ), ν, r ) − ν ∂ ν Lξ
+
+(s(ν, r ), ν, r ) + 4
+
+3ν
+
+(r + 2 ‖s(ν, r )‖2)
+
+(r + ‖s(ν, r )‖2)2
+
+(
+
+∂r Lξ(s(ν, r ), ν, r )
+
+)2
+
+. (19) 
+
+For the optimal values ν∗ and r∗ ∈ Dν that maximize max ν≥0, r ∈Dν Lξ(s(ν, r ), ν, r ),
+
+s∗(ν∗, r ∗) = −
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s(ν∗, r ∗)‖2 I
+
+)−1
+
+∇f (xk), (20) 
+
+is the minimizer of min s∈Rd max ν≥0 Lξ(s, ν ) in (17), i.e., the optimal s∗ in Lemma 1. 
+
+5Published in Transactions on Machine Learning Research (02/2026) 
+
+Corollary 1. The constrained optimization problem (7) is characterized by strong duality, i.e., 
+
+min 
+
+> s∈Rd
+
+max  
+
+> ν≥0
+
+Lξ(s, ν ) = max  
+
+> ν≥0
+
+min 
+
+> s∈Rd
+
+Lξ(s, ν ). (21) 
+
+Proof. See the proof of Theorem 1. 
+
+Given Corollary 1, the equivalence between problems (5) and (7) is established in Theorem 2. The equivalence implies that both problems have the same optimum. 
+
+Theorem 2 (Proof in Appendix B.4) . Let ν∗ be the optimal dual variable of the constrained optimization problem (7). The following optimization problems 
+
+min 
+
+> s∈Rd
+
+mM (s) and min 
+
+> s∈Rd
+
+ˆm(s) subject to gξ(s) ≤ 0 (22) 
+
+are equivalent w.r.t. the optimal solution s∗, when M = ν∗ and ξ = ‖s∗‖32.
+
+## 3 Local Convergence Analysis 
+
+Outline. This section provides the local convergence analysis of Algorithm 1. It begins with Assumption 1, which defines the Lipschitz continuity constants for fi(x), ∇fi(x), and ∇2fi(x). Subsequently, Theorem 3 establishes the local convergence of Algorithm 1 when using the exact gradient and Hessian matrix. Adequate agreement between the exact gradient ∇f (xk) and the approximate gradient gk is established in Assumption 2. This assumption is grounded on Wang et al. (2019, Assumption 2) and facilitates the approx-imation of the gradient using a sampling scheme in Lemma 5, akin to the one outlined in (Kohler & Lucchi, 2017, Theorem 7). A sufficient agreement between the exact diagonal Hessian matrix Diag( ∇2f (xk)) and the approximate diagonal Hessian matrix Bk in (30), is established in Assumption 3. Assumption 3 is a direct application of (Wang et al., 2019, Assumption 2). Additionally, Assumption 3 supports Lemma 6, while Lemma 3 is pivotal for establishing Lemma 4. Lemma 4 is used in Lemmata 5, 6, and Corollary 2. Lemmata 5 and 6 provide the deviation bounds for the gradient and Hessian matrix, along with the corresponding conditions required for these bounds to hold. These conditions are consolidated in Corollary 2, which ensures the validity of both deviation bounds. The analysis concludes by discussing the local convergence of the sub-sampled case, where the exact gradient 
+
+∇f (xk) and diagonal Hessian matrix Diag( ∇2f (xk)) are replaced with their sub-sampled approximations gk
+
+and Bk, respectively. 
+
+Convergence Analysis. Next, we begin with the main results of the analysis. Assumption 1 is com-monly used in previous works (Nesterov & Polyak, 2006; Cartis et al., 2011a;b; Kohler & Lucchi, 2017) and is applied here in combination with Remark 1. Let F ⊆ Rd be a closed convex set with a non-empty interior. Let x0 ∈ int F be a starting point of the iterative optimization scheme in the interior of F .
+
+Assumption 1 (Continuity) . The convergence analysis is based on the following assumptions: 
+
+• The functions fi(x) are twice-continuously differentiable and bounded from below by f low  
+
+> i
+
+.
+
+• The functions fi(x), ∇fi(x), and ∇2fi(x) are Lipschitz continuous in F with Lipschitz constants 
+
+Lf , Lg, and LH , respectively. 
+
+Remark 1. Due to the triangle inequality, it follows that the Lipschitz continuity also holds for f (x), ∇f (x),and ∇2f (x), with Lipschitz constants Lf , Lg, and LH , respectively. In addition, given Assumption 1, f (x)
+
+is also lower bounded by some f low .
+
+6Published in Transactions on Machine Learning Research (02/2026) 
+
+By leveraging Theorem 2, the iteration complexity of Algorithm 1 is equivalent to that performed by the cubic regularization method in (Nesterov & Polyak, 2006). Theorem 3 analyses the iteration complexity of Algorithm 1 by adapting the analysis from Nesterov & Polyak (2006, Theorem 1), when Diag( ∇2f (x)) replaces ∇2f (x). 
+
+Theorem 3 (Proof in Appendix B.12) . Suppose Assumption 1 holds. Also, let the sequence xi, with i ≥ 0,be generated by Algorithm 1 when Diag( ∇2f (xi)) is used. Then, after k iterations, the sequence {xi}i≥1
+
+satisfies 
+
+min  
+
+> 1≤i≤k
+
+‖∇ f (xi)‖2 ≤ O
+
+( 1
+
+k2/3
+
+)
+
+. (23) If we want to find the iteration k that satisfies min 1≤i≤k ‖∇ f (xi)‖2 ≤ ǫ, we upper bound (23) by ǫ and we conclude that 
+
+k ≥ O
+
+( 1
+
+ǫ3/2
+
+)
+
+. (24) 
+
+Deviation Bounds. Rather than utilizing deterministic gradient and Hessian information, we can employ estimates of the gradient, the Hessian matrix, and the loss function, which are derived from an independent set of points Bk, i.e., 
+
+gk = 1
+
+|Bk|
+
+∑
+
+> i∈Bk
+
+∇fi(xk), (25) 
+
+Hk = 1
+
+|Bk|
+
+∑
+
+> i∈Bk
+
+∇2fi(xk), (26) and 
+
+F (xk ) = 1
+
+|Bk|
+
+∑
+
+> i∈Bk
+
+fi(xk ). (27) 
+
+Assumption 2 (Sufficient agreement of gk and ∇f (xk )) . There is a constant Cg > 0 such that the inexact gradient gk satisfies, for all k ≥ 0,
+
+‖gk − ∇ f (xk)‖2 ≤ Cg ‖sk‖22 . (28) For some xk, the computation of the Hessian matrix Hk ∈ Rd×d in (26) is expensive due to the large size d of xk . Only the Hessian-vector product can be calculated at a reasonable computational complex-ity (Pearlmutter, 1994). Let Hk : Rd → Rd be a function such that Hk(v) ∆
+
+= Hkv, where Hk is not accessible. Given the Hessian-vector product operator Hk, the diagonal of Hk, i.e., hk
+
+> ∆
+
+= diag( Hk), is approximated by the Hutchinson’s method as Bekas et al. (2007) 
+
+bk =
+
+[ S∑
+
+> s=1
+
+Hk(vs) ⊙ vs
+
+]
+
+⊘
+
+[ S∑
+
+> i=1
+
+vs ⊙ vs
+
+]
+
+= 1
+
+S
+
+> S
+
+∑
+
+> s=1
+
+Hk(vs) ⊙ vs ∈ Rd, (29) where vs ∼ Rademacher (0.5) and S is the number of random vectors used in the approximation. Thus, the diagonal approximate Hessian matrix Bk ∈ Rd×d is given by 
+
+Bk
+
+> ∆
+
+= Diag( bk) = 1
+
+S
+
+> S
+
+∑
+
+> s=1
+
+Diag ( Hk(vs) ⊙ vs) . (30) The approximate Hessian matrix (30) is used in the description of Algorithms 1 and 2, in Section 4. It is worth noting that in the code implementation of Algorithms 1 and 2 only the diagonal of Bk is computed, which reduces the memory cost from d × d to d.7Published in Transactions on Machine Learning Research (02/2026) 
+
+Assumption 3. There is a constant CB > 0 such that the inexact Hessian Bk satisfies, for all k ≥ 0,
+
+∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≤ CB ‖sk‖2 . (31) By replacing ∇f (xk) and ∇2f (xk) with gk and Bk we get 
+
+mM (s) ∆
+
+= F (xk ) + gTk s + 1
+
+2 sT Bk s + M
+
+6 ‖s‖32 . (32) Note that the conditions under which ∇f (xk) and ∇2f (xk) can be substituted with gk and Bk are detailed in Lemmata 5 and 6, respectively. Let ( sk+1 , ν k+1 ) be the output of Algorithm 2 for B = Bk, g = gk, and so on. Algorithm 2 is called in line 3 of Algorithm 1. Then, recall that ( sk+1 , ν k+1 ) is a minimizer of (7) and according to Theorem 2 it is also a minimizer of problem (5) for M = νk+1 . The first- and second-order optimality conditions 
+
+sTk+1 ∇smM=νk+1 (sk+1 ) = 0 (33) and 
+
+sTk+1 
+
+(
+
+∇2 
+
+> s
+
+mM=νk+1 (sk+1 )
+
+)
+
+sk+1 ≥ 0, (34) get us to Lemma 3. Lemma 3 is exploited to prove Lemma 4. Lemma 4 is used by Lemmata 5, 6, and Corollary 2. 
+
+Lemma 3 (Approximate model minimizer) . Let 
+
+sk+1 = arg min 
+
+> s∈Rd
+
+mM (s). (35) 
+
+Then, the following statements hold 
+
+gk + Bk sk+1 + M
+
+2 ‖sk+1 ‖2 sk+1 = 0, (36) 
+
+Bk + M
+
+2 ‖sk+1 ‖2 I  0, (37) 
+
+and 
+
+gTk sk+1 + 1
+
+2 sTk+1 Bk sk+1 + M
+
+6 ‖sk+1 ‖32 ≤ − M
+
+12 ‖sk+1 ‖32 . (38) 
+
+Recall that xk+1 = xk + sk+1 and from Theorem 2, M = νk+1 .Proof. The reader is referred to (Wang et al., 2019, Lemma 3). 
+
+Lemma 4. Let {F (xk)} be bounded from below by F low . Also, let sk+1 satisfy the first two conditions in Lemma 3 and let M be bounded from below by some M low . Then 
+
+‖sk+1 ‖ → 0, as k → ∞ . (39) 
+
+Proof. First, note that by Assumption 1, F (x) is also bounded from below by some F low . Additionally, since 
+
+M is bounded from below and M = νk+1 , as indicated in Theorem 2, νk+1 is also bounded from below. The lower bound of M is further discussed in Lemma 14 in Appendix B.11. Following similar lines to Cartis et al. (2011a, Lemma 5.1), we focus on the sub-sequence of successful iterations, as in (Cartis et al., 2011a; Conn et al., 2000). Thus, from the successful iteration in Algorithm 1, i.e., when ρk ∈ [η1, η 2), we have 
+
+F (xk) − F (xk+1 ) ≥ η1(F (xk ) − mM=νk+1 (sk+1 )) 8Published in Transactions on Machine Learning Research (02/2026) 
+
+> (
+
+32 )
+
+≥ η1
+
+(
+
+−gTk sk+1 − 1
+
+2 sTk+1 Bk sk+1 − M low 
+
+6 ‖sk+1 ‖32
+
+)
+
+, (40) which by applying (38) yields 
+
+F (xk) − F (xk+1 ) ≥ η1
+
+M low 
+
+12 ‖sk+1 ‖32 . (41) Summing over all iterates from 0 to k − 1 in (41) we obtain 
+
+F (x0) − F (xk+1 ) ≥ η1
+
+12 M low 
+
+> k−1
+
+∑
+
+> k=0
+
+‖sk‖32 , (42) which taking into account that {F (xk)} is bounded below yields 12 
+
+η1M low 
+
+(F (x0) − F low ) ≥
+
+> k−1
+
+∑
+
+> k=0
+
+‖sk‖32 . (43) Thus, the series ∑k−1 
+
+> k=0
+
+‖sk‖32 is convergent and (39) holds. The same conclusion is also derived in (Cartis et al., 2011a, Lemma 5.1). 
+
+Lemma 5. Let the approximate gradient gk be computed on a set of points Bgk, with cardinality |Bgk|. For 
+
+ǫ ≥ 4√2Lf
+
+√ ln 1   
+
+> δ+1
+> 4
+> |Bgk|
+
+we have with high probability 1 − δ that 
+
+‖gk − ∇ f (xk )‖2 ≤ ǫ. (44) 
+
+In addition, if 
+
+|Bgk| ≥ 32 L2
+
+> f
+
+ln 1 
+
+> δ
+
++ 1
+
+> 4
+
+C2 
+
+> g
+
+‖sk‖42
+
+, (45) 
+
+and Lemma 4 holds, gk satisfies Assumption 2. Proof. The proof can be found in Appendix B.5. 
+
+Lemma 6. Let the approximate diagonal Hessian matrix Bk be computed on a set of points BHk , with cardinality |BHk |. For ǫ ≥ √dL g ln 2d  
+
+> δ
+> S|BHk|
+
+we have with high probability 1 − δ that 
+
+∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≤ ǫ. (46) 
+
+In addition, if 
+
+|BHk | ≥ √dL g
+
+ln 2d
+
+> δ
+
+S ‖sk‖2 CB
+
+(47) 
+
+and Lemma 4 holds, Bk satisfies Assumption 3. Proof. The proof can be found in Appendix B.6. 
+
+Corollary 2. If 
+
+|Bk| ≥ max 
+
+{
+
+32 L2
+
+> f
+
+ln 1 
+
+> δ
+
++ 1
+
+> 4
+
+C2 
+
+> g
+
+‖sk−1‖42
+
+, √dL g
+
+ln 2d
+
+> δ
+
+S ‖sk−1‖2 CB
+
+}
+
+, (48) 
+
+then gk and Bk satisfy Assumptions 2 and 3 with probability 1 − δ, for δ ∈ (0 , 1] .
+
+9Published in Transactions on Machine Learning Research (02/2026) 
+
+Proof. We combine the results of Lemma 5 and 6. Note that ‖sk−1‖ is used instead of ‖sk‖. Due to Lemma 4, 
+
+‖sk‖2 ≤ ‖ sk−1‖2 ⇔ ‖ sk‖−12 ≥ ‖ sk−1‖−12 . This modification is useful for the practical application of the sampling schemes. However, this poses a challenge since Cg , CH , Lf , and Lg are not easily accessible. 
+
+Remark 2. Lemma 4 and Corollary 2 imply that the sample size is eventually equal to the entire sample size n as Algorithm 1 converges. Thus we have 
+
+gk → ∇ f (xk ) and Bk → Diag( ∇2f (xk)) as k → ∞ . (49) 
+
+This allows us to invoke the deterministic local convergence guarantees as k → ∞ in Theorem 3. However, stochastic first- and second-order information from gk and Bk is used. 
+
+## 4 Algorithmic Solution 
+
+In Theorem 1, it was shown that the optimal ( ν∗, r ∗) solving max ν≥0, r ∈Dν Lξ(ν, r ) is used in (18) to compute the minimizer of (7). To solve (7) and compute ( ν∗, r ∗) Algorithm 1 and 2 are utilized, respectively. In particular, Lemma 7 is employed in Algorithm 2, which is essential for calculating the values of ν∗ and 
+
+r∗.Let VSI , SI , and UI stand for the Very Successful, Successful, and Unsuccessful Iteration, respectively, in Algorithm 1 (Conn et al., 2000, Section 6.1). Denote λ+ 
+
+> d
+
+(Bk) as the minimal non-negative diagonal shift that makes Bk sufficiently positive definite to allow a stable computation of the TR step. Details on the selection of λ+ 
+
+> d
+
+(Bk) in Algorithm 2 can be found in Conn et al. (2000, Section 7.3.11) and (Gould et al., 1999). 
+
+Lemma 7 (Proof in Appendix B.7) . The optimal values ν∗ and r∗ achieving 
+
+max 
+
+> ν≥0, r ∈Dν
+
+Lξ(ν, r ) (50) 
+
+are given by r∗ = 3
+
+√ξ and by solving 
+
+φ(ν∗, r ∗) = 1
+
+‖s(ν∗, r ∗)‖2
+
+− 1
+
+> 3
+
+√ξ = 0 , (51) 
+
+w.r.t. ν∗, respectively. 
+
+Next, we clarify the role and physical interpretation of the AdaCubic hyperparameters as they appear in Algorithms 1 and 2: • η1 (acceptance threshold). η1 ∈ (0 , 1) is the minimum ratio between the actual loss reduction and the predicted reduction of the cubic model required to accept a step. If ρk ≥ η1, the step is considered successful and the parameters are updated. This parameter η1 controls how cautiously the algorithm accepts update steps. Smaller values make acceptance easier, while larger values enforce stricter agreement between the cubic model mνk+1 (sk+1 ) and the objective function F (xk + sk+1 ). • η2 (very successful threshold). η2 ≥ η1 identifies very successful iterations. When ρk ≥ η2,the effective trust-region boundary is expanded, allowing larger steps in subsequent iterations. This mechanism accelerates convergence when the cubic model mνk+1 (sk+1 ) is highly accurate. • α1 (expansion factor). α1 ≥ 1 controls the increase of the trust-region parameter ξk after very successful iterations, thereby expanding the effective trust-region boundary. • α2 (shrinkage factor). α2 ∈ (0 , 1) decreases the trust-region boundary after unsuccessful iterations (ρk ≤ η1). By shrinking the trust-region boundary, more conservative updates are obtained, thereby improving robustness in regions where the cubic model mνk+1 (s) is less accurate. 10 Published in Transactions on Machine Learning Research (02/2026) 
+
+Algorithm 1 AdaCubic algorithm  
+
+> 1:
+
+Set ξk ← 1, κeasy ∈ (0 , 1), 0 < α 2 < 1 ≤ α1, and 0 < η 1 ≤ η2 < 1.  
+
+> 2:
+
+repeat ⊲ k -th iteration, k = 0 , 1, . . . ⊲ The function F , Bk, and gk are evaluated on the same batch. 
+
+⊲ RootFinder is Algorithm 2.  
+
+> 3:
+
+sk+1 , ν k+1 ← RootFinder (Bk, gk, ξ k, κ easy ) 
+
+> 4:
+
+Compute ρk using 
+
+ρk = F (xk ) − F (xk + sk+1 )
+
+F (xk) − mνk+1 (sk+1 ) 
+
+> 5:
+
+if ρk ≥ η1 then  
+
+> 6:
+
+xk+1 ← xk + sk+1  
+
+> 7:
+
+else  
+
+> 8:
+
+xk+1 ← xk 
+
+> 9:
+
+end if  
+
+> 10:
+
+Update ξk using 
+
+ξk+1 ←
+
+
+
+max 
+
+{
+
+α1 ‖sk+1 ‖32 , ξ k
+
+}
+
+if ρk ≥ η2 ⊲ VSI keep the same ξk if ρk ∈ [η1, η 2) ⊲ SI max 
+
+{
+
+α2 ‖sk+1 ‖32 , ǫ m
+
+}
+
+if ρk ≤ η1 ⊲ UI where ǫm ≈ 10 −6. 
+
+> 11:
+
+until execution stops (e.g., after a specific number of training epochs) 
+
+Algorithm 2 Find model minimizer  
+
+> 1:
+
+procedure RootFinder (B, g, ξ, κ easy ) 
+
+> 2:
+
+Set r ← 3
+
+√ξ 
+
+> 3:
+
+if B is positive definite then  
+
+> 4:
+
+ν ← 0 
+
+> 5:
+
+else 
+
+⊲ For some λ+ 
+
+> d
+
+(B) barely smaller than λd(B) 
+
+> 6:
+
+ν ← − 2 λ+ 
+
+> d
+
+(B) / r 
+
+> 7:
+
+end if  
+
+> 8:
+
+Compute s = −(B + 1 
+
+> 2
+
+ν r I)−1 g 
+
+> 9:
+
+if ‖s‖32 ≤ ξ then  
+
+> 10:
+
+if B is positive definite or ‖s‖32 = ξ then  
+
+> 11:
+
+return s , ν 
+
+> 12:
+
+else  
+
+> 13:
+
+Compute the eigenvector ud that corresponds to the eigenvalue λd(B). Then find the root α
+
+of the equation ‖s + α ud‖2 = ξ1/3 which makes the model mν (s + α ud) the smallest.  
+
+> 14:
+
+return s + α ud, ν 
+
+> 15:
+
+end if  
+
+> 16:
+
+end if 
+
+⊲ The following, produces s∗ and ν∗ in Lemma 1.  
+
+> 17:
+
+while | ‖ s‖2 − ξ1/3| ≤ κeasy ξ1/3 do 
+
+⊲ By Remark 3, ν increases.  
+
+> 18:
+
+ν ← ν − φ(ν, r ) / ∂ ν φ(ν, r ) 
+
+> 19:
+
+s = −(B + 1 
+
+> 2
+
+ν r I)−1 g 
+
+> 20:
+
+end while  
+
+> 21:
+
+return s , ν 
+
+> 22:
+
+end procedure 
+
+11 Published in Transactions on Machine Learning Research (02/2026) 
+
+• κeasy (root-finding tolerance). κeasy ∈ (0 , 1) specifies the error tolerance to terminate the Newton iterations when solving the cubic subproblem in Algorithm 2. κeasy determines how close the norm of the computed step should be to the trust-region boundary before the termination of the dual variable calculation. Smaller values enforce higher accuracy in solving the subproblem, while larger values favor computational efficiency. Overall, η1 and η2 govern step acceptance, α1 and α2 regulate updates of the trust-region boundary, and 
+
+κeasy balances accuracy and efficiency in the inner solver of Algorithm 2. AdaCubic adaptively computes the dual parameter νk+1 , which determines the step sk+1 , the acceptance ratio ρk, and consequently the evolution of the trust-region parameter ξk. The dual variable νk+1 encodes local curvature information through the Hessian approximation and acts as an adaptive term in the cubic subproblem. This relationship enables an automatic adjustment of ξk , allowing AdaCubic to respond effectively to the local geometry of the non-convex loss landscape and to achieve competitive performance across the benchmarks in Section 5. 
+
+## 5 Experimental Evaluation 
+
+Experiments are conducted on computer vision, natural language processing, and signal processing tasks, where the results obtained with the proposed AdaCubic optimizer are compared with those obtained with the SGD , Adam , and AdaHessian optimizers. The natural language processing experiments are conducted using the Hugging Face Transformers library (Wolf et al., 2020). For SGD , Adam , and AdaHessian , the Learning Rate (LR) is fine-tuned. For AdaCubic , the parameters η1 = 0 .05, η2 = 0 .75, α1 = 2 .5, α2 = 0 .25, and κeasy = 0 .01 are chosen universally in the experimental evaluation. These parameters are chosen based on the analysis in (Conn et al., 2000, Section 17.1). Table 1 summarizes the universal hyperparameter values used by AdaCubic across all benchmarks. Table 1: Universal AdaCubic hyperparameter settings. All hyperparameters in Algorithm 2 are fixed across benchmarks. ǫm denotes a numerical safeguard used in Algorithm 1. 
+
+AdaCubic Hyperparameters 
+
+Hyperparameter η1 η2 α1 α2 κeasy ǫm
+
+Assigned Value 0.05 0.75 2.5 0.25 0.01 10 −6
+
+Tables 2 and 3 summarize the experimental configurations for each benchmark, including datasets, model architectures, optimizers, and LR settings. Table 2: Summary of model architectures, training settings, and optimizers used in all experiments.                                                                         
+
+> Task Dataset Model Batch Epochs Optimizers
+> CV CIFAR-10 ResNet20 /ResNet32 256 500 SGD ,Adam ,AdaHessian ,AdaCubic
+> CIFAR-100 ResNet18 256 200 SGD ,Adam ,AdaHessian ,AdaCubic
+> NLU
+> SST-2 ,QNLI ,RTE ,WNLI SqueezeBERT 32 15 SGD ,AdaHessian ,AdaCubic
+> MRPC ,QQP SqueezeBERT 32 15 SGD ,AdaHessian ,AdaCubic
+> STS-B ,MNLI SqueezeBERT 32 15 SGD ,AdaHessian ,AdaCubic
+> LM WikiText-2 RoBERTa /BERT /DistilBERT 86SGD ,AdaHessian ,AdaCubic
+> PTB RoBERTa /BERT /DistilBERT 86SGD ,AdaHessian ,AdaCubic
+> CMI VISION ResNet18 256 100 Adam ,AdaCubic
+
+Computer Vision (CV). To prove the effectiveness of AdaCubic , experiments are conducted using 
+
+CIFAR-10 and CIFAR-100 datasets (Krizhevsky, 2009). The experimental results are summarized in Ta-ble 4. In all experiments, a batch size of 256 is used. The mean accuracy and standard deviation (std) over five runs are reported for each experiment. The number of epochs used to train the models on CIFAR-10 and 
+
+CIFAR-100 is 500 and 200, respectively. In addition, the optimizers are fine-tuned w.r.t. the initial LR and the decaying LR scheme. For SGD , Adam , and AdaHessian , the initial learning rates are 0.1, 0.001, and 12 Published in Transactions on Machine Learning Research (02/2026) 
+
+Table 3: Summary of LRs used in all experiments. For the CV benchmark, LRs are decayed by a factor of 10 at epochs 80 and 120 on CIFAR-10 , and by a factor of 20 at epochs 60, 120, and 160 on CIFAR-100 .For NLU, LM, and CMI benchmarks, no LR decay is applied. For CMI, LR is decayed by a factor of 10 at epochs 80 and 120. AdaCubic is used with a fixed universal parameter set and does not require LR tuning. 
+
+Optimizer Task Dataset(s) Initial LR LR Schedule / Tuning 
+
+SGD CV CIFAR-10 / CIFAR-100 0.1 Step decay (tuned) 
+
+Adam CV CIFAR-10 / CIFAR-100 10 −3 Step decay (tuned) 
+
+AdaHessian CV CIFAR-10 / CIFAR-100 0.15 Step decay (tuned) 
+
+AdaCubic CV CIFAR-10 / CIFAR-100 no LR Universal parameters 
+
+SGD NLU SST-2 , QNLI , RTE , WNLI 2×10 −2 Tuned 
+
+SGD NLU STS-B 2×10 −3 Tuned 
+
+AdaHessian NLU SST-2 , QNLI , STS-B , MNLI 2×10 −3 Tuned 
+
+AdaHessian NLU MRPC , RTE 2×10 −4 Tuned 
+
+AdaHessian NLU WNLI 2×10 −2 Tuned 
+
+AdaCubic NLU All GLUE tasks no LR Universal parameters 
+
+SGD LM WikiText-2 , PTB 5×10 −3 Tuned 
+
+AdaHessian LM WikiText-2 (all models) 5×10 −4 Tuned 
+
+AdaHessian LM PTB (RoBERTa ) 5×10 −3 Tuned 
+
+AdaHessian LM PTB (BERT , DistilBERT ) 5×10 −4 Tuned 
+
+AdaCubic LM WikiText-2 , PTB no LR Universal parameters 
+
+Adam CMI VISION 10 −4 Tuned 
+
+AdaCubic CMI VISION no LR Universal parameters 
+
+0.15. Furthermore, for AdaHessian , β1 and β2 are set to 0.9 and 0.999, respectively. On CIFAR-10 , the LR is decayed by a factor of 10 at epochs 80 and 120, while on CIFAR-100 , the LR is decayed by a factor of 20 at epochs 60, 120, and 160. In addition, spatial averaging (Yao et al., 2021) is used for AdaCubic and 
+
+AdaHessian on CIFAR-100 . The entries corresponding to the best accuracy are marked in bold. ∆ reports the accuracy differences between AdaCubic and the strongest competing optimizer in each setting. When spatial averaging is used, the accuracy is shown in gray. On the CIFAR-10 dataset, both AdaHessian and AdaCubic demonstrate higher accuracy than conven-tional optimization methods like SGD and Adam . It is worth noting that, while both methods excel, 
+
+AdaHessian achieves a slight edge in accuracy over AdaCubic for ResNet20 and ResNet32 by 0.15% and 0.5%, respectively. This performance distinction underscores the effectiveness of AdaCubic and positions it as a formidable competitor to AdaHessian in enhancing model accuracy on the CIFAR-10 dataset. On the CIFAR-100 dataset without spatial averaging, AdaCubic falls behind SGD , Adam , and AdaHessian 
+
+by margins of 0.81%, 0.23%, and 0.64%, respectively. However, with spatial averaging, both AdaHessian 
+
+and AdaCubic achieve improved accuracy. This comparative analysis highlights AdaCubic ’s distinct per-formance characteristics, demonstrating its unique capabilities relative to other optimizers in challenging scenarios, such as on the CIFAR-100 dataset. Figure 1 depicts the training loss of ResNet20 (top) and ResNet32 (bottom) on CIFAR-10 for Adam , Ada-Hessian , and AdaCubic optimizers. As can be seen, the losses of Adam and AdaHessian decrease dramatically at epoch 80, when the LR has decayed by a factor of 10. As can be seen, only by using an adaptive LR can the training loss reduction of Adam and AdaHessian match that of AdaCubic . In the last epochs, the loss of AdaCubic is lower than that of Adam and higher than that of AdaHessian . It should be noted that, in all experiments, AdaCubic is used with the same set of parameters and achieves competitive performance compared to the remaining fine-tuned optimizers. On CIFAR-10 , AdaCubic consistently outperforms first-order methods ( SGD , Adam ) and ranks second to AdaHessian , with very small gaps of 0 .15% and 0 .5% for ResNet20 and ResNet32 , respectively, as 13 Published in Transactions on Machine Learning Research (02/2026) 
+
+Table 4: Accuracy (%) and std of the accuracy measures for ResNet18/20/32 models on CIFAR-10 and 
+
+CIFAR-100 datasets. ∆ reports the gap between the strongest competing optimizer and AdaCubic .
+
+CIFAR-10 CIFAR-100 
+
+ResNet20 ResNet32 ResNet18 
+
+SGD 88.52 ± 0.24 89.02 ± 0.20 72.62 ± 0.002 
+
+Adam 90.26 ± 0.19 91.24 ± 0.20 72.04 ± 0.13 
+
+AdaHessian 91.64 ± 0.46 93.15 ± 0.12 72.45 ± 0.16 - - 72.59 ± 0.271 
+
+AdaCubic 91.49 ± 0.46 92.65 ± 0.19 71.81 ± 0.003 - - 72 ± 0.337 
+
+∆ 0.15 ± 0.36 0.5 ± 0.07 0.81 ± 0.001 - - 0.59 ± 0.066 
+
+Table 5: Figures of merit on GLUE benchmark using SGD , AdaHessian , and AdaCubic optimizers on natural language understanding tasks. ∆ reports the gap between the strongest competing optimizer and 
+
+AdaCubic 
+
+.
+
+Dataset SGD AdaHessian AdaCubic ∆
+
+Accuracy (%) 
+
+SST-2 91.62 90.71 90.71 0.91 
+
+QNLI 90.37 89.47 90.01 0.36 
+
+RTE 70.39 64.98 70.39 0.00 
+
+WNLI 56.33 56.33 56.33 0.00 
+
+F1 / Accuracy (%) 
+
+MRPC 0.9094 / 87.25 0.8562 / 78.18 0.9042 / 86.76 0.0052 /0.49 
+
+QQP 0.8775 / 90.89 0.8742 / 90.82 0.8723 / 90.40 0.0052 /0.49 
+
+Pearson / Spearman Corr. 
+
+STS-B 0.8863 / 0.8845 0.8786 / 0.8735 0.8832 / 0.8814 0.0031 /0.0031 
+
+Matched / Mismatched Accuracy (%) 
+
+MNLI 82.45 / 82.05 81.65 / 81.57 81.88 / 81.89 0.57 /0.16 
+
+summarized in Table 4. On CIFAR-100 without spatial averaging, AdaCubic trails the best-performing optimizer by at most 0 .81%. Due to its larger number of classes and increased classification difficulty, CIFAR-100 will possibly lead to optimization regimes with stronger parameter interactions. Since AdaCubic ,like AdaHessian , relies on a diagonal approximation of the Hessian, it does not explicitly capture such off-diagonal curvature effects, which may partially explain the observed gap. Importantly, when spatial averaging is applied, the performance of AdaCubic improves and becomes closer to that of AdaHessian 
+
+and SGD , confirming that part of the gap is related to high-variance curvature estimation. 
+
+Natural Language Understanding (NLU). Table 5 summarizes the results on the natural language un-derstanding task. The GLUE benchmark (Wang et al., 2018) is used to train the SqueezeBERT (Iandola et al., 2020) model for 15 epochs. For SGD and AdaHessian , the initial LR is fine-tuned in all datasets. For 
+
+SGD , the initial LR is set to 2 · 10 −2 for all datasets except from STS-B where it is set to 2 · 10 −3. For 
+
+AdaHessian , the initial LR is set to 2 · 10 −3 for SST-2 , STS-B , MNLI , and QNLI , to 2 · 10 −4 for MRPC and 
+
+RTE , and to 2 · 10 −2 for WNLI .14 Published in Transactions on Machine Learning Research (02/2026) 
+
+# 1  111 1        
+
+#   
+
+# 1  
+
+# 1  
+
+#    
+
+#  
+
+#  
+
+#   
+
+           
+
+  
+
+ 1 
+
+ 1 
+
+  
+
+  
+
+> (a)
+
+# 1  111 1        
+
+#   
+
+#   
+
+#   
+
+#   
+
+# 1  
+
+# 1  
+
+# 1  
+
+# 1  
+
+#    
+
+#  
+
+#  
+
+#   
+
+           
+
+  
+
+ 1 
+
+ 1 
+
+  
+
+  
+
+> (b)
+
+Figure 1: Training loss curve of ResNet20 (top) and ResNet32 (bottom) on CIFAR-10 for Adam , AdaHes-sian , and AdaCubic optimizers. The default parameters of the SqueezeBERT model can be found in the official Hugging Face library 1. The dataset acronyms in the Hugging Face library are SST-2 , QNLI , RTE , WNLI , MRPC , QQP , STS-B , and MNLI , while the model acronym is squeezebert/squeezebert-uncased .To simplify the experimental evaluation, the experiments are divided into four groups, each corresponding to a different performance measure. Group 1 consists of the SST-2 , QNLI , RTE , and WNLI datasets. Group 2 consists of the MRPC and QQP datasets, while groups 3 and 4 consist of the SST-B and MNLI datasets, 
+
+> 1https://github.com/huggingface/transformers/tree/main/examples/pytorch/text-classification
+
+15 Published in Transactions on Machine Learning Research (02/2026) 
+
+respectively. The entries corresponding to the best metrics are marked in bold. ∆ reports the accuracy differences between AdaCubic and the strongest competing optimizer in each setting. • Group 1. Concerning accuracy measure, AdaCubic and AdaHessian demonstrate the same per-formance on SST-2 , while SGD performs better by 0.91%. On QNLI , SGD outperforms AdaCubic 
+
+by 0.36%, while AdaCubic outperforms AdaHessian by 0.54%. On RTE , AdaCubic and SGD 
+
+achieve the same performance, while AdaHessian is outperformed by 5.41%. On WNLI , all optimiz-ers achieve the same performance. Overall, the mean accuracies achieved by SGD , AdaHessian ,and AdaCubic are 77.17%, 75.37%, and 76.86%, respectively. It can be observed that, on average, 
+
+SGD outperforms AdaCubic by 0.31%, while AdaCubic outperforms AdaHessian by 1.5%. • Group 2. Concerning F1 measure on MRPC , SGD outperforms AdaCubic by 0.0052, while AdaCu-bic outperforms AdaHessian by 0.048. On the same dataset, SGD achieves higher accuracy than AdaCubic by 0.49%, whereas AdaCubic outperforms AdaHessian by 8.58%. Concerning 
+
+F1 measure on QQP , SGD outperforms AdaHessian by 0.0052, while AdaHessian outperforms 
+
+AdacCubic by 0.0019. On the same dataset, SGD achieves higher accuracy than Adahessian by 0.07%, while AdaHessian outperforms AdaCubic by 0.42%. Overall, the mean F1 values achieved by SGD , AdaHessian , and AdaCubic are 0.89345, 0.8652, and 0.88825, respectively, while the mean accuracies are 89.07%, 84.5%, and 88.58%, respectively. This way, on average, SGD outper-forms AdaCubic by 0.0052 and 0.49%, on F1 and accuracy measures, respectively, while AdaCubic 
+
+outperforms AdaHessian by 0.02305 and 4.08%, respectively. • Group 3. Concerning Pearson correlation index, SGD outperforms AdaCubic by 0.0031, while 
+
+AdaCubic outperforms AdaHessian by 0.0046. Regarding the Spearman correlation index, SGD 
+
+outperforms AdaCubic by 0.0031, while AdaCubic outperforms AdaHessian by 0.0079. • Group 4. Concerning matched accuracy (Wang et al., 2018), SGD outperforms AdaCubic by 0.57%, while AdaCubic outperforms AdaHessian by 0.23%. Concerning mismatched accu-racy (Wang et al., 2018), SGD outperforms AdaCubic by 0.16%, while AdaCubic outperforms 
+
+AdaHessian by 0.32%. It is worth noting that AdaCubic exhibits the second-best performance with a pre-fixed universal set of parameters, while SGD and AdaHessian are fine-tuned w.r.t. the initial LR. 
+
+Language Modeling (LM). Tables 6 and 7 summarize the results on the language modeling, where perplexity (Jelinek et al., 1977) is used as an evaluation metric. PTB (Marcus et al., 1994) and 
+
+wikitext-2 (Merity et al., 2017) datasets are used to train RoBERTa (Liu et al., 2019), BERT (Devlin et al., 2018), and DistilBERT (Sanh et al., 2019) models with SGD , AdaHessian , and AdaCubic optimizers. Table 6: Perplexity achieved by SGD , AdaHessian , and AdaCubic on wikitext-2 dataset. 
+
+Optimizer RoBERTa BERT DistilBERT 
+
+SGD 3.547 13.380 6.118 
+
+AdaCubic 3.756 5.759 6.565 
+
+AdaHessian 4.374 16.151 6.822 
+
+Table 7: Perplexity using SGD , AdaHessian , and AdaCubic on the PTB dataset. 
+
+Optimizer RoBERTa BERT DistilBERT 
+
+SGD 4.345 17.344 8.299 
+
+AdaCubic 5.145 14.170 7.334 
+
+AdaHessian 7.582 20.851 10.182 
+
+16 Published in Transactions on Machine Learning Research (02/2026) 
+
+The initial LR of SGD is fine-tuned to 5 · 10 −3 for all models and both datasets. For AdaHessian , the initial LR is fine-tuned to 5 · 10 −4 for all models on wikitext-2 dataset. On PTB dataset, the initial LR of 
+
+AdaHessian optimizer is set to 5 ·10 −3 to train RoBERTa model, while the remaining models are trained with initial LR 5 ·10 −4. The remaining parameters for the trained models can be found in the official Hugging Face library 2. The dataset acronyms in the Hugging Face library are ptb_text_only and wikitext-2-raw-v1 .In contrast, the model acronyms are roberta-base , bert-base-cased , and distilbert-base-uncased .      
+
+> 1
+>  
+>  
+>  
+>  
+>  
+>    !
+> 
+> 
+>  
+
+(a) RoBERTa        
+
+> 1
+> 
+> 
+> 1 
+> 1
+> 1
+> 1
+> 1
+>   
+> 
+>  
+>  
+
+(b) BERT       
+
+> 1
+>  
+>  
+>  
+>  
+>  
+>  
+>    !
+> 
+> 
+>  
+
+(c) DistilBERT 
+
+Figure 2: Perplexity vs. epochs for RoBERTa , BERT , and DistilBERT models on wikitext-2 dataset.       
+
+> 1
+> 
+> 
+> 
+> 
+> 1 
+> 11 !"
+> 
+> 
+>  
+
+(a) RoBERTa        
+
+> 1
+> 1
+> 1
+> 1
+>  
+> 
+> 
+>  
+> 
+>  
+>  
+
+(b) BERT       
+
+> 1
+> 
+> 
+> 1 
+> 11
+> 1
+> 1  !
+> 
+> 
+>  
+
+(c) DistilBERT 
+
+Figure 3: Perplexity vs. epochs for RoBERTa , BERT , and DistilBERT models on PTB dataset. First, the perplexity measurements gathered for the wikitext-2 dataset in Table 6 are discussed. When 
+
+RoBERTa is used, SGD outperforms AdaCubic and AdaHessian by 0.209 and 0.827, respectively. Next, when BERT is used, AdaCubic outperforms SGD and AdaHessian by 7.621 and 10.392, respectively. For the DistilBERT model, SGD outperforms AdaCubic and AdaHessian by 0.447 and 0.704, respectively. We observe that in all models, AdaCubic outperforms AdaHessian and performs better or competitively when compared to SGD . Figure 2 depicts the perplexity metric vs. epochs for all models and optimizers on the wikitext-2 dataset. Table 7 gathers perplexity measures on the PTB dataset. When RoBERTa is used, SGD outperforms AdaCu-bic and AdaHessian by 0.8 and 3.237, respectively. For the BERT model, AdaCubic outperforms SGD and 
+
+AdaHessian by 3.174 and 6.681, respectively. For the DistilBERT model, AdaCubic outperforms SGD 
+
+and AdaHessian by 0.965 and 2.848, respectively. Figure 3 depicts the perplexity metric vs. epochs for all models and optimizers on the PTB dataset. On the NLU benchmark, Table 5, AdaCubic consistently achieves either the best or the second-best perfor-mance across all tasks, with the performance gaps reported in the ∆ column remaining small. The second-best performance of AdaCubic on certain GLUE tasks can be understood in light of recent Hessian-based anal-yses of Transformers (Zhang et al., 2024). In particular, Zhang et al. (2024) shows that Transformer models exhibit block-wise heterogeneity in their Hessian structure, with strong curvature differences and interactions across parameter groups. While AdaCubic explicitly leverages second-order information through diagonal 
+
+> 2
+
+https://github.com/huggingface/transformers/tree/main/examples/pytorch/language-modeling 
+
+17 Published in Transactions on Machine Learning Research (02/2026) 
+
+Hessian approximations, such approximations may be insufficient to capture cross-parameter or block-level curvature interactions fully. This likely explains why AdaCubic remains highly competitive but does not consistently outperform finely tuned baselines on Transformer-based tasks. Similar conclusions hold for the LM benchmark, where AdaCubic consistently achieves either the best or second-best performance across all datasets. Overall, it should be noted that AdaCubic exhibits the best or second-best performance with a pre-fixed universal set of parameters, while SGD and AdaHessian are fine-tuned w.r.t. the initial LR. 
+
+Camera Model Identification (CMI). The publicly available VISION dataset (Shullani et al., 2017) is utilized for camera model identification. VISION includes 648 Native videos, which remain unaltered post-capture by the camera. These Native videos were disseminated via social media platforms such as YouTube 
+
+and WhatsApp , with corresponding versions included in the dataset. Of the 684 Native videos, 644 were shared via YouTube and 622 via WhatsApp . Additional details on VISION can be found in (Shullani et al., 2017). Taking into account the VISION dataset naming conventions outlined in Shullani et al. (2017), videos captured by devices D04, D12, D17, and D22 are excluded due to issues encountered during frame extraction or audio track retrieval. Table 8: CMI accuracy (%) using ResNet18 .
+
+AdaCubic Adam 
+
+Native WhatsApp YouTube Native WhatsApp YouTube 
+
+Fold 0 97.40 96.10 94.59 96.10 93.50 91.9 Fold 1 93.51 93.51 93.24 94.80 90.90 93.24 Fold 2 94.81 92.22 94.59 90.90 88.31 95.94 Fold 3 93.42 93.43 91.89 93.42 94.73 82.43 Fold 4 94.73 88.16 93.24 94.73 88.15 95.94 
+
+Mean 
+
+± std 94.77 
+
+± 1.43 93.68 
+
+± 2.59 93.51 
+
+± 1.01 93.99 
+
+± 1.76 91.11 
+
+± 2.66 91.89 
+
+± 4.98 
+
+The videos are partitioned into training, testing, and validation sets to conduct a typical five-fold stratified cross-validation. The audio content from each video is extracted, and the log-Mel spectrogram for each extracted audio clip is computed using three distinct window sizes and hop sizes. This results in 3-channel log-Mel spectrograms that capture various frequency details of the audio content. The 3-channel log-Mel spectrograms are then fed into ResNet18 to perform CMI. Furthermore, for Adam , β1 and β2 are set to 0.9 and 0.999, respectively. The LR is decayed by a factor of 10 at epochs 80 and 120 with an initial value 10 −4.Table 8 summarizes the results when AdaCubic and Adam optimizers are used. The mean accuracy achieved using AdaCubic in the Native , WhatsApp , and YouTube benchmarks is 94 .77%, 93 .68%, and 93 .51%, re-spectively. In comparison, the mean accuracy with Adam is 93 .99% for Native , 91 .11% for WhatsApp , and 91 .89% for YouTube . This indicates that AdaCubic is more accurate than Adam by 0 .78%, 2 .57%, and 1.62% in the Native , WhatsApp , and YouTube benchmarks, respectively. In terms of std, AdaCubic demon-strates greater consistency than Adam by achieving lower std values of 0 .33, 0 .07, and 3 .97 in the Native ,
+
+WhatsApp , and YouTube benchmarks, respectively. Implementation details for the audio CMI task can be found in (Tsingalis et al., 2024). 
+
+## 6 Computational Complexity and Discussion 
+
+The performance and time complexity of the second-order methods depend on the approximation of the second-order information captured by the Hessian matrix. Similarly to AdaHessian , AdaCubic leverages the Hutchinson method (Bekas et al., 2007) to approximate the diagonal of the Hessian matrix. Figure 4 depicts the time complexity of SGD , AdaHessian , and AdaCubic when they are used to train ResNet20 
+
+on CIFAR-10 . As can be seen, the time complexity of the first-order optimizer SGD is smaller than that of the two second-order optimizers, with AdaCubic having less time complexity than AdaHessian .18 Published in Transactions on Machine Learning Research (02/2026) 
+
+# 1   111 1 1 1   ! 
+
+# 
+
+#  
+
+# 1 
+
+# 1 
+
+#  ##"$     
+
+#  
+
+# !! 
+
+# # 
+
+Figure 4: Cumulative time vs. epochs for SGD , AdaHessian , and AdaCubic for ResNet20 on CIFAR-10 .       
+
+> 00 0 0 0 000
+
+# ##"$    
+
+> 00
+> 0
+> 0
+> 
+> 0
+> 
+> 0
+> 
+>   !!
+
+#  
+
+# !! 
+
+# # 
+
+#  " !!   0      
+
+> (a) Cumulative time vs. loss
+> 00 0 0 000
+
+#  
+
+> 00
+> 0
+> 0
+> 
+> 0
+> 
+> 0
+> 
+>  
+
+#  
+
+#  
+
+#   
+
+> (b) Training loss vs. epochs
+
+Figure 5: Comparison of SGD , AdaHessian , and AdaCubic on ResNet20 and CIFAR-10 . Training loss vs. cumulative time over epochs (Left). Training loss vs. epochs (Right). Figure 5a shows the training loss vs. cumulative time for SGD , AdaHessian , and AdaCubic . Figure 5b shows the training loss vs. epochs for SGD , AdaHessian , and AdaCubic . The training loss in Figure 5b corresponds to that in Figure 5a. The horizontal dashed line in Figure 5a marks the target loss threshold of 0 .15. AdaCubic reaches this threshold after 55 epochs and 42.40 minutes. In comparison, SGD and 
+
+AdaHessian require 83 and 81 epochs, corresponding to 35.16 and 61.85 minutes. Table 9 summarizes the latter results. Although AdaCubic needs more time than SGD due to the computation of the second-order information, AdaCubic reaches the desired loss in fewer epochs without any LR tuning. This highlights 
+
+AdaCubic as an efficient trade-off between computational cost and convergence quality. Additionally, storing the Hessian matrix increases the memory consumption of any second-order optimizer. Using Hutchinson’s method for approximating the diagonal of the Hessian, the second-order information is represented by the diagonal approximation of the Hessian matrix, which leads to a O(d) memory com-19 Published in Transactions on Machine Learning Research (02/2026) 
+
+Table 9: Execution time in minutes required to reach a target loss threshold when ResNet20 is trained on 
+
+CIFAR-10 .
+
+SGD AdaHessian AdaCubic 
+
+Epoch Time Epoch Time Epoch Time 
+
+Result 83 35.16 81 61.85 55 42.40 
+
+plexity (Bekas et al., 2007). This additional memory cost is incurred by AdaCubic relative to first-order methods such as SGD .Furthermore, when utilizing Bekas et al. (2007), the approximation of the diagonal of the Hessian demands an additional gradient back-propagation. The additional gradient back-propagation step is also needed in 
+
+AdaHessian . When comparing AdaCubic with Adam , the latter shares similar memory consumption due to the requirement of the gradient momentum term, but it does not necessitate an additional gradient back-propagation. Table 10: Comparison of optimization methods used in the experimental evaluation. Recall that d denotes the number of model parameters and S the number of random vectors used in the diagonal Hessian approx-imation. 
+
+Optimizer Order Sensitivity Extra Backward Pass Time Cost Memory Footprint 
+
+SGD First High No d d
+
+Adam First High No d 3d
+
+AdaHessian Second Medium Yes S d 4d
+
+AdaCubic Second Low Yes S d 2d
+
+Table 10 summarizes the optimization methods used in the experimental evaluation, highlighting their opti-mization order, sensitivity to hyperparameters, and computational overhead. The “Order” column indicates whether an optimizer relies on first- or second-order information. The sensitivity of the optimizers w.r.t. the LR is summarized in the “Sensitivity” column. The sensitivity of SGD , Adam , and AdaHessian w.r.t. the LR is discussed thoroughly in (Yao et al., 2021). AdaCubic has low sensitivity because it achieves compet-itive performance using a universal set of hyperparameters. The “Extra Backward Pass” column indicates whether additional back-propagation steps are required per optimization iteration, which directly relates to the use of second-order information. The reported time cost is dominated by the back-propagation proce-dure and is expressed as a function of the number of model parameters d. Recall that S is the number of random vectors used in the approximation of the diagonal Hessian matrix. Using S random vectors requires 
+
+S backpropagation steps, increasing the time cost linearly. The “Memory Footprint” refers to the memory needed to store the gradient, the moment terms, and the approximated diagonal Hessian. As can be seen, the memory footprint of Adam and AdaHessian is 3 d and 4 d, respectively, as the gradient and moments need memory relative to the number of parameters d. AdaHessian needs an additional memory footprint of 
+
+d for the storage of the approximate diagonal Hessian. AdaCubic shows a 2 d memory overhead relative to 
+
+SGD , since the gradient must be retained to compute the Hutchinson-based approximation of the diagonal Hessian, which is subsequently used by Algorithm 2. However, according to Algorithm 2, AdaCubic requires only the approximated diagonal Hessian for its updates, yielding a theoretical memory footprint of O(d). The gap between practical and theoretical memory costs comes from the design of modern deep-learning frameworks, such as PyTorch, which are optimized for first-order optimization methods. Thus, computing the diagonal Hessian approximation requires retaining intermediate gradient information. Developing a custom implementation that directly computes the diagonal Hessian without storing such intermediates is beyond the scope of this work. 20 Published in Transactions on Machine Learning Research (02/2026) 
+
+## 7 Conclusions 
+
+AdaCubic , a novel adaptive cubic regularized second-order optimizer, has been proposed. AdaCubic 
+
+leverages an approximate Hessian diagonal to reduce the computational cost induced by estimating curvature information. Although many cubically regularized methods have been proposed in the literature, none have been extensively tested in practical deep-learning applications. The effectiveness of the proposed optimizer has been demonstrated through experiments on computer vision, natural language processing, and signal processing tasks, all using deep neural networks trained on various datasets. With a pre-fixed universal selection of parameters, AdaCubic exhibits better or competitive performance when compared to other state-of-the-art fine-tuned optimizers. This fact makes AdaCubic an attractive solution for optimizing deep neural networks. 
+
+## Acknowledgments 
+
+This work was supported by the Hellenic Foundation for Research and Innovation (HFRI) under the HFRI PhD Fellowship grant (Fellowship Number: 1376) and the “2nd Call for HFRI Research Projects to support Faculty Members & Researchers” (Project Number: 3888). The results were obtained using the High-Performance Computing Infrastructure and Resources of Aristotle University of Thessaloniki (AUTh). The authors would like to acknowledge the support provided by the IT Center of AUTh throughout the progress of this research work. 
+
+## References 
+
+Z. Allen-Zhu and Y. Li. Neon2: Finding local minima via first-order oracles. In Advances in Neural Information Processing Systems , volume 31, 2018. Zeyuan Allen-Zhu. Natasha 2: Faster non-convex optimization than SGD. In Advances in Neural Information Processing Systems , volume 31, 2018. Zeyuan Allen-Zhu and Elad Hazan. Variance reduction for faster non-convex optimization. In Proc. Int. Conf. on Machine Learning , pp. 699–707, 2016. Amrit Singh Bedi, Ketan Rajawat, Vaneet Aggarwal, and Alec Koppel. Escaping saddle points for successive convex approximation. IEEE Transactions on Signal Processing , 70:307–321, 2021. Costas Bekas, Effrosyni Kokiopoulou, and Yousef Saad. An estimator for the diagonal of a matrix. Applied Numerical Mathematics , 57(11-12):1214–1229, 2007. Dimitri P Bertsekas. Nonlinear Programming, 3rd . Athena Scientific Belmont, 2017. Stéphane Boucheron, Gábor Lugosi, and Pascal Massart. Concentration Inequalities: A Nonasymptotic Theory of Independence . Oxford University Press, 2013. Stephen Boyd and Lieven Vandenberghe. Convex Optimization . Cambridge University Press, 2004. Yair Carmon and John Duchi. Gradient descent finds the cubic-regularized nonconvex Newton step. SIAM Journal on Optimization , 29(3):2146–2178, 2019. Coralia Cartis, Nicholas IM Gould, and Philippe L Toint. Adaptive cubic regularisation methods for uncon-strained optimization. Part I: motivation, convergence and numerical results. Mathematical Programming ,127(2):245–295, 2011a. Coralia Cartis, Nicholas IM Gould, and Philippe L Toint. Adaptive cubic regularisation methods for un-constrained optimization. Part II: worst-case function-and derivative-evaluation complexity. Mathematical Programming , 130(2):295–319, 2011b. Zixiang Chen, Dongruo Zhou, and Quanquan Gu. Faster perturbed stochastic gradient methods for finding local minima. In Proc. Int. Conf. on Algorithmic Learning Theory , pp. 176–204, 2022. 21 Published in Transactions on Machine Learning Research (02/2026) 
+
+Andrew R Conn, Nicholas IM Gould, and Philippe L Toint. Trust Region Methods . SIAM, 2000. Marina Danilova, Pavel Dvurechensky, Alexander Gasnikov, Eduard Gorbunov, Sergey Guminov, Dmitry Kamzolov, and Innokentiy Shibaev. Recent theoretical advances in non-convex optimization. In High-Dimensional Optimization and Probability , pp. 79–163. Springer, 2022. Shaveta Dargan, Munish Kumar, Maruthi Rohit Ayyagari, and Gulshan Kumar. A survey of deep learn-ing and its applications: A new paradigm to machine learning. Archives of Computational Methods in Engineering , 27(4):1071–1092, 2020. Yann N Dauphin, Razvan Pascanu, Caglar Gulcehre, Kyunghyun Cho, Surya Ganguli, and Yoshua Bengio. Identifying and attacking the saddle point problem in high-dimensional non-convex optimization. In 
+
+Advances in Neural Information Processing Systems , pp. 2933–2941, 2014. Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. BERT: pre-training of deep bidi-rectional transformers for language understanding, 2018. URL https://arxiv.org/abs/1810.04805 .[retrieved: February 28, 2026]. Cong Fang, Chris Junchi Li, Zhouchen Lin, and Tong Zhang. SPIDER: Near-optimal non-convex optimiza-tion via stochastic path-integrated differential estimator. In Advances in Neural Information Processing Systems , volume 31, 2018. Rong Ge, Furong Huang, Chi Jin, and Yang Yuan. Escaping from saddle points—online stochastic gradient for tensor decomposition. In Proc. Conf. on Learning Theory , pp. 797–842. PMLR, 2015. Rong Ge, Zhize Li, Weiyao Wang, and Xiang Wang. Stabilized SVRG: Simple variance reduction for nonconvex optimization. In Proc. Int. Conf. on Learning Theory , pp. 1394–1448, 2019. Gene H Golub and Charles F Van Loan. Matrix Computations . Johns Hopkins Press Baltimore, 2012. Nicholas IM Gould, Stefano Lucidi, Massimo Roma, and Philippe L Toint. Solving the trust-region subprob-lem using the Lanczos method. SIAM Journal on Optimization , 9(2):504–525, 1999. David Gross. Recovering low-rank matrices from few coefficients in any basis. IEEE Transactions on Information Theory , 57(3):1548–1566, 2011. Christopher J Hillar and Lek-Heng Lim. Most tensor problems are NP-Hard. Journal of the ACM , 60(6): 1–39, 2013. Kevin Huang, Junyu Zhang, and Shuzhong Zhang. Cubic regularized newton method for the saddle point models: A global and local convergence analysis. Journal of Scientific Computing , 91(2):1–31, 2022. Forrest N. Iandola, Albert E. Shaw, Ravi Krishna, and Kurt W. Keutzer. SqueezeBERT: What can computer vision teach NLP about efficient neural networks?, 2020. URL https://arxiv.org/abs/2006.11316 .[retrieved: February 28, 2026]. Majid Jahani, Sergey Rusakov, Zheng Shi, Peter Richtárik, Michael W Mahoney, and Martin Takáč. Doubly adaptive scaled algorithm for machine learning using second-order information. In Proc. Int. Conf. on Learning Representations , 2021. Fred Jelinek, Robert L Mercer, Lalit R Bahl, and James K Baker. Perplexity—a measure of the difficulty of speech recognition tasks. The Journal of the Acoustical Society of America , 62(S1):S63–S63, 1977. Chi Jin, Rong Ge, Praneeth Netrapalli, Sham M Kakade, and Michael I Jordan. How to escape saddle points efficiently. In Proc. Int. Conf. on Machine Learning , pp. 1724–1732, 2017. Chi Jin, Praneeth Netrapalli, Rong Ge, Sham M Kakade, and Michael I Jordan. On nonconvex optimization for machine learning: Gradients, stochasticity, and saddle points. Journal of the ACM , 68(2):1–29, 2021. Diederik P. Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In Proc. Int. Conf. on Learning Representations , 2015. 22 Published in Transactions on Machine Learning Research (02/2026) 
+
+Marius Kloft, Ulf Brefeld, Pavel Laskov, Klaus-Robert Müller, Alexander Zien, and Sören Sonnenburg. Efficient and accurate ℓp-norm multiple kernel learning. In Advances in Neural Information Processing Systems , pp. 997–1005, 2009. Jonas Moritz Kohler and Aurelien Lucchi. Sub-sampled cubic regularization for non-convex optimization. In Proc. Int. Conf. on Machine Learning , pp. 1895–1904, 2017. Alex Krizhevsky. Learning multiple layers of features from tiny images. Technical report, University of Toronto, 2009. Kfir Levy, Ali Kavis, and Volkan Cevher. STORM+: Fully adaptive SGD with recursive momentum for nonconvex optimization. In Advances in Neural Information Processing Systems , volume 34, pp. 20571– 20582, 2021. Zhize Li. SSRGD: Simple stochastic recursive gradient descent for escaping saddle points. In Advances in Neural Information Processing Systems , volume 32, pp. 5956–5965, 2019. Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. RoBERTa: A robustly optimized bert pretraining approach, 2019. URL https://arxiv.org/abs/1907.11692 . [retrieved: February 28, 2026]. Mitch Marcus, Beatrice Santorini, and Mary Ann Marcinkiewicz. Building a large annotated corpus of English: The Penn Treebank. Using Large Corpora , 273, 1994. Stephen Merity, Caiming Xiong, James Bradbury, and Richard Socher. Pointer sentinel mixture models. In 
+
+Proc. Int. Conf. on Learning Representations , 2017. Katta G Murty and Santosh N Kabadi. Some NP-complete problems in quadratic and nonlinear program-ming. Mathematical Programming , 39(2):117–129, 1987. Yurii Nesterov. Lectures on Convex Optimization , volume 137. Springer, 2018. Yurii Nesterov and Boris T Polyak. Cubic regularization of newton method and its global performance. 
+
+Mathematical Programming , 108(1):177–205, 2006. Lam M Nguyen, Jie Liu, Katya Scheinberg, and Martin Takáč. SARAH: A novel method for machine learning problems using stochastic recursive gradient. In Proc. Int. Conf. on Machine Learning , pp. 2613–2621, 2017a. Lam M Nguyen, Jie Liu, Katya Scheinberg, and Martin Takáč. Stochastic recursive gradient algorithm for nonconvex optimization, 2017b. URL https://arxiv.org/abs/1705.07261 . [retrieved: February 28, 2026]. Seonho Park, Seung Hyun Jung, and Panos M Pardalos. Combining stochastic adaptive cubic regularization with negative curvature for nonconvex optimization. Journal of Optimization Theory and Applications ,184(3):953–971, 2020. Barak A Pearlmutter. Fast exact multiplication by the Hessian. Neural Computation , 6(1):147–160, 1994. Omead Pooladzandi, David Davini, and Baharan Mirzasoleiman. Adaptive second order coresets for data-efficient machine learning. In Proc. Int. Conf. on Machine Learning , pp. 17848–17869, 2022a. Omead Pooladzandi, David Davini, and Baharan Mirzasoleiman. Adaptive second order coresets for data-efficient machine learning. In Proc. Int. Conf. on Machine Learning , pp. 17848–17869, 2022b. Samira Pouyanfar, Saad Sadiq, Yilin Yan, Haiman Tian, Yudong Tao, Maria Presa Reyes, Mei-Ling Shyu, Shu-Ching Chen, and Sundaraja S Iyengar. A survey on deep learning: Algorithms, techniques, and applications. ACM Computing Surveys , 51(5):1–36, 2018. Herbert Robbins and Sutton Monro. A stochastic approximation method. The Annals of Mathematical Statistics , pp. 400–407, 1951. 23 Published in Transactions on Machine Learning Research (02/2026) 
+
+Clément W Royer and Stephen J Wright. Complexity analysis of second-order line-search algorithms for smooth nonconvex optimization. SIAM Journal on Optimization , 28(2):1448–1477, 2018. Abdurakhmon Sadiev, Aleksandr Beznosikov, Abdulla Jasem Almansoori, Dmitry Kamzolov, Rachael Tap-penden, and Martin Takáč. Stochastic gradient methods with preconditioned updates, 2022. URL 
+
+https://arxiv.org/abs/2206.00285 . [retrieved: February 28, 2026]. Victor Sanh, Lysandre Debut, Julien Chaumond, and Thomas Wolf. DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter, 2019. URL https://arxiv.org/abs/1910.01108 . [retrieved: February 28, 2026]. Dasara Shullani, Marco Fontani, Massimo Iuliani, Omar Al Shaya, and Alessandro Piva. Vision: A video and image dataset for source identification. EURASIP Journal on Information Security , 2017:1–16, 2017. Tao Sun, Dongsheng Li, Zhe Quan, Hao Jiang, Shengguo Li, and Yong Dou. Heavy-ball algorithms always escape saddle points. In Proc. Int. Joint Conf. on Artificial Intelligence , pp. 3520–3526, 2019. Nilesh Tripuraneni, Mitchell Stern, Chi Jin, Jeffrey Regier, and Michael I Jordan. Stochastic cubic regulariza-tion for fast nonconvex optimization. In Advances in Neural Information Processing Systems , volume 31, 2018. Ioannis Tsingalis, Christos Korgialas, and Constantine Kotropoulos. Camera model identification using audio and visual content from videos, 2024. URL https://arxiv.org/abs/2406.17916 . [retrieved: February 28, 2026]. Roman Vershynin. High-Dimensional Probability: An Introduction with Applications in Data Science , vol-ume 47. Cambridge University Press, 2018. Alex Wang, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and Samuel Bowman. GLUE: A multi-task benchmark and analysis platform for natural language understanding. In Proc. of Empirical Methods in Natural Language Processing Workshop , pp. 353–355, 2018. Jun-Kun Wang, Chi-Heng Lin, and Jacob Abernethy. Escaping saddle points faster with stochastic momen-tum. In Proc. Int. Conf. on Learning Representations , 2020a. Jun-Kun Wang, Chi-Heng Lin, and Jacob D Abernethy. A modular analysis of provable acceleration via Polyak’s momentum: Training a wide ReLU network and a deep linear network. In Proc. Int. Conf. on Machine Learning , pp. 10816–10827, 2021a. Zhe Wang, Yi Zhou, Yingbin Liang, and Guanghui Lan. A note on inexact gradient and Hessian conditions for cubic regularized newton’s method. Operations Research Letters , 47(2):146–149, 2019. Zhe Wang, Yi Zhou, Yingbin Liang, and Guanghui Lan. Cubic regularization with momentum for non-convex optimization. In Proc. Uncertainty in Artificial Intelligence , pp. 313–322, 2020b. Zhiguo Wang, Jiawei Zhang, Tsung-Hui Chang, Jian Li, and Zhi-Quan Luo. Distributed stochastic con-sensus optimization with momentum for nonconvex nonsmooth problems. IEEE Transactions on Signal Processing , 69:4486–4501, 2021b. Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chaumond, Clement Delangue, Anthony Moi, Pierric Cistac, Tim Rault, Remi Louf, Morgan Funtowicz, et al. Transformers: State-of-the-Art Natural Language Processing. In Proc. Conf. on Empirical Methods in Natural Language Processing: System Demonstrations ,pp. 38–45. Association for Computational Linguistics, 2020. Zhewei Yao, Amir Gholami, Sheng Shen, Mustafa Mustafa, Kurt Keutzer, and Michael Mahoney. Ada-Hessian: An adaptive second order optimizer for machine learning. In Proc. AAAI Conf. on Artificial Intelligence , pp. 10665–10673, 2021. Chenyi Zhang and Tongyang Li. Escape saddle points by a simple gradient-descent based algorithm. In 
+
+Advances in Neural Information Processing Systems , volume 34, pp. 8545–8556, 2021. 24 Published in Transactions on Machine Learning Research (02/2026) 
+
+Yushun Zhang, Congliang Chen, Tian Ding, Ziniu Li, Ruoyu Sun, and Zhiquan Luo. Why transformers need ADAM: A Hessian perspective. In Advances in Neural Information Processing Systems , volume 37, pp. 131786–131823, 2024. Dongruo Zhou and Quanquan Gu. Stochastic recursive variance-reduced cubic regularization methods. In 
+
+Proc. Int. Conf. on Artificial Intelligence and Statistics , pp. 3980–3990, 2020. 25 Published in Transactions on Machine Learning Research (02/2026) 
+
+## A Summary of Dependencies       
+
+> Theorem 1
+> Corollary 1
+> Theorem 2
+> Theorem 3
+> Lemma 2
+> Lemma 1
+> Lemma 3 Lemma 4
+> Lemmata 5, 6 Corollary 2
+> Algorithm 2
+> Lemmata 7, 11, 12, 13
+> Theorem 3 Lemmata 14, 15, 16
+> Lemma 17
+> Lemma 18
+> Theorem 2
+> Corollary 3
+> Lemma 3
+> Lemma 9
+> Lemma 10
+> Lemma 8
+> Lemma 3
+> Lemma 4
+> Lemma 22
+> Lemmata 20, 21
+> Lemma 5
+> Corollary 2
+> Lemma 6
+> Lemma 19
+> Assumption 1 Theorem 3 Lemmata 4, 5, 6, 9 Assumption 3 Lemma 6 Corollary 2
+
+Figure 6: Logical connection between key lemmata, theorems, and corollaries throughout Sections 2 to 4 and Appendices B.1 to B.13. 
+
+## B Supporting Proofs 
+
+B.1 Proof of Lemma 1 
+
+Here, we follow the guidelines in (Conn et al., 2000, Theorem 7.2.1). Let us assume that s∗ is a minimizer of ˆ m(s) subject to ‖s∗‖32 ≤ ξ. Then, there is a Lagrange multiplier ν∗ such that 
+
+ν∗ (‖s∗‖32 − ξ) = 0 ⇔
+
+{
+
+ν∗ = 0 , inactive constraint 
+
+‖s∗‖32 = ξ, active constraint . (52) (52) is the unfolded Complementary Slackness (CS) condition Bertsekas (2017) for the constrained optimiza-tion problem (7). The active case occurs when s∗ lies on the boundary of Ω, i.e., gξ(s∗) = 0 ⇔ ‖ s∗‖32 = ξ
+
+and the inactive case occurs when s∗ lies in the interior of Ω, i.e. gξ(s∗) < 0 ⇔ ‖ s∗‖32 < ξ .
+
+⊲ Active constraint case. We assume that s∗ is a minimizer of ˆ m(s) subject to ‖s∗‖32 = ξ. From the first-order optimality conditions Bertsekas (2017), there exists a Lagrange multiplier ν∗, such that 
+
+∇sLξ(s∗, ν ∗) = 0 ⇔ ∇ s ˆm(s∗) + ν∗ ∇sgξ(s∗) = 0
+
+⇔ ∇ 2f (xk) s∗ + ∇f (xk)
+
+︸ ︷︷ ︸
+
+∇s ˆm(s∗)
+
++ ν∗
+
+2 ‖s∗‖2 s∗ = 0 ⇔
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
+s∗ = −∇ f (xk), (53) 26 Published in Transactions on Machine Learning Research (02/2026) 
+
+where the identity ∇s ‖s‖32 = 3 ‖s‖2 s was used for some s. Let s be a feasible point on the boundary of Ω, i.e., ‖s‖32 = ξ. The Taylor expansion of ˆ m(s) around the minimizer s∗ is ˆm(s) = ˆ m(s∗) + ( s − s∗)T ∇s ˆm(s∗) + 1
+
+2 (s − s∗)T ∇2 
+
+> s
+
+ˆm(s∗) ( s − s∗). (54) From the second line in (53), we also have 
+
+∇s ˆm(s∗) = − ν
+
+2 ‖s∗‖2 s∗. (55) Given (55) and the fact that s and s∗ are feasible points on the boundary of Ω, i.e., ‖s∗‖32 = ξ = ‖s‖32, we have (s − s∗)T ∇s ˆm(s∗) = − ν∗
+
+2 ‖s∗‖2 (s − s∗)T s∗ = ν∗
+
+2 ‖s∗‖2 (‖s∗‖22 − sT s∗)= ν∗
+
+2 ‖s∗‖2
+
+[ 1
+
+2
+
+(
+
+ξ2/3 + ξ2/3)
+
+− sT s∗
+
+]
+
+= ν∗
+
+2 ‖s∗‖2
+
+[ 1
+
+2
+
+(
+
+‖s∗‖22 + ‖s‖22
+
+)
+
+− sT s∗
+
+]
+
+, (56) which implies (s − s∗)T ∇s ˆm(s∗) = ν∗
+
+4 ‖s∗‖2 (s − s∗)T (s − s∗). (57) Combining (54), (57), and ∇2 
+
+> s
+
+ˆm(s∗) = ∇2f (xk) gives ˆm(s) = ˆ m(s∗) + 1
+
+4 ν∗ ‖s∗‖2 (s − s∗)T (s − s∗) + 1
+
+2 (s − s∗)T ∇2f (xk)( s − s∗)= ˆ m(s∗) + 1
+
+2 (s − s∗)T
+
+(
+
+∇2f (xk ) + ν∗
+
+2 ‖s∗‖ I
+
+)
+
+(s − s∗). (58) The second-order optimality condition Bertsekas (2017, Proposition 4.3.1) for z ∈ Rd yields 
+
+zT (
+
+∇2 
+
+> s
+
+ˆm(s∗) + ν∗ ∇2 
+
+> s
+
+gξ(s∗)
+
+)
+
+z ≥ 0, (59) where 
+
+∇2 
+
+> s
+
+ˆm(s∗)
+
+︸ ︷︷ ︸   
+
+> ∇2f(xk)
+
++ν∗ ∇2 
+
+> s
+
+gξ(s∗) = 
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
++ ν∗
+
+2
+
+s∗(s∗)T
+
+‖s∗‖2
+
+(60) such that zT ∇sgξ(s∗) = 1 
+
+> 2
+
+‖s∗‖2 zT s∗ = 0 ⇔ zT s∗ = 0. Since s∗ 6 = 0, we have 
+
+zT
+
+{( 
+
+∇2f (xk ) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
++ ν∗
+
+2
+
+s∗(s∗)T
+
+‖s∗‖2
+
+}
+
+z ≥ 0 ⇔
+
+zT
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
+z + ν∗
+
+2(zT s∗)2
+
+‖s∗‖2
+
+≥ 0.
+
+(61) Using zT s∗ = 0 in (61) we get 
+
+zT
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
+z ≥ 0. (62) This indicates that ∇2f (xk) + ν∗ 
+
+> 2
+
+‖s∗‖2 I is positive semi-definite for vectors in the direction of the null-space of ∇sgξ(s∗), i.e., perpendicular to ∇sgξ(s∗). It remains to consider vectors w ∈ Rd that do not belong to the null-space of ∇sgξ(s∗), i.e., wT ∇sgξ(s∗) 6 =0, and prove that ∇2f (xk) + ν∗ 
+
+> 2
+
+‖s∗‖2 I is also positive semi-definite. To this end, define the line s =
+
+s∗ + α w as a function of α. Because we are interested in w, such that wT ∇sgξ(s∗) 6 = 0, the line intersects the constraint gξ(s) = 0 ⇔ ‖ s‖32 = ξ in two values of α. For α = 0 we have s = s∗ and the aforementioned 27 Published in Transactions on Machine Learning Research (02/2026) 
+
+discussion holds. For α 6 = 0, s satisfies ‖s‖32 = ξ. In the latter case, we may write s−s∗ = α w. From (58), we arrive at ˆm(s) = ˆ m(s∗) + α2
+
+2 wT
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
+w, (63) with α 6 = 0. Given the assumption that s∗ is a minimizer, i.e., ˆ m(s∗) ≤ ˆm(s), (63) implies that ∇2f (xk) +  
+
+> ν∗
+> 2
+
+‖s∗‖2 I is positive semi-definite. So far, we have shown that if s∗ is a minimizer subject to ‖s∗‖32 = ξ,then ∇2f (xk) + ν∗ 
+
+> 2
+
+‖s∗‖2 I is positive semi-definite either in the direction of the null-space of ∇sgξ(s∗)or not. Conversely, if ∇2f (xk) + ν∗ 
+
+> 2
+
+‖s∗‖2 I is positive semi-definite, from (58) and (63), we arrive at ˆm(s∗) ≤ ˆm(s), i.e., s∗ is a minimizer subject to ‖s∗‖32 = ξ.Regarding the uniqueness of the solution, when ∇2f (xk ) + ν∗ 
+
+> 2
+
+‖s∗‖2 I is positive definite, from (58) and (63) we have that ˆ m(s∗) < ˆm(s), which indicates that s∗ is a unique minimizer subject to ‖s∗‖32 = ξ.
+
+⊲ Inactive constraint case. 
+
+In this case, we assume that s∗ is a minimizer of ˆ m(s) subject to ‖s∗‖32 < ξ when ν∗ = 0. From (53) we obtain 
+
+∇2f (xk)s∗ = −∇ f (xk). (64) From the second-order optimality condition Bertsekas (2017, Proposition 4.3.1), it is implied that 
+
+∇2
+
+> ss
+
+Lξ(s∗, ν ∗) is positive semi-definite. Using the latter fact, along with the fact that ∇2
+
+> ss
+
+Lξ(s∗, ν ∗) = 
+
+∇2f (xk) when ν∗ = 0, we get that ∇2f (xk) is positive semi-definite. This, in turn, implies that we are dealing with a convex problem. Conversely, when ∇2f (xk) is positive semi-definite and ν∗ = 0, we can use the Taylor expansion of ˆ m(s)in (54) along with the fact that 
+
+∇s Lξ(s∗, ν ∗) = 0 ⇔ ∇ s ˆm(s∗) + ✘✘✘✘ ✘✘✿ 0
+
+ν∗ ∇sgξ(s∗)
+
+︸ ︷︷ ︸  
+
+> as ν∗= 0
+
+= 0
+
+⇔ ∇ s ˆm(s∗) = 0
+
+(65) to show that ˆm(s∗) ≤ ˆm(s). This implies that s∗ is a minimizer subject to ‖s∗‖32 < ξ . Regarding the uniqueness of the solution, when ∇2f (xk) positive definite and ν∗ = 0, we can solve (58) w.r.t. 
+
+s∗ = −∇ 2f (xk)−1∇f (xk), which indicates that s∗ is a unique minimizer subject to ‖s∗‖32 < ξ .Given that no assumption has been made on the structure of ∇f (x), we can repeat the aforementioned proof using Diag( ∇2f (x)) instead of ∇f (x) to arrive at Corollary 3. 
+
+Corollary 3. A vector s∗ is a minimizer of ˆm(s) subject to ‖s∗‖32 ≤ ξ if and only if satisfies 
+
+(
+
+Diag( ∇2f (xk)) + ν∗
+
+2 ‖s∗‖2 I
+
+)
+
+s∗ = −∇ f (xk), (66) Diag( ∇2f (xk )) + ν∗
+
+2 ‖s∗‖2 I  0, (67) 
+
+and ν∗ (‖s∗‖32 − ξ) = 0 , where ν∗ ≥ 0. If ∇2f (xk) + ν∗ 
+
+> 2
+
+‖s∗‖2 I ≻ 0, then the minimizer s∗ is unique. 
+
+Corollary 3 will be used in the proof of Theorem 3. 
+
+B.2 Proof of Lemma 2 
+
+Starting from the primal optimization problem min 
+
+> s∈Rd
+
+Lξ(s, ν ) (8)
+
+= min   
+
+> s∈Rd‖s‖22=τ
+
+∇f (xk)T s + 1
+
+2 sT ∇2f (xk)s + ν
+
+6
+
+(
+
+τ 3/2 − ξ
+
+)
+
+, (68) 28 Published in Transactions on Machine Learning Research (02/2026) 
+
+where ν is the Lagrange multiplier, the optimal value of the primal problem can be expressed as min 
+
+> s∈Rd
+
+Lξ(s, ν ) (8)
+
+= min   
+
+> s∈Rdτ≥0
+
+max 
+
+> r∈Dν
+
+{
+
+∇f (xk)T s + 1
+
+2 sT ∇2f (xk) s + ν
+
+6
+
+(
+
+τ 3/2 − ξ
+
+)
+
++ rν 
+
+4
+
+(
+
+‖s‖22 − τ
+
+)}
+
+, (69) where r is the Lagrange multiplier associated to the constraint ‖s‖22 = τ (Boyd & Vandenberghe, 2004, Section 5.4). It is essential to highlight that the optimality conditions outlined in Bertsekas (2017, Proposition 4.2.1) explicitly require r to belong to R. However, r is restricted to Dν for reasons that become apparent as the proof unfolds. If the weak duality property is applied to the right-hand side (RHS) of (69), we arrive at min 
+
+> s∈Rd
+
+Lξ(s, ν ) ≥ max 
+
+> r∈Dν
+
+min   
+
+> s∈Rdτ≥0
+
+{
+
+∇f (xk )T s + 1
+
+2 sT ∇2f (xk) s + ν
+
+6
+
+(
+
+τ 3/2 − ξ
+
+)
+
++ rν 
+
+4
+
+(
+
+‖s‖22 − τ
+
+) }
+
+. (70) From the first-order optimality condition Bertsekas (2017), the optimal value in the Left Hand Side (LHS) of (68) w.r.t. s is attained by s that satisfies ∇sLξ(s, ν ) = 0, i.e., 
+
+(
+
+∇2f (xk) + ν
+
+2 ‖s‖2 I
+
+)
+
+s = −∇ f (xk), ν ≥ 0. (71) At this point, we note that (71) differs from (9), because the stationarity of Lξ(s, ν ) is studied w.r.t. s only. Denote the RHS of (70) as 
+
+Lξ(s, ν, r, τ ) = ∇f (xk)T s + 1
+
+2 sT ∇2f (xk) s + ν
+
+6
+
+(
+
+τ 3/2 − ξ
+
+)
+
++ rν 
+
+4
+
+(
+
+‖s‖22 − τ
+
+)
+
+= ∇f (xk)T s + 1
+
+2 sT (
+
+∇2f (xk) + ν r 
+
+2 I
+
+)
+
+s + ν
+
+6
+
+(
+
+τ 3/2 − ξ
+
+)
+
+− rν 
+
+4 τ. (72) We start with the case ν > 0. Solving ∂τ Lξ(s, ν, r, τ ) = 0 w.r.t. τ , we get 
+
+τ ∗ = r2, (73) where r ∈ Dν . Restricting r in Dν , implies that r > 0, which in turn implies τ ∗ > 0, as ‖s‖ = τ ∗. If τ ∗ = 0, we have ‖s‖ = 0, which leads to the trivial solution, i.e., the zero vector. Solving ∇sLξ(s, ν, r, τ ) = 0 w.r.t. 
+
+s, we arrive at 
+
+∇f (xk ) = −
+
+(
+
+∇2f (xk) + ν r 
+
+2 I
+
+)
+
+s. (74) For r ∈ Dν , we get from (74) 
+
+s(ν, r ) = −
+
+(
+
+∇2f (xk) + ν r 
+
+2 I
+
+)−1
+
+∇f (xk), ν > 0, (75) which implies the dependence of s on the variables ν and r. Restricting r in Dν , we achieve the invertibility in (75) when ν > 0. Substituting (73) and (74) in (72), we get 
+
+Lξ(s(ν, r ), ν, r ) = − 1
+
+2 s(ν, r )T (
+
+∇2f (xk ) + ν r 
+
+2 I
+
+)
+
+s(ν, r ) − ν
+
+6 ξ − ν
+
+12 r3. (76) Combining (70) and (76) we get for ν > 0min 
+
+> s∈Rd
+
+Lξ(s, ν ) ≥ max 
+
+> r∈Dν
+
+Lξ(s(ν, r ), ν, r ). (77) The derivative of (76) w.r.t. r is 
+
+∂r Lξ(s(ν, r ), ν, r ) = ν
+
+4
+
+(
+
+‖s(ν, r )‖22 − r2)
+
+. (78) Thus, for any ν > 0, the optimal value in the RHS of (77) is attained for r∗ ∈ Dν that solves 
+
+( ∂Lξ(s(ν, r ), ν, r )
+
+∂r 
+
+)
+
+> r=r∗
+
+= 0 . (79) 29 Published in Transactions on Machine Learning Research (02/2026) 
+
+Using (78) in (79), we have 
+
+r∗ = ‖s(ν, r ∗)‖2 for any ν > 0. (80) Restricting r∗ in Dν , we avoid the trivial solution s(ν, r ∗) = 0 for any ν > 0. This restriction on r in (69) is precisely due to its inclusion in Dν .Using (74) in (8) we attain 
+
+Lξ(s(ν, r ), ν ) = −s(ν, r )T (
+
+∇2f (xk) + ν r 
+
+2 I
+
+)
+
+s(ν, r ) + 1
+
+2 s(ν, r )T ∇2f (xk) s(ν, r ) + ν
+
+6 ‖s(ν, r )‖32 − ν
+
+6 ξ. (81) Adding and subtracting the terms ν 
+
+> 12
+
+r3 and ν r  
+
+> 4
+
+‖s(ν, r )‖22, we get 
+
+Lξ(s(ν, r ), ν ) = −s(ν, r )T (
+
+∇2f (xk) + ν r 
+
+2 I
+
+)
+
+s(ν, r ) + 1
+
+2 s(ν, r )T ∇2f (xk) s(ν, r ) + ν
+
+6 ‖s(ν, r )‖32
+
+− ν
+
+6 ξ +
+
+( ν
+
+12 r3 − ν
+
+12 r3)︸ ︷︷ ︸
+
+> 0
+
++
+
+( ν r 
+
+4 ‖s(ν, r )‖22 − ν r 
+
+4 ‖s(ν, r )‖22
+
+)︸ ︷︷ ︸
+
+> 0
+
+. (82) Next, using (76), with appropriate rearrangements we arrive at 
+
+Lξ(s(ν, r ), ν ) = Lξ(s(ν, r ), ν, r ) + ν
+
+12 r3 + ν
+
+6 ‖s(ν, r )‖32 − ν r 
+
+4 ‖s(ν, r )‖22
+
+= Lξ(s(ν, r ), ν, r ) + ν
+
+12 
+
+(
+
+r3 + 2 ‖s(ν, r )‖32 − 3r ‖s(ν, r )‖22
+
+)
+
+= Lξ(s(ν, r ), ν, r ) + ν
+
+12 (‖s(ν, r )‖2 − r)2 (r + 2 ‖s(ν, r )‖2) . (83) Then, using (78) for r ∈ Dν and ν > 0 we obtain 
+
+Lξ(s(ν, r ), ν ) = Lξ(s(ν, r ), ν, r ) + 4
+
+3ν
+
+(r + 2 ‖s(ν, r )‖2)
+
+(r + ‖s(ν, r )‖2)2
+
+(
+
+∂rLξ(s(ν, r ), ν, r )
+
+)2
+
+. (84) When (79) is satisfied for some ν > 0, Lξ(s(ν, r ), ν, r ) given by (84) is maximized w.r.t. r ∈ Dν . From (84) we have 
+
+Lξ(s(ν, r ∗), ν ) = max 
+
+> r∈Dν
+
+Lξ(s(ν, r ), ν, r ). (85) In order to obtain (12), we need to show 
+
+Lξ(s(ν, r ∗), ν ) = min 
+
+> s∈Rd
+
+Lξ(s, ν ), ν > 0. (86) When r∗ ∈ Dν in (75) and using r∗ = ‖s(ν, r ∗)‖2 for some ν > 0 in (80), we get 
+
+(
+
+∇2f (xk) + ν
+
+2 ‖s(ν, r ∗)‖ I
+
+)
+
+s(ν, r ∗) = −∇ f (xk) (87) which implies that s(ν, r ∗) minimizes Lξ(s, ν ). We conclude with the case ν = 0. In this case, we observe that (12) is easily attained by applying (70) when equality holds, which concludes the proof. 
+
+B.3 Proof of Theorem 1 
+
+From the weak duality in (7) and (12) we have min 
+
+> s∈Rd
+
+max  
+
+> ν≥0
+
+Lξ(s, ν ) ≥ max  
+
+> ν≥0
+
+min 
+
+> s∈Rd
+
+Lξ(s, ν ) (12 )
+
+= max  
+
+> ν≥0
+
+max 
+
+> r∈Dν
+
+Lξ(s(ν, r ), ν, r ) = max   
+
+> r∈Dν,ν ≥0
+
+Lξ(s(ν, r ), ν, r ), (88) where the last term in (88) refers to a joint optimization problem. We start with the case ν > 0. The derivative of (76) w.r.t. ν is 
+
+∂ν Lξ
+
+(s(ν, r ), ν, r ) = r
+
+4 ‖s(ν, r )‖22 − ξ
+
+6 − r3
+
+12 , (89) 30 Published in Transactions on Machine Learning Research (02/2026) 
+
+where r ∈ Dν .To prove that (88) holds with equality and subsequently prove (17), we study the optimality conditions that maximize the RHS of (88). The optimal value in the RHS of (88) w.r.t ν > 0 is achieved by some ν∗ > 0that solves ( ∂Lξ
+
+(s(ν, r ), ν, r )
+
+∂ν 
+
+)
+
+> ν=ν∗
+
+= 0 , (90) for r ∈ Dν . In addition, the optimal value in the RHS of (88) w.r.t r ∈ Dν is achieved if (79) or equiva-lently (80) holds. Given that (80) holds for any ν > 0, without loss of generality, we assume that (80) also holds for ν∗ > 0, i.e., 
+
+r∗ = ‖s(ν∗, r ∗)‖2 for any ν∗ > 0. (91) When (91) holds, from (90) we get 
+
+ξ = 3r∗
+
+2 ‖s(ν∗, r ∗)‖22 − r∗3
+
+2 . (92) Solving (14) w.r.t. ∇f (xk) and substituting in (8) we get 
+
+Lξ(s(ν, r ), ν ) = −s(ν, r )T (
+
+∇2f (xk) + ν r 
+
+2 I
+
+)
+
+s(ν, r )+ 1
+
+2 s(ν, r )T ∇2f (xk ) s(ν, r ) + ν
+
+6
+
+(
+
+‖s(ν, r )‖32 − ξ
+
+)
+
+. (93) Then, applying (92) for r ∈ Dν , we have 
+
+Lξ(s(ν, r ), ν ) = −s(ν, r )T (
+
+∇2f (xk) + ν r 
+
+2 I
+
+)
+
+s(ν, r ) + 1
+
+2 s(ν, r )T ∇2f (xk) s(ν, r )+ 
+
+ν
+
+6 ‖s(ν, r )‖32 − ν r 
+
+4 ‖s(ν, r )‖22 + ν r 3
+
+12 . (94) Adding and subtracting ν r  
+
+> 4
+
+‖s(ν, r )‖22 we obtain 
+
+Lξ(s(ν, r ), ν ) = − 1
+
+2 s(ν, r )T (
+
+∇2f (xk) + ν r 
+
+2 I
+
+)
+
+s(ν, r ) − ν r 
+
+4 ‖s(ν, r )‖22 + ν
+
+6 ‖s(ν, r )‖32 −
+
+ν r 
+
+4 ‖s(ν, r )‖22 + ν r 3
+
+12 . (95) Similarly adding and subtracting νξ  
+
+> 6
+
+and ν r 3 
+
+> 12
+
+reveals the term Lξ(s(ν, r ), ν, r ) yielding 
+
+Lξ(s(ν, r ), ν ) (13 )
+
+= Lξ(s(ν, r ), ν, r ) + ν
+
+( r3
+
+12 + ξ
+
+6 − r
+
+4 ‖s(ν, r )‖22
+
+)
+
++ ν
+
+12 
+
+(
+
+r3 + 2 ‖s(ν, r )‖32 − 3r ‖s(ν, r )‖22
+
+)
+
+.
+
+(96) The terms inside the first bracket of (96) are identified as −∂ν Lξ
+
+(s(ν, r ), ν, r ), yielding 
+
+Lξ(s(ν, r ), ν ) = Lξ(s(ν, r ), ν, r ) − ν ∂ ν Lξ
+
+(s(ν, r ), ν, r ) + ν
+
+12 (‖s(ν, r )‖2 − r)2 (r + 2 ‖s(ν, r )‖2)
+
+> (
+
+89 )
+
+= Lξ
+
+(s(ν, r ), ν, r ) + 4
+
+3ν
+
+(r + 2 ‖s(ν, r )‖2)
+
+(r + ‖s(ν, r )‖2)2
+
+(
+
+∂r Lξ(s(ν, r ), ν, r )
+
+)2
+
+− ν ∂ ν Lξ
+
+(s(ν, r ), ν, r ) (97) and by rearranging terms, we arrive at 
+
+Lξ(s(ν, r ), ν ) = Lξ
+
+(s(ν, r ), ν, r ) − ν ∂ ν Lξ
+
+(s(ν, r ), ν, r ) + 4
+
+3ν
+
+(r + 2 ‖s(ν, r )‖2)
+
+(r + ‖s(ν, r )‖2)2
+
+(
+
+∂r Lξ(s(ν, r ), ν, r )
+
+)2
+
+. (98) When (79) and (90) hold, Lξ
+
+(s(ν, r ), ν, r ) is maximized and from (98), we have 
+
+Lξ
+
+(s(ν∗, r ∗), ν ∗, r ∗) = max 
+
+> ν≥0,r ∈Dν
+
+Lξ(s(ν, r ), ν, r ), (99) 31 Published in Transactions on Machine Learning Research (02/2026) 
+
+where r∗ and ν∗ optimize the RHS of (88). Given r∗, ν∗, and (99), to show (17), we need to prove 
+
+Lξ
+
+(s(ν∗, r ∗), ν ∗, r ∗) = min 
+
+> s∈Rd
+
+max  
+
+> ν≥0
+
+Lξ(s, ν ). (100) To do so, we need to show that the optimal s in the RHS of (100) equals s(ν∗, r ∗) in the LHS of (100). The optimal s in the RHS of (100) satisfies Lemma 1. Thus, by Lemma 1, if s(ν∗, r ∗) satisfies the CS condition 
+
+ν∗ (‖s(ν∗, r ∗)‖32 − ξ) = 0 (101) and the system of equations 
+
+(
+
+∇2f (xk) + ν∗
+
+2 ‖s(ν∗, r ∗)‖ I
+
+)
+
+s(ν∗, r ∗) = −∇ f (xk), (102) then (100) holds. (101) implies ‖s(ν∗, r ∗)‖32 = ξ for ν∗ > 0, which is true because of (91). To prove (102), we apply (87), where without loss of generality we replace ν > 0 with ν∗ > 0, and the proof is complete. Corollary 1, in the paper’s main body, summarizes this proof’s main result. 
+
+B.4 Proof of Theorem 2 
+
+The proof has two parts. The first part deals with the RHS of (22), while the second part deals with the LHS of (22). A similar procedure is followed to that in Kloft et al. (2009, Proposition 1) to prove Theorem 2. 
+
+⊲ First part .Let s∗ be the minimizer of (7) which satisfies the feasibility condition gξ(s∗) ≤ 0. We want to show that when M = ν∗, s∗ is also a minimizer of (5). From Lemma 1, we recall that ν∗ (‖s∗‖32 − ξ) = 0. Consequently, min 
+
+> s∈Rd
+
+max  
+
+> ν≥0
+
+Lξ(s, ν ) = Lξ(s∗, ν ∗) = ˆ m(s∗) + ✘✘✘✘✘ ✘✘✘✿ 0
+
+ν∗
+
+6
+
+(
+
+‖s∗‖32 − ξ
+
+)︸ ︷︷ ︸
+
+> 0 from CS condition
+
+= ˆ m(s∗). (103) From Corollary 1, we have min 
+
+> s∈Rd
+
+max  
+
+> ν≥0
+
+Lξ(s, ν ) = max  
+
+> ν≥0
+
+min 
+
+> s∈Rd
+
+Lξ(s, ν )
+
+︸ ︷︷ ︸
+
+> ψ(ν)
+
+= max  
+
+> ν≥0
+
+ψ(ν) = ψ(ν∗), (104) where ψ(ν) is the dual function of the constrained optimization problem (7). From (103) and (104) we have ˆm(s∗) = ψ(ν∗) = min 
+
+> s∈Rd
+
+Lξ(s, ν ∗) = min 
+
+> s∈Rd
+
+{
+
+ˆm(s) + ν∗
+
+6 
+
+> ≤0,by feasibility
+
+︷ ︸︸ ︷(
+
+‖s‖32 − ξ
+
+) } 
+
+≤ min 
+
+> s∈Rd
+
+ˆm(s) = ˆ m(s∗) + 1
+
+6 ✘✘✘✘ ✘✘✘✘✿ 0
+
+ν∗ (
+
+‖s∗‖32 − ξ
+
+)︸ ︷︷ ︸
+
+> 0 from CS condition
+
+= ˆ m(s∗). (105) Since the first and the last term in (105) are equal, due to the CS condition, the in-between inequalities hold with equality, i.e., min 
+
+> s∈Rd
+
+{
+
+ˆm(s) + ν∗
+
+6
+
+(
+
+‖s‖32 − ξ
+
+)} 
+
+= ˆ m(s∗) + ν∗
+
+6
+
+(
+
+‖s∗‖32 − ξ
+
+)
+
+. (106) Removing the constant term − ν∗ 
+
+> 6
+
+ξ from both sides of (106), we obtain min 
+
+> s∈Rd
+
+mν∗ (s) = ˆ m(s∗) + ν∗
+
+6 ‖s∗‖32(7)
+
+= f (xk) + ∇f (xk )T s∗ 
+
+> k
+
++ 1
+
+2 s∗T ∇2f (xk)s∗ + ν∗
+
+6 ‖s∗‖32(6)
+
+= mν∗ (s∗), (107) which implies that s∗ is also a minimizer of (5) with M = ν∗ and the first part of the proof is complete. 32 Published in Transactions on Machine Learning Research (02/2026) 
+
+⊲ Second part .Let s∗ be a minimizer of (5). We should prove that s∗ is also a minimizer of (7) when ξ = ‖s∗‖32. For such ξ, gξ(s∗) = 0. We prove the second part by contradiction. Suppose, s∗ is not optimal in (7), i.e., there is a feasible point s such that ˆ m(s) ≤ ˆm(s∗). For this feasible point we also have gξ(s) ≤ 0 and 
+
+gξ(s) ≤ gξ(s∗). Then, we get, ˆm(s) ≤ ˆm(s∗) ⇔ ˆm(s) + gξ(s) ≤ ˆm(s∗) + gξ(s∗)
+
+⇔ ˆm(s) + ν
+
+6
+
+(
+
+‖s‖32 − ξ
+
+)
+
+≤ ˆm(s∗) + ν
+
+6
+
+(
+
+‖s∗‖32 − ξ
+
+)
+
+. (108) Adding ν 
+
+> 6
+
+ξ in both sides of the last inequality in (108), using the definition of mM (s) (6) with M = ν,and applying the definition of ˆ m(s) (7), we get 
+
+mν (s) ≤ mν (s∗). (109) This is a contradiction, because s∗ is a minimizer of (5). Hence, s∗ is also a minimizer of (7), when 
+
+gξ(s∗) = 0 ⇔ ξ = ‖s∗‖32, which concludes the second part of the proof. 
+
+B.5 Proof of Lemma 5 
+
+We follow similar lines to the proof of (Kohler & Lucchi, 2017, Lemma 6 and Theorem 7). Note that Bgk
+
+is used instead of Bk to emphasize that the deviation bound in (44) and the sampling scheme in (45) are specifically derived using information associated with gk.The proof resorts to Vector Bernstein’s inequality in Lemma 19 (discussed in Appendix B.13). Let us define the centered gradient 
+
+zsi,k = ∇fi(xk) − ∇ f (xk), (110) where i = 1 , . . . , n = |Bgk|. First, we show 
+
+∥∥zsi,k 
+
+∥∥2 ≤ ‖∇ fi(xk)‖ + ‖∇ f (xk)‖2 ≤ 2Lf , (111) which implies 
+
+∥∥∥zsi,k 
+
+∥∥∥22 ≤ 4L2 
+
+> f
+
+. Accordingly, σ2 ∆
+
+= 4 L2 
+
+> f
+
+in Lemma 19. In (111), we have used 
+
+‖∇ f (xk)‖2 ≤ 1
+
+n
+
+> n
+
+∑
+
+> i=1
+
+‖∇ fi(x)‖2 ≤ 1
+
+n
+
+> n
+
+∑
+
+> i=1
+
+Lf = Lf , (112) where the triangle inequality and Assumption 1 have been applied. Then, we have 
+
+zk = 1
+
+|Bgk|
+
+> n
+
+∑
+
+> i=1
+
+zsi,k = gk − ∇ f (xk). (113) Using (113) in Lemma 19 for n = |Bgk| and σ2 = 4 L2 
+
+> f
+
+yields Pr( ‖gk − ∇ f (xk )‖2 ≥ ǫ) ≤ exp 
+
+(
+
+−| Bgk| ǫ2
+
+32 L2
+
+> f
+
++ 1
+
+4
+
+)
+
+. (114) Next, we require that the probability of the gradient deviation Pr( ‖gk − ∇ f (xk)‖2 ≥ ǫ) is less than some 
+
+δ ∈ (0 , 1], i.e., exp 
+
+(
+
+−| Bgk| ǫ2
+
+32 L2
+
+> f
+
++ 1
+
+4
+
+)
+
+≤ δ ⇔ ǫ ≥ 4√2Lf
+
+√
+
+ln 1 
+
+> δ
+
++ 1
+
+> 4
+
+|Bgk| . (115) To derive (44), we use (115) in ‖gk − ∇ f (xk)‖2 ≥ ǫ, along with Assumption 2 to get 
+
+ǫ ≤ ‖ gk − ∇ f (xk)‖2 ≥ Cg ‖sk‖22 ⇔ 4√2Lf
+
+√
+
+ln 1 
+
+> δ
+
++ 1
+
+> 4
+
+|Bgk| ≤ Cg ‖sk‖22 , (116) 33 Published in Transactions on Machine Learning Research (02/2026) 
+
+which yields (45). Using the complementary probability with δ ∈ (0 , 1], it is implied that 
+
+‖gk − ∇ f (xk)‖2 ≤ ǫ
+
+is fulfilled with high probability 1 − δ when (115) holds. The latter derives (44), and the proof is complete. 
+
+B.6 Proof of Lemma 6 
+
+Following similar lines to Kohler & Lucchi (2017, Lemma 8 and Theorem 9) and using BHk instead of Bk to emphasize that the deviation bound in (46) and the sampling scheme in (47) are obtained using information related to Bk, we get 
+
+Bk
+
+> (
+
+30 )
+
+= 1
+
+S
+
+> S
+
+∑
+
+> s=1
+
+Diag ( Hkvs ⊙ vs) = 1
+
+S
+
+> S
+
+∑
+
+> s=1
+
+Diag 
+
+ 1
+
+|Bgk|
+
+∑
+
+> i∈Bgk
+
+∇2fi(xk )
+
+ vs ⊙ vs
+
+
+
+= 1
+
+S
+
+> S
+
+∑
+
+> s=1
+
+1
+
+|Bgk|
+
+∑
+
+> i∈Bgk
+
+Diag (∇2fi(xk)vs ⊙ vs
+
+) . (117) Let 
+
+Bsi,k = Diag (∇2fi(xk)vs ⊙ vs
+
+) . (118) For A ∈ Rd×d it is known that ‖A‖2 ≤ ‖ A‖F (Golub & Van Loan, 2012). Accordingly, for Bsi,k we obtain 
+
+∥∥Bsi,k 
+
+∥∥2 = ∥∥Diag (∇2fi(xk )vs ⊙ vs
+
+)∥ ∥2 ≤ ∥∥Diag (∇2fi(xk)vs ⊙ vs
+
+)∥ ∥F
+
+=
+
+√√√√ d∑
+
+> j=1
+
+([ ∇2fi(xk )vs]j [vs]j )2 =
+
+√√√√ d∑
+
+> j=1
+
+([ ∇2fi(xk)vs]j )2, (119) where [ vs]j = ±1, yielding 
+
+∥∥Bsi,k 
+
+∥∥2 ≤ ∥∥∇2fi(xk )vs
+
+∥∥2 ≤ ∥∥∇2fi(xk)∥∥2 ‖vs‖2 . (120) For vs ∈ Rd, ‖vs‖2 ≤ √d ‖vs‖∞ Gould et al. (1999), where ‖vs‖∞ = max 1≤i≤d |[vs]i| = 1. This allows us to rewrite (120) as ∥∥Bsi,k 
+
+∥∥2 ≤ √d ∥∥∇2fi(xk)∥∥2 ‖vs‖∞ ≤ √d ∥∥∇2fi(xk)∥∥2 . (121) As a result ∥∥Bsi,k 
+
+∥∥2 ≤ √dL g, (122) because ∥∥∇2fi(xk )∥∥2 ≤ Lg due to Assumption 1. To apply the Matrix Bernstein’s inequality in Lemma 22, define the centered Hessian matrix 
+
+Zsi,k = Bsi,k − Diag( ∇2f (xk)) , (123) where i = 1 , . . . , |BHk |.Let n′ = |BHk |. From Lemma 8, using Assumption 1, and applying the triangle inequality we have 
+
+∥∥Diag( ∇2f (x)) ∥∥2 ≤ ∥∥∇2f (x)∥∥2 ≤ 1
+
+n′
+
+> n′
+
+∑
+
+> i=1
+
+∥∥∇2fi(x)∥∥2 ≤ 1
+
+n′
+
+> n′
+
+∑
+
+> i=1
+
+Lg ≤ Lg, (124) Using (122), (124), and applying triangle inequality yields 
+
+∥∥Zsi,k 
+
+∥∥2 = ∥∥Bsi,k − Diag( ∇2f (x)) ∥∥2 ≤ ∥∥Bsi,k 
+
+∥∥2 + ∥∥Diag( ∇2f (x)) ∥∥2 ≤ (√d + 1) Lg, (125) 34 Published in Transactions on Machine Learning Research (02/2026) 
+
+which implies ∥∥Zsi,k 
+
+∥∥2 ≤ √dL g , (126) as d ≫ 1. Let 
+
+Zk
+
+> ∆
+
+= 1
+
+S
+
+> S
+
+∑
+
+> s=1
+
+1
+
+|BHk |
+
+∑
+
+> i∈BHk
+
+Zsi,k =
+
+> (
+
+123 )(118 )
+
+Bk − Diag( ∇2f (xk)) . (127) Let also 
+
+σ2 ∆ 
+
+=
+
+∥∥∥∥∥∥
+
+> S
+
+∑
+
+> s=1
+
+∑
+
+> i∈BHk
+
+E
+
+[
+
+Zsi,k 
+
+> 2
+
+]∥∥∥∥∥∥2
+
+≤
+
+> S
+
+∑
+
+> s=1
+
+∑
+
+> i∈BHk
+
+∥∥∥E
+
+[
+
+Zsi,k 
+
+> 2
+
+]∥ ∥∥2 ≤
+
+> S
+
+∑
+
+> s=1
+
+∑
+
+> i∈BHk
+
+E
+
+[∥ ∥∥Zsi,k 
+
+> 2
+
+∥∥∥2
+
+]
+
+≤
+
+> S
+
+∑
+
+> s=1
+
+∑
+
+> i∈BHk
+
+E
+
+[∥∥Zsi,k 
+
+∥∥2
+
+∥∥Zsi,k 
+
+∥∥2
+
+]
+
+≤ d S |BHk | L2
+
+> g
+
+, (128) which implies σ2 ≤ d S |BHk | L2
+
+> g
+
+. Also let K ∆
+
+= √d L g. Using the latter in Lemma 22 implies 
+
+P
+
+∥∥∥∥∥∥
+
+> S
+
+∑
+
+> s=1
+
+∑
+
+> i∈BHk
+
+Zsi,k 
+
+∥∥∥∥∥∥2
+
+≥ t
+
+ ≤
+
+
+
+2d exp 
+
+( 3 
+
+> 8
+> −t2
+> dS|BHk|L2
+> g
+
+)
+
+, t ≤ σ2
+
+> √dL g
+
+2d exp 
+
+( 3
+
+> 8
+> −t√dL g
+
+)
+
+, t > σ2
+
+> √dL g
+
+. (129) Using (127) in (129) for t ≤ σ2
+
+> √dL g
+
+and setting ǫ = t  
+
+> |BHk|S
+
+yields Pr( ∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≥ ǫ) ≤ 2d exp 
+
+− 3
+
+8 S|BHk |
+
+(
+
+ǫ
+
+√dL g
+
+)2 . (130) For some δ ∈ (0 , 1], we are interested in the upper bound Pr( ∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≥ ǫ) ≤ δ, (131) which implies 2d exp 
+
+(
+
+− 3
+
+8 S|BHk | ǫ2
+
+dL 2
+
+> g
+
+)
+
+≤ δ ⇔ ǫ ≥ √dL g
+
+√
+
+ln 2d
+
+> δ
+
+S|BHk | . (132) Similarly, using (127) in (129) for t > σ2
+
+> √dL g
+
+and setting ǫ = t  
+
+> |BHk|S
+
+yields Pr( ∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≥ ǫ) ≤ 2d exp 
+
+(
+
+− 3
+
+8 S|BHk | ǫ
+
+√dL g
+
+)
+
+. (133) Again, we are interested in the probability Pr( ∥∥Bk − Diag( ∇2f (xk)) ∥∥2) ≥ ǫ) is less than some δ ∈ (0 , 1], i.e., 2d exp 
+
+(
+
+− 3
+
+8 S|BHk | ǫ
+
+√dL g
+
+)
+
+≤ δ ⇔ ǫ ≥ √dL g
+
+ln 2d
+
+> δ
+
+S|BHk | . (134) We have that for x ≤ 1 that e−x ≤ e−x2
+
+. Thus, for d ≫ 1 we have ǫ√dL g
+
+< 1 and the tightest upper bound of Pr( ∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≥ ǫ) is (133). (134) indicates how large ǫ must be for the probability of a deviation in (133) to be at most δ, depending on the number of Hutchinson samples S, the mini-batch size 
+
+|BHk |, the parameter dimension d, and the smoothness constant Lg. Next, using (134) in Assumption 3, we get 
+
+ǫ ≤ ∥∥Bk − Diag( ∇2f (xk )) ∥∥2 ≤ CB ‖sk‖2 ⇔ √dL g
+
+ln 2d
+
+> δ
+
+S|BHk | ≤ CB ‖sk‖2 ⇔ | BHk | ≥ √dL g
+
+ln 2d
+
+> δ
+
+S ‖sk‖2 CB
+
+, (135) 35 Published in Transactions on Machine Learning Research (02/2026) 
+
+which yields (47). Using the complementary bound Pr( ∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≤ ǫ) ≥ 1 − δ, 
+
+it is implied that ∥∥Bk − Diag( ∇2f (xk)) ∥∥2 ≤ ǫ
+
+is fulfilled with high probability 1 − δ when (134) holds. The latter is (46) and the proof is complete. 
+
+B.7 Proof of Lemma 7 
+
+In the following, gk and Bk are utilized instead of ∇f (xk ) and ∇2f (xk). This substitution is performed because gk and Bk are directly used in Algorithms 1 and 2, both of which operate on data batches. In this manner, s(ν, r ) is now defined in terms of Bk and gk, rather than Diag( ∇2f (xk)) and ∇f (xk), respectively. To obtain the minimizer s(ν, r ) in (20), we need to solve w.r.t. ν and r the system of equations 
+
+∂r Lξ(ν, r ) = 0 and ∂ν Lξ(ν, r ) = 0 . (136) The solution ( ν, r ) in (136) can also be computed sequentially. We start with the case ν > 0. In this case, we can first solve ∂r Lξ(ν, r ) = 0 w.r.t. r ∈ Dν . Then, the optimal r, can be used to solve ∂ν Lξ(ν, r ) = 0 w.r.t. ν to obtain the optimal ν > 0. Solving ∂r Lξ(ν, r ) = 0 w.r.t. r, yields 
+
+ν
+
+4
+
+{[
+
+−gTk
+
+(
+
+Bk + ν r 
+
+2 I
+
+)−1] [ 
+
+−
+
+(
+
+Bk + ν r 
+
+2 I
+
+)−1
+
+gk
+
+]}
+
+− ν r 2
+
+4 = 0 (18 )
+
+⇔ ν (‖s(ν, r )‖22 − r2) = 0 . (137) For s(ν, r ) 6 = 0, r ∈ Dν , and ν > 0. Fom (137), we obtain the root 
+
+r = ‖s(ν, r )‖2 . (138) Then, the optimal ν can be computed by solving ∂ν Lξ(ν, r ) (13 )
+
+= 0 w.r.t. ν, i.e., 
+
+r
+
+4
+
+{[
+
+−gTk
+
+(
+
+Bk + ν r 
+
+2 I
+
+)−1] [ 
+
+−
+
+(
+
+Bk + ν r 
+
+2 I
+
+)−1
+
+gk
+
+]}
+
+− ξ
+
+6 − r3
+
+12 = 0 , (139) which is rewritten as 
+
+r
+
+4 ‖s(ν, r )‖22 − ξ
+
+6 − r3
+
+12 = 0 (140) for some ξ > 0. Substituting (138) in (140), the optimal r is given by 
+
+r = 3
+
+√ξ. (141) Using (141) in (140), the optimal ν can be computed by solving 
+
+ω(ν, r ) = ‖s(ν, r )‖2 − 3
+
+√ξ = 0 , (142) w.r.t. ν for r fixed. It is shown in Conn et al. (2000, Section 7.3.3) that instead of solving (142), it is more preferable to solve 
+
+φ(ν, r ) = 1
+
+‖s(ν, r )‖2
+
+− 1
+
+> 3
+
+√ξ = 0 . (143) We conclude with the case ν = 0. In this case, the minimizer s(ν, r ) in (20) is handled by Algorithm 2, which concludes the proof. 36 Published in Transactions on Machine Learning Research (02/2026) 
+
+B.8 Preliminaries for Lemmata 6 and 9 
+
+Lemma 8. For M ∈ Rd×d and Diag( M) we have 
+
+‖M‖2 ≥ ‖ Diag( M)‖2 . (144) 
+
+Proof. First, we prove 
+
+‖Diag( M)‖2 = max  
+
+> k
+
+| Diag( M)kk |, (145) Let d∗ = max k Diag( M)kk . Then, from the definition of the spectral norm, we have 
+
+‖Diag( M)‖2 = max   
+
+> ‖x‖2=1
+
+‖Diag( M)x‖2 ≤ max  
+
+> ‖x‖2=1
+
+√∑
+
+> k
+
+(Diag( M)kk xk)2 ≤ | d∗| max  
+
+> ‖x‖2=1
+
+√∑
+
+> k
+
+x2
+
+> k
+
+, (146) which leads to 
+
+‖Diag( M)‖2 ≤ | d∗|. (147) Let em be the vector of all zeros except a 1 in the mth position, where m = arg max i Diag( M)ii . Then, 
+
+‖Diag( M)‖2 = max   
+
+> ‖x‖2=1
+
+‖Diag( M)x‖2 ≥ ‖ Diag( M)em‖2 , (148) which leads to 
+
+‖Diag( M)‖2 ≥ | d∗|. (149) (147) and (149) imply (145). From the definition of the spectral norm, we have 
+
+‖M‖2 = max  
+
+> ‖x‖2=1
+
+√
+
+xT MT Mx 
+
+‖x‖22
+
+= max  
+
+> ‖x‖2=1
+
+‖Mx ‖2
+
+‖x‖2
+
+= max  
+
+> x,y6=0
+
+|xT My |
+
+‖x‖2 ‖y‖2
+
+≥ | eTj Me i| = |Mij |. (150) Restricting (150) in the diagonal elements of M gives 
+
+‖M‖2 ≥ max  
+
+> i
+
+| Diag( M)ii |, (151) which using (145) leads to 
+
+‖M‖2 ≥ ‖ Diag( M)‖2 , (152) which is (144). This inequality becomes an equality when M is a diagonal matrix. Therefore, (144) provides the tightest possible bound in this case. 
+
+B.9 Lemmata 9 and 10 
+
+Given the Lipschitz continuity assumption of ∇2f (x), Lemma 9 introduces the Lipschitz continuity of Diag( ∇2f (x)). Lemma 9 is used in Lemmata 10 and 17. Lemma 10 is an adaptation of Nesterov & Polyak (2006, Lemma 1) tailored to fit the context of this analysis. Lemma 10 is used in Lemmata 14, 15, and 16. 
+
+Lemma 9. If ∇2f (x) is Lipschitz continuous in F , Diag( ∇2f (x)) is also Lipschitz continuous, i.e., 
+
+∥∥Diag( ∇2f (x)) − Diag( ∇2f (y)) ∥∥2 ≤ LH ‖x − y‖2 . (153) 
+
+Proof. The proof of the lemma is easily obtained by combining the Lipschitz continuity of the Hessian matrix in Assumption 1 (see also Remark 1) with Lemma 8 in Appendix B.8. In Lemma 8, we use M =
+
+∇2f (x) − ∇ 2f (y). 
+
+37 Published in Transactions on Machine Learning Research (02/2026) 
+
+Lemma 10. For any x and y in F , we have 
+
+∥∥∇f (y) − ∇ f (x) − Diag( ∇2f (x))( y − x)∥∥2 ≤ LH
+
+2 ‖y − x‖2 (154) 
+
+and ∣∣∣f (y) − f (x) − ∇ f (x)T (y − x) − 1
+
+2 (y − x)T Diag( ∇2f (x))( y − x)
+
+∣∣∣ ≤ LH
+
+6 ‖y − x‖32 . (155) 
+
+Proof. Nesterov & Polyak (2006, Lemma 1) does not make any assumption on the structure of ∇2f (x). The only assumption to derive Nesterov & Polyak (2006, Lemma 1) is the Lipschitz continuity of ∇2f (x). Thus, given Lemma 9 and following the proof guidelines in Nesterov & Polyak (2006, Lemma 1), (154) and (155) are easily derived, which concludes the proof. 
+
+B.10 Details for Algorithm 2 
+
+Here, Algorithm 2 is discussed when Bk and gk are utilized instead of ∇f (xk) and ∇2f (xk), respectively. This is done because Bk and gk are directly involved in the application of Algorithm 1, which operates on data batches. In this manner, s(ν, r ) and φ(ν, r ) are now defined with respect to Bk and gk, rather than Diag( ∇2f (xk)) and ∇f (xk), respectively. Lemma 11 provides some useful properties of φ(ν, r ) exploited in line 18 of Algorithm 2. Lemma 11 is used in Lemma 12 which shows that for some r ∈ Dν , Newton-Raphson updates in line 18 of Algorithm 2 converge to the roots of φ(ν, r ) = 0 w.r.t. ν > 0. However, the Newton-Raphson method may diverge on its own, and appropriate safeguards are necessary to prevent this. These safeguards are adopted from (Conn et al., 2000, Algorithm 7.3.6) in Algorithm 2. Lemma 13 stems from Conn et al. (2000, Lemma 7.3.5) adapted to the analysis here. Lemma 13 provides the termination rule used in Algorithm 2. 
+
+Lemma 11. Let ˜Hk(ν, r ) ∆
+
+= Bk + ν r 
+
+2 I. (156) 
+
+Suppose gk 6 = 0 and ν r > max {0, −2 λd
+
+(Bk
+
+)} for some ν > 0 and r > 0. Then, the function φ(ν, r ) is strictly increasing and concave w.r.t. ν and fixed r. The first- and second-order partial derivatives of φ(ν, r )
+
+w.r.t. ν are 
+
+∂ν φ(ν, r ) = − ∂ν s(ν, r )T s(ν, r )
+
+‖s(ν, r )‖32
+
+> 0 (157) 
+
+and 
+
+∂2 
+
+> ν
+
+φ(ν, r ) = 3 
+
+{ ( ∂ν s(ν, r )T s(ν, r ))2
+
+‖s(ν, r )‖52
+
+− ‖∂ν s(ν, r )‖22 ‖s(ν, r )‖22
+
+‖s(ν, r )‖52
+
+}
+
+≤ 0, (158) 
+
+respectively, with 
+
+∂ν s(ν, r ) = − r
+
+2 ˜H−1 
+
+> k
+
+(ν, r ) s(ν, r ). (159) 
+
+Proof. Following similar lines to Conn et al. (2000, Lemma 7.3.1), the first-order partial derivative of φ(ν, r )(51) w.r.t. ν is 
+
+∂ν φ(ν, r ) = ∂ν
+
+(s(ν, r )T s(ν, r ))− 1 
+
+> 2
+
+−
+
+   ✒
+
+0
+
+∂ν
+
+1
+
+> 3
+
+√ξ
+
+= − 1
+
+2 ‖s(ν, r )‖−32
+
+> d
+
+∑
+
+> ℓ=1
+
+2 ∂ν (s(ν, r )) ℓ (s(ν, r )) ℓ = − ∂ν s(ν, r )T s(ν, r )
+
+‖s(ν, r )‖32
+
+, (160) which is (157). The second-order partial derivative of φ(ν, r ) w.r.t. ν reads 38 Published in Transactions on Machine Learning Research (02/2026) 
+
+∂2 
+
+> ν
+
+φ(ν, r ) = −∂ν
+
+{(s(ν, r )T s(ν, r ))− 3 
+
+> 2
+
+(∂ν s(ν, r )T s(ν, r ))}
+
+=
+
+{
+
+3
+
+(∂ν s(ν, r )T s(ν, r ))2
+
+‖s(ν, r )‖52
+
+− ∂2 
+
+> ν
+
+s(ν, r )T s(ν, r ) + ‖∂ν s(ν, r )‖22
+
+‖s(ν, r )‖32
+
+}
+
+. (161) The first-order partial derivative of 
+
+s(ν, r ) (18 )
+
+= − ˜H−1 
+
+> k
+
+(ν, r ) gk (162) w.r.t. ν is 
+
+∂ν s(ν, r ) = r
+
+2 ˜H−2 
+
+> k
+
+(ν, r ) gk
+
+> (
+
+162 )
+
+= − r
+
+2 ˜H−1 
+
+> k
+
+(ν, r ) s(ν, r ), (163) which is (159). From (163) and the assumptions about ν and r, i.e., ν r > max {0, −2 λd
+
+(Bk
+
+)} with ν > 0and r > 0, we obtain 
+
+∂ν s(ν, r )T s(ν, r ) = − r
+
+2 s(ν, r )T ˜H−1 
+
+> k
+
+(ν, r ) s(ν, r ) < 0. (164) Using (164) in (160), we infer that φ(ν, r ) is strictly increasing w.r.t. ν. The second derivative of (162) w.r.t. 
+
+ν is given by 
+
+∂2 
+
+> ν
+
+s(ν, r ) = r2
+
+2 ˜H−2 
+
+> k
+
+(ν, r ) s(ν, r ). (165) From (162) and (165) we get 
+
+∂2 
+
+> ν
+
+s(ν, r )T s(ν, r ) = 2 ‖∂ν s(ν, r )‖22 . (166) The substitution of (166) in (161) yields 
+
+∂2 
+
+> ν
+
+φ(ν, r ) = 3 
+
+{ ( ∂ν s(ν, r )T s(ν, r ))2
+
+‖s(ν, r )‖52
+
+− ‖∂ν s(ν, r )‖22 ‖s(ν, r )‖22
+
+‖s(ν, r )‖52
+
+}
+
+, (167) which is (158). The concavity of φ(ν, r ), w.r.t. ν, i.e., ∂2 
+
+> ν
+
+φ(ν, r ) ≤ 0, follows by applying the Cauchy-Schwartz inequality, i.e., (∂ν s(ν, r )T s(ν, r ))2 ≤ ‖ ∂ν s(ν, r )‖22 ‖s(ν, r )‖22, in (167), which completes the proof. 
+
+Lemma 12. Let φ(ν, r ) satisfy Lemma 11. Suppose that for some ν > 0 and r > 0 we have ν r > 
+
+max {0, −2 λd
+
+(Bk
+
+)} and φ(ν, r ) < 0. Then for a fixed r, the Newton iterates 
+
+ν+ ← ν − φ(ν, r )
+
+∂ν φ(ν, r ) , (168) 
+
+will still satisfy φ(ν+, r ) < 0 and convergence monotonically toward the root ν∗ of φ(ν, r ) = 0 w.r.t. ν. The convergence of the Newton iterations w.r.t. ν is at least linear and ultimately quadratic. Proof. Following similar lines to Conn et al. (2000, Lemma 7.3.2), we study the convergence of the Newton iterations in (168) w.r.t. ν when r is fixed. Suppose that φ(ν, r ) satisfies Lemma 11, which implies ∂ν φ(ν, r ) >
+
+0. Then, from the Newton iteration w.r.t. ν in (168), we have 
+
+φ(ν, r ) + ( ν+ − ν) ∂ν φ(ν, r ) = 0 . (169) According to Lemma 11, φ(ν, r ) is concave, i.e., ∂2 
+
+> ν
+
+φ(ν, r ) ≤ 0. Combining the concavity of φ(ν, r ) with (169) we get 
+
+φ(ν+, r ) < φ (ν, r ) + ( ν+ − ν) ∂ν φ(ν, r ) = 0 which proves that φ(ν, r ) < 0 is inherited by all Newton iterations w.r.t. ν. Let ( ν∗, r ) be the root of 
+
+φ(ν, r ). In addition, let ( νI , r ) be an intermediate point between points ( ν, r ) and ( ν∗, r ), i.e., ( νI , r ) = 
+
+α (ν, r ) + (1 − α) ( ν∗, r ) with α ∈ (0 , 1). Then, the Taylor expansion about ν∗, r reads as 
+
+φ(ν, r ) = ✘✘✘✘ ✿ 0
+
+φ(ν∗, r ) + ∂ν φ(νI , r )( ν − ν∗) + 1
+
+2 ∂2 
+
+> ν
+
+φ(νI , r )( ν − ν∗)2 + O ((ν − ν∗)3) . (170) 39 Published in Transactions on Machine Learning Research (02/2026) 
+
+We assume that ( ν, r ) is close to ( ν∗, r ). This proximity implies that the last term in equation (170) becomes even closer to zero, and consequently, it is omitted from the subsequent analysis. The assumption that ( ν, r )is in proximity to ( ν∗, r ) ensures the convergence of the Newton method (Bertsekas, 2017). This proximity is achieved by utilizing the safeguarded Newton Algorithm 2. A comprehensive analysis of the safeguarded Newton methodology can be found in (Conn et al., 2000). Subtracting ν∗ from both sides of (168), i.e., 
+
+ν+ − ν∗ = ( ν − ν∗) − φ(ν, r )
+
+∂ν φ(ν, r ) (171) and substituting (170) in (171), we arrive at 
+
+ν+ − ν∗ =
+
+(
+
+1 − ∂ν φ(νI , r )
+
+∂ν φ(ν, r )
+
+)
+
+(ν − ν∗) − 1
+
+2
+
+∂2 
+
+> ν
+
+φ(νI , r )
+
+∂ν φ(ν, r ) (ν − ν∗)2. (172) We examine the following cases: 1. If 
+
+∣∣∣1 − ∂ν φ(νI ,r ) 
+
+> ∂νφ(ν,r )
+
+∣∣∣ > 1, (172) diverges. 2. If 
+
+∣∣∣1 − ∂ν φ(νI ,r ) 
+
+> ∂νφ(ν,r )
+
+∣∣∣ < 1, we have at least linear convergence in (172). 3. If 
+
+∣∣∣1 − ∂ν φ(νI ,r ) 
+
+> ∂νφ(ν,r )
+
+∣∣∣ = 0, we have quadratic convergence as the linear term vanishes in (172). From the concavity of φ(ν, r ) w.r.t. ν, we have that ∂ν φ(ν, r ) is decreasing, which implies that 
+
+∣∣∣1− ∂ν φ(νI ,r ) 
+
+> ∂νφ(ν,r )
+
+∣∣∣ <
+
+1. Thus, the Newton iterations w.r.t. ν in (168) converge at least linearly and ultimately quadratically, which completes the proof. 
+
+Remark 3. Lemma 11 implies that ∂ν φ(ν, r ) > 0. Suppose that for some ν and r we have φ(ν, r ) < 0, i.e., Lemma 12 holds. Then, by (168) we have that ν+ > ν . Given ν+ > ν and the initial values of r and ν in lines 2, 4, and 6 of Algorithm 2, the optimal r and ν always satisfy Bk + ν r  
+
+> 2
+
+I ≻ 0.
+
+Lemma 13. For some ν > 0 and r > 0, suppose ν r > max {0, −2 λd(Bk)} and 
+
+| ‖ s(ν, r )‖2 − ξ 1 
+
+> 3
+
+| ≤ κeasy ξ 1 
+
+> 3
+
+(173) 
+
+with κeasy ∈ (0 , 1) . Then 
+
+ˆm(s(ν, r )) ≤ (1 − κeasy )2 ˆm(s∗
+
+> k
+
+), (174) 
+
+where s∗ 
+
+> k
+
+is the minimizer of (7) that satisfies Lemma 1, and 
+
+ˆm(s) ∆
+
+= F (xk) + gTk s + 1
+
+2 sT Bk s. (175) 
+
+Proof. A similar proof to that in Conn et al. (2000, Lemma 7.3.5) can be devised for the constraint ‖s‖32 ≤
+
+ξ.
+
+B.11 Preliminaries for Theorem 3 
+
+Here, Nesterov & Polyak (2006, Lemma 1), Nesterov & Polyak (2006, Lemma 2), Nesterov & Polyak (2006, Lemma 3), Nesterov & Polyak (2006, Lemma 4), and Nesterov & Polyak (2006, Lemma 5), correspond to Lemmata 10, 14, 15, 16 and 18, respectively, proven for Diag( ∇2f (x)) in place of ∇2f (x). In addition, Lemma 17 is proven providing details not included in (Nesterov & Polyak, 2006, Section 2). 40 Published in Transactions on Machine Learning Research (02/2026) 
+
+Let the level set 
+
+L(c) = {x ∈ Rd : f (x) ≤ c}, (176) and assume that F ⊆ L(f (x0)). Let ˆf(x, y) = f (x) + ∇f (x)T (y − x) + 1
+
+2 (y − x)T Diag( ∇2f (x))( y − x) + M
+
+6 ‖y − x‖32 , (177) 
+
+TM (x) = arg min 
+
+> y
+
+ˆf (x, y), (178) and ¯fM (x) = min 
+
+> y
+
+ˆf (x, y). (179) That is, ¯fM (x) = ˆf (x, T M (x)) . (180) To compute TM (x) in (178), we solve ∇y ˆf(x, y) = 0, i.e., 
+
+∇f (x) + Diag( ∇2f (x))( y − x) + M
+
+2 ‖y − x‖2 (y − x) = 0. (181) Let rM (x) = ‖x − TM (x)‖2. For y = TM (x) in (181), if we multiply both sides of (181) by TM (x) − x we arrive at 
+
+∇f (x)T (TM (x) − x) + ( TM (x) − x)T Diag( ∇2f (x))( TM (x) − x) + M
+
+2 ‖(TM (x) − x)‖32 = 0 . (182) 
+
+Lemma 14. For any x ∈ F with f (x) ≤ f (x0), we have 
+
+∇f (x)T (x − TM (x)) ≥ 0. (183) 
+
+Moreover, if M ≥ 2 
+
+> 3
+
+LH and x ∈ int F , then 
+
+TM (x) ∈ L(f (x)) . (184) 
+
+Proof. Using Corollary 3, we obtain 
+
+Diag( ∇2f (x)) + M
+
+2 ‖x − y‖2 I  0, (185) which when pre-multiplied by (TM (x) − x)T and post-multiplied by (TM (x) − x) yields 
+
+(TM (x) − x)T Diag( ∇2f (x))( TM (x) − x) + M
+
+2 ‖TM (x) − x‖32 ≥ 0. (186) Then, combining (182) with (186) we arrive at (183). 
+
+Assumption and Contradiction. We now show that TM (x) ∈ L(f (x)) . Following the approach of Nesterov & Polyak (2006, Lemma 2), we proceed by contradiction by assuming TM (x) /∈ L(f (x)) for 
+
+M ≥ 2 
+
+> 3
+
+LH . We then show that this assumption cannot hold, leading to a contradiction. Thus, we conclude that TM (x) ∈ L(f (x)) .By assuming TM (x) /∈ L(f (x)) , there exist 
+
+yα = (1 − α) x + α T M (x), (187) with α ∈ [0 , 1] , such that 
+
+f (yα) > f (x). (188) Using the upper bound of (155) with y = yα we obtain 41 Published in Transactions on Machine Learning Research (02/2026) 
+
+f (yα) ≤ f (x) + ∇f (x)T (yα − x) + 1
+
+2 (yα − x)T Diag( ∇2f (x))( yα − x) + LH
+
+6 ‖yα − x‖32(187 )
+
+=
+
+f (x) + α∇f (x)T (TM (x) − x) + α2
+
+2 (TM (x) − x)T Diag( ∇2f (x))( TM (x) − x) + α3LH
+
+6 ‖TM (x) − x‖32 ,
+
+(189) which using (182) implies 
+
+f (yα) − f (x) ≤ − 
+
+(
+
+α − α2
+
+2
+
+)
+
+∇f (x)T (x − TM (x)) 
+
+︸ ︷︷ ︸ 
+
+> ≥0 as α∈[0 ,1] and (
+
+195 )
+
+− α2
+
+2
+
+( M
+
+2 − αL H
+
+3
+
+)
+
+‖TM (x) − x‖32 . (190) For α ≤ 1, we have M
+
+2 − αL H
+
+3 ≥ M
+
+2 − LH
+
+3 , (191) which by using our assumption M ≥ 2 
+
+> 3
+
+LH it is implied that f (yα) ≤ f (x) in (190). However, f (yα) ≤ f (x)
+
+contradicts (188) for M ≥ 2 
+
+> 3
+
+LH , which in turn leads to (184), and the proof is complete. 
+
+Lemma 15. If TM (x) ∈ F then 
+
+‖∇ f (TM (x)) ‖2 ≤ LH + M
+
+2 r2 
+
+> M
+
+(x). (192) 
+
+Proof. Setting y = TM (x) in (154) and (181) we get 
+
+∥∥∇f (TM (x)) − ∇ f (x) − Diag( ∇2f (x))( TM (x) − x)∥∥2 ≤ LH
+
+2 ‖TM (x) − x‖2 (193) and ∥∥∇f (x) + Diag( ∇2f (x))( TM (x) − x)∥∥2 = M
+
+2 ‖TM (x) − x‖22 = M
+
+2 r2 
+
+> M
+
+(x), (194) respectively. Then, combining (193) with (194) and the definition of the reverse triangle inequality, we arrive at (192) and the proof is complete. 
+
+Lemma 16. For any x ∈ F we have 
+
+¯fM (x) ≤ min 
+
+> y
+
+( M + LH
+
+6 ‖y − x‖32 + f (y)
+
+)
+
+(195) 
+
+and 
+
+f (x) − ¯fM (x) ≥ M
+
+12 r3 
+
+> M
+
+(x). (196) 
+
+Moreover, if M ≥ LH , then TM (x) ∈ F and 
+
+f (TM (x)) ≤ ¯fM (x). (197) 
+
+Proof. In the following, we have used the relaxed condition M ≥ LH as M ≥ LH > 2 
+
+> 3
+
+LH . Note that the relaxed condition M ≥ LH also satisfies Lemma 14. From the lower and upper bound of (155) we have 
+
+ˆf(x, y) ≤ M + LH
+
+6 ‖y − x‖32 + f (y) (198) and 
+
+f (y) ≤ ˆf (x, y), (199) respectively. Thus, we have 
+
+f (y) ≤ ˆf(x, y) ≤ M + LH
+
+6 ‖y − x‖32 + f (y). (200) 42 Published in Transactions on Machine Learning Research (02/2026) 
+
+Minimizing (200) all sides w.r.t. y yields 
+
+min  
+
+> y
+
+f (y) ≤ min 
+
+> y
+
+ˆf (x, y) ≤ min 
+
+> y
+
+( M + LH
+
+6 ‖y − x‖32 + f (y)
+
+)
+
+. (201) which in turn using y = TM (x) yields 
+
+f (TM (x)) ≤ ˆf (x, T M (x)) ≤ min 
+
+> y
+
+( M + LH
+
+6 ‖y − x‖32 + f (y)
+
+)
+
+. (202) Additionally, using (180) in (202) we obtain (195). Note that (195) aligns with the results presented in Nesterov & Polyak (2006, Lemma 4), with the distinction that Diag( ∇2f (x)) is used in place of ∇2f (x).From the LHS of (202) and (177) we obtain 
+
+f (x) − f (TM (x)) ≥ f (x) − ˆf(x, T M (x)) = −∇ f (x)T (TM (x) − x) − 1
+
+2 (TM (x) − x)T Diag( ∇2f (x))( TM (x) − x) − M
+
+6 ‖TM (x) − x‖32 . (203) In addition, from (182) we have 
+
+− 1
+
+2 (TM (x) − x)T Diag( ∇2f (x))( TM (x) − x) = 1
+
+2 ∇f (x)T (TM (x) − x) + M
+
+4 ‖TM (x) − x‖32 , (204) which combined with (203) and (180) gives 
+
+f (x) − ¯fM (x) ≥ − 1
+
+2 ∇f (x)T (TM (x) − x) + M
+
+12 r3 
+
+> M
+
+(x), (205) which in turn combined with (183) yields (196). To conclude the proof, setting y = TM (x) in the LHS of (200) and using (180) we obtain (197). 
+
+Lemma 17. If x ∈ F then 
+
+μMi (xi+1 ) ∆
+
+= max 
+
+{√ 2
+
+LH + Mi
+
+‖∇ f (xi+1 )‖2, − 2
+
+2LH + Mi
+
+λmin (Diag( ∇2f (xi+1 ))) 
+
+}
+
+. (206) 
+
+Proof. From (192) we have √ 2
+
+LH + M ‖∇ f (xi+1 )‖2 ≤ ‖ xi+1 − xi‖2 . (207) (185) implies 
+
+Diag( ∇2f (x)) − LH ‖x − y‖2 I + M
+
+2 ‖x − y‖2 I  − LH ‖x − y‖2 I ⇔
+
+λmin 
+
+(Diag( ∇2f (x)) ) − LH ‖x − y‖2 ≥ − 
+
+( M
+
+2 + LH
+
+)
+
+‖x − y‖2 , (208) which by setting y = xt+1 and x = xt yields 
+
+λmin 
+
+(Diag( ∇2f (xt)) ) − LH ‖xt − xt+1 ‖22 ≥ − 
+
+( M
+
+2 + LH
+
+)
+
+‖xt − xt+1 ‖2 . (209) Combining Nesterov (2018, Corrolary 1.2.3) with Lemma 9 for y = xt+1 and x = xt yields 
+
+λmin 
+
+(Diag( ∇2f (xt+1 )) ) ≥ λmin 
+
+(Diag( ∇2f (xt)) ) − LH ‖xt − xt+1 ‖2 , (210) which when combined with (209) gives 
+
+λmin 
+
+(Diag( ∇2f (xt+1 )) ) ≥ − 
+
+( M
+
+2 + LH
+
+)
+
+‖xt − xt+1 ‖2 , (211) 43 Published in Transactions on Machine Learning Research (02/2026) 
+
+and, in turn, implies 
+
+− 2
+
+2LH + M λmin 
+
+(Diag( ∇2f (xt+1 )) ) ≤ ‖ xt − xt+1 ‖2 , (212) In order to obtain an (ǫg , ǫ H )-stationary point, we need ‖xt − xt+1 ‖2 ≤ ǫg and ‖xt − xt+1 ‖2 ≤ ǫH in (207) and (212), respectively, which yields (206), and the proof is complete. 
+
+Lemma 18. For any x ∈ F we have 
+
+μM (TM (x)) ≤ rM (x). (213) 
+
+Proof. Adapting Nesterov (2018, Corollary 1.2.2) in our context yields 
+
+Diag( ∇2f (TM (x)))  Diag( ∇2f (x)) − rM (x)LH I. (214) Combining (214) and (185) gives 
+
+Diag( ∇2f (TM (x)))  − 
+
+( 1
+
+2 M + LH
+
+)
+
+rM (x)I, (215) which when combined with Lemma 17 yields (213) and the proof is complete. 
+
+B.12 Proof of Theorem 3 
+
+Let (si+1 , ν i+1 ) be the output of Algorithm 2 for B = Diag( ∇2f (xi)) , g = ∇f (xi). Recall that (si+1 , ν i+1 )
+
+is a minimizer of (7) and according to Theorem 2 it is also a minimizer of problem (5) where M = νi+1 .Recall also that xi+1 = xi + si+1 and let the sequence {xi}i≥1 be generated by Algorithm 1. Next, suppose that Assumption 1 holds, i.e., the objective function f (x) is bounded from bellow, f (x) ≥ f low 
+
+for all x ∈ F . Then, we continue with the proof of the main result in Theorem 3. From (196), we have 
+
+f (x0) − ¯fM0 (x0) ≥ M0
+
+12 r3 
+
+> M0
+
+(x0)
+
+f (x1) − ¯fM1 (x1) ≥ M1
+
+12 r3 
+
+> M1
+
+(x1)
+
+...
+
+f (xk−1) − ¯fMk−1 (xk−1) ≥ Mk−1
+
+12 r3 
+
+> Mk−1
+
+(xk−1),
+
+(216) where rMi (xi) = ‖xi − xi+1 ‖2 and 
+
+¯fMi (x) ∆
+
+= min 
+
+> s∈Rd
+
+mMi (s). (217) Summing over (216) we get k−1∑
+
+> i=0
+
+(f (xi) − ¯fMi (xi)) ≥
+
+> k−1
+
+∑
+
+> i=0
+
+Mi
+
+12 r3 
+
+> Mi
+
+(xi). (218) Then applying f (xi+1 ) ≤ ¯fMi (xi) (Lemma 16), we get 
+
+> k−1
+
+∑
+
+> i=0
+
+(f (xi) − f (xi+1 )) ≥
+
+> k−1
+
+∑
+
+> i=0
+
+Mi
+
+12 r3 
+
+> Mi
+
+(xi), (219) which, by applying the telescoping sum, yields 
+
+f (x0) − f (xk) ≥
+
+> k−1
+
+∑
+
+> i=0
+
+Mi
+
+12 r3 
+
+> Mi
+
+(xi). (220) 44 Published in Transactions on Machine Learning Research (02/2026) 
+
+Next, using the lower bound of f (xk), i.e., f low by Assumption 1 and Remark 1, we obtain 
+
+f (x0) − f low ≥
+
+> k−1
+
+∑
+
+> i=0
+
+Mi
+
+12 r3 
+
+> Mi
+
+(xi), (221) which implies 
+
+f (x0) − f low ≥ k L0
+
+12 r3 
+
+> L0
+
+(xi) ⇔ μMi (xi+1 ) ≤ rMi (xi) ≤ 12 1/3
+
+( f (x0) − f low 
+
+k M i
+
+)1/3
+
+, (222) where Lemma 18 (Appendix B.11) is applied to get μMi (xi+1 ) ≤ rMi (xi). For LH = Mi and applying the trick 12 = 3 · 4 ⇔ 12 1/3 = 3 1/3 · (8 /2) 1/3 ⇔ 12 1/3 = (3 /2) 1/3 · 81/3 ⇔ 12 1/3 = (3 /2) 1/3 · 2 ⇔ 12 1/3 =(3 /2) 1/3 · 8/4 ≤ (3 /2) 1/3 · 8/3, we arrive at 
+
+μLH (xi+1 ) ≤ 8
+
+3
+
+( 3
+
+2
+
+f (x0) − f low 
+
+LH k
+
+)1/3
+
+. (223) As in Nesterov & Polyak (2006, Theorem 3), here it is assumed that ∇2f (xi) is positive definite for some 
+
+i ≥ 0. The latter assumption implies that Diag( ∇2f (xi)) is also positive definite. Then for some i ≥ 0,from (206), we restrict our study to 
+
+μLH (xi+1 ) = 
+
+√ 1
+
+LH
+
+‖∇ f (xi+1 )‖2, (224) which combined with (223), yields 
+
+min  
+
+> 0≤i≤k−1
+
+‖∇ f (xi+1 )‖2 ≤ L1/3
+
+> H
+
+( 8
+
+3
+
+)2 ( 3
+
+2
+
+f (x0) − f low 
+
+k
+
+)2/3
+
+, (225) which implies (23). The convergence rate in (23) is used to establish the local convergence rate when the approximate gi and Bi are used instead of ∇f (xi) and ∇2f (xi), respectively. The latter argument is strengthened by Corollary 2, and the proof is complete. 
+
+B.13 Vector and Matrix Bernstein Inequalities 
+
+For completeness, we restate Kohler & Lucchi (2017, Lemma 18), incorporating corrections for minor ty-pographical errors. Lemma 19 is utilized by Lemma 5. Next, Lemma 20 is introduced and utilized by Lemma 22, which in turn is utilized by Lemma 6. Lemma 21 is also used by Lemma 22. 
+
+Lemma 19 (Vector Bernstein Inequality) . Let x1, x2, . . . xn be independent random vectors of common dimension d and assume that each one is centered, uniformly bounded, and also the variance is bounded from above, i.e., 
+
+E[xi] = 0 and ‖xi‖2 ≤ ϑ as well as E[‖xi‖22] ≤ σ2. (226) 
+
+Let z = 1
+
+> n
+
+∑ni=1 xi. Then we have 
+
+Pr( ‖z‖2 ≥ ǫ) ≤ exp 
+
+(
+
+−n ǫ2
+
+8σ2 + 1
+
+4
+
+)
+
+, (227) 
+
+with 0 < ǫ < σ 2/ϑ + σ.Proof. A proof can be found in (Kohler & Lucchi, 2017, Lemma 18). However, some typographical errors were identified, leading us to reproduce the proof for clarity. The Vector Bernstein inequality for independent, zero-mean random vectors Gross (2011, Theorem 12) states 
+
+Pr 
+
+(
+
+1
+
+n
+
+∥∥∥∥∥
+
+> n
+
+∑
+
+> i=1
+
+xi
+
+∥∥∥∥∥2
+
+≥ 1
+
+n (t + √V )
+
+)
+
+≤ exp 
+
+(
+
+− t2
+
+4V
+
+)
+
+, (228) 45 Published in Transactions on Machine Learning Research (02/2026) 
+
+where V = ∑ni=1 E[‖xi‖22] is the sum of the traces of the covariance matrices of the centered vectors xi.Using E[‖xi‖22] ≤ σ2 yields V ≤ nσ 2.Note that in (228), the probability condition is scaled by a factor of 1/n to align with the subsequent analysis involving z. Let ǫ = ( t + √V )/n ⇔ t = nǫ − √V . Using (228) we get 
+
+Pr ( ‖z‖2 ≥ ǫ) ≤ exp 
+
+− 1
+
+4
+
+(
+
+nǫ − √V
+
+√V
+
+)2 = exp 
+
+(
+
+− 1
+
+4
+
+( nǫ 
+
+√V − 1
+
+)2)
+
+. (229) We claim that 
+
+− 1
+
+4
+
+( nǫ 
+
+√V − 1
+
+)2
+
+≤ − 1
+
+4
+
+n2ǫ2
+
+2V + 1
+
+4 (230) Indeed, if (230) holds we arrive at a valid inequality 
+
+− n2ǫ2
+
+V + 2 nǫ 
+
+√V − 1 ≤ − 1
+
+2
+
+n2ǫ2
+
+V + 1 
+
+⇔
+
+( nǫ 
+
+√2V − √2
+
+)2
+
+≥ 0.
+
+(231) Using (230) in (229) gives 
+
+Pr ( ‖z‖2 ≥ ǫ) ≤ exp 
+
+(
+
+−n ǫ2
+
+8σ2 + 1
+
+4
+
+)
+
+, (232) where V ≤ nσ 2 is used. According to Gross (2011, Theorem 12), t < V / max i ‖xi‖2. For V ≤ nσ 2 and 
+
+‖xi‖2 ≤ ϑ gives t < nσ 2/ϑ . Given V ≤ nσ 2 and t < nσ 2/ϑ , we arrive at 
+
+nǫ = t + √V ≤ nσ 2
+
+ϑ + √nσ ⇔ ǫ ≤ σ2
+
+ϑ + σ, (233) where √x < x with x > 1 is used. In addition, it can be shown that Var( z) ≤ σ2/n Gross (2011, Theorem 12) establishing (227), which concluded the proof. 
+
+Lemma 20. Let ui : Ω ui → Rn and vj : Ω vj → Rm be independent random vectors for each i, j . Let 
+
+g : Rn × Rm → Rd×d be a function that produces random matrices. Then, for any indices (i, j ) 6 = ( k, l ), the matrices g(ui, vj ) and g(uk, vl) are independent, regardless of whether ui and vj come from the same or different distributions. Proof. Let two threshold matrices M and M′ (which are symmetric d × d matrices), and consider the probability 
+
+P (g(ui, vj ) ⋖− M ∩ g(uk, vl) ⋖− M′), (234) using the element-wise comparison operator ⋖−. Given that ui : Ω ui → Rn and vj : Ω vj → Rm are independent random vectors, and g : Rn × Rm → Rd×d is a function generating random matrices, we rewrite the event as 
+
+{g(ui, vj ) ⋖− M} ≡ { (ωui , ω vj ) ∈ Ωui × Ωvj : g(ui(ωui ), vj (ωvj )) ⋖− M}≡ { (ui, vj ) ∈ Rn × Rm : g(ui, vj ) ⋖− M}. (235) Similarly, we have 
+
+{g(uk, vl) ⋖− M′} ≡ { (ωuk , ω vl ) ∈ Ωuk × Ωvl : g(uk(ωuk ), vl(ωvl )) ⋖− M′}≡ { (uk, vl) ∈ Rn × Rm : g(uk, vl) ⋖− M′}. (236) Let 
+
+A = {(ui, vj ) ∈ Rn × Rm : g(ui, vj ) ⋖− M} (237) 46 Published in Transactions on Machine Learning Research (02/2026) 
+
+and 
+
+B = {(uk, vl) ∈ Rn × Rm : g(uk, vl) ⋖− M′}. (238) Then using (235) and (236) in (234), we write 
+
+P ({g(ui, vj ) ⋖− M} ∩ { g(uk, vl) ⋖− M′}) = P (( ui, vj ) ∈ A ∩ (uk, vl) ∈ B). (239) Recall that the sequences {ui} and {vj } are independent families of random variables which implies that the pairs (ui, vj ) are formed by drawing independently from these families. Thus, since ui and vj are independent for each (i, j ), and (uk, vl) are also independent, we have 
+
+P ({g(ui, vj ) ⋖− M} ∩ { g(uk, vl) ⋖− M′}) = P (( ui, vj ) ∈ A)P (( uk , vl) ∈ B), (240) which implies 
+
+P ({g(ui, vj ) ⋖− M} ∩ { g(uk, vl) ⋖− M′}) = P (g(ui, vj ) ⋖− M)P (g(uk, vl) ⋖− M′), (241) where (235) and (236) are used. Since the joint probability factorizes, this proves that g(ui, vj ) and g(uk, vl)
+
+are independent whenever (i, j ) 6 = ( k, l ), regardless of whether ui and vj come from the same or different distributions. 
+
+Lemma 21. Let X ∈ Rd×d be a symmetric mean-zero matrix with ‖X‖ ≤ 1 almost surely. Then, 
+
+E [exp( λX)]  exp (g(λ)E[X2]) , (242) 
+
+where g(λ) = eλ − λ − 1.Proof. We refer the reader to (Vershynin, 2018). 
+
+Lemma 22 (Matrix Bernstein Inequality) . Let Xij 
+
+> ∆
+
+= g(ui, vj ) be d × d zero-mean random matrices with two independent sources of randomness, ui and vj . Also, let {Xij }N,M i,j =1 be a set of independent random matrices of common dimension d × d, such that ‖Xij ‖2 ≤ K almost surely for all i, j . Then, for every t ≥ 0,we have 
+
+Pr 
+
+∥∥∥∥∥∥
+
+> N
+
+∑
+
+> i=1
+> M
+
+∑
+
+> j=1
+
+Xij 
+
+∥∥∥∥∥∥2
+
+≥ t
+
+ ≤ 2d exp 
+
+(
+
+− t2/2
+
+σ2 + Kt/ 3
+
+)
+
+. (243) 
+
+Here, the matrix variance is given by 
+
+σ2 =
+
+∥∥∥∥∥∥
+
+> N
+
+∑
+
+> i=1
+> M
+
+∑
+
+> j=1
+
+E [X2
+
+> ij
+
+]∥∥∥∥∥∥2
+
+. (244) 
+
+In particular, we can express this bound as a mixture of sub-Gaussian and sub-exponential tails, just like in the scalar Bernstein’s inequality: 
+
+Pr 
+
+∥∥∥∥∥∥
+
+> N
+
+∑
+
+> i=1
+> M
+
+∑
+
+> j=1
+
+Xij 
+
+∥∥∥∥∥∥2
+
+≥ t
+
+ ≤ 2d exp 
+
+(
+
+− 3
+
+8 min 
+
+{ t2
+
+σ2 , t
+
+K
+
+}) 
+
+. (245) 
+
+Proof. The following analysis is based on (Vershynin, 2018, Theorem 5.4.1). 
+
+Reduction of MGF. To bound the norm of the sum 
+
+S ∆
+
+=
+
+> N
+
+∑
+
+> i=1
+> M
+
+∑
+
+> j=1
+
+Xij , (246) 47 Published in Transactions on Machine Learning Research (02/2026) 
+
+we need to control the largest and smallest eigenvalues of S. We can do this separately. To put this formally, consider the largest eigenvalue 
+
+λmax (S) ∆
+
+= max  
+
+> i
+
+λi(S) (247) and note that 
+
+‖S‖2 = max |λi(S)| = max {λmax (S), λ max (−S)} (248) and 
+
+Pr( |λmax (S)| ≥ t) = Pr( λmax (S) ≥ t) + Pr( λmax (−S) ≥ t) − Pr( λmax (S) ≥ t and λmax (−S) ≥ t), (249) which implies 
+
+Pr( |λmax (S)| ≥ t) ≤ Pr( λmax (S) ≥ t) + Pr( λmax (−S) ≥ t). (250) To bound λmax (S), we proceed with computing the moment generating function. We fix λ ≥ 0 and use Markov’s inequality to obtain 
+
+Pr( λmax (S) ≥ t) = Pr( eλλ max (S) ≥ eλt ) ≤ e−λt E[eλλ max (S)]. (251) Since by Vershynin (2018, Definition 5.4.2) the eigenvalues of eλS are eλλ i (S), we have 
+
+E ∆
+
+= E[eλλ max (S)] = E[λmax (eλS)] . (252) Since the eigenvalues of eλS are all positive, the maximum eigenvalue of eλS is bounded by the sum of all eigenvalues, the trace of eλS, which leads to 
+
+E ≤ E[Tr( eλS)] . (253) 
+
+Application of Lieb’s inequality. First note that 
+
+S = 
+
+> N−1
+
+∑
+
+> i=1
+> M−1
+
+∑
+
+> j=1
+
+Xij + 
+
+> N−1
+
+∑
+
+> i=1
+
+XiM +
+
+> M−1
+
+∑
+
+> j=1
+
+XN j + XN M . (254) To prepare the application of Lieb’s inequality in Vershynin (2018, Lemma 5.4.9), let us separate the last term from the sum S
+
+E
+
+[
+
+≤ E Tr 
+
+(
+
+exp 
+
+(N −1∑
+
+> i=1
+> M−1
+
+∑
+
+> j=1
+
+λXij + 
+
+> N−1
+
+∑
+
+> i=1
+
+λXiM +
+
+> M−1
+
+∑
+
+> j=1
+
+λXN j + λXN M 
+
+))] 
+
+. (255) Conditioning on {Xij }N −1,M −1 
+
+> i,j =1
+
+and applying Vershynin (2018, Lemma 5.4.9) for the fixed matrix 
+
+H ∆
+
+= 
+
+> N−1
+
+∑
+
+> i=1
+> M−1
+
+∑
+
+> j=1
+
+λXij + 
+
+> N−1
+
+∑
+
+> i=1
+
+λXiM +
+
+> M−1
+
+∑
+
+> j=1
+
+λXN j (256) and the random matrix Z ∆
+
+= λXN M , we obtain 
+
+E ≤ E{Xij }N,M i,j =1 
+
+[
+
+Tr 
+
+(
+
+exp 
+
+(N −1∑
+
+> i=1
+> M−1
+
+∑
+
+> j=1
+
+λXij + 
+
+> N−1
+
+∑
+
+> i=1
+
+λXiM +
+
+> M−1
+
+∑
+
+> j=1
+
+λXN j + λXN M 
+
+))] 
+
+≤ E{Xij }N −1,M −1
+
+> i,j =1
+
+[
+
+EXN M 
+
+[
+
+Tr 
+
+(
+
+exp 
+
+(N −1∑
+
+> i=1
+> M−1
+
+∑
+
+> j=1
+
+λXij + 
+
+> N−1
+
+∑
+
+> i=1
+
+λXiM +
+
+> M−1
+
+∑
+
+> j=1
+
+λXN j + λXN M 
+
+))]] 
+
+≤ E{Xij }N −1,M −1
+
+> i,j =1
+
+[
+
+Tr 
+
+(
+
+exp 
+
+(N −1∑
+
+> i=1
+> M−1
+
+∑
+
+> j=1
+
+λXij + 
+
+> N−1
+
+∑
+
+> i=1
+
+λXiM +
+
+> M−1
+
+∑
+
+> j=1
+
+λXN j + log EXN M eλXN M 
+
+))] 
+
+. (257) 48 Published in Transactions on Machine Learning Research (02/2026) 
+
+We continue similarly: separate the next term λXN −1,M −1 from the remaining sum and apply Vershynin (2018, Lemma 5.4.9) again for Z = λXN −1,M −1. Repeating this process N M times, we obtain 
+
+Pr( λmax (S) ≥ t) ≤ Tr 
+
+e−λt exp 
+
+
+
+> N
+
+∑
+
+> i=1
+> M
+
+∑
+
+> j=1
+
+log E exp λXij 
+
+ . (258) 
+
+MGF of the individual terms. It remains to bound the matrix-valued moment generating function 
+
+E eλXij for each term Xij . We now use Lemma 21. 
+
+Completion of the proof. Using Lemma 21, we obtain 
+
+E [exp ( λXij /K )]  exp (g(λ) E[X2 
+
+> ij
+
+]/K 2) ⇔
+
+> N,M
+
+∏
+
+> i,j =1
+
+E [exp ( λXij /K )] 
+
+> N,M
+
+∏
+
+> i,j =1
+
+exp (g(λ) E[X2 
+
+> ij
+
+]/K 2)
+
+⇔
+
+> N,M
+
+∏
+
+> i,j =1
+
+E [exp ( λXij /K )]  exp 
+
+g(λ)
+
+> N,M
+
+∑
+
+> i,j =1
+
+E[X2 
+
+> ij
+
+]/K 2
+
+ , (259) which implies 
+
+> N,M
+
+∏
+
+> i,j =1
+
+E [exp ( λXij /K )]  exp 
+
+g(λ)
+
+> N,M
+
+∑
+
+> i,j =1
+
+E[X2 
+
+> ij
+
+]/K 2
+
+ . (260) Also, given that Xij are independent, we have 
+
+> N,M
+
+∏
+
+> i,j =1
+
+E [exp ( λXij /K )] = exp 
+
+log 
+
+
+
+> N,M
+
+∏
+
+> i,j =1
+
+E exp ( λXij /K )
+
+ = exp 
+
+
+
+> N,M
+
+∑
+
+> i,j =1
+
+log E exp ( λXij /K )
+
+ , (261) which combined with (260) 
+
+exp 
+
+
+
+> N,M
+
+∑
+
+> i,j =1
+
+log E exp ( λXij /K )
+
+  exp 
+
+g(λ)
+
+> N,M
+
+∑
+
+> i,j =1
+
+E[X2 
+
+> ij
+
+]/K 2
+
+ , (262) and applying the trace to both sides yields 
+
+Tr 
+
+exp 
+
+
+
+> N,M
+
+∑
+
+> i,j =1
+
+log E exp ( λXij /K )
+
+ ≤ Tr (exp (g(λ) ˜Z/K 2)) , (263) where ˜Z ∆
+
+= E
+
+[∑Ni=1 
+
+∑Mj=1 X2
+
+> ij
+
+]
+
+. Since the trace of exp( g(λ)˜Z/K 2) is a sum of d positive eigenvalues, it is bounded by d times the maximum eigenvalue and using Vershynin (2018, Definition 5.4.2), we obtain 
+
+Tr (exp (g(λ) ˜Z/K 2)) ≤ d λ max 
+
+(exp (g(λ) ˜Z/K 2)) = d exp (g(λ) λmax (˜Z/K 2))
+
+= d exp (g(λ) ‖ ˜Z‖/K 2) = d exp (g(λ) σ2/K 2) . (264) Combining (258) and (264) we get 
+
+Pr( λmax (S) ≥ Kt ) ≤ e−λt Tr 
+
+exp 
+
+
+
+> N
+
+∑
+
+> i=1
+> M
+
+∑
+
+> j=1
+
+log E exp λXij /K 
+
+ ≤ d exp (−λt + g(λ) σ2/K 2) , (265) which implies 
+
+Pr( λmax (S) ≥ t) ≤ d exp 
+
+(
+
+− λ
+
+K t + g(λ)
+
+K2 σ2
+
+)
+
+. (266) 49 Published in Transactions on Machine Learning Research (02/2026) 
+
+Minimizing over λ > 0, the minimum occurs at 
+
+λ = log 
+
+(
+
+1 + Kt 
+
+σ2
+
+)
+
+, t ≥ 0. (267) Plugging this into the bound, we get 
+
+Pr ( λmax (S) ≥ t) ≤ d exp 
+
+(
+
+− σ2
+
+K2 h
+
+( Kt 
+
+σ2
+
+)) 
+
+, (268) where 
+
+h(u) = (1 + u) log(1 + u) − u, for u > 0. (269) We know that Boucheron et al. (2013, Exercise 2.8) 
+
+h(u) ≥ u2
+
+2(1 + u/ 3) , (270) with u > 0 and thus 
+
+Pr ( λmax (S) ≥ t) ≤ d exp 
+
+(
+
+− σ2
+
+K2
+
+u2
+
+2(1 + u/ 3) 
+
+)
+
+, (271) where u = Kt  
+
+> σ2
+
+. Substituting u in (271), we obtain 
+
+Pr ( λmax (S) ≥ t) ≤ d exp 
+
+(
+
+− t2/2
+
+σ2 + Kt/ 3
+
+)
+
+. (272) Following similar steps with −S instead of S and using (250), yields 
+
+P (|λmax (S)| ≥ t) ≤
+
+{2d exp 
+
+( −3t2
+
+> 8σ2
+
+)
+
+, t ≤ σ2/K 
+
+2d exp ( −3t
+
+> 8K
+
+) , t > σ 2/K. (273) Intuitively, for small t, i.e., t ≤ σ2/K , we have a sub-Gaussian bound, while for large t, i.e., t > σ 2/K , we have a sub-exponential bound. Looking for the tightest bound, we may write 
+
+P (|λmax (S)| ≥ t) ≤ 2d exp 
+
+(
+
+− 3
+
+8 min 
+
+{ t2
+
+σ2 , t
+
+K
+
+}) 
+
+. (274) 
+
+50
