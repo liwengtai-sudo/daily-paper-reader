@@ -1,0 +1,319 @@
+Title: Robust Fair Disease Diagnosis in CT Images
+
+URL Source: https://arxiv.org/pdf/2604.09710v1
+
+Published Time: Tue, 14 Apr 2026 00:05:16 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Robust Fair Disease Diagnosis in CT Images 
+
+# Justin Li 1* Daniel Ding 1∗ Asmita Yuki Pritha 2∗ Aryana Hou 3∗ Xin Wang 4 Shu Hu 5† 1 Carmel High School, Carmel, Indiana, USA {justinyli2018,danielding56 }@gmail.com  
+
+> 2
+
+# Capstone School Dhaka, Bangladesh asmitayukipritha@gmail.com  
+
+> 3
+
+# Clarkstown High School South, West Nyack, New York, USA aryanahou@gmail.com  
+
+> 4
+
+# University at Albany, State University of New York, Albany, New York, USA xwang56@albany.edu 
+
+> 5
+
+# Purdue University, West Lafayette, Indiana, USA hu968@purdue.edu 
+
+# Abstract 
+
+Automated diagnosis from chest CT has improved consid-erably with deep learning, but models trained on skewed datasets tend to perform unevenly across patient demo-graphics. However, the situation is worse than simple de-mographic bias. In clinical data, class imbalance and group underrepresentation often coincide, creating com-pound failure modes that neither standard rebalancing nor fairness corrections can fix alone. We introduce a two-level objective that targets both axes of this problem. Logit-adjusted cross-entropy loss operates at the sample level, shifting decision margins by class frequency with provable consistency guarantees. Conditional Value at Risk aggre-gation operates at the group level, directing optimization pressure toward whichever demographic group currently has the higher loss. We evaluate on the Fair Disease Di-agnosis benchmark using a 3D ResNet-18 pretrained on Kinetics-400, classifying CT volumes into Adenocarcinoma, Squamous Cell Carcinoma, COVID-19, and Normal groups with patient sex annotations. The training set illustrates the compound problem concretely: squamous cell carcinoma has 84 samples total, 5 of them female. The combined loss reaches a gender-averaged macro F1 of 0.8403 with a fair-ness gap of 0.0239, a 13.3% improvement in score and 78% reduction in demographic disparity over the baseline. Ab-lations show that each component alone falls short. The code is publicly available at https://github.com/ Purdue-M2/Fair-Disease-Diagnosis 
+
+# 1. Introduction 
+
+Lung disease remains one of the leading causes of death worldwide, and the diagnostic landscape has only gotten more complicated in recent years. Lung cancer causes more 
+
+> *Co-first Authors
+> †Corresponding author.
+
+Figure 1. Training set distribution by disease category and pa-tient sex. The dataset exhibits a compound imbalance: squamous cell carcinoma is already the rarest class overall (84 samples), and its female subset contains only 5 training examples. This intersec-tion of class rarity and demographic scarcity motivates our two-level objective that simultaneously addresses both axes of imbal-ance. 
+
+than 1.8 million deaths annually. Among the non-small cell subtypes, adenocarcinoma and squamous cell carcinoma are the most common, and distinguishing between them matters because the treatment protocols diverge substan-tially [1]. In 2019, the COVID-19 began, quickly chang-ing the lung disease field. The disease spreads rapidly, fre-quently present with no symptoms at all, yet produces de-tectable abnormalities on chest CT — one study reported findings in 62.2% of asymptomatic patients [2]. The imag-ing infrastructure to screen for these conditions already ex-ists and is widely implemented. Ninety-six percent of US emergency departments in a randomly sampled survey had a CT scanner on site [3]. The scanners are not the bottle-neck; rather, radiologists are. The volume of scans gener-ated across institutions far exceeds what clinicians can read in a reasonable timeframe, and that throughput gap is what has driven the sustained push toward automated deep learn-ing solutions [4, 5]. These solutions have matured quickly, and modern ar-chitectures on single-institution benchmarks achieve strong 
+
+> arXiv:2604.09710v1 [cs.CV] 8 Apr 2026
+
+aggregate performance [6, 7]. But aggregate performance is a dangerous metric when the underlying data has a structure that the model can exploit unevenly. Clinical CT data con-sistently has this kind of structure, and the specific problem we address is the interaction between class imbalance and demographic skew. Rare conditions are underrepresented in training data because they are rare. That much is well known. What is less obvious is that the imbalance is not the same across patient groups. In our benchmark, squa-mous cell carcinoma has 84 training samples out of 734 to-tal. Split by sex, 79 are male and 5 are female. A classi-fier trained with standard cross-entropy on this distribution will learn squamous cell features almost entirely from male presentations, because that is where the gradient originates from. It will then fail on female patients presenting with the same disease, and because the class is already small, the overall accuracy will scarcely register the drop. The failure is real but it hides in the aggregate [8–10]. The fairness and class-rebalancing literature have pro-posed sensible solutions to their respective halves of this problem, but they were not designed to handle the intersec-tion. Logit adjustment [9] adds frequency-dependent offsets to the logits, enlarging the margin for rare classes. Menon et al. proved Fisher consistency for the balanced error rate 
+
+τ = 1 , a guarantee that neither LDAM [8] nor equalization loss [11] provides. But logit adjustment does not see group labels — every patient gets the same offset regardless of sex, so if male squamous cell samples dominate the gradi-ent, the correction still flows predominantly through male data. CVaR based fairness aggregation [12, 13] works from the other direction, upweighting whichever demographic group currently has higher loss. The trouble is that when per-sample loss is itself class-imbalanced, CVaR equalizes a biased signal. Both groups get similar loss values, but within each group the rare class is still being ignored. Nei-ther mechanism, applied alone, can reach the particular in-tersection of the distribution where the real clinical risk sits. We propose combining these methods into a single two-level objective. Logit-adjusted cross-entropy handles class imbalance at the sample level by reshaping which classes contribute to the gradient. CVaR aggregation handles demo-graphic equity at the group level by reshaping which groups the optimizer prioritizes. The two mechanisms act on dif-ferent dimensions of the loss function — one controls per-sample gradient direction along the class axis, the other con-trols per-group gradient magnitude along the demographic axis — and their composition is what allows the gradient to finally reach the specific intersection that neither can reach alone. We implement this on a 3D ResNet-18 pretrained on Kinetics-400 and evaluate on the Fair Disease Diag-nosis benchmark of the PHAROS-AIF-MIH CVPR Work-shop [14, 15], a four class lung CT classification task with explicit gender equity requirements. Our contributions are as follows: (1) We propose a two level training objective combining logit adjusted cross entropy with CVaR group aggre-gation, and show that the two components address or-thogonal failure modes whose intersection produces the most clinically dangerous errors in the dataset. (2) We experiment and analyze the effectiveness of our pro-posed approach and compare it against a baseline to evaluate the contributions of our method. 
+
+# 2. Related Work 
+
+2.1. Disease Diagnosis in CT Images 
+
+Deep learning has become the prevailing approach for auto-mated disease diagnosis from computed tomography, with applications spanning lung cancer subtype classification, COVID-19 screening, and pulmonary abnormality detec-tion [16–18]. Early methods [19] decomposed 3D CT volumes into individual 2D slices and classified them us-ing pretrained convolutional networks such as ResNet [20], DenseNet [21], and Xception [22]. These approaches per-form reasonably well when training and testing occur on data from the same institution. However, they discard spa-tial continuity between consecutive slices, which is criti-cal for identifying diffuse pathologies such as ground glass opacities and for differentiating cancer subtypes that appear similar in any individual slice [23, 24]. This limitation motivated the shift toward 3D convolu-tional architectures, typically pretrained on video data [25, 26]. Kollias et al. [27] introduced RACNet, a routing and alignment architecture designed to handle CT vol-umes of varying length within a unified decision frame-work, and established a strong benchmark on COV19-CT-DB. Li et al. [28] later achieved competitive multi-class re-sults on the same dataset using 3D ResNeSt50 [29]. Neither method, however, models how data distributions vary across hospitals or acquisition sites; both formulate diagnosis as a single-task problem. Multi-task learning (MTL) provides a principled remedy by optimizing several related objectives simultaneously, en-couraging the shared backbone to learn features that gener-alize across tasks [30]. MTL has yielded consistent gains elsewhere in medical imaging, including joint segmenta-tion and classification in chest radiography [31] and si-multaneous lesion detection and attribute prediction in der-moscopy [32], yet CT diagnostic pipelines have largely not adopted it. Pairing a disease classification head with an aux-iliary source-identification head could force the network to learn site invariant representations, but this configuration has not been explored in a setting that must also contend with class imbalance and demographic fairness. Two additional challenges compound these limitations. CT datasets are almost always imbalanced: common condi-tions dominate while rare but clinically significant patholo-gies such as squamous cell carcinoma are underrepre-sented [33, 34]. At the same time, growing evidence in-dicates that diagnostic models perform unevenly across pa-tient subgroups stratified by gender [35–37]. These issues are not independent, as different demographic groups tend to exhibit different disease prevalences, so mitigating one without accounting for the other risks exacerbating the re-maining disparity. Current CT frameworks either overlook both problems or treat them in isolation. 
+
+2.2. Fair Machine Learning and Class Imbalance 
+
+There is now substantial evidence that models trained on demographically skewed data produce systematically dis-parate outcomes for subgroups defined by gender, race, or age [12, 36, 38–45]. In medical imaging the implications are particularly serious: Xu et al. [35] demonstrated that aggregate accuracy can conceal significant subgroup-level failures across modalities ranging from chest radiography to cardiac MRI. Standard mitigation strategies include prepro-cessing techniques that rebalance group representation [46], in processing objectives that embed fairness constraints di-rectly into learning [47, 48], and post-processing calibration applied after training [49]. Among in processing formulations, Conditional Value at Risk (CVaR) [50, 51] has attracted significant attention as it provides a tractable upper bound on worst case group risk. It belongs to the broader family of rank based decompos-able losses [52, 53], and Hu and Chen [54] established its clinical viability by achieving demographic fairness in sur-vival analysis without requiring group labels. Ju et al. [55] extended this line of work with DAW-FDD, a hierarchical CVaR loss whose outer level equalizes performance across demographic groups while the inner level handles class im-balance within each group. DAW-FDD delivers strong intra domain fairness, but it depends on explicit demographic an-notations and has only been validated on binary detection tasks. Lin et al. [56] identified a more fundamental short-coming: fairness gains from such methods collapse under domain shift, as the model memorizes source specific de-mographic patterns rather than learning invariant represen-tations. Their remedy, combining feature disentanglement, a bi level fairness loss, and sharpness aware minimiza-tion [57], improved cross domain fairness but introduced considerable architectural overhead and has not been eval-uated in a clinical imaging context. Hou et al. [58] raised a separate concern, arguing that group level metrics are in-sufficiently granular, and proposed anchor learning with se-mantic agnostic individual fair learning to address per sam-ple equity. On the class imbalance side [59–67], logit adjust-ment [34] offers a Fisher consistent correction by shifting logits according to label frequencies [33], yet its interac-tion with fairness aware objectives remains unstudied. To address this gap, we unify a CVaR based fairness objective and logit adjusted cross entropy inside a multi task learning framework, jointly targeting the coupled class imbalance, demographic fairness, and source heterogeneity problem in CT based disease diagnosis. 
+
+# 3. Method 
+
+3.1. Problem Formulation 
+
+We consider a training set S = {(xi, y i, g i)}ni=1 ,where each xi is a 3D chest CT volume, yi ∈ Y =
+
+{Healthy , Adenocarcinoma , Squamous Cell , COVID-19 }
+
+is the diagnostic label, and gi ∈ G = {male , female }
+
+records patient sex. We write Ig = {i ∈ [n] : gi = g} for the index set of group g.We want a classifier fθ : x 7 → Y that achieves two things at once: (i) strong diagnostic accuracy across all four cate-gories despite severe class imbalance, and (ii) equitable per-formance across genders, measured by 
+
+P ′ = 12
+
+ F 1macro male + F 1macro female 
+
+. (1) These objectives interact in ways that make tackling them separately insufficient. Squamous cell carcinoma, for instance, contributes as few as 5 female training samples. Na¨ ıve empirical risk minimization on such a distribution will push the decision boundaries toward dominant classes. But a group level fairness mechanism applied on top of an imbalanced loss just propagates the same class bias into both groups equally, which helps neither. Our framework (Figure 2) handles both problems through a two level objective: logit adjusted cross en-tropy [9] at the sample level corrects class imbalance, while CVaR aggregation [12] at the group level enforces demo-graphic equity. 
+
+3.2. Preprocessing 
+
+CT scans in the dataset range from roughly 50 to over 700 axial slices at 512 × 512 resolution. We discard the top and bottom 10% of slices to remove non pulmonary regions (cervical spine, upper abdomen), then uniformly sample 64 slices from the remainder via linear index inter-polation. Each slice is converted to grayscale, resized to 
+
+256 × 256 , and normalized to [0 , 1] , producing an input ten-sor x ∈ R1×64 ×256 ×256 . Training augmentation consists of random 224 × 224 crops and horizontal flips; inference uses a center crop. 
+
+3.3. Backbone Architecture 
+
+Our backbone is R3D-18 [68] pretrained on Kinetics-400. Video pretrained spatiotemporal kernels transfer well to CT volumes because both domains exhibit spatially coherent Figure 2. Overview of the proposed framework. Row 1 : representative CT slices from the four diagnostic categories. Row 2 : preprocess-ing removes non-pulmonary regions, samples to a fixed depth of 64, and normalizes to produce the input volume. Row 3 : a Kinetics-400 pretrained R3D-18 extracts features, classified through a fully connected head. The logit adjusted loss (§ 3.4) corrects class imbalance, while CVaR aggregation (§ 3.5) enforces gender fairness. Dashed arrows indicate metadata inputs. 
+
+patterns that evolve gradually along the third axis. We replace the first convolutional layer with a single channel 
+
+3 ×7×7 kernel initialized by averaging the pretrained RGB weights along the channel dimension, and swap the classi-fication head for a fully connected network ( 512 → 256 →
+
+4) with ReLU and 0.5 dropout. 
+
+3.4. Logit Adjusted Cross Entropy for Class Imbal-ance 
+
+Standard cross entropy on a skewed distribution biases the classifier toward frequent classes. Inverse frequency reweighting is a common fix, but Byrd and Lipton [69] show it has limited effect in separable regimes because it does not change the inter class margins. Logit adjustment [9] works differently. Instead of reweighting the loss, it adds class frequency dependent off-sets directly to the logits. Let fy (x) be the logit for class y
+
+and πy its empirical frequency. The logit adjusted loss is 
+
+ℓLA (x, y ) = − log exp  fy (x) + τ · log πy
+
+P 
+
+> y′∈Y
+
+exp  fy′ (x) + τ · log πy′
+
+ ,
+
+(2) where τ > 0 controls the adjustment strength. This is equivalently a pairwise margin loss with margin ∆yy ′ =
+
+τ · log( πy′ /π y ): when y is rare and y′ is dominant, the mar-gin grows large, forcing wide logit separation. This is ex-actly what inverse frequency weighting fails to achieve. Menon et al. [9] prove that with τ = 1, this loss is Fisher consistent for the balanced error rate, meaning its minimizer coincides with the Bayes optimal scorer. Nei-ther LDAM [70] nor the equalization loss [11] provides this guarantee. We fix τ = 1 throughout. The probabilistic view is also useful: training with logit adjustment encourages estimation of the balanced posterior 
+
+P bal (y | x) ∝ P (y | x)/P (y) rather than the native P (y |
+
+x), yielding predictions invariant to training set imbalance. Algorithm 1 Training with LA + CVaR 
+
+Require: Training set S, group set G, class frequencies 
+
+{πy }, α, learning rate η 
+
+> 1:
+
+Initialize θ from Kinetics-400 pretrained R3D-18  
+
+> 2:
+
+for each epoch do  
+
+> 3:
+
+for each minibatch B ⊂ S do  
+
+> 4:
+
+Compute ℓLA  
+
+> i
+
+for all i ∈ B ▷ Eq. (2)  
+
+> 5:
+
+for each g ∈ G do  
+
+> 6:
+
+Lg ← 1 
+
+> |I g∩B|
+
+P  
+
+> i∈I g∩B
+
+ℓLA  
+
+> i
+
+▷ Eq. (3)  
+
+> 7:
+
+end for  
+
+> 8:
+
+Find λ∗ via binary search on {L g }g∈G ▷ convex in λ 
+
+> 9:
+
+L ← λ∗ + 1
+
+> α|G|
+
+P 
+
+> g∈G
+
+[Lg − λ∗]+ ▷ Eq. (4)  
+
+> 10:
+
+θ ← θ − η∇θ L 
+
+> 11:
+
+end for  
+
+> 12:
+
+end for 
+
+3.5. CVaR Fairness Aggregation 
+
+Logit adjustment corrects class imbalance but is completely blind to demographics. It applies the same offset to every patient regardless of sex, so if the model can reduce loss more easily on one gender, it will, and the per gender F1 gap persists. We handle this with CVaR [12, 71], which aggregates group losses in a way that places more weight on whichever group is currently doing worse. For each g ∈ G , the mean logit adjusted loss is 
+
+Lg = 1
+
+|I g |
+
+X
+
+> i∈I g
+
+ℓLA  
+
+> i
+
+. (3) The training objective is the group level CVaR: 
+
+L = min  
+
+> λ∈R
+
+λ + 1
+
+α |G| 
+
+X
+
+> g∈G
+
+[Lg − λ]+, (4) where [·]+ = max(0 , ·) and α ∈ (0 , 1] controls fairness strength. At α → 0 this becomes pure minimax over groups [72]; at α = 1 it is a simple average. The optimal 
+
+λ is convex and found via binary search at each step with negligible overhead. 
+
+3.6. Analysis of the Joint Objective 
+
+The full procedure is given in Algorithm 1. The binary search at line 8 requires no gradient computation. The rest of the pipeline is end to end differentiable. Is combining logit adjustment with CVaR just stacking two known components, or does the interaction produce something neither achieves alone? We argue the latter. 
+
+Orthogonality. Logit adjustment reshapes which classes receive gradient signal at the per sample level. It does not see group labels. CVaR reshapes which groups receive opti-mization pressure at the aggregate level. It does not see per class structure. CVaR alone on an imbalanced dataset may equalize group losses while both groups still ignore the rare class. The two mechanisms act on orthogonal axes: one controls per sample gradient direction (class axis), the other controls per group gradient magnitude (demographic axis). 
+
+Complementary failure modes. Squamous cell carci-noma has 79 male but only 5 female training samples. Logit adjustment alone upweights this class uniformly, but 94% of the squamous cell gradient comes from male samples, so the learned features specialize to male presentation. CVaR alone detects the gender gap and shifts pressure toward the female group, but within that group the abundant classes dominate and the extra gradient never reaches the rare class. Only the composition routes sufficient signal to the precise intersection (female, squamous cell carcinoma) that is most at risk. 
+
+Remark 1. Logit adjustment is invariant to group mem-bership; CVaR is invariant to per class structure. Their composition is the minimal objective that is simultaneously sensitive to both the class axis and the demographic axis of the training distribution. 
+
+# 4. Experimental Settings 
+
+4.1. Datasets 
+
+We evaluate on the Fair Disease Diagnosis benchmark [14, 15], which contains 3D chest CT scans labeled across four categories: Adenocarcinoma (A), Squamous Cell Carcinoma (G), COVID-19, and Normal. Patient sex (male/female) is provided for each scan. The training set has 734 scans (404 male, 330 female) and the validation set has 155 (77 male, 78 female). Scan lengths range from roughly 50 to 700 slices at 512 ×512 resolution. As shown in Figure 1, the class distribution is heavily skewed: squa-mous cell carcinoma has only 84 training samples in total, and just 5 of those are female. This severe overlap between class rarity and gender underrepresentation is what drives our fairness aware loss design. 
+
+4.1.1. Evaluation Metrics 
+
+We adopt the official protocol from [15]. The validation set is split by sex into Subset A (male) and Subset B (female), and a four class macro F1 is computed on each. The final score averages the two: 
+
+P = 12 (F1 macro male + F1 macro female ) (5) The macro F1 here is simply the unweighted mean of per class F1 scores. A model that performs well on males but poorly on females (or vice versa) will be penalized directly. We also report the fairness gap, |F1 macro male − F1 macro female |, as a scalar measure of demographic disparity. 4.1.2. Baseline Methods 
+
+We compare FairLACVaR against the competition baseline and three ablation variants that isolate each component of our loss. (1) Competition Baseline (CNN-RNN): The or-ganizer baseline [15] pairs a ResNet-50 encoder with a uni-directional GRU (128 units) for slice level aggregation. It is trained with softmax cross-entropy using gender balanced loss averaging, processes scans padded to 700 slices, and achieves a score of 0.6230. (2) Baseline (CE): Our own 3D ResNet-18 trained with standard cross-entropy and no fairness mechanism at all. This is the direct ablation tar-get. (3) LA Only: Same architecture, but trained with Logit-Adjusted cross-entropy [73] to account for class fre-quency skew. No CVaR aggregation across genders. (4) CVaR Only: Standard cross-entropy wrapped in CVaR based group fairness aggregation ( α = 0 .7) over the two gender groups, without logit adjustment. These ablations cleanly separate what class aware calibration contributes from what demographic aware optimization adds. As Ta-ble 1 shows, neither LA nor CVaR alone reaches the score or the fairness gap of the combined FairLACVaR loss, which confirms that both problems need to be tackled together. 
+
+4.1.3. Implementation Details 
+
+All experiments run in PyTorch on a single NVIDIA A100 GPU. The backbone is a 3D ResNet-18 [74] pretrained on Kinetics-400 [75]. Since CT scans are grayscale, we col-lapse the first convolution from 3 input channels to 1 by av-eraging the pretrained RGB weights along the channel axis. On top of the encoder we attach a classification head: a lin-ear layer (512 →256), ReLU, dropout ( p = 0 .5), and a final four class projection. For preprocessing, we strip the top and bottom 10% of slices from each scan to get rid of neck and abdominal re-gions that carry no diagnostic signal. The remaining vol-ume is resampled to 64 slices and resized to 256 ×256, with intensities normalized to [0 , 1] . Training augmentations in-clude random cropping to 224 ×224, random 90 ◦ rotations in the axial plane, and brightness jittering (scale factor sam-pled from [0 .8, 1.2] ). At test time we use a fixed center crop of 224 ×224. We train for 70 epochs using Adam [76] with a learn-ing rate of 1 × 10 −4 and weight decay of 1 × 10 −5, de-cayed via cosine annealing ( Tmax = 70 ). Mixed precision is enabled through PyTorch’s GradScaler. Batch size is 2, since full 3D volumes consume substantial GPU memory. We save every checkpoint and select the best by validation macro F1. All runs are seeded at 42 for reproducibility. In the FairLACVaR loss, we fix the logit adjustment tempera-ture at τ = 1 .0 and sweep the CVaR concentration α over 
+
+{0.4, 0.5, 0.6, 0.7, 0.8, 0.9}; the resulting trade-off between overall score and fairness gap is reported in Table 1.     
+
+> Figure 3. Performance vs. fairness trade-off across all configura-tions. Circles ( •) denote FairLACVaR at different αvalues, dia-monds denote single-component ablations, and the square marks the baseline. The star ( ⋆) indicates the best overall configuration (α= 0 .8), which occupies the upper-left region corresponding to high score and low fairness gap. Table 1. Main results and ablation study on the challenge valida-tion set. All runs use a fixed random seed on NVIDIA A100. Best values in bold .
+
+Method α F1 male F1 female Score ↑ Gap ↓
+
+Baseline & Ablations 
+
+Baseline (CE) – 0.7957 0.6868 0.7413 0.1089 LA Only – 0.8596 0.7375 0.7986 0.1221 CVaR Only 0.7 0.8738 0.7591 0.8165 0.1148 
+
+FairLACVaR (LA + CVaR) 
+
+LA + CVaR 0.4 0.7574 0.7185 0.7379 0.0389 LA + CVaR 0.5 0.7935 0.7287 0.7611 0.0648 LA + CVaR 0.6 0.8079 0.7374 0.7727 0.0705 LA + CVaR 0.7 0.7835 0.8394 0.8115 0.0559 LA + CVaR 0.8 0.8283 0.8522 0.8403 0.0239 
+
+LA + CVaR 0.9 0.8910 0.7611 0.8260 0.1299 
+
+4.2. Results 
+
+We sweep the CVaR confidence level α from 0.4 to 0.9 on the challenge validation set under a fixed random seed, with all runs on a single NVIDIA A100. Table 1 reports results alongside the baseline and ablation variants. The baseline, trained with standard cross-entropy, scores 0.7413 with a gap of 0.1089. When we look at this by class and gender, the problem is clear: female Squamous Cell re-call is just 0.08 against 0.75 for males. With only 5 female Squamous Cell training samples versus 79 male, the net-work maps most of these cases onto Adenocarcinoma in-stead, which shows up as low female Adenocarcinoma pre-cision (0.68). With α = 0 .8, our combined loss reaches 0.8403 with a gap of 0.0239, a 13.3% score improvement and 78% gap reduction over the baseline. Female Squamous Cell F1 goes from 0.14 to 0.63 as recall rises from 0.08 to 0.46 at a preci-sion of 1.00. COVID-19 and Normal F1 stay above 0.90 for both genders across all settings. This is also the only con-figuration where female macro F1 (0.8522) exceeds male (0.8283), so the model closes the gap by lifting the under-performing group rather than dragging down the majority. Two ablations (Table 1) confirm that both components are needed. Logit adjustment alone improves score (0.7986) but widens the gap (0.1221). CVaR alone reaches 0.8165 but leaves the gap at 0.1148. Neither one handles the in-teraction between class and demographic imbalance. The combined loss at α = 0 .8 beats LA-only by 5.2% in score with 80% gap reduction, and CVaR-only by 2.9% with 79% gap reduction. Logit adjustment corrects class-frequency bias, CVaR shifts gradient emphasis to the hardest subgroup samples, and removing either leaves a gap in coverage. The full sweep shows a non-monotonic pattern across three phases (Figure 3). From α = 0.4 to 0.6, score rises (0.7379 to 0.7727) but female F1 stays near 0.73 be-cause the broad CVaR tail dilutes the fairness signal across classes. At α = 0 .7 the tail narrows enough to be domi-nated by hard female Squamous Cell cases and female F1 jumps to 0.8394, exceeding male F1 for the first time. This peaks at α = 0 .8. At α = 0 .9 the tail becomes too thin (worst 10%), male F1 spikes to 0.8910, female F1 drops to 0.7611, and the gap reverts to 0.1299. 
+
+4.3. Sensitivity Analysis 
+
+We rerun α ∈ { 0.7, 0.8, 0.9} on an NVIDIA L4 with the same seed and code (Table 2). We focus on the high-α range because the broader tail at lower α smooths the loss surface and should be less affected by hardware differences. The results change considerably. On the A100, α = 0 .8
+
+is the clear best (score 0.8403, gap 0.0239, epoch 69). On the L4, the same setting stops early at epoch 44 and reaches only 0.7544, with its near-zero gap (0.0093) com-ing from male F1 dropping rather than female F1 rising. At 
+
+α = 0 .9 it flips: the L4 gives a balanced result (0.8096, gap 0.0565) while the A100 produces the worst gap in the study (0.1299). The optimal α shifts from 0.8 to 0.9 depending on the GPU. This happens because the A100 and L4 use different cuDNN convolution kernels and accumulate rounding er-rors differently. These differences are tiny on their own but        
+
+> Table 2. Hardware sensitivity analysis. Same seed and code on NVIDIA A100 vs. L4. The optimal αshifts across platforms, but all configurations within α∈[0 .7,0.9] improve over the baseline.
+
+# α GPU F1 male F1 female Score ↑ Gap ↓
+
+# 0.7 A100 0.7835 0.8394 0.8115 0.0559 L4 0.8467 0.7415 0.7941 0.1052 0.8 A100 0.8283 0.8522 0.8403 0.0239 
+
+# L4 0.7498 0.7591 0.7544 0.0093 0.9 A100 0.8910 0.7611 0.8260 0.1299 L4 0.8379 0.7813 0.8096 0.0565 
+
+compound through backpropagation over training. At high 
+
+α the CVaR surface is sharp with several competing minima that differ in fairness properties, so small numerical pertur-bations can push the model toward a fundamentally differ-ent solution. Two things hold regardless of platform: the combined loss beats the baseline and both ablations in every tested configuration, and all settings within α ∈ [0 .7, 0.9] achieve scores above 0.79 with gaps below 0.11. We recommend tuning α within this range on the target deployment hard-ware. 
+
+# 5. Conclusion 
+
+We presented a two level objective for fair disease diagno-sis in chest CT that combines logit adjusted cross entropy at the sample level with CVaR aggregation at the group level. On the Fair Disease Diagnosis benchmark the combined loss achieves a gender averaged macro F1 of 0.8403 and a demographic gap of 0.0239, improving the baseline by 13.3% in score and reducing the fairness disparity by 78%. Neither component achieves this result independently: logit adjustment improves accuracy but widens the gender gap because 94% of the rare class gradient flows through male data, while CVaR narrows the group disparity but cannot fix what it does not see — the rare class stays neglected in both groups. There are limitations to acknowledge, some more prac-tical than others. The fairness formulation considers binary sex groups only. Real clinical populations vary along many dimensions — age, ethnicity, comorbidity burden — and extending CVaR to intersections of several attributes is not straightforward because the group structure grows combi-natorially and the data requirements per cell grow with it. A more immediate issue is hardware sensitivity. We found that the optimal α shifts between GPUs because different hardware accumulates rounding errors differently through backpropagation, and at high α the CVaR surface has com-peting minima that differ meaningfully in fairness proper-ties. The practical recommendation is to tune α on the de-ployment hardware rather than transferring a value from a different setup. Future work will explore hierarchical CVaR structures for multiple sensitive attributes and evaluate whether the framework generalizes under cross institutional domain shift. 
+
+# Acknowledgements 
+
+This work is supported by the U.S. National Science Foun-dation (NSF) under grant IIS-2434967, and the National Ar-tificial Intelligence Research Resource (NAIRR) Pilot and TACC Lonestar6. The views, opinions and/or findings ex-pressed are those of the author and should not be interpreted as representing the official views or policies of NSF and NAIRR Pilot. 
+
+# References 
+
+[1] G. Litjens, T. Kooi, B. E. Bejnordi, A. A. A. Setio, F. Ciompi, M. Ghafoorian, J. A. Van Der Laak, B. Van Ginneken, and C. I. S´ anchez, “A survey on deep learning in medical image analysis,” Medical Image Analysis , vol. 42, pp. 60–88, 2017. 1[2] S. Inui, A. Fujikawa, M. Jitsu, N. Kunishima, S. Watanabe, Y. Suzuki, S. Umeda, and Y. Uwabe, “Chest CT findings in cases from the cruise ship Diamond Princess with coro-navirus disease (COVID-19),” Radiology: Cardiothoracic Imaging , vol. 2, no. 2, p. e200110, 2020. 1 [3] A. S. Raja, A. D. Sodickson, D. L. Bhatt, and H. M. Zafar, “Availability of computed tomography in U.S. emergency departments,” Journal of the American College of Radiology ,vol. 14, no. 8, pp. 998–1002, 2017. 1 [4] D. Kollias, A. Tagaris, A. Stafylopatis, S. Kollias, and G. Tagaris, “Deep neural architectures for prediction in healthcare,” in Complex & Intelligent Systems , vol. 4. Springer, 2018, pp. 297–310. 1 [5] A. Arsenos, D. Kollias, and S. Kollias, “A large imaging database and novel deep neural architecture for COVID-19 diagnosis,” in IEEE 14th Image, Video, and Multidimen-sional Signal Processing Workshop (IVMSP) . IEEE, 2022, pp. 1–5. 1 [6] D. Kollias, A. Arsenos, and S. Kollias, “A deep neural archi-tecture for harmonizing 3-D input data analysis and decision making in medical imaging,” Neurocomputing , vol. 542, p. 126244, 2023. 2 [7] D. Kollias, A. Arsenos, L. Soukissian, and S. Kollias, “MIA-COV19D: COVID-19 detection through 3-D chest CT im-age analysis,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2021, pp. 537–544. 2 [8] K. Cao, C. Wei, A. Gaidon, N. Arechiga, and T. Ma, “Learn-ing imbalanced datasets with label-distribution-aware mar-gin loss,” in Advances in Neural Information Processing Sys-tems , vol. 32, 2019. 2 [9] A. K. Menon, S. Jayasumana, A. S. Rawat, H. Jain, A. Veit, and S. Kumar, “Long-tail learning via logit adjustment,” in International Conference on Learning Representations ,2021. 2, 3, 4 [10] Z. Xu et al. , “Fairness in medical AI: Systematic review of bias detection and mitigation,” arXiv preprint , 2024. 2 [11] J. Tan, C. Wang, B. Li, Q. Li, W. Ouyang, C. Yin, and J. Yan, “Equalization loss for long-tailed object recognition,” in Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2020, pp. 11 662–11 671. 2, 4 [12] Y. Ju, S. Hu, S. Jia, G. H. Chen, and S. Lyu, “Improv-ing fairness in deepfake detection,” in Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , 2024, pp. 4655–4665. 2, 3, 5 [13] R. T. Rockafellar and S. Uryasev, “Optimization of condi-tional value-at-risk,” Journal of Risk , vol. 2, pp. 21–42, 2000. 2[14] D. Kollias, “Domain adaptation and fairness in medical imaging,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops , 2024. 2, 5 [15] ——, “PHAROS-AIF-MIH: Fair disease diagnosis bench-mark,” arXiv preprint , 2025. 2, 5, 6 [16] G. Litjens, T. Kooi, B. E. Bejnordi, A. A. A. Setio, F. Ciompi, M. Ghafoorian, J. A. Van Der Laak, B. Van Ginneken, and C. I. S´ anchez, “A survey on deep learning in medical image analysis,” Medical Image Analysis , vol. 42, pp. 60–88, 2017. 2[17] D. Kollias, A. Tagaris, A. Stafylopatis, S. Kollias, and G. Tagaris, “Deep neural architectures for prediction in healthcare,” in Complex & Intelligent Systems , vol. 4. Springer, 2018, pp. 297–310. [18] J. Yang, P. Huang, J. Hu, S. Hu, S. Lyu, X. Wang, J. Guo, and X. Wu, “An explainable non-local network for covid-19 diagnosis,” arXiv preprint arXiv:2408.04300 , 2024. 2 [19] X. Zhu, S. Hu et al. , “Cgd-net: A hybrid end-to-end net-work with gating decoding for liver tumor segmentation from ct images,” in 2024 IEEE International Conference on Ad-vanced Video and Signal Based Surveillance (AVSS) . IEEE, 2024, pp. 1–7. 2 [20] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image recognition,” in Proceedings of the IEEE Confer-ence on Computer Vision and Pattern Recognition , 2016, pp. 770–778. 2 [21] G. Huang, Z. Liu, L. Van Der Maaten, and K. Q. Weinberger, “Densely connected convolutional networks,” in Proceed-ings of the IEEE Conference on Computer Vision and Pattern Recognition , 2017, pp. 4700–4708. 2 [22] F. Chollet, “Xception: Deep learning with depthwise separa-ble convolutions,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2017, pp. 1251– 1258. 2 [23] A. Arsenos, D. Kollias, and S. Kollias, “A large imaging database and novel deep neural architecture for COVID-19 diagnosis,” in IEEE 14th Image, Video, and Multidimen-sional Signal Processing Workshop (IVMSP) . IEEE, 2022, pp. 1–5. 2 [24] D. Kollias, A. Arsenos, L. Soukissian, and S. Kollias, “MIA-COV19D: COVID-19 detection through 3-D chest CT im-age analysis,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2021, pp. 537–544. 2 [25] K. Hara, H. Kataoka, and Y. Satoh, “Can spatiotemporal 3D CNNs retrace the history of 2D CNNs and ImageNet?” in 
+
+Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2018, pp. 6546–6555. 2 [26] D. Tran, H. Wang, L. Torresani, J. Ray, Y. LeCun, and M. Paluri, “A closer look at spatiotemporal convolutions for action recognition,” in Proceedings of the IEEE Confer-ence on Computer Vision and Pattern Recognition , 2018, pp. 6450–6459. 2 [27] D. Kollias, A. Arsenos, and S. Kollias, “A deep neural archi-tecture for harmonizing 3-D input data analysis and decision making in medical imaging,” Neurocomputing , vol. 542, p. 126244, 2023. 2 [28] Z. Li et al. , “Multi-class COVID-19 diagnosis from CT scans using 3D ResNeSt50,” arXiv preprint , 2025. 2 [29] H. Zhang, C. Wu, Z. Zhang, Y. Zhu, H. Lin, Z. Zhang, Y. Sun, T. He, J. Mueller, R. Manmatha, M. Li, and A. Smola, “ResNeSt: Split-attention networks,” in Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops , 2022, pp. 2736–2746. 2 [30] R. Caruana, “Multitask learning,” Machine Learning ,vol. 28, no. 1, pp. 41–75, 1997. 2 [31] X. Chen, L. Yao, and Y. Zhang, “Residual attention U-Net for automated multi-class segmentation of COVID-19 chest CT images,” arXiv preprint arXiv:2004.05645 , 2020. 2 [32] J. Kawahara, S. Daneshvar, G. Argenziano, and G. Hamarneh, “Seven-point checklist and skin lesion classification using multitask multimodal neural nets,” IEEE Journal of Biomedical and Health Informatics , vol. 23, no. 2, pp. 538–546, 2019. 2 [33] K. Cao, C. Wei, A. Gaidon, N. Arechiga, and T. Ma, “Learn-ing imbalanced datasets with label-distribution-aware mar-gin loss,” in Advances in Neural Information Processing Sys-tems , vol. 32, 2019. 3 [34] A. K. Menon, S. Jayasumana, A. S. Rawat, H. Jain, A. Veit, and S. Kumar, “Long-tail learning via logit adjustment,” in International Conference on Learning Representations ,2021. 3 [35] Z. Xu et al. , “Fairness in medical AI: Systematic review of bias detection and mitigation,” arXiv preprint , 2024. 3 [36] M. A. Ricci Lara, R. Echeveste, and E. Ferrante, “Address-ing fairness in artificial intelligence for medical imaging,” 
+
+Nature Communications , vol. 13, no. 1, p. 4581, 2022. 3 [37] D. Kollias, A. Arsenos, and S. Kollias, “Domain adapta-tion, explainability & fairness in AI for medical image anal-ysis: Diagnosis of COVID-19 based on 3-D chest CT-scans,” 
+
+arXiv preprint arXiv:2403.02192 , 2024. 3 [38] N. Mehrabi, F. Morstatter, N. Saxena, K. Lerman, and A. Galstyan, “A survey on bias and fairness in machine learn-ing,” ACM Computing Surveys , vol. 54, no. 6, pp. 1–35, 2021. 3 [39] F. Ding, W. Yi, Y. Zhou, X. He, H. Rao, and S. Hu, “Decoupling bias, aligning distributions: Synergistic fair-ness optimization for deepfake detection,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2026. [40] A. Hou, L. Lin, J. Li, and S. Hu, “Rethinking individual fair-ness in deepfake detection,” in Proceedings of the 33rd ACM International Conference on Multimedia , 2025, pp. 11 424– 11 433. [41] S. Bansal, M. Wu, X. Wang, and S. Hu, “Robust fairness vision-language learning for medical image analysis,” MIPR ,2025. [42] M. Wu, L. Lin, W. Zhang, X. Wang, Z. Yang, and S. Hu, “Preserving auc fairness in learning with noisy protected groups,” in The 42nd International Conference on Machine Learning (ICML) , 2025. [43] L. Lin, X. He, Y. Ju, X. Wang, F. Ding, and S. Hu, “Preserv-ing fairness generalization in deepfake detection,” in Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 16 815–16 825. [44] S. Hu and G. H. Chen, “Fairness in survival analysis with distributionally robust optimization,” Journal of Machine Learning Research , vol. 25, no. 246, pp. 1–85, 2024. [45] ——, “Distributionally robust survival analysis: A novel fairness loss without demographics,” in Machine Learning for Health . PMLR, 2022, pp. 62–87. 3 [46] A. V. Nadimpalli and A. Rattani, “GBDF: Gender balanced deepfake dataset towards fair deepfake detection,” in Journal of Computing Sciences in Colleges , 2022. 3 [47] M. Hardt, E. Price, and N. Srebro, “Equality of opportunity in supervised learning,” in Advances in Neural Information Processing Systems , vol. 29, 2016. 3 [48] C. Dwork, M. Hardt, T. Pitassi, O. Reingold, and R. Zemel, “Fairness through awareness,” in Proceedings of the 3rd Innovations in Theoretical Computer Science Conference ,2012, pp. 214–226. 3 [49] Z. Wang et al. , “Fairness-aware adversarial perturbation to-wards bias mitigation for deployed deep models,” in Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 10 379–10 388. 3 [50] R. T. Rockafellar and S. Uryasev, “Optimization of condi-tional value-at-risk,” Journal of Risk , vol. 2, pp. 21–42, 2000. 3[51] D. Levy, Y. Carmon, J. Duchi, and A. Sidford, “Large-scale methods for distributionally robust optimization,” in 
+
+Advances in Neural Information Processing Systems , vol. 33, 2020, pp. 8847–8860. 3 [52] S. Hu et al. , “Rank-based decomposable losses in machine learning: A survey,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2023. 3 [53] ——, “Sum of ranked range loss for supervised learning,” 
+
+arXiv preprint , 2022. 3 [54] S. Hu and G. H. Chen, “Distributionally robust optimization for fairness-aware survival analysis,” arXiv preprint , 2022. 3 [55] Y. Ju, S. Hu, S. Jia, G. H. Chen, and S. Lyu, “Improv-ing fairness in deepfake detection,” in Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , 2024, pp. 4766–4775. 3 [56] L. Lin, X. He, Y. Ju, X. Wang, F. Ding, and S. Hu, “Preserv-ing fairness generalization in deepfake detection,” in Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 16 815–16 825. 3 [57] P. Foret, A. Kleiner, H. Mobahi, and B. Neyshabur, “Sharpness-aware minimization for efficiently improving generalization,” in International Conference on Learning Representations , 2021. 3 [58] A. Hou, L. Lin, J. Li, and S. Hu, “Rethinking individual fair-ness in deepfake detection,” in Proceedings of the ACM In-ternational Conference on Multimedia , 2025. 3 [59] Y. S. Krubha, A. Hou, B. Vester, W. Walker, X. Wang, L. Lin, and S. Hu, “Robust ai-generated face detection with imbal-anced data,” MIPR , 2025. 3 [60] L. Lin, Y. S. Krubha, Z. Yang, C. Ren, T. D. Le, I. Amerini, X. Wang, and S. Hu, “Robust covid-19 detection in ct images with clip,” in 2024 IEEE 7th International Conference on Multimedia Information Processing and Retrieval (MIPR) .IEEE, 2024, pp. 586–592. [61] L. Lin, S. Hu et al. , “Robust light-weight facial affective be-havior recognition with clip,” MIPR , 2024. [62] L. Lin, I. Amerini, X. Wang, S. Hu et al. , “Robust clip-based detector for exposing diffusion model-generated im-ages,” MIPR , 2024. [63] S. Hu, X. Wang et al. , “Rank-based decomposable losses in machine learning: A survey,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2023. [64] W. Pu, J. Hu, X. Wang, Y. Li, S. Hu, B. Zhu, R. Song, Q. Song, X. Wu, and S. Lyu, “Learning a deep dual-level network for robust deepfake detection,” Pattern Recognition ,vol. 130, p. 108832, 2022. [65] H. Guo, S. Hu, X. Wang, M.-C. Chang, and S. Lyu, “Robust attentive deep neural network for detecting gan-generated faces,” IEEE Access , vol. 10, pp. 32 574–32 583, 2022. [66] S. Hu, Y. Ying, X. Wang, and S. Lyu, “Sum of ranked range loss for supervised learning,” Journal of Machine Learning Research , vol. 23, no. 112, pp. 1–44, 2022. [67] ——, “Learning by minimizing the sum of ranked range,” 
+
+Advances in Neural Information Processing Systems , vol. 33, pp. 21 013–21 023, 2020. 3 [68] D. Tran, H. Wang, L. Torresani, J. Ray, Y. LeCun, and M. Paluri, “A closer look at spatiotemporal convolutions for action recognition,” in Proceedings of the IEEE Confer-ence on Computer Vision and Pattern Recognition , 2018, pp. 6450–6459. 3 [69] J. Byrd and Z. Lipton, “What is the effect of importance weighting in deep learning?” in International Conference on Machine Learning , 2019, pp. 872–881. 4 [70] K. Cao, C. Wei, A. Gaidon, N. Arechiga, and T. Ma, “Learn-ing imbalanced datasets with label-distribution-aware mar-gin loss,” in Advances in Neural Information Processing Sys-tems , 2019. 4 [71] R. T. Rockafellar and S. Uryasev, “Optimization of condi-tional value-at-risk,” Journal of Risk , vol. 2, no. 3, pp. 21–41, 2000. 5 [72] J. Rawls, Justice as Fairness: A Restatement . Harvard Uni-versity Press, 2001. 5 [73] A. K. Menon, S. Jayasumana, A. S. Rawat, H. Jain, A. Veit, and S. Kumar, “Long-tail learning via logit adjustment,” in International Conference on Learning Representations ,2021. 6 [74] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image recognition,” in Proceedings of the IEEE Confer-ence on Computer Vision and Pattern Recognition , 2016, pp. 770–778. 6 [75] W. Kay, J. Carreira, K. Simonyan, B. Zhang, C. Hillier, S. Vijayanarasimhan, F. Viola, T. Green, T. Back, P. Nat-sev, M. Suleyman, and A. Zisserman, “The Kinetics human action video dataset,” in arXiv preprint arXiv:1705.06950 ,2017. 6 [76] D. P. Kingma and J. Ba, “Adam: A method for stochastic op-timization,” in International Conference on Learning Repre-sentations , 2015. 6

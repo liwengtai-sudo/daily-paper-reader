@@ -1,0 +1,335 @@
+Title: Orthogonal Quadratic Complements for Vision Transformer Feed-Forward Networks
+
+URL Source: https://arxiv.org/pdf/2604.09709v1
+
+Published Time: Tue, 14 Apr 2026 00:07:38 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+# Orthogonal Quadratic Complements for Vision Transformer Feed-Forward Networks 
+
+Wang Zixian China Mobile Communications Group Shandong Co., Ltd. 
+
+wangzixian@sd.chinamobile.com 
+
+# Abstract 
+
+Recent bilinear feed-forward replacements for vision transform-ers can substantially improve accuracy, but they often conflate two effects: stronger second-order interactions and increased redundancy relative to the main branch. We study a comple-mentary design principle: auxiliary quadratic features should contribute only information that is not already captured by the dominant hidden representation. To this end we propose 
+
+Orthogonal Quadratic Complements (OQC), which build a low-rank quadratic auxiliary branch and explicitly project it onto the orthogonal complement of the main branch before injec-tion. We also study an efficient low-rank realization (OQC-LR) and gated extensions (OQC-static and OQC-dynamic). Un-der a parameter-matched Deep-ViT/CIFAR-100 protocol with a fixed penultimate-residual readout, full OQC improves an AFBO baseline from 64 .25 ±0.22 to 65 .59 ±0.22 , while OQC-LR reaches 65 .52 ± 0.25 with a substantially better speed– accuracy trade-off. On TinyImageNet, the gated extension OQC-dynamic achieves 51 .88 ± 0.32 , improving the baseline (50 .45 ± 0.21 ) by +1 .43 points and outperforming all ungated variants. Mechanism analyses show near-zero post-projection auxiliary–main overlap together with improved representation geometry and class separation. The full family—ungated and gated alike—generalizes consistently across both datasets. 
+
+# 1 Introduction 
+
+Feed-forward networks (FFNs) remain one of the main bottle-necks in vision transformers. While simple MLP blocks carry most of the channel mixing capacity, they struggle to capture higher-order interactions explicitly. Consequently, ongoing re-search often replaces or augments standard FFNs with more expressive multiplicative or bilinear operators. However, we argue that the true bottleneck is not solely the lack of capacity, but rather the failure to extract structurally novel information. Simply adding an auxiliary high-order branch to a host FFN does not automatically guarantee better information utiliza-tion. Whether augmenting a standard MLP or a state-of-the-art bilinear operator (such as AFBO), a recurring failure mode is representation redundancy: additional quadratic branches often collapse back into the dominant main representation. This suggests that the key problem is not merely “add another second-order branch”, but rather how to inject non-redundant complementary information .We approach this from a finite-dimensional Hilbert-space viewpoint. Let the main hidden map define the dominant sub-space of a transformer block. An auxiliary quadratic branch should then act as a complement, not as a duplicate. This moti-vates OQC: we first construct a low-rank quadratic feature, then explicitly remove the component aligned with the main branch, and finally inject only the orthogonal complement. The result-ing module can be instantiated as a full hidden-space comple-ment (OQC) or as a cheaper low-rank variant (OQC-LR). We also explore gated versions (OQC-static and OQC-dynamic), which modulate the complement after orthogonalization. Across the experiments in this paper, the picture is consistent. Every complement variant improves the AFBO baseline on both CIFAR-100 and TinyImageNet. Full OQC provides the most geometry-preserving improvement, OQC-LR is the best efficiency-oriented approximation, and the OQC-gated family generalizes reliably across both datasets—with OQC-dynamic achieving the highest TinyImageNet accuracy. Crucially, OQC serves as a broad enhancement pattern: our generic transfer study shows that orthogonal quadratic complements provide substantial performance boosts to standard MLPs, while con-tinuing to yield reliable gains even when applied to highly-optimized bilinear operators like AFBO. 
+
+Contributions. 
+
+• We introduce OQC, an FFN design principle that injects only the orthogonal quadratic complement of the dominant main branch instead of an unrestricted auxiliary quadratic branch. • We derive two practical realizations: a full complement model with the best cross-dataset accuracy, and an efficient low-rank variant (OQC-LR) with a better speed–accuracy trade-off. • We provide mechanism evidence that the complement pro-jection removes auxiliary–main overlap while improving rep-resentation geometry and class separation, and we delineate where the method does and does not transfer beyond the primary AFBO host backbone. • We additionally study gated extensions (OQC-static and OQC-dynamic) and show that adaptive gating is promis-ing on CIFAR-100 but currently does not displace full OQC as the strongest cross-dataset claim. 1
+
+> arXiv:2604.09709v1 [cs.CV] 8 Apr 2026
+
+# 2 Related Work 
+
+Vision transformers. The Transformer architecture [ 1] was originally proposed for sequence modelling and has since be-come a standard backbone for visual recognition via ViT [ 2 ]. Follow-up work such as DeiT [ 3 ] and Swin [ 4] showed that training protocol and hierarchical design strongly affect down-stream performance. Our work does not propose a new back-bone; instead, it modifies the FFN inside a fixed ViT-style block. 
+
+Expressive FFN replacements. Gated activations and multi-plicative channel mixers, such as GLU variants [ 5 ], increase ex-pressivity by introducing feature-wise products. Recent vision-specific bilinear operators go further and directly model second-order interactions. The most relevant baseline in our study is AFBO [ 6], which replaces the FFN with an asymmetric factor-ized bilinear operator built from grouped channel mappings. 
+
+Residual readout and depth aggregation. We also use a penultimate-residual (PR) readout, which forms the final clas-sifier representation as a residual combination of the last and penultimate layer states. In this paper that readout is treated as a fixed control shared by all AFBO-based variants; it is not the main contribution. Our goal is to understand how much addi-tional signal remains after the dominant final feature is fixed, and whether orthogonal quadratic complements can exploit it more effectively than unrestricted auxiliary branches. 
+
+# 3 Method 
+
+3.1 Theoretical Motivation: Beyond Linear Sub-spaces 
+
+The need for explicit feature interaction. Standard vision transformer FFNs operate as token-wise multi-layer percep-trons (MLPs). Their primary limitation is the lack of explicit high-order feature interaction; they must rely on compositional depth to indirectly model complex dependencies. Directly injecting a quadratic auxiliary branch introduces structural cur-vature and multiplicative interactions, akin to the mechanisms that make Gated Linear Units (GLU) and bilinear pooling effec-tive. From a functional perspective, a standard fully-connected layer learns mappings confined to a linear subspace, span( W ).A quadratic auxiliary branch, conversely, models interactions of the form x⊤Ax . These represent fundamentally distinct func-tion families. The quadratic component is specifically designed to capture structural information strictly outside the main linear subspace. 
+
+The necessity of redundancy removal. However, simply adding an unrestricted high-order branch does not guaran-tee that the network will learn non-redundant information. Consider a typical formulation of a quadratic feature such as 
+
+q(x) = ( U x ) ⊙ (V x ). When expanded, a portion of this prod-uct captures genuine cross-feature interactions, but another substantial component often reduces to a linear deformation proportional to a standard mapping W x .Suppose a transformer block already possesses a dominant hidden map b(x) ∈ RC×H×W produced by a strong bilinear FFN such as AFBO. A naive additive auxiliary branch would inject q(x) as 
+
+y = b(x) + α q (x). (1) If the redundancy is not explicitly managed, the network fre-quently collapses to a lazy solution where the auxiliary branch mimics the dominant map, yielding y ≈ (1 + α′)b(x). The auxiliary branch fails to introduce new structural information and merely amplifies the existing host representation. To solve this, we interpret b(x) and the auxiliary feature as elements of a finite-dimensional Hilbert space equipped with the standard inner product. By explicitly defining the main branch as the dominant subspace, we can project the auxiliary feature onto the orthogonal complement of that space. Cutting out the linearly dependent duplicate leaves exactly the genuine, non-redundant higher-order variations. 
+
+3.2 Main Branch Representation 
+
+Our method is designed to be agnostic to the specific architec-ture of the host FFN. Let the host FFN produce a dominant hidden representation b(x). The OQC module can be inte-grated into any host: standard MLPs, bilinear operators such as AFBO [ 6], or other FFN variants. In our primary experiments we use AFBO as the host because it already provides a strong dominant representation, making it a demanding testbed for the complement; we also evaluate directly on a plain MLP host in Section 4.6. In our implementation, this hidden map is then fed to an output projection and wrapped inside a standard pre-norm transformer block. We keep that host branch fixed and only change the auxiliary pathway. This isolates the contribution of the complement rather than conflating it with a different backbone. 
+
+3.3 Orthogonal Quadratic Complements 
+
+We first construct a low-rank quadratic auxiliary feature. Let 
+
+u(x), v (x) ∈ Rr×H×W (2) be two learned projections of the block input, and define the raw quadratic feature 
+
+q(x) = RMSNorm( u(x) ⊙ v(x)) , (3) where ⊙ denotes Hadamard multiplication and r ≪ C.To orthogonalize this feature with respect to the main branch, we map the main hidden map into the same auxiliary space: 
+
+m(x) = RMSNorm( P b (x)) . (4) Here P : RC×H×W → Rr×H×W is a learned projection into the auxiliary space. We then remove the component aligned with m(x):
+
+q⊥(x) = RMSNorm 
+
+
+
+q(x) − ⟨q(x), m (x)⟩∥m(x)∥2 + ε m(x)
+
+
+
+. (5) 2Orthogonality property. For every nonzero m(x), the un-normalized residual in Eq. (5) is orthogonal to m(x) by con-struction: 
+
+
+
+q(x) − ⟨q(x), m (x)⟩∥m(x)∥2 + ε m(x), m (x)
+
+
+
+≈ 0. (6) Our mechanism study confirms that the absolute cosine overlap between auxiliary and main features drops from roughly 0.13 –
+
+0.14 before projection to approximately 10 −8 after projection. 
+
+Interpretation. This projection is the core distinction be-tween our method and a naive auxiliary quadratic branch. A standard additive auxiliary branch is free to relearn directions already present in the host representation. In contrast, OQC forces the auxiliary branch to act as a complement. In Hilbert-space terms, the main branch defines the dominant subspace and the quadratic branch is restricted to the corresponding orthogonal complement. This gives the method a precise non-redundancy bias rather than a generic “more capacity” story. 
+
+3.4 Full OQC and Efficient OQC-LR 
+
+We study two realizations of the complement. 
+
+Full OQC. The first lifts the auxiliary feature to the full hidden width, performs the complement in hidden space, and adds the resulting update to the main branch: 
+
+h(x) = b(x) + σ(β) O q⊥(x) , (7) where O maps the auxiliary feature to the hidden width and 
+
+σ(β) is a learned mixing coefficient. 
+
+OQC-LR. The second performs orthogonalization entirely in low-rank space and only then lifts the result back to the hidden width: 
+
+h(x) = b(x) + σ(β) ∆( x), (8) with 
+
+∆( x) = RMSNorm  O(q⊥(x))  . (9) This OQC-LR form preserves most of the gain while substan-tially reducing the runtime gap relative to full OQC. Empiri-cally, the best trade-off in our current sweep is rank 56 , which we denote as OQC-LR r56. 
+
+3.5 Gated OQC Variants 
+
+We also examine gated complement variants, which modulate the orthogonal auxiliary update after projection. 
+
+OQC-static. A static scalar gate uses the same per-model learned mixing coefficient σ(β) as OQC-LR, but with a more conservative initialization ( β0 ≈ 0) and an explicit gate param-eterization that is decoupled from the host FFN design: 
+
+h(x) = b(x) + σ(β) ∆( x), β0 ∼ N (0 , 0.01) . (10) The key distinction from OQC-LR is architectural indepen-dence: the static gate is implemented as a standalone parameter rather than being embedded in the host FFN class, allowing the same gate design to be reused across arbitrary host branches. 
+
+OQC-dynamic. A dynamic gate predicts an input-dependent spatial modulation map g(x) via a lightweight 1×1 convolution on the input: 
+
+h(x) = b(x) + σ(g(x)) ⊙ ∆( x). (11) This increases adaptivity by allowing the complement injection to vary per token and per sample. In our experiments, the dy-namic gate achieves competitive accuracy ( 65 .33 ± 0.11% , sin-gle protocol) while maintaining a low mean activation ( ∼ 0.11 )with a non-trivial standard deviation ( 0.121 ), indicating gen-uinely input-dependent modulation rather than a reparameter-ized constant. 
+
+3.6 Architecture Illustration 
+
+Figure 1 summarizes the progression from a standard host FFN to OQC and finally to the gated OQC extension. The visual difference reveals the core mechanism: the host FFN (e.g., an MLP or AFBO) produces a dominant main branch, while OQC introduces a low-rank quadratic auxiliary feature and explicitly projects it onto the orthogonal complement of the host’s representation. The gated OQC family preserves this orthogonal complement but conditionally modulates it using a static or dynamic gate. 
+
+3.7 Penultimate-Residual Readout 
+
+All main AFBO-based experiments use the same readout: 
+
+z = hL + σ(γ)hL−1, (12) where hL and hL−1 are the last and penultimate layer represen-tations. We keep this component fixed across the AFBO, full OQC, and OQC-gated comparisons so that the paper focuses on the FFN change itself rather than on readout engineering. 
+
+# 4 Experiments 
+
+4.1 Experimental Protocol 
+
+Our primary protocol uses Deep-ViT on CIFAR-100 with depth 
+
+8, width 256 , 8 heads, patch size 4, batch size 512 , and three seeds. We train with AdamW, a peak learning rate of 2 × 10 −3,weight decay 0.05 , and a short warmup before cosine decay. We report the best test accuracy over training, parameter count, and measured throughput in images per second. The TinyImageNet transfer uses the same backbone family with image size 64 ,patch size 8, batch size 128 , and three seeds. Unless otherwise noted, all AFBO-based methods share the same penultimate-residual readout, so differences in Tables 1–4 isolate the FFN change itself. 3Input x                  
+
+> Main Branch structure (e.g., standard MLP, or AFBO layers)
+> Output ymain
+> Standard Host FFN
+> Input x
+> Main Branch b(x)
+> (e.g., MLP / AFBO)
+> Ulr xVlr x
+> ⊙
+> Orthogonalize ⊥
+> RMS Norm
+> +
+> Output y
+> q(x)
+> α·∆⊥(x)
+> Projection
+> OQC-Enhanced FFN
+> Input x
+> Main Branch b(x)Orthogonal Complement ∆⊥(x)
+> ⊗Gate g(x)
+> +
+> Output y
+> (Dynamic)
+> Modulated ∆⊥
+> Gated OQC Extension
+
+Figure 1: Architecture evolution. Left: The host FFN (e.g., standard MLP or AFBO) produces a dominant main branch. Middle: 
+
+OQC adds a low-rank quadratic auxiliary feature and explicitly projects it onto the orthogonal complement of the main branch. 
+
+Right: The gated OQC family maintains the orthogonal complement but dynamically or statically modulates its injection to the host branch. 
+
+Method Acc. (%) Params (M) Img/s AFBO+PR 64.25 ± 0.22 6.37 9762 
+
+OQC full 65.59 ± 0.22 6.97 5642 OQC-LR r56 65.52 ± 0.25 7.19 7497 OQC-static 65.44 ± 0.19 7.59 7032 OQC-dynamic 65.33 ± 0.11 7.59 7155 
+
+Table 1: Main CIFAR-100 results under the common Deep-ViT protocol. Full OQC is the strongest cross-validated variant, while OQC-LR r56 offers a better speed–accuracy trade-off. 
+
+4.2 Main Results on Deep-ViT/CIFAR-100 
+
+Table 1 establishes the main empirical hierarchy. Full OQC is the strongest overall variant and improves the matched AFBO baseline by +1 .34 points. OQC-LR r56 recovers nearly all of that gain while being markedly faster than full OQC, making it the strongest efficiency-oriented version in the current suite. The gated OQC family is competitive on CIFAR-100: OQC-static slightly outperforms OQC-dynamic in accuracy, while the dynamic gate remains somewhat faster and later shows the strongest class separation signal. Two points are worth emphasizing. First, these gains are not coming from a readout trick alone, because the readout is fixed across all methods. Second, the variants represent different trade-offs rather than a single monotone frontier: full OQC is the best geometry-preserving complement, OQC-LR r56 is the best speed–accuracy compromise, and OQC-static is the strongest gated instance on CIFAR-100 under the main protocol. The TinyImageNet experiment (Section 4.3) later shows that OQC-dynamic takes the lead on the second dataset. 
+
+Method Acc. (%) Params (M) Img/s AFBO+PR 50.45 ± 0.21 6.43 11900 
+
+OQC full 51.36 ± 0.28 7.03 8085 OQC-LR r56 51.35 ± 0.11 7.25 9400 OQC-static 51.47 ± 0.07 7.65 9108 OQC-dynamic 51.88 ± 0.32 7.65 9051 
+
+Table 2: TinyImageNet cross-dataset transfer (3 seeds, consis-tent protocol). All OQC variants improve the AFBO baseline. OQC-dynamic achieves the highest accuracy, confirming that the gated family generalizes beyond CIFAR-100. 
+
+4.3 Cross-Dataset Transfer on TinyImageNet 
+
+The TinyImageNet transfer in Table 2 validates the OQC fam-ily at scale and across datasets. All four complement variants consistently improve the AFBO baseline, with gains ranging from +0 .90 (OQC-LR r56) to +1 .43 (OQC-dynamic) percent-age points. Notably, OQC-dynamic achieves 51 .88 ± 0.32 —the highest single result on TinyImageNet—while OQC-static achieves the tightest variance ( ±0.07 ), indicating reliable im-provement across seeds. These results resolve the earlier uncertainty about cross-dataset generalization of the gated family. Both OQC-static and OQC-dynamic transfer positively to TinyImageNet, demon-strating that adaptive gating is not an artifact of CIFAR-100-specific tuning. 
+
+4.4 Mechanism Analysis 
+
+Table 3 reveals a useful split between geometry and discrimina-tion. Full OQC preserves the richest representation geometry, 4Method Acc. EffRank PartRatio Sep. AFBO+PR 64.41 76.64 48.49 1.0118 OQC full 65.18 78.17 50.43 1.0146 OQC-LR r56 65.29 77.53 49.85 1.0194 OQC-static 65.44 77.67 50.05 1.0172 OQC-dynamic 65.33 77.49 49.96 1.0202 
+
+Table 3: Mechanism statistics on CIFAR-100. “Sep.” denotes class separation score. with the best effective rank and participation ratio. The gated family slightly sacrifices that geometry but improves class sep-aration, which explains why OQC-static and OQC-dynamic remain competitive in accuracy on CIFAR-100. Orthogonalization itself behaves exactly as intended. For OQC-LR r56, the mean auxiliary–main absolute cosine drops from 0.143 before projection to 1.49 × 10 −8 after projection. For OQC-static and OQC-dynamic, the corresponding drops are 0.133 → 1.23 × 10 −8 and 0.131 → 1.23 × 10 −8. The dynamic gate also changes how much complement is used: its mean mixing coefficient decreases from roughly 0.190 to 0.130 ,while the gate standard deviation rises to 0.121 , indicating genuinely input-dependent modulation rather than a disguised constant scalar. The mechanism picture therefore matches the accuracy pic-ture. Full OQC is the most geometry-preserving variant, while OQC-dynamic is the most discriminative according to sepa-ration score. OQC-static ends up sitting between those ex-tremes and is therefore the strongest gated accuracy point in this specific protocol. Figure 2 makes this split more visible: panel (a) shows that overlap is almost annihilated after projec-tion, panel (b) shows that full OQC occupies the best geometry corner while OQC-dynamic pushes furthest toward discrim-ination, and panel (c) shows that dynamic gating genuinely changes complement usage rather than merely reparameteriz-ing the same scalar gate. OQC-LR OQC-static OQC-dynamic      
+
+> 0.000
+> 0.025
+> 0.050
+> 0.075
+> 0.100
+> 0.125
+> 0.150
+> 0.175
+> 0.200
+> Abs. cosine overlap
+> 0.143 0.133 0.131
+> (a) Orthogonalization Removes Overlap
+> Before
+> After
+> 77 78
+> Effective Rank
+> 1.012
+> 1.014
+> 1.016
+> 1.018
+> 1.020
+> Separation Score
+> AFBO
+> OQC full
+> OQC-LR r56
+> OQC-static
+> OQC-dynamic
+> (b) Geometry vs. Discrimination
+> OQC-LR OQC-static OQC-dynamic
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> Gate coefficient  0.190 0.195
+> 0.130
+> 0.013
+> 0.121
+> (c) Complement Usage
+> Mean gate
+> Gate std.
+
+Figure 2: Mechanism visualization. (a) Auxiliary–main ab-solute cosine overlap before and after complement projection; orthogonalization reduces it to machine-precision zero. (b) 
+
+Effective-rank vs. separation score: full OQC achieves the richest geometry while OQC-dynamic achieves the best class separation. (c) Complement usage: OQC-dynamic lowers av-erage gate activation and introduces genuine input-dependent variation (high gate std.), confirming it is not a reparameterized static gate. 
+
+4.5 Ablation on Auxiliary Rank and Design 
+
+To understand the sensitivity of OQC to its capacity and ar-chitectural choices, we conducted several ablation studies on CIFAR-100. 
+
+Auxiliary Rank Sweep. We varied the rank r of the auxiliary quadratic branch. Starting from a baseline accuracy of 64 .25% ,an extremely low rank ( r = 16 ) yields 64 .45 ± 0.59% —only a marginal improvement—while rank r = 48 and r = 64 climb to 65 .13 ± 0.12% and 65 .31 ± 0.17% respectively. This con-firms that the orthogonal complement needs sufficient dimen-sionality to capture non-redundant high-order features effec-tively. Figure 3 shows the resulting trade-off: the full comple-ment improves steadily with rank (left panel), while OQC-LR peaks at r = 56 and forms the cleanest efficiency sweet spot in the Pareto view (right panel). 10 20 30 40 50 60 70    
+
+> Auxiliary Rank
+> 64.00
+> 64.25
+> 64.50
+> 64.75
+> 65.00
+> 65.25
+> 65.50
+> 65.75
+> 66.00
+> Top-1 Accuracy (%)
+> r=56
+> sweet spot
+> (a) Rank Sweep
+> AFBO+PR baseline
+> OQC full
+> OQC-LR
+> 6000 7000 8000 9000
+> Throughput (img/s)
+> 64.2
+> 64.4
+> 64.6
+> 64.8
+> 65.0
+> 65.2
+> 65.4
+> Top-1 Accuracy (%)
+> AFBO+PR
+> r=16
+> r=48
+> r=64
+> r=48
+> r=56
+> r=64
+> (b) Accuracy–Efficiency Pareto
+> AFBO+PR
+> OQC full
+> OQC-LR
+
+Figure 3: Accuracy–efficiency trade-off. (a) Rank sweep: full OQC improves monotonically with rank, while OQC-LR peaks at r=56 (starred). (b) Pareto frontier: OQC-LR r56 delivers 65 .52% at 7,485 img/s, substantially faster than full OQC ( 5,655 img/s) while nearly matching its accuracy. 
+
+Alternative Complement Designs. We explored alternative, cheaper designs for the auxiliary branch to validate the necessity of each component in OQC: • Shared Projection : Sharing the projection matrices between the main and auxiliary branches reduces the parameter over-head but drops the accuracy to 64 .85 ± 0.14% , indicating that the auxiliary branch needs independent capacity to find complementary features. • Scalar Gated (No Orthogonalization) : A naive scalar-gated auxiliary branch without explicit orthogonalization only achieves 63 .47 ± 0.19% , performing worse than the baseline. This strongly validates our core hypothesis: simply adding more quadratic capacity is ineffective; the orthogo-nalization step is what prevents redundancy and drives the performance gain. • Low-Rank Orthogonalization (No Gate) : When orthog-onalization is performed in low-rank space but the result is injected without any gating ( α ≡ 1), accuracy drops to 
+
+63 .03 ± 0.23% (3-seed confirmation run). This demonstrates that while orthogonalization provides non-redundant features, a gating mechanism is strictly necessary to control the injec-5Condition MLP AFBO Base 47.27 ± 0.42 62.82 ± 0.45                   
+
+> +PR 47.29 ±0.25 63.77 ±0.11
+> +OQC-LR 50.75 ±0.23 63.88 ±0.29
+> +OQC-LR +PR 51.39 ±0.42 65.16 ±0.07
+
+Table 4: Component decomposition on CIFAR-100 (3 seeds, top-1 acc.%). Base : host FFN only, no readout, no complement. PR: penultimate-residual readout. OQC-LR: efficient low-rank complement. tion scale and prevent the complement from destabilizing the main branch. 
+
+Note. The main results in Table 1 and the ablation confirmation above use the same Deep-ViT backbone but slightly differ-ent training protocols (learning rate and total epoch budget). Numbers within each protocol are directly comparable; cross-protocol comparisons should account for this difference. 
+
+4.6 Generic Transfer and Component Decompo-sition 
+
+Table 4 decomposes the two design choices—complement (OQC) and readout (PR)—across two host architectures. Three findings emerge. 
+
+PR readout is structure-dependent. The penultimate-residual readout adds negligible gain for a plain MLP ( +0 .02 
+
+pp) but a meaningful +0 .95 pp for the richer AFBO branch, confirming that the readout exploits depth-aggregated structure that a simple MLP does not produce. 
+
+OQC-LR is broadly applicable. The complement improves both hosts: MLP gains +3 .48 pp and AFBO gains +1 .06 pp without any readout. Gains are inversely proportional to host strength, consistent with the intuition that OQC is most useful when the host defines a stable dominant subspace while still leaving orthogonal second-order directions unexploited. 
+
+OQC and PR are super-additive on AFBO. Combined, OQC-LR +PRadds +2 .34 pp from the plain AFBO base-line, exceeding the naïve sum of their individual contributions (0.95+1 .06=2 .01 pp). We hypothesize that the complement en-riches the depth-token distribution in a way that the PR readout can exploit more effectively. 
+
+4.7 Backbone Transfer Caveat 
+
+We also ran a small ViT-Tiny transfer study for the penultimate-residual readout in isolation. The result was mixed rather than clearly positive. We do not include that setting as a main table because it does not test the full OQC method, but it is still informative: simple readout improvements should not be con-fused with the complement mechanism itself. This is another reason the paper focuses on the AFBO-hosted complement family rather than on a universal readout claim. 
+
+# 5 Discussion and Limitations 
+
+Three limitations matter for interpretation. 
+
+The complement is not universal. Our generic transfer ex-periment shows a large positive result on a plain MLP host and a moderate gain on AFBO. We do not claim that orthogonal quadratic complements should be inserted into every FFN in-discriminately; in particular, the gain diminishes for hosts that already model strong quadratic interactions. 
+
+Gated variants generalize, but with wider variance. Our TinyImageNet transfer experiment confirms that both OQC-static and OQC-dynamic produce consistent gains on a second dataset. However, OQC-dynamic shows a higher standard deviation ( ±0.32 ) compared to OQC-static ( ±0.07 ) and the ungated variants. This suggests that dynamic gating may be sensitive to initialization, and that additional runs or learning-rate tuning could be worthwhile before treating OQC-dynamic as the definitive leader. 
+
+Readout gains do not appear universally backbone-agnostic. 
+
+In a separate ViT-Tiny pilot, penultimate-residual readout alone did not improve the baseline ( 24 .37 ± 0.95 vs. 23 .94 ± 0.38 ). For this reason, we use the readout as a controlled component inside the AFBO family, but avoid promoting it as a universal architectural improvement. 
+
+# 6 Conclusion 
+
+We introduced OQC, a feed-forward design principle that in-jects only the orthogonal quadratic complement of a domi-nant main branch. The resulting method improves a matched AFBO baseline on Deep-ViT/CIFAR-100 and TinyImageNet across all tested variants—ungated and gated alike. Full OQC and OQC-LR provide the most stable improvements; OQC-dynamic achieves the highest single accuracy on TinyImageNet (51 .88 ± 0.32 ), and mechanism analyses confirm that the aux-iliary branch becomes non-redundant after projection. OQC-LR is the most practical efficiency-oriented variant; and the OQC-gated family is a cross-dataset-validated extension that trades some geometric richness for stronger class discrimi-nation. More broadly, the results suggest that second-order auxiliary branches are most useful when they are explicitly constrained to occupy the complement of the dominant repre-sentation rather than to compete with it directly. 
+
+# References 
+
+[1] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention Is All You Need. In 
+
+Advances in Neural Information Processing Systems (NeurIPS) , 2017. 6[2] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, Jakob Uszkoreit, and Neil Houlsby. An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale. In International Conference on Learning Representations (ICLR) , 2021. [3] Hugo Touvron, Matthieu Cord, Matthijs Douze, Fran-cisco Massa, Alexandre Sablayrolles, and Hervé Jégou. Training Data-Efficient Image Transformers & Distilla-tion Through Attention. In Proceedings of the 38th Inter-national Conference on Machine Learning (ICML) , vol-ume 139 of Proceedings of Machine Learning Research ,pages 10347–10357, 2021. [4] Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng Zhang, Stephen Lin, and Baining Guo. Swin Transformer: Hierarchical Vision Transformer Using Shifted Windows. In Proceedings of the IEEE/CVF International Confer-ence on Computer Vision (ICCV) , pages 10012–10022, 2021. [5] Noam Shazeer. GLU Variants Improve Transformer. 
+
+arXiv preprint arXiv:2002.05202 , 2020. [6] Junjie Wu, Qilong Wang, Jiangtao Xie, Pengfei Zhu, and Qinghua Hu. Asymmetric Factorized Bilinear Operation for Vision Transformer. In International Conference on Learning Representations (ICLR) , 2025. 7
