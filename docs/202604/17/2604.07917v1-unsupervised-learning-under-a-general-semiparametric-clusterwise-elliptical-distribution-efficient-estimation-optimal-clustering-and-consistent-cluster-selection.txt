@@ -1,0 +1,3874 @@
+Title: Unsupervised Learning Under a General Semiparametric Clusterwise Elliptical Distribution: Efficient Estimation, Optimal Clustering, and Consistent Cluster Selection
+
+URL Source: https://arxiv.org/pdf/2604.07917v1
+
+Published Time: Fri, 10 Apr 2026 01:04:26 GMT
+
+Number of Pages: 45
+
+Markdown Content:
+# Unsupervised Learning Under a General Semiparametric Clusterwise Elliptical Distribution: Efficient Estimation, Optimal Clustering, and Consistent Cluster Selection 
+
+Jen-Chieh Teng 1, Sheng-Hsin Fan 2, Chin-Tsang Chiang 3, Ming-Yueh Huang 4,Alvin Lim 51Data Science Degree Program, National Taiwan University, Taipei, Taiwan 
+
+> 2
+
+Department of Mathematics, National Taiwan University, Taipei, Taiwan 
+
+> 3
+
+Institute of Applied Mathematical Sciences, National Taiwan University, Taipei, Taiwan 
+
+> 4
+
+Institute of Statistical Science, Academia Sinica, Taipei, Taiwan 
+
+> 5
+
+Goizueta Business School, Emory University, Atlanta, GA, USA 
+
+April 10, 2026 
+
+Abstract 
+
+We introduce a general semiparametric clusterwise elliptical distribution to assess how latent cluster structure shapes continuous outcomes. Using a subjectwise representation, we first estimate cluster-specific mean vectors and a cluster-invariant scatter matrix by minimizing a weighted sum of squares criterion augmented with a separation penalty; we provide an initialization scheme and a computational algorithm with guaranteed convergence. This initial estimator consistently recovers the true clusters and seeds a second phase that alternates pseudo-maximum likelihood (or pseudo-maximum marginal likelihood) estimation with cluster reassignment, yielding asymptotic semiparametric efficiency and an optimal clustering that asymptotically maximizes the probability of correct membership. We also propose a semiparametric information criterion for selecting the number of clusters. Monte Carlo simulations and empirical applications demonstrate strong finite-sample performance and practical value. 
+
+## 1 Introduction 
+
+Cluster analysis is a core tool across disciplines—from bioinformatics (Liu, Hayes, Nobel, and Marron, 2008) to marketing (Gomes and Meisen, 2023)—for uncovering latent subpopulations when class labels are unavailable. Also called segmentation in marketing research, clustering is increasingly used not only to decide the number of groups and group observations by similarity but also to relate latent cluster structure to observed variables. Researchers have employed both distribution-free methods 
+
+Keywords: Clusterwise elliptical distribution, Optimal clustering, Pseudo-maximum likelihood estimation, Semi-parametric efficiency, Semiparametric information criterion, Separation penalty estimation 
+
+1
+
+> arXiv:2604.07917v1 [stat.ME] 9 Apr 2026
+
+(e.g., McLachlan, 1982; McLachlan and Basford, 1988) and distribution-based methods (e.g., Gordon, 1999; Hastie, Tibshirani, Friedman, and Friedman, 2009) to explore such relationships. Two motivating applications illustrate these needs. In personalized marketing, firms increas-ingly build customer representations from implicit behavior—product views, purchase sequences, and RFM (Recency, Frequency, Monetary) summaries—and then segment customers to enable targeted treatment assignment. The default k-means algorithm (MacQueen, 1967) effectively assumes spher-ical, equally sized clusters, an assumption often violated in heterogeneous retail data. Relaxing this geometry is crucial to recover life-stage-like segments (e.g., singles vs. families) that are diffi-cult to infer from sparse or missing demographics, and to move beyond heuristic targeting toward automated, data-driven personalization. In healthcare, patient stratification with the Pima Indian Diabetes dataset offers a complementary view. While supervised models can achieve high accuracy with careful preprocessing and feature engineering like principal component analysis and random forests (Salih, Ibrahim, Zeebaree, Zebari, Abdulrahman, and Abdulkareem, 2024), they depend on labels. An unsupervised approach first discovers latent clinical profiles from biomarkers, which can augment downstream prediction and guide risk-stratified interventions. Given noise, missingness, and heterogeneity—ubiquitous in clinical data—elliptical clusters capture elongated, correlated patterns (e.g., glucose-BMI axes) that spherical models miss. Long-term findings in the Pima population underscore the stakes, with diabetes a key driver of kidney failure and other complications (Nelson, Knowler, Kretzler, Lemley, Looker, Mauer, Mitch, Najafian, and Bennett, 2021). This article introduces a semiparametric clusterwise elliptical distribution (SCED) for continuous data and develops an efficient estimation-clustering procedure. The framework covers a broad class of elliptical laws—including clusterwise multivariate normal and multivariate t distributions—providing substantially more modeling flexibility than conventional parametric mixtures. Leveraging a subject-wise representation of the latent structure, we construct a weighted least-squares objective with a separation penalty that estimates cluster-specific mean vectors and a cluster-invariant scatter matrix while producing cluster assignments. A subsequent pseudo-maximum likelihood estimator attains the 2semiparametric efficiency bound, and the refined clustering rule asymptotically maximizes the proba-bility of correct membership. The nonconvex program in the separation penalty estimation procedure is solved via the difference of convex functions programming (DCFP) (An and Tao, 2005) combined with the alternating direction method of multipliers algorithm (ADMM) (Boyd, Parikh, Chu, Peleato, and Eckstein, 2011), with a tailored initialization to improve stability. Relative to pairwise-fusion penalties (Chi and Lange, 2015), the approach reduces computational complexity (cf. Tang, Xue, and Qu, 2021) and strengthens clustering consistency. A semiparametric information criterion (SPIC) is proposed to select the number of clusters. Our contributions are fourfold: (1) a general SCED framework that subsumes Gaussian and t
+
+clusterwise models while avoiding misspecification from fully parametric generators; (2) an estimation-clustering scheme that achieves asymptotic semiparametric efficiency and provides an asymptotically optimal clustering rule; (3) a scalable DCFP+ADMM algorithm with an initialization strategy for the separation penalty estimation procedure; and (4) a semiparametric information criterion for data-adaptive determination of the number of clusters. This work builds on and connects two major strands of the literature. Distribution-free cluster-ing includes hierarchical and non-hierarchical families. Hierarchical approaches comprise agglomer-ative procedures (Jambu and Lebeaux, 1978; Lance and Williams, 1966, 1967) and divisive schemes (Macnaughton-Smith, Williams, Dale, and Mockett, 1964). Among non-hierarchical methods, k-means (MacQueen, 1967)—with antecedents in Steinhaus (1956) and Forgy (1965) and efficient up-dates by Lloyd (1982)—is canonical. Invariance-based criteria leveraging within- and between-cluster variance under linear transformations were proposed by Friedman and Rubin (1967); Marriott (1971) suggested selecting the number of clusters by minimizing the determinant of the within-cluster co-variance scaled by the square of the number of clusters. Comprehensive reviews appear in Cormack (1971) and Gordon (1987). However, these procedures generally provide only partial guarantees; convex relaxations (Chi and Lange, 2015) improve tractability but do not fully settle the statistical consistency of the resulting cluster estimators. Distribution-based clustering identifies latent groups 3via mixtures of cluster-specific distributions. Wolfe (1965) studied univariate Gaussian mixtures; Day (1969) extended to multivariate Gaussians and documented likelihood singularities when covariances are unrestricted. Robustness concerns motivated multivariate t mixtures (McLachlan and Peel, 1998); see McLachlan and Peel (2000) for a comprehensive treatment. Closer to our approach, subjectwise representations for likelihood-based estimation were developed by Symons (1981) and extended via the classification EM of Celeux and Govaert (1992), with covariance reparameterizations (orientation, volume, and shape) by Banfield and Raftery (1993) and Celeux and Govaert (1995). Bayesian model selection for clustering is discussed in Fraley and Raftery (1998, 2002). Our semiparametric elliptical specification departs from likelihood-centric mixtures by leaving the density generator unspecified, thereby gaining robustness while preserving interpretability of cluster means and scatter. The remainder of the article proceeds as follows. Section 2 formalizes the SCED model and its subjectwise representation. Section 3 develops a novel method for estimation and clustering. Section 4 details the DCFP+ADMM algorithm and initialization and outlines the full computational procedure. Section 5 reports simulation evidence on finite-sample estimation and clustering accuracy. Section 6 presents applications in personalized marketing and patient stratification. Section 7 concludes with main findings and future directions. 
+
+## 2 Clusterwise and Subjectwise Elliptical Distributions 
+
+Let X be a p × 1 vector of continuous variables with support X , and let C be a latent cluster variable taking values in support C = {1, . . . , k }, where k denotes the number of clusters. We consider a semiparametric clusterwise elliptical distribution (SCED) for the conditional density of X given 
+
+C:
+
+f (x|c; θ) = |Σ|− 12 fp
+
+ (x − μc)⊤Σ−1(x − μc), x ∈ X , c ∈ C , (2.1) where θ is a column vector comprising the mean vectors μ1, . . . , μ k and the upper triangular entries of the scatter matrix Σ, and fp is an unknown density generator that satisfies the normalization condition 2 πp/ 2 R ∞ 
+
+> 0
+
+rp−1fp(r2)dr/ Γ p/ 2) = 1. To ensure identifiability, the first diagonal entry of 4Σ is fixed at one. Given estimators of fp and Σ, the cluster-invariant variance matrix of X (Σ x)can be estimated via Σ x = ( πp/ 2 R ∞ 
+
+> 0
+
+rp+1 fp(r2)dr/ Γ( p/ 2 + 1))Σ. Empirical evidence indicates that 
+
+fp is typically monotone and includes, as special cases, the density generators of the multivariate normal and multivariate t distributions. Imposing this restriction, however, does not by itself improve parameter estimation. Under the SCED, the observed variables X can be expressed as 
+
+X =
+
+> k
+
+X
+
+> c=1
+
+I(C = c)μc + Σ 12 U, (2.2) where I(·) denotes an indicator function and U is a p×1 spherical random vector. In unsupervised set-tings, standard pseudo-maximum likelihood methods are not directly applicable to the k-component mixture density 
+
+f (x; η) = 
+
+> k
+
+X
+
+> c=1
+
+πcf (x|c; θ), (2.3) where η = ( θ⊤, π ⊤)⊤, π = ( π1, . . . , π k−1)⊤, and πc = P (C = c) > 0 for c ∈ C , with Pkc=1 πc = 1. To address this limitation, we adopt a subjectwise representation of model (2.2) in the first phase of estimation: 
+
+Xi = βi + Σ 12 Ui, i = 1 , . . . , n, with β1, . . . , β n ∈ { μ1, . . . , μ k}. (2.4) Given an initial consistent clustering estimator, we develop the pseudo-maximum likelihood and pseudo-maximum marginal likelihood procedures for estimating the parameter vector η while simulta-neously refining the clusters to maximize the probability of correct membership. The method reduces the p-dimensional density estimation problem to the estimation of a low-dimensional density genera-tor. Specifically, we estimate the density generator fp through the density of the transformed variable 
+
+Y = Pkc=1 I(C = c)Yc,
+
+g(y) = π p
+
+> 2
+
+Γ  p
+
+> 2
+
+ (ψ(y)) p 
+
+> 2−1
+
+ψ(1) (y)fp
+
+ ψ(y), (2.5) where y is a realization of Y , Yc = Ψ(( X − μc)⊤Σ−1(X − μc)), and Ψ is a strictly increasing function with continuous derivative ψ(1) , the derivative of its inverse ψ = Ψ −1. The density g provides an 5alternative representation of the conditional density f (x|c; θ) in the SCED as 
+
+f (x|c; θ) = w(yc)g(yc), (2.6) where yc is a realization of Yc and w(yc) = Γ( p/ 2)( ψ(yc)) 1−p/ 2/(|πΣ|1/2ψ(1) (yc)) for c ∈ C . When g is estimated via kernel smoothing, its performance may deteriorate when ( X − μc)⊤Σ−1(X − μc) is close to zero or extremely large (see Liebscher, 2005). To mitigate this issue, we apply the transformation 
+
+Y = Pkc=1 I(C = c){− d0 + [ dp/ 20 + (( X − μc)⊤Σ−1(X − μc)) p/ 2]2/p }, where d0 > 0 is a fixed constant. Although the choice of Ψ influences the leading constant in the asymptotic mean integrated squared error of the estimator of fp, there is no known practical method for selecting Ψ optimally. More importantly, the asymptotic properties of the proposed estimator of θ is invariant to the choice of Ψ. 
+
+## 3 Estimation and Cluster Selection 
+
+Let G = {G 1, . . . , Gk} denote a partition of the individual-level index set {1, . . . , n }, with Go represent-ing the set of underlying clusters. In model (2.2), let μ be the column vector comprising μ1, . . . , μ k,with μo as its true value. Similarly, in model (2.4), let β be the column vector comprising β1, . . . , β n,with the true value βo satisfying βo 
+
+> i
+
+= μo 
+
+> c
+
+for all i ∈ G o 
+
+> c
+
+, i = 1 , . . . , n , c ∈ C . Based on unsupervised data {Xi}ni=1 , we develop a novel method for estimation and clustering. The assumptions and proofs of the main results are provided in Appendices A.1–A.6. 
+
+3.1 Separation Penalty Estimation 
+
+Given a p × p positive-definite matrix W , the parameters βo and μo are estimated by minimizing a weighted sum of squares objective with an ℓ1-based separation penalty: 
+
+SS sp (β, μ ; λ) = 12
+
+> n
+
+X
+
+> i=1
+
+(Xi − βi)⊤W (Xi − βi) + λ
+
+> n
+
+X
+
+> i=1
+
+min  
+
+> c
+
+W 12 (βi − μc) 1, (3.1) where λ > 0 is a shrinkage parameter and ∥ · ∥ 1 denotes the ℓ1-norm. The parameter λ regulates the within-cluster heterogeneity: larger values promote tighter clustering by encouraging separation, whereas smaller values allow for greater within-cluster variability. When W = Ip, the first term in (3.1) coincides with the classical k-means objective. However, the clusters induced by minimizing this 6criterion may not consistently recover Go. In our estimation, W is chosen as a consistent estimator of Σ −1 
+
+> x
+
+.For a given λ, the separation penalty estimator of ( βo, μ o) is defined as ( ˆβ, ˆμ) ∈ arg min 
+
+> {β,μ }
+
+SS sp (β, μ ; λ). (3.2) The tuning parameter λ is set to a minimizer of Pni=1 (Xi − ˆβi)⊤(Xi − ˆβi). The corresponding clustering estimator bG = { bG1, . . . , bGk} of Go is obtained by assigning the ith data point to the cluster set bGc
+
+according to c ∈ arg min {c1∈C} ∥W 12 ( ˆβi − ˆμc1 )∥1, i = 1 , . . . , n . The variance matrix Σ x is estimated by 
+
+bΣx = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+(Xi − ˆβi)⊤(Xi − ˆβi) or bΣx = 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ bGc
+
+(Xi − ˆμc)⊤(Xi − ˆμc). (3.3) Although the asymptotic behavior of ( ˆβ, ˆμ) is invariant to the choice of W , empirical results show that setting W = bΣ−1 
+
+> x
+
+in (3.1) yields better agreement between the clustering estimator and the underlying clusters than using W = Ip.Define the oracle estimator of βo as ˆβor = Pkc=1 (I(1 ∈ G o 
+
+> c
+
+), . . . , I (n ∈ G o 
+
+> c
+
+)) ⊤ ⊗ ˆμor  
+
+> c
+
+, where ⊗
+
+denotes the Kronecker product, and define ˆ μor = (ˆ μor 1 , . . . , ˆμor  
+
+> k
+
+)⊤ as a minimizer of Pni=1 
+
+Pkc=1 I(Ci =
+
+c)( Xi − μc)⊤(Xi − μc). The oracle property of ( ˆβλ, ˆμλ) holds under the conditions on the spherical random vector U in model (2.2), the parameter spaces B and U of β and μ, respectively, and the regularization parameter λ.
+
+Theorem 1. Under assumptions A1–A3, 
+
+P   ˆβ = ˆβor −→ 1 and P  ˆμ = ˆ μor −→ 1 as n−→∞ .
+
+Proof. See Appendix A.3. Theorem 1 implies that the probability of exact recovery, bG = Go, converges to one as the sample size increases. From the asymptotic normality of ˆ μor ,
+
+√n ˆμ − μo d
+
+−→ N  0, diag( π1Σx, . . . , π kΣx) as n −→ ∞ . (3.4) 73.2 Semiparametric Efficient Estimation 
+
+For notational convenience, define bYi = Pkc=1 I(i ∈ bGc)Yic , i = 1 , . . . , n . To estimate the density g(y)of Y , we adopt the reflection technique of Cowling and Hall (1996) and Zhang, Karunamuni, and Jones (1999) to reduce boundary bias near zero. The resulting boundary-corrected kernel is 
+
+Kh(v1, v 2) = 1
+
+h K
+
+ v1 − v2
+
+h
+
+
+
++ 1
+
+h K
+
+ −v1 − v2
+
+h
+
+
+
+,
+
+where K is a symmetric, compactly supported, and twice continuously differentiable second-order kernel with its second derivative satisfying R K(2) (u)du = 0, and h > 0 denotes the bandwidth. Given a fixed value of θ, we estimate g(y) using the kernel estimator ˆgh(y; θ) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+Kh
+
+  bYi, y , (3.5) and construct a corresponding plug-in estimator of f (x|c; θ) as ˆfh(x|c; θ) = w(yc)ˆ gh(yc; θ), c ∈ C . (3.6) By replacing f (x|c; θ) with ˆfh(x|c; θ) and I i ∈ G o
+
+> c
+
+ with I i ∈ bGc
+
+ in the log-likelihood function 
+
+ℓ(η) = 
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ G o
+
+> c
+
+ log  πcf (Xi|c; θ) △
+
+=
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ G o
+
+> c
+
+ log f (Xi, c ; η), (3.7) we obtain the log-pseudo-likelihood function 
+
+pℓ 1(η) = 
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ bGc
+
+ log  πc ˆfh(Xi|c; θ) △
+
+=
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ bGc
+
+ log ˆfh(Xi, c ; η). (3.8) The maximizer ˜ η of pℓ 1(η), for a fixed bandwidth h, is defined as the pseudo-maximum likelihood estimator. The corresponding estimator of π is explicitly given by ˜ π = ( | bG1|, · · · , | bGk−1|)⊤/n . To initialize the maximization of pℓ 1(η) with respect to θ, we use the separation penalty estimator ˆ μ
+
+and the scatter matrix estimator bΣ = bΣx/bσ2
+
+> x
+
+, where bσ2 
+
+> x
+
+denotes the first diagonal element of bΣx. The bandwidth h is selected as ˆh = n3/80 ˜h, where ˜h minimizes the cross-validation criterion of Bowman (1984), 
+
+CV 1(h) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ Z  ˆg −ih
+
+ y; ˆθ  2dy − 2ˆ g −ih
+
+  bYi; ˆθ 
+
+, (3.9) with ˆ g −ih (y; θ) denoting the leave-one-out version of the estimator in (3.5). The conventional choice 8˜h = Op(n−1/5) is unsuitable in the current setting, as it violates assumption A4, which is required for the √n-consistency of ˜ η.Let the true value ηo of η be an interior point of the parameter space H. The proposed pseudo-maximum likelihood estimator ˜ η achieves the same asymptotic behavior as the estimator constructed from fully observed data {(Xi, C i)}ni=1 .
+
+Theorem 2. Under assumptions A4–A8, 
+
+˜η p
+
+−→ ηo and √n ˜η − ηo d
+
+−→ N  0, V −11
+
+ as n−→∞ ,
+
+where V1 = var   P kc=1 I(C = c)f [1] (X, c ; ηo)/f [0] (X, c ; ηo) and f [m](x, c ; η) is defined in (A.3). Proof. See Appendix A.4. As shown in Chiang, Fan, Huang, Teng, and Lim (2024), V1 is invariant to the specification of Ψ. Following the approach of Bickel, Klaassen, Ritov, and Wellner (1998), we show in Appendix A.5 that V −11 is the semiparametric efficiency bound for the present model. In the context of unsupervised learning under parametric clusterwise elliptical distributions, the underlying density of X is given by the k-component mixture density in (2.3). As an alternative to 
+
+pℓ 1(η) in (3.8), we further consider the log-pseudo-marginal-likelihood function 
+
+pℓ 2(η) = 
+
+> n
+
+X
+
+> i=1
+
+log 
+
+ kX
+
+> c=1
+
+πc ˆfˆh(Xi|c; θ)
+
+ △
+
+=
+
+> n
+
+X
+
+> i=1
+
+log ˆfˆh(Xi; η). (3.10) Under the same conditions as in Theorem 2, with assumption A8 replaced by the requirement that 
+
+V2 = var( Pkc=1 f [1] (X, c ; ηo)/ Pkc=1 f (X, c ; ηo)) is positive definite, the pseudo-maximum marginal likelihood estimator ˇ η is consistent and asymptotically normal. 
+
+Theorem 3. Under assumptions A4–A7 and A9, 
+
+ˇη p
+
+−→ ηo and √n ˇη − ηo d
+
+−→ N  0, V −12
+
+ as n−→∞ .
+
+Proof. See Appendix A.4. 9Our research findings underscore the importance of considering application contexts when choosing between ˜ η and ˇ η.
+
+3.3 Optimal Clustering and Refined Estimation 
+
+From the SCED and the corresponding cluster probabilities, the posterior probability that a data point with observation x belongs to Cluster c is given by π(c|x; ηo) = f (x, c ; ηo)/f (x; ηo), c ∈ C . Let 
+
+Co denote the cluster membership associated with a new observation X0. The Bayes classifier eC
+
+assigns X0 to the cluster with the highest posterior probability: 
+
+eC = c0 if π(c0|X0; ηo) = max  
+
+> {c∈C}
+
+π(c|X0; ηo). (3.11) For any classifier ¯C based on X0, the probability of correct membership is 
+
+P ( ¯C = Co) = E
+
+ kX
+
+> c0=1
+
+E[I( ¯C = c0)I(Co = c0)|X0]
+
+
+
+= E
+
+ kX
+
+> c0=1
+
+I( ¯C = c0)π(c0|X0; ηo)
+
+
+
+.
+
+By construction, for any c1, c 2 ∈ C with eC = c1 and ¯C = c2, π(c1|X0; ηo) − π(c2|X0; ηo) ≥ 0. It follows that eC maximizes the probability of correct membership. By replacing f (x, c ; ηo) with ˆf˜h(x, c ; ˜ η) and f (x; ηo) with ˆf˜h(x; ˜ η), π(c|x; ηo) is estimated by ˜π c|x; ˜ η =ˆf˜h
+
+ x, c ; ˜ η
+
+ˆf˜h(x; ˜ η) , c ∈ C . (3.12) Using these posterior cluster probability estimators, the separation-penalty-based clustering estimator 
+
+bG is refined to eG via the optimal clustering rule: Assigning the ith data point to eGc0 such that ˜ π c0|Xi; ˜ η = max  
+
+> {c∈C}
+
+˜π c|Xi; ˜ η, i = 1 , . . . , n. (3.13) In practice, ˜ η in (3.12) and (3.13) may be replaced by ˇ η. Given eG, the refined pseudo-maximum likelihood and pseudo-maximum marginal likelihood estimators of ηo are obtained by maximizing the corresponding log-pseudo-likelihood functions: 
+
+pℓ 1r(η) = 
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I(i ∈ eGc) log  πc ˜fˆh∗ (Xi|c; θ) △
+
+=
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I(i ∈ eGc) log ˜fˆh∗ (Xi, c ; η), (3.14) 
+
+pℓ 2r(η) = 
+
+> n
+
+X
+
+> i=1
+
+log 
+
+ kX
+
+> c=1
+
+πc ˜fˆh∗ (Xi|c; θ)
+
+ △
+
+=
+
+> n
+
+X
+
+> i=1
+
+log ˜fˆh∗ (Xi; η), (3.15) where ˜fh(x|c; θ) = w(yc)˜ gh(yc; θ), c ∈ C , ˜ gh(y; θ) = Pni=1 Kh( eYi, y )/n , eYi = Pkc=1 I(i ∈ eGc)Yic , and 10 ˆh∗ = n3/80 ˘h, with ˘h minimizing the cross-validation criterion 
+
+CV 2(h) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ Z  ˜g−ih
+
+ y; eθ  2dy − 2˜ g−ih
+
+  eYi; ˜θ 
+
+. (3.16) This procedure is iterated until convergence. 
+
+3.4 Selecting the Number of Clusters 
+
+Assume that lim n→∞ P   eG = Go = 1 for every fixed k ≥ 1. Let k∗ denote the true number of clusters, and define G∗o = {G ∗o1 , . . . , G∗o 
+
+> k∗
+
+} and η∗o = ( η∗o1 , . . . , η ∗o 
+
+> k∗
+
+)⊤, where G∗o 
+
+> ℓ
+
+= Go 
+
+> ℓ
+
+and η∗o 
+
+> ℓ
+
+= ηo 
+
+> ℓ
+
+for 
+
+ℓ = 1 , . . . , k ∗. Let C∗ be the latent cluster variable associated with G∗, supported on C∗ = {1, . . . , k ∗}.Furthermore, let ˘ η and ˘ η∗ denote the refined pseudo-maximum marginal likelihood estimators of ηo
+
+and η∗o, respectively, and let eG∗ denote the refined clustering estimator of G∗o.Define CG = Go : G∗o 
+
+> ℓ
+
+= S     
+
+> {ℓ1:Go
+> ℓ1⊆G ∗o
+> ℓ,θ o
+> ℓ1=θ∗o
+> ℓ}
+
+Go 
+
+> ℓ1
+
+∀ℓ ∈ C ∗ and pℓ (k) = Pni=1 log ˜f −i 
+
+> ˘h
+
+(Xi; ˘ η). Building on the arguments of Theorem 2 and the associated technical lemma, we show that 1
+
+n pℓ (k∗) − 1
+
+n pℓ (k) = 
+
+
+
+Op
+
+ n− 45
+
+ + Op
+
+ n−1 Go ∈ C G ,b2(k) + op(1) otherwise, (3.17) where b(k) > 0 is a constant. The leading term Op(n−4/5) in the asymptotic expansion of pℓ (k) sug-gests a penalty of order k log n/n 4/5 for estimating the densities ( f (x|1; θo), . . . , f (x|k; θo)) given θo.The subsequent term Op(n−1) corresponds a correction of order ( k(p + 1) + p(p + 1) /2 − 2) log n/n , re-flecting the estimation of ηo. These considerations motivate the following semiparametric information criterion for selecting the number of clusters: SPIC( k) = − 1
+
+n pℓ (k) + k log n
+
+2n 45
+
++ k(p + 1) log n
+
+2n . (3.18) The theorem below establishes that the minimizer ˘k of SPIC consistently estimates k∗.
+
+Theorem 4. Under assumptions A4–A9, 
+
+˘k p
+
+−→ k∗ as n−→∞ .
+
+Proof. See Appendix A.6. 11 Remark 1. An alternative to pℓ (k) in (3.17) is given by Pni=1 
+
+Pkc=1 I(i ∈ eGc) log ˜f −i 
+
+> ˘h
+
+(Xi|c; θ), evalu-ated at the refined pseudo-maximum likelihood estimator of θ. Nonetheless, numerical results indicate that the associated semiparametric information criterion tends to overestimate the number of clusters, even as the sample size grows. 
+
+## 4 Estimation Implementation 
+
+This section introduces an initialization strategy to enhance convergence in the separation penalty estimation procedure, details the implementation algorithm (with pseudocode in Appendix A.7), and outlines the computational procedure of the proposed method. 
+
+4.1 An Initialization Strategy 
+
+In implementing the separation penalty estimation procedure, we first apply k-means to {Xi}ni=1 
+
+to construct an initial partition ¯Gℓ = { ¯Gℓ
+
+> 1
+
+, . . . , ¯Gℓℓ } of {1, . . . , n } for each ℓ = 2 , . . . , ¯k, where ¯k =
+
+⌊pn/ log n⌋. Given this clustering estimator, we compute the estimator ¯μℓ =
+
+ 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+I i ∈ ¯Gℓ
+
+> 1
+
+X⊤ 
+
+> i
+
+, . . . , 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+I i ∈ ¯Gℓℓ
+
+X⊤
+
+> i
+
+⊤
+
+(4.1) by minimizing the following within-cluster sum of squares with Gℓ = ¯Gℓ:
+
+SS (μℓ; Gℓ) = 12
+
+> n
+
+X
+
+> i=1
+> ℓ
+
+X
+
+> c=1
+
+I i ∈ G ℓc
+
+  Xi − μℓc
+
+⊤ Xi − μℓc
+
+. (4.2) The resulting estimator of the subject-specific parameter vector is then given by ¯βℓ =
+
+> ℓ
+
+X
+
+> c=1
+
+ I 1 ∈ ¯Gℓc
+
+, . . . , I  n ∈ ¯Gℓc
+
+ ⊤ ⊗ ¯μℓc. (4.3) Although ¯ μℓ and ¯βℓ, ℓ = 2 , . . . , ¯k, may be used as initial values, they do not provide a direct advantage within the considered semiparametric framework. To enhance the consistency of ¯Gℓ and the accuracy of the corresponding estimator ¯ μℓ, we refine the clustering of data points based on 
+
+SD ic = ( Xi − ¯μℓc)⊤ ¯Σ−1 
+
+> x
+
+(Xi − ¯μℓc), i = 1 , . . . , n, c = 1 , . . . , ℓ, (4.4) with ¯Σx = Pni=1 
+
+Pℓc=1 I(1 ∈ ¯Gℓc )( Xi − ¯μℓc)( Xi − ¯μℓc)⊤/n . Each data point is then reassigned to the 12 cluster attaining the minimum squared distance: Assign the ith data point to ˇGℓc0 such that SD ic 0 = min  
+
+> {1≤c≤ℓ}
+
+SD ic , i = 1 , . . . , n. (4.5) Replacing ¯Gℓ with ˇGℓ in (4.1) and (4.3) yields the updated estimators ˇ μℓ and ˇβℓ. Similarly, replacing ¯Gℓ and ¯ μℓ with ˇGℓ and ˇ μℓ, respectively, in (4.4) yields the updated estimator ˇΣx. This refinement process is iterated by alternating between (4.4) and (4.5) until either a local minimum of SS (μℓ; ˇGℓ)is attained or a specified convergence criterion is met. 
+
+4.2 Computational Algorithm for the Separation Penalty Estimation 
+
+For a fixed λ, let ( ˆβ(m), ˆμ(m)) denote the solution at iteration m ≥ 0, with ˆβ(0) selected from { ˇβℓ :
+
+ℓ = k, . . . , ¯k} and ˆ μ(0) set to ˇ μk. The sequence of shrinkage parameters λ1 < · · · < λ J is selected over [λ1, λ J ], where λ1 = min {i,c ∈C : ˆβ(0)    
+
+> i̸=ˆ μ(0)
+> c}
+
+∥W 1/2( ˆβ(0)  
+
+> i
+
+− ˆμ(0)  
+
+> c
+
+)∥1 and λJ = max {i,c ∈C} ∥W 1/2( ˆβ(0)  
+
+> i
+
+− ˆμ(0)  
+
+> c
+
+)∥1.To simplify the computation of ( ˆβ(m+1) , ˆμ(m+1) ) in SS sp (β, μ ; λ) for a given λ, we introduce an aux-iliary parameter vector δi = ( δi1, . . . , δ 1k, . . . , δ n1, . . . , δ nk )⊤ to reformulate the minimization problem as Minimize SS  β, μ, δ  = SS w(β) + λ
+
+> n
+
+X
+
+> i=1
+
+min  
+
+> c
+
+δic 1
+
+subject to W 12
+
+ βi − μc
+
+ = δic , i = 1 , . . . , n, c ∈ C . (4.6) Since the objective function is separable in ( β, μ ) and δ, we employ the ADMM of Boyd et al. (2011). The corresponding augmented Lagrangian function is 
+
+SS  β, μ, δ  +
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+ν⊤
+
+> ic
+
+ W 12 (βi − μc) − δic 
+
+ + ν0
+
+2
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+W 12 (βi − μc) − δic 2, (4.7) where νic , i = 1 , . . . , n, c ∈ C , are Lagrange multipliers, the penalty parameter ν0 is set to 1, and ∥ · ∥ 
+
+denotes the Frobenius norm. The separation penalty estimation procedure is implemented via the following iterative algo-rithm: 
+
+β(s+1)  
+
+> i
+
+= 1
+
+k + 1 
+
+
+
+Xi +
+
+> k
+
+X
+
+> c=1
+
+ ˆμ(m) 
+
+> c
+
++ W − 12 δ(s) 
+
+> ic
+
+− W − 12 ν(s)
+
+> ic
+
+ + W −1λ∂ ⊤ 
+
+> β
+
+S  ˆβ(m), ˆμ(m)
+
+, (4.8) 13 ˆμ(m+1)  
+
+> c
+
+=W − 12 median i:c∈arg min  
+
+> c1
+> W12
+
+  ˆβ(m+1)  
+
+> i−ˆμ(m)
+> c1
+
+
+
+> 1
+
+ W 12 ˆβ(m+1) 
+
+> i
+
+
+
+> j
+
+!
+
+, c ∈ C . (4.9) ˆδ(s+1)  
+
+> ic
+
+=diag max 
+
+(
+
+0, 1 − λ
+
+ W 12
+
+  ˆβ(m+1)  
+
+> i
+
+− ˆμ(m+1) 
+
+> c
+
+ + ˆ ν(m)
+
+> ic
+
+
+
+> j
+
+)!  W 12
+
+  ˆβ(m+1)  
+
+> i
+
+− ˆμ(m+1) 
+
+> c
+
+ + ˆ ν(m)
+
+> ic
+
+,
+
+(4.10) ˆν(m+1)  
+
+> ic
+
+=ˆ ν(m) 
+
+> ic
+
++  W 12
+
+  ˆβ(m+1)  
+
+> i
+
+− ˆμ(m+1) 
+
+> c
+
+ − ˆδ(m+1) 
+
+> ic
+
+, s ≥ 0, (4.11) where ˆδ(0)  
+
+> ic
+
+= W 12
+
+  ˆβ(0)  
+
+> i
+
+− ˆμ(0) 
+
+> c
+
+ and ˆ ν(0)  
+
+> ic
+
+= 0, i = 1 , . . . , n , c ∈ C .
+
+4.3 Computational Procedure 
+
+The proposed method is described with the following algorithm: 
+
+Algorithm 1 Computational procedure  
+
+> 1:
+
+Construct an initial partition ¯Gℓ of {1, . . . , n } by applying k-means to {Xi}ni=1 for each ℓ ∈{2, . . . , ¯k}. 
+
+> 2:
+
+Update   ¯Gℓ, ¯μℓ to   ˇGℓ, ˇμℓ by iteratively applying the rule in (4.5) and minimizing SS (μℓ; ˇGℓ)with respect to μℓ for each ℓ ∈ { 2, . . . , ¯k}. 
+
+> 3:
+
+Obtain the separation penalty estimates   bG, ˆμ by applying the algorithm in Section 4.2, initialized by the estimates   ˇGℓ, ˇμℓ : ℓ = k, . . . , ¯k . 
+
+> 4:
+
+Maximize pℓ 1(η) in (3.8) or pℓ 2(η) in (3.10) to obtain the pseudo-maximum likelihood estimate ˜η or the pseudo-maximum marginal likelihood estimate ˇ η, with ˆh selected via the minimizer ˜h of 
+
+CV 1(h) in (3.9).  
+
+> 5:
+
+Compute the posterior cluster probability estimates in (3.12) and update bG to eG using the optimal clustering rule in (3.13).  
+
+> 6:
+
+Maximize pℓ 1r(η) in (3.14) or pℓ 2r(η) in (3.15) to obtain the refined estimate ˘ η, with ˆh∗ selected via the minimizer ˜h∗ of CV 2(h) in (3.16).  
+
+> 7:
+
+Repeat Steps 3–6 for k ≥ 1, and select the number of clusters by minimizing SPIC in (3.18). 14 5 Monte Carlo Simulations 
+
+We conducted comprehensive simulations to assess the compared methods across various sample sizes, specifically n = 250 , 500 , 750, and 1000. Each configuration was replicated 500 times to produce stable and reliable results. Supplementary tables are provided in Appendix A.8. 
+
+5.1 Simulation Design and Performance Metrics 
+
+The data were generated from clusterwise elliptical distributions under three scenarios: (p, k ) ∈{(6 , 2) , (10 , 2) , (10 , 3) }. The cluster membership probabilities were set to ( π1, π 2) = (0 .6, 0.4) for 
+
+k = 2, and ( π1, π 2, π 3) = (0 .4, 0.3, 0.3) for k = 3. The cluster-specific mean vectors were given by 0p, (1 .5, 0, . . . , 1.5, 0) ⊤ for k = 2 and 0p, 1.51 p, (1 .5, 0, . . . , 1.5, 0) ⊤ for k = 3, where 0 p and 1 p
+
+denote p×1 vectors of zeros and ones, respectively. The cluster-invariant variance matrix was specified as Σ x = σ2(0 .175 Ip + 0 .0751 p1⊤ 
+
+> p
+
+), where Ip is the p × p identity matrix. The scalar parameter σ ∈{1, 1.2, 1.4, 1.6} controls the degree of separation between clusters, with smaller values corresponding to more distinct clusters and larger values inducing greater overlap. Two density generators were considered: M1. fp(y) = γoy5 45 4 − y
+
+ 14
+
+I
+
+
+
+0 ≤ y ≤ 45 4
+
+
+
+,
+
+M2. fp(y) = 1(2 π) p
+
+> 2
+
+exp 
+
+
+
+− y
+
+2
+
+
+
+I(y > 0) ,
+
+where γo = Γ( p/ 2)) /[2 πp/ 2 R 3√5/20 yp+9 (45 /4 − y2)1/4dy ]. We computed the Rand index (RI) (Rand, 1971) between the underlying clusters and each clus-tering estimate to quantify the agreement of the recovered cluster assignments. The performance of an estimator bαg of a generic parameter vector αo was assessed using the normalized root squared error (RSE), defined as p(bαg − αo)⊤(bαg − αo)/|αo|.
+
+5.2 Assessment of Estimation and Clustering 
+
+The clustering methods under comparison included k-means, the initialization strategy (IS) in Section 4.1, the separation penalty (SP) estimation in Section 3.1, and the optimal clustering (OC) in Section 15 3.3. For the OC method, we examined two variants: one based on a clusterwise multivariate normal distribution, denoted by OC n, and another based on a clusterwise multivariate t-distribution, denoted by OC t. Tables 1 and S1 present the clustering performance across methods. The IS method achieves substantially higher RI values than k-means, with the discrepancy widening as the sample size n and the scalar parameter σ increase. The SP method slightly outperforms the IS method when n = 125 and performs comparably in the other settings. Under model M1, the OC method outperforms the SP and OC n methods, achieving substantially higher RI values for all ( p, k ) combinations when σ ≥ 1.2. Notably, the OC n method generally outperforms the OC t method. Under model M2, the OC method yields higher RI values than the SP method for ( p, k ) = (6 , 2) when σ ≥ 1.2 and for ( p, k ) = (10 , 2) when σ ≥ 1.4, and is otherwise similar or slightly superior. The OC n method generally outperforms the OC method across all σ values when ( p, k ) = (10 , 2) and n ≤ 250, and performs comparably or marginally better in other scenarios. Overall, the decline in RI values across models, variable dimensions, and numbers of clusters is primarily attributable to increasing σ. In contrast, RI values increase with n, particularly for n ≤ 750 or n ≤ 1000. Table 1: Means of 500 RI values (scaled by 10 2) of the underlying clusters and clustering estimates from various methods under model M1. (p, k ) (6,2) (10,2) (10,3) 
+
+σ n k-means IS SP OC OC n OC t k-means IS SP OC OC n OC t k-means IS SP OC OC n OC t
+
+1 125 97.24 99.83 99.84 99.97 99.90 99.89 98.29 99.98 99.98 99.99 99.99 99.99 98.04 99.36 99.36 99.39 99.41 99.35 250 97.54 99.95 99.96 99.98 99.94 99.94 98.42 100.00 100.00 100.00 100.00 100.00 98.45 99.62 99.61 99.68 99.57 99.61 500 97.63 99.97 99.97 99.99 99.96 99.96 98.38 99.99 99.99 100.00 99.99 99.99 98.52 99.68 99.68 99.78 99.70 99.67 750 97.67 99.97 99.97 99.98 99.96 99.96 98.41 100.00 100.00 100.00 100.00 100.00 98.57 99.69 99.69 99.80 99.69 99.69 1000 97.63 99.97 99.97 99.99 99.97 99.96 98.40 100.00 100.00 100.00 100.00 100.00 98.58 99.70 99.70 99.81 99.70 99.70 1.2 125 88.85 96.07 96.13 98.04 96.54 96.50 92.99 99.10 99.16 99.39 99.20 99.23 92.55 96.30 96.31 96.70 96.54 96.36 250 89.47 97.63 97.64 98.66 97.79 97.75 93.22 99.58 99.58 99.72 99.64 99.63 93.74 97.79 97.78 98.40 97.86 97.75 500 89.85 97.94 97.94 98.87 98.01 97.96 93.25 99.67 99.67 99.77 99.68 99.67 94.06 98.04 98.03 98.81 98.05 98.00 750 90.09 98.01 98.01 98.91 98.06 98.04 93.42 99.69 99.69 99.80 99.71 99.69 94.16 98.05 98.05 98.83 98.06 98.05 1000 90.13 98.02 98.02 98.90 98.06 98.04 93.48 99.70 99.70 99.79 99.71 99.71 94.28 98.16 98.16 98.92 98.16 98.14 1.4 125 79.59 85.72 85.75 92.08 86.23 86.10 84.86 94.27 94.35 95.43 94.75 95.01 85.53 88.80 88.81 89.57 89.37 88.84 250 80.09 90.49 90.49 96.29 91.23 91.03 85.38 97.61 97.63 98.53 97.82 97.77 86.54 92.89 92.89 94.73 92.89 92.85 500 80.42 92.54 92.54 96.84 93.20 93.06 85.56 97.97 97.97 98.82 98.06 98.02 87.08 94.44 94.44 96.70 94.54 94.33 750 80.52 92.86 92.86 96.93 93.39 93.28 85.79 98.06 98.06 98.92 98.14 98.11 87.48 94.68 94.67 96.95 94.71 94.64 1000 80.60 93.01 93.01 96.99 93.52 93.42 85.88 98.10 98.10 98.93 98.19 98.15 87.66 94.81 94.81 97.06 94.85 94.82 1.6 125 71.74 74.66 74.65 82.07 74.93 74.60 77.04 83.85 83.89 85.79 84.40 84.46 78.59 80.26 80.28 80.74 80.55 79.96 250 72.21 78.39 78.39 91.24 79.29 78.84 77.43 91.33 91.34 95.32 92.15 92.14 79.34 83.39 83.39 85.80 83.04 82.88 500 72.36 83.72 83.72 94.29 84.84 84.36 77.74 94.60 94.61 97.07 94.99 94.87 79.51 86.66 86.66 90.45 87.05 86.25 750 72.44 85.59 85.59 94.55 86.77 86.32 77.76 94.88 94.88 97.30 95.16 95.12 79.68 88.17 88.17 92.41 87.99 87.91 1000 72.58 86.64 86.64 94.95 87.69 87.35 77.82 95.07 95.07 97.38 95.29 95.23 79.77 88.99 88.99 93.42 88.89 88.79 The estimation procedures for the cluster-specific mean vectors and cluster-invariant variance matrix encompassed k-means, IS, SP, pseudo-maximum likelihood (PML), pseudo-maximum marginal 16 likelihood (PMML), and their refined versions, RPML and RPMML. We also considered maximum marginal likelihood methods for a mixture of normal and a mixture of t distributions, denoted by MML n and MML t, respectively. Tables 2–3 and S2–S3 report the average RSEs over 500 replications for the estimated cluster-specific mean vectors and cluster-invariant variance matrix. The IS estimator achieves lower RSEs for the mean vectors than the k-means estimator, marginally so when σ = 1, and increasingly so as σ ≥ 1.2. The discrepancy becomes more pronounced with larger n when σ ≥ 1.4, and with increasing σ across all n. A similar pattern holds for the estimated cluster-invariant variance matrix: the IS estimator yields lower or substantially lower RSEs. The gap widens with increasing n
+
+(for fixed σ) and increasing σ (for fixed n). The trends in the RSEs of the SP and IS estimators align with their corresponding RI values. Tables 2 and S2 further show that, under model M1, the PML estimator tends to outperform the PMML estimator, except when σ ≤ 1.4 with n = 125 or n ≤ 250, and when σ = 1 .6 regardless of n. Relative to the SP estimator, the PML estimator attains lower or substantially lower RSEs when k = 2, and comparable or marginally lower RSEs when k = 3. Under model M2, the RSEs of the PML and SP estimators are comparable to or marginally higher than the RSE of the PMML estimator for the mean vectors. Tables 3 and S3 indicate that, under model M1, the PML estimator yields lower or substantially lower RSEs than the SP estimator, is comparable to or slightly better than the PMML estimator for k = 2, but performs worse than the PMML estimator for k = 3. Under model M2, the RSEs of the PMML and SP estimators are generally similar to or slightly better than that of the PML estimator. An exception arises when σ = 1 .6, where the PML estimator exhibits notably higher RSEs than the PMML estimator. The only case in which the PML estimator outperforms the PMML estimator occurs when ( p, k ) = (6 , 2) and σ ≤ 1.2, where the improvement is marginal. Under model M1, the RSE of the RPML estimator for the mean vectors is comparable to, and often slightly below, that of PML; under model M2, their performance is comparable. The same pattern holds for PMML and RPMML. For the variance (scatter) matrix, RPMML and PMML yield similar RSEs. RPML matches PML for k = 2 under M2 and achieves slightly lower RSEs in the 17 other settings. Relative to the parametric benchmarks, Tables 2 and S2 show that under M1 the RPMML estimator attains marginally lower mean-vector RSEs than MML n and MML t, whereas under M2 its RSEs are comparable. For the variance matrix, Tables 3 and S3 indicate that RPMML improves upon MML n and MML t under M1 (often substantially), while under M2 MML n performs on par with RPMML and MML t. Across all scenarios, RSEs decrease monotonically as σ decreases and n increases. Under both M1 and M2, the average RSEs of RPML and RPMML approach the asymptotically semiparametric efficient (ASPE) benchmark as n grows; under M2, the average RSE of MML n likewise approaches the asymptotically efficient (AE) benchmark. Tables 4 and S4 compare the proposed SPIC with mixture of normal and mixture of t distributions Bayesian information criteria, denoted by BIC n and BIC t, respectively, for selecting the number of clusters. Although the Elbow method (Cormack, 1971; Thorndike, 1953) and the Silhouette method (Rousseeuw, 1987) can select the number of clusters—both distribution-free heuristics—they do not guarantee consistent estimation. Accordingly, we do not provide comparisons of these methods with SPIC. Under model M1, SPIC outperforms both alternatives, while BIC n generally performs better than BIC t. BIC t overestimates the number of clusters for ( p, k ) = (6 , 2), even as n increases. Under model M2, BIC n performs best overall. SPIC yields comparable results but tends to have slightly fewer clusters when σ ≥ 1.4 and n = 125. In contrast, BIC t consistently performs the worst. Across all settings, SPIC correctly select the number of clusters when n > 125 or n > 250, depending on the configuration. 
+
+## 6 Applications 
+
+This section illustrates the practical utility of the proposed methodology through two empirical appli-cations. The considered continuous variables were standardized to have mean zero and variance one before model fitting, ensuring meaningful comparisons across estimation methods. Supplementary figures and tables are provided in Appendix A.8. 18 Table 2: Means of 500 RSEs (scaled by 10 2) of the proposed, competing, and oracle estimates of the cluster-specific mean vectors under model M1. (p, k ) σ n k-means IS SP PML PMML RPML RPMML MML n MML t ASPE (6,2) 1 125 1.11 1.01 1.01 0.38 0.39 0.35 0.37 1.01 1.01 0.37 250 0.78 0.71 0.71 0.20 0.21 0.20 0.22 0.71 0.71 0.19 500 0.55 0.50 0.50 0.12 0.13 0.11 0.12 0.50 0.50 0.11 750 0.45 0.40 0.40 0.09 0.10 0.08 0.09 0.40 0.40 0.08 1000 0.40 0.35 0.35 0.07 0.08 0.06 0.07 0.34 0.35 0.06 1.2 125 1.82 1.40 1.40 0.51 0.53 0.47 0.49 1.31 1.32 0.44 250 1.43 0.87 0.87 0.26 0.27 0.25 0.27 0.86 0.86 0.24 500 1.15 0.61 0.61 0.14 0.15 0.14 0.16 0.63 0.63 0.13 750 1.01 0.48 0.48 0.11 0.12 0.10 0.11 0.51 0.51 0.10 1000 0.99 0.43 0.43 0.09 0.09 0.08 0.08 0.42 0.43 0.07 1.4 125 2.88 2.28 2.28 0.96 0.98 0.95 0.97 1.86 1.94 0.53 250 2.57 1.31 1.31 0.33 0.34 0.30 0.33 1.12 1.14 0.28 500 2.33 0.82 0.82 0.18 0.19 0.16 0.18 0.78 0.80 0.16 750 2.27 0.66 0.66 0.13 0.14 0.12 0.14 0.65 0.66 0.11 1000 2.26 0.55 0.55 0.10 0.11 0.09 0.10 0.53 0.54 0.09 1.6 125 4.06 3.52 3.52 1.92 1.92 1.87 1.88 3.07 3.29 0.60 250 3.86 2.67 2.67 0.70 0.70 0.69 0.70 1.80 2.16 0.32 500 3.67 1.56 1.56 0.27 0.28 0.25 0.28 1.04 1.14 0.18 750 3.58 1.16 1.16 0.21 0.22 0.19 0.21 0.83 0.88 0.14 1000 3.58 0.85 0.85 0.13 0.14 0.12 0.13 0.67 0.70 0.10 (10,2) 1 125 0.61 0.59 0.59 0.36 0.37 0.38 0.37 0.59 0.59 0.36 250 0.45 0.42 0.42 0.21 0.21 0.20 0.21 0.42 0.42 0.20 500 0.32 0.30 0.30 0.11 0.12 0.11 0.11 0.30 0.30 0.11 750 0.26 0.24 0.24 0.08 0.08 0.07 0.08 0.24 0.24 0.07 1000 0.23 0.21 0.21 0.06 0.06 0.06 0.06 0.21 0.21 0.06 1.2 125 0.90 0.72 0.72 0.45 0.46 0.46 0.46 0.72 0.72 0.45 250 0.69 0.51 0.51 0.27 0.27 0.25 0.25 0.51 0.51 0.25 500 0.54 0.37 0.37 0.13 0.14 0.14 0.14 0.37 0.37 0.13 750 0.46 0.29 0.29 0.10 0.10 0.09 0.09 0.29 0.29 0.09 1000 0.43 0.25 0.25 0.08 0.08 0.08 0.08 0.26 0.26 0.07 1.4 125 1.45 1.02 1.02 0.70 0.70 0.68 0.67 0.88 0.89 0.55 250 1.20 0.61 0.61 0.32 0.33 0.30 0.30 0.62 0.62 0.29 500 1.04 0.44 0.44 0.17 0.17 0.16 0.16 0.43 0.43 0.16 750 0.97 0.35 0.35 0.13 0.13 0.12 0.11 0.36 0.36 0.11 1000 0.95 0.30 0.30 0.10 0.10 0.10 0.09 0.30 0.30 0.09 1.6 125 2.15 1.68 1.67 1.33 1.32 1.30 1.32 1.34 1.35 0.63 250 1.92 0.92 0.92 0.45 0.45 0.44 0.45 0.78 0.81 0.35 500 1.73 0.52 0.52 0.21 0.21 0.19 0.21 0.51 0.51 0.19 750 1.73 0.43 0.43 0.15 0.16 0.15 0.16 0.42 0.42 0.13 1000 1.68 0.37 0.37 0.12 0.13 0.12 0.13 0.36 0.37 0.10 (10,3) 1 125 1.13 1.09 1.09 1.09 1.10 1.09 1.10 1.11 1.12 0.99 250 0.75 0.69 0.69 0.69 0.69 0.68 0.69 0.69 0.73 0.68 500 0.55 0.52 0.52 0.52 0.52 0.52 0.52 0.52 0.50 0.52 750 0.43 0.41 0.41 0.40 0.41 0.40 0.41 0.41 0.41 0.40 1000 0.38 0.36 0.36 0.36 0.36 0.36 0.36 0.36 0.36 0.36 1.2 125 1.80 1.54 1.55 1.52 1.27 1.51 1.27 1.53 1.40 1.20 250 1.12 0.89 0.89 0.87 0.86 0.87 0.86 0.92 0.90 0.82 500 0.87 0.66 0.66 0.62 0.64 0.63 0.64 0.66 0.63 0.62 750 0.75 0.54 0.54 0.49 0.58 0.49 0.49 0.54 0.51 0.48 1000 0.67 0.45 0.45 0.44 0.44 0.44 0.44 0.46 0.45 0.44 1.4 125 2.62 2.33 2.33 2.23 2.09 2.24 2.09 2.16 1.81 1.42 250 2.01 1.33 1.33 1.25 1.11 1.25 1.11 1.22 1.14 0.99 500 1.83 0.83 0.83 0.75 0.77 0.75 0.77 0.83 0.82 0.73 750 1.69 0.68 0.68 0.59 0.62 0.60 0.62 0.67 0.65 0.58 1000 1.65 0.59 0.59 0.54 0.55 0.54 0.55 0.59 0.57 0.53 1.6 125 3.91 3.56 3.55 3.52 3.13 3.49 3.13 3.43 3.55 1.69 250 3.47 2.71 2.71 2.57 1.88 2.57 1.88 2.20 1.62 1.17 500 3.56 1.88 1.88 1.66 1.07 1.64 1.07 1.19 1.04 0.86 750 3.58 1.47 1.47 1.15 0.81 1.15 0.81 0.92 0.85 0.71 1000 3.67 1.21 1.21 0.92 0.72 0.90 0.72 0.82 0.79 0.62 Table 3: Means of 500 RSEs (scaled by 10 2)of proposed, competing, and oracle estimates of the cluster-invariant variance matrix under model M1. (p, k ) σ n k-means IS SP PML PMML RPML RPMML MML n MML t ASPE (6,2) 1 125 2.27 2.14 2.14 0.96 0.97 0.96 0.97 2.16 2.52 0.96 250 1.62 1.52 1.52 0.52 0.53 0.52 0.52 1.54 1.98 0.52 500 1.19 1.08 1.08 0.31 0.32 0.30 0.30 1.09 1.60 0.29 750 1.01 0.88 0.88 0.24 0.25 0.22 0.23 0.90 1.45 0.22 1000 0.91 0.75 0.75 0.19 0.19 0.17 0.18 0.77 1.37 0.17 1.2 125 4.33 3.38 3.37 1.50 1.51 1.50 1.53 3.30 3.93 1.39 250 3.54 2.28 2.28 0.79 0.80 0.76 0.81 2.34 3.09 0.74 500 3.09 1.60 1.60 0.46 0.47 0.45 0.47 1.69 2.55 0.42 750 2.91 1.31 1.31 0.35 0.35 0.33 0.36 1.40 2.35 0.32 1000 2.83 1.11 1.11 0.28 0.28 0.27 0.29 1.22 2.23 0.25 1.4 125 7.84 6.35 6.34 3.21 3.22 3.21 3.21 5.65 6.97 1.91 250 7.06 3.84 3.84 1.19 1.20 1.12 1.21 3.47 4.71 1.01 500 6.64 2.47 2.47 0.63 0.64 0.61 0.65 2.48 3.78 0.58 750 6.50 1.99 1.99 0.48 0.49 0.46 0.50 2.09 3.50 0.43 1000 6.44 1.71 1.71 0.40 0.40 0.38 0.41 1.84 3.33 0.34 1.6 125 12.50 11.38 11.37 7.13 7.11 7.05 7.03 10.41 12.26 2.47 250 11.66 8.61 8.60 2.78 2.77 2.57 2.75 6.28 8.88 1.33 500 11.29 5.22 5.22 1.07 1.07 1.04 1.08 3.61 5.56 0.76 750 11.14 3.85 3.85 0.83 0.83 0.80 0.84 2.95 4.91 0.57 1000 11.04 3.06 3.06 0.57 0.58 0.53 0.57 2.55 4.53 0.44 (10,2) 1 125 2.30 2.23 2.23 1.49 1.49 1.49 1.49 2.23 2.54 1.49 250 1.65 1.58 1.58 0.82 0.83 0.81 0.83 1.58 1.91 0.81 500 1.20 1.11 1.11 0.46 0.46 0.45 0.46 1.11 1.49 0.45 750 1.02 0.91 0.91 0.33 0.33 0.31 0.33 0.91 1.31 0.32 1000 0.90 0.78 0.78 0.26 0.26 0.25 0.26 0.78 1.22 0.26 1.2 125 3.93 3.26 3.25 2.19 2.19 2.20 2.19 3.24 3.70 2.15 250 3.12 2.29 2.29 1.19 1.19 1.17 1.19 2.29 2.78 1.17 500 2.64 1.60 1.60 0.67 0.67 0.66 0.67 1.61 2.18 0.65 750 2.45 1.32 1.32 0.48 0.48 0.46 0.48 1.33 1.92 0.46 1000 2.33 1.13 1.13 0.39 0.39 0.39 0.39 1.14 1.79 0.37 1.4 125 6.94 5.06 5.04 3.61 3.61 3.62 3.61 4.66 5.37 2.93 250 6.02 3.20 3.20 1.66 1.67 1.63 1.66 3.18 3.89 1.59 500 5.56 2.22 2.22 0.92 0.93 0.90 0.92 2.24 3.05 0.91 750 5.38 1.83 1.83 0.67 0.67 0.65 0.66 1.84 2.69 0.64 1000 5.26 1.57 1.57 0.54 0.54 0.54 0.54 1.59 2.51 0.51 1.6 125 11.00 8.77 8.75 7.01 6.97 7.03 6.97 7.59 8.73 3.85 250 10.06 5.19 5.18 2.66 2.66 2.63 2.66 4.45 5.49 2.10 500 9.56 3.06 3.06 1.25 1.26 1.20 1.26 3.01 4.10 1.18 750 9.44 2.52 2.52 0.90 0.91 0.87 0.91 2.47 3.61 0.83 1000 9.33 2.15 2.15 0.73 0.74 0.73 0.74 2.13 3.38 0.67 (10,3) 1 125 2.45 2.35 2.35 1.89 1.86 1.89 1.86 2.40 2.73 1.77 250 1.72 1.63 1.63 1.10 1.07 1.08 1.07 1.66 1.90 1.05 500 1.25 1.12 1.12 0.75 0.61 0.60 0.61 1.14 1.33 0.77 750 1.07 0.92 0.92 0.63 0.46 0.46 0.46 0.94 1.10 0.46 1000 0.95 0.79 0.79 0.56 0.38 0.38 0.38 0.81 0.96 0.38 1.2 125 4.59 3.76 3.76 3.18 3.02 3.19 3.02 3.87 4.25 2.54 250 3.47 2.44 2.44 1.66 1.58 1.61 1.58 2.53 2.90 1.50 500 2.88 1.69 1.70 1.12 0.91 0.90 0.91 1.77 2.00 0.90 750 2.71 1.43 1.44 1.01 0.73 0.70 0.73 1.49 1.66 0.70 1000 2.57 1.21 1.21 0.85 0.57 0.55 0.57 1.27 1.46 0.55 1.4 125 8.15 6.77 6.76 6.07 5.26 6.09 5.26 6.20 6.49 3.44 250 7.08 4.16 4.16 2.91 2.41 2.88 2.41 3.81 4.20 2.05 500 6.47 2.69 2.69 1.68 1.34 1.33 1.34 2.61 2.92 1.33 750 6.18 2.27 2.27 1.38 1.02 0.94 1.02 2.15 2.39 0.94 1000 6.00 2.01 2.01 1.20 0.85 0.76 0.76 1.90 2.09 0.76 1.6 125 13.03 11.69 11.67 11.01 9.22 10.85 9.22 10.09 11.21 4.49 250 12.06 8.95 8.95 7.08 4.95 6.91 4.95 6.57 6.32 2.67 500 11.70 6.35 6.35 4.12 2.43 3.98 2.43 4.02 4.07 2.01 750 11.55 5.18 5.18 2.91 1.70 2.78 1.70 3.14 3.32 1.70 1000 11.46 4.44 4.44 2.18 1.43 1.79 1.43 2.70 2.87 1.43 
+
+6.1 Application in Customer Segmentation 
+
+Customer segmentation enables differentiated marketing by identifying distinct groups of shoppers with coherent purchasing patterns. To illustrate our methodology, we analyze transaction data from a North American supermarket chain spanning 2017-2020. The source consists of two primary tables: (i) a Transaction table (about 1.2 billion rows) with customer ID, transaction ID, date, product ID, quantity, and unit price; and (ii) a Product table ( about 150,000 rows) with description, category, subcategory, brand, manufacturer, and pack size. For empirical clarity and to avoid pandemic-related 19 Table 4: Means of 500 estimated number of clusters using different information criteria under model M1. (p, k ) (6,2) (10,2) (10,3)                                                                                                                                                                                                   
+
+> σnSPIC BIC nBIC tSPIC BIC nBIC tSPIC BIC nBIC t
+> 1125 2.00 2.00 2.01 2.00 2.01 2.00 3.01 3.01 2.99 250 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 500 2.01 2.00 2.01 2.00 2.00 2.00 3.00 3.00 3.00 750 2.01 2.01 2.13 2.00 2.00 2.00 3.00 3.00 3.00 1000 2.01 2.02 2.54 2.00 2.00 2.00 3.00 3.00 3.00 1.2 125 2.00 1.93 1.91 2.00 2.01 1.99 3.01 3.02 2.97 250 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 500 2.01 2.00 2.02 2.00 2.00 2.00 3.00 3.00 3.00 750 2.02 2.01 2.18 2.00 2.00 2.00 3.00 3.00 3.00 1000 2.02 2.02 2.75 2.00 2.00 2.00 3.00 3.00 3.00 1.4 125 1.98 1.38 1.37 2.00 1.83 1.79 2.85 2.79 2.74 250 2.00 1.83 1.90 2.00 2.00 2.00 3.02 3.01 3.01 500 2.00 1.97 2.05 2.00 2.00 2.00 3.00 3.00 3.00 750 2.00 2.01 2.23 2.00 2.00 2.00 3.00 3.00 3.00 1000 2.00 2.02 2.80 2.00 2.00 2.00 3.00 3.00 3.00 1.6 125 1.87 1.09 1.11 1.82 1.26 1.24 2.49 2.27 2.21 250 2.02 1.40 1.43 2.00 1.92 1.87 2.97 2.80 2.74 500 2.01 1.97 1.78 2.00 2.00 2.00 3.01 3.02 3.01 750 2.01 2.02 2.21 2.00 2.00 2.00 3.00 3.02 3.03 1000 2.00 1.99 2.78 2.00 2.00 2.00 3.02 3.01 3.02
+
+distortions, we focus on calendar year 2018—the most complete pre-COVID year in the dataset—and restrict attention to reliably active shoppers. Inclusion criteria are: (a) loyalty-program members; (b) at least 26 transactions in 2018 (multiple transactions within a week counted as a single purchasing occasion); (c) evidence of engagement—at least one transaction every two months; and (d) for the category analysis, participation in product categories where each included customer records at least 26 transactions in 2018. This design balances sample size, purchase regularity, and representativeness while reducing the risk of inadvertently including churned customers. After filtering, the reduced dataset contains 4,062 customers and 116,426 transactions across nine major product categories. We construct two variable sets per customer: (1) six bimonthly purchase amounts for Jan-Feb, Mar-Apr, May-Jun, Jul-Aug, Sep-Oct, and Nov-Dec; and (2) category-level purchase amounts for Cold Beverages, Fruit, Household, In-Store (prepared foods), Meal Makers, Milk & Eggs, Snacks, Natural Foods, and Vegetables. The bimonthly profile serves as the clustering feature space; the category totals are held out for interpretation and validation of cluster meaning. Let T1 through T6 denote the six bimonthly intervals and let PA 1 through PA 6 be the correspond-ing log-transformed purchase amounts. We fit the SCED to PA 1, PA 2, . . . , PA 6. Model selection via the semiparametric information criterion (SPIC) favors three clusters; in contrast, normal- and 20 t-based BICs prefer more clusters but exhibit local minima at three clusters (Table 5). For three clusters, agreement with the OC method measured by the RI is 0.643 for k-means, 0.820 for IS, 0.820 for SP, 0.896 for OC n, and 0.854 for OC t. Thus, k-means yields a substantially different partition— consistent with its spherical-cluster bias—whereas the remaining methods align more closely with OC. Under OC, Clusters 1 to 3 contain 2,513, 1,081, and 468 customers, with mean purchase amounts of 371.20, 199.10, and 277.75, and mean transaction counts of 28.95, 28.30, and 27.98, respectively. Table 5: Information criterion values versus number of clusters. Number of clusters SPIC BIC n BIC t
+
+1 7.913 7.971 7.910 2 7.898 7.953 7.858 3 7.865 7.893 7.822 
+
+4 7.895 7.927 7.841 5 7.890 7.879 7.818 
+
+6 7.910 7.870 7.825 Parameter estimation results (Table 6) compare RPML, RPMML, MML n, and MML t. RPML and RPMML deliver broadly similar point estimates, which differ from the fully parametric MML n and MML t. Using 500 within-cluster bootstrap resamples, the bootstrap mean-squared errors for RPML are 0.063 (cluster-specific mean vectors) and 0.078 (cluster-invariant variance matrix), whereas RP-MML achieves 0.033 and 0.029, respectively. RPMML therefore provides better parameter estimates than RPML in this application, while retaining the semiparametric robustness of the proposed frame-work. Let ℓ0(k) = max η ℓ(η), and define 
+
+D = 1
+
+n
+
+ pℓ  ˘k − ℓ0
+
+ ˘k − log nn 45
+
+.
+
+By Theorems 3 and 4, a parametric clusterwise elliptical model is closest to the true data-generating mechanism within its class if D ≤ 0 and not the closest otherwise. For the clusterwise multivari-ate normal and clusterwise multivariate t specifications, we obtain D = 0 .021 and D = 0 .088, respectively—both positive—indicating that neither parametric model adequately approximates the truth. Using the estimated mean vectors with bootstrap standard errors, pairwise comparisons of 21 purchase amounts across the six time intervals show statistically significant differences at the 0.05 level: Cluster 1 exceeds Cluster 2 from T1 to T6; Cluster 1 exceeds Cluster 3 from T2 to T6; and Cluster 3 exceeds Cluster 2 at every time period except T5.Figure S1 shows that in T5, Cluster 3 records significantly lower purchase amounts than Clusters 1 and 2 across all nine major product categories. Aside from the In-Store category in T1 and T2,Cluster 2 purchases are significantly lower than Cluster 1’s across the remaining categories. Relative to Cluster 3, Cluster 1 is significantly higher in Household ( T2), Milk & Eggs ( T4), and—in T6—In-Store, Milk & Eggs, Snacks, Natural Foods, and Vegetables. Except for T5, Cluster 2’s purchase amounts are generally comparable to or significantly lower than Cluster 3’s across categories. Table S5 corroborates these patterns for average weekly spend: Cluster 1 exceeds Cluster 2 in every category and exceeds Cluster 3 in all but Cold Beverages. Compared with Cluster 3, Cluster 2 is significantly lower in every category except Cold Beverages, Household, and In-Store. With the exception of Fruit, cross-cluster patterns in average purchase amounts closely mirror those in average weekly purchase amounts. 
+
+6.2 Application in Pima-Indian Diabetes Research 
+
+The Pima Indian Diabetes dataset compiled by the National Institute of Diabetes and Digestive and Kidney Diseases contains records on 768 adult women of Pima Indian heritage ( age ≥ 21 at baseline) from a longitudinal study of incident diabetes over a 1-5 year follow-up. For each participant, we observe age ; gravidity status gs (coded 0 if the number of pregnancies ≤ 2, 1 if > 2); diabetes status ds 
+
+(0 = non-diabetic, 1 = diabetic); and six log-transformed clinical measures: two-hour plasma glucose after an oral glucose tolerance test ( gtt ), diastolic blood pressure ( dbp ), triceps skinfold thickness (tsf t ), two-hour serum insulin ( si ), body mass index ( bmi ), and diabetes pedigree function ( dpf ). To mitigate physiologically implausible values, we excluded patients with extreme biomarker readings or zeros for either bmi or gtt , yielding a final analytic sample of 389 participants. Of these, 128 met the WHO diagnostic criteria for diabetes and 261 did not. Among participants with recorded gravidity, 22 Table 6: Mean vector estimates (bootstrap standard errors) from the RPML, RPMML, MML n, and MML t methods, and variance matrix estimates (bootstrap standard errors), with the upper and lower triangles corresponding to RPML and RPMML, respectively. Method RPML RPMML MML n MML t
+
+Variable μ1 μ2 μ3 μ1 μ2 μ3 μ1 μ2 μ3 μ1 μ2 μ3
+
+PA 1 0.46 -1.15 0.36 0.44 -1.02 0.37 0.26 -1.64 0.40 0.28 -1.41 0.41 (0.012) (0.019) (0.025) (0.015) (0.027) (0.023) (0.026) (0.179) (0.071) (0.041) (0.203) (0.087) PA 2 0.36 -0.85 0.18 0.39 -0.76 0.18 0.08 -0.58 0.30 0.09 -0.06 0.25 (0.013) (0.033) (0.039) (0.016) (0.037) (0.032) (0.048) (0.160) (0.088) (0.054) (0.131) (0.072) PA 3 0.25 -0.55 0.05 0.31 -0.51 0.08 0.07 -0.48 0.20 0.07 0.10 0.15 (0.018) (0.038) (0.029) (0.020) (0.026) (0.030) (0.028) (0.086) (0.069) (0.031) (0.063) (0.069) PA 4 0.23 -0.46 -0.06 0.29 -0.42 -0.01 0.08 -0.45 0.05 0.07 0.09 -0.02 (0.018) (0.037) (0.034) (0.022) (0.023) (0.041) (0.032) (0.101) (0.075) (0.033) (0.085) (0.080) PA 5 0.49 -0.31 -1.45 0.48 -0.28 -1.19 0.19 -0.42 -2.05 0.20 0.10 -1.67 (0.008) (0.028) (0.033) (0.024) (0.023) (0.026) (0.035) (0.091) (0.143) (0.047) (0.093) (0.173) PA 6 0.24 -0.41 -0.21 0.30 -0.35 -0.14 0.07 -0.42 -0.15 0.10 0.08 -0.16 (0.017) (0.029) (0.032) (0.024) (0.027) (0.028) (0.032) (0.074) (0.112) (0.035) (0.072) (0.086)                                                                                      
+
+> PA 1PA 2PA 3PA 4PA 5PA 6
+> 0.49 -0.01 0.02 -0.02 -0.01 -0.06 PA 1
+> (0.012) (0.013) (0.008) (0.010) (0.010) (0.009) 0.72 0.26 0.17 0.14 0.07 PA 2
+> (0.017) (0.012) (0.011) (0.011) (0.014)
+> PA 10.49 0.86 0.36 0.23 0.14 PA 3
+> (0.017) (0.019) (0.016) (0.012) (0.013)
+> PA 2-0.02 0.71 0.91 0.32 0.18 PA 4
+> (0.011) (0.023) (0.022) (0.012) (0.016)
+> PA 30.01 0.26 0.87 0.53 0.24 PA 5
+> (0.012) (0.023) (0.027) (0.014) (0.012)
+> PA 4-0.02 0.16 0.36 0.90 0.91 PA 6
+> (0.013) (0.015) (0.021) (0.028) (0.026)
+> PA 50.02 0.15 0.24 0.32 0.52 (0.012) (0.011) (0.015) (0.014) (0.023)
+> PA 6-0.06 0.07 0.14 0.18 0.25 0.91 (0.011) (0.014) (0.013) (0.014) (0.011) (0.028)
+
+210 had at most two pregnancies and 178 had more than two. The study objective is to identify latent clusters from the biomarker-age profile and examine their associations with ds and gs .We fit the SCED to gtt, dbp, tsf t, si, bmi, dpf, and age . Model selection using the semiparametric information criterion (SPIC) and two parametric comparators (BIC n and BIC t) consistently favored four clusters (Table 7). Agreement among clustering methods was high: RI = 0.855 between k-means and OC; 0.972 between IS and OC; 0.972 between SP and OC; 0.972 between OC n and OC; and 0.974 between OC t and OC. Under the OC solution, cluster sizes were 102, 105, 100 and 81, respectively, for Clusters 1 to 4. Diabetes prevalence was low in Clusters 1 and 3 (0.128 and 0.120) and markedly higher in Clusters 2 and 4 (0.543 and 0.580). The proportions with low gravidity were 0.716, 0.571, 0.660, and 0.139 in Clusters 1 to 4, respectively. Comparing the OC clustering to the partition defined jointly by ( ds, gs ) yielded RI= 0 .652, indicating that while disease/gravidity status is informative, 23 the latent structure is not reducible to these two labels. Table 7: Information criterion values versus number of clusters. Number of clusters SPIC BIC n BIC t
+
+1 9.192 9.178 9.151 2 9.154 9.174 9.141 3 9.139 9.139 9.076 4 9.046 9.081 9.041 
+
+5 9.120 9.133 9.090 6 9.207 9.183 9.141 Clustering assignments from OC n and OC t closely matched OC, but the corresponding maximum marginal likelihood estimates differed from the pseudo-maximum and pseudo-maximum marginal estimates (Table 8). In bootstrap evaluation, RPMML achieved lower mean-squared error than RPML for both the cluster-specific mean vectors (0.072 vs. 0.087) and the cluster-invariant variance matrix (0.075 vs. 0.086), suggesting improved parameter estimation. The inadequacy of purely parametric specifications was further reflected in the goodness-of-fit statistic D: D = 0 .194 for the clusterwise normal and D = 0 .144 for the clusterwise t, both indicating lack of fit relative to the semiparametric model. Group comparisons (Table S6) show that diabetic patients ( ds = 1) are significantly older and exhibit higher levels across all six biomarkers than non-diabetics. Participants with higher gravidity ( gs = 1) are significantly older and have elevated gtt and dbp relative to those with gs = 0. Consistent with these patterns, Clusters 1 and 3 are composed primarily of non-diabetic, low-gravidity participants, whereas Clusters 2 and 4 are dominated by diabetic, high-gravidity participants. Notable nuances include: bmi in Cluster 1 is comparable to Clusters 2 and 4 and exceeds Cluster 3; mean age in Cluster 2 is similar to Clusters 1 and 3 but lower than Cluster 4. Although the RI between OC and the ( ds, gs ) partition is modest, the estimated cluster mean vectors (Table 8) mirror the group contrasts in Table S6 for ( ds, gs ) ∈ { (0 , 0) , (0 , 1) , (1 , 0) , (1 , 1) },yielding coherent clinical interpretations. Table S7 further indicates a cluster-specific diabetes effect alongside a largely cluster-invariant gravidity effect on the biomarkers, a pattern that merits additional investigation. 24 Table 8: Mean vector estimates (bootstrap standard errors) from the RPML, RPMML, MML n, and MML t methods, and variance matrix estimates (bootstrap standard errors), with the upper and lower triangles corresponding to RPML and RPMML, respectively. Method RPML RPMML MML n MML t
+
+Variable μ1 μ2 μ3 μ4 μ1 μ2 μ3 μ4 μ1 μ2 μ3 μ4 μ1 μ2 μ3 μ4
+
+gtt -0.87 0.73 -0.29 0.47 -0.62 0.50 -0.27 0.47 -0.29 0.25 -0.27 0.40 -0.35 0.31 -0.30 0.41 (0.068) (0.069) (0.092) (0.105) (0.06) (0.065) (0.087) (0.100) (0.185) (0.200) (0.143) (0.141) (0.184) (0.182) (0.143) (0.145) 
+
+dpb -0.24 0.22 -0.37 0.43 -0.38 0.28 -0.25 0.46 -0.66 0.48 -0.15 0.51 -0.63 0.47 -0.12 0.50 (0.100) (0.112) (0.107) (0.100) (0.088) (0.099) (0.099) (0.084) (0.224) (0.212) (0.171) (0.098) (0.204) (0.186) (0.168) (0.101) 
+
+tsft 0.42 0.64 -1.32 0.28 0.26 0.66 -1.29 0.33 0.14 0.72 -1.33 0.29 0.16 0.71 -1.33 0.29 (0.067) (0.065) (0.07) (0.086) (0.059) (0.057) (0.063) (0.083) (0.148) (0.118) (0.149) (0.113) (0.145) (0.108) (0.136) (0.104) 
+
+si -0.64 0.69 -0.36 0.35 -0.44 0.60 -0.42 0.27 -0.24 0.41 -0.43 0.30 -0.26 0.46 -0.47 0.30 (0.092) (0.085) (0.097) (0.107) (0.075) (0.078) (0.092) (0.098) (0.180) (0.169) (0.132) (0.130) (0.160) (0.163) (0.139) (0.123) 
+
+bmi 0.29 0.55 -0.96 0.17 0.20 0.49 -0.92 0.18 0.06 0.59 -0.92 0.14 0.10 0.56 -0.96 0.16 (0.088) (0.088) (0.087) (0.096) (0.080) (0.084) (0.078) (0.088) (0.170) (0.161) (0.137) (0.099) (0.160) (0.155) (0.138) (0.109) 
+
+dpf -0.24 0.49 -0.24 -0.01 -0.17 0.33 -0.24 -0.01 -0.09 0.34 -0.27 -0.01 -0.08 0.32 -0.29 0.00 (0.105) (0.099) (0.103) (0.129) (0.104) (0.093) (0.092) (0.115) (0.194) (0.216) (0.157) (0.142) (0.170) (0.195) (0.156) (0.141) 
+
+age -0.55 -0.26 -0.52 1.65 -0.54 -0.29 -0.52 1.58 -0.48 -0.29 -0.53 1.65 -0.49 -0.28 -0.54 1.63 (0.053) (0.055) (0.054) (0.074) (0.042) (0.050) (0.049) (0.072) (0.077) (0.101) (0.073) (0.124) (0.078) (0.105) (0.063) (0.138) 
+
+gtt dpb tsft si bmi dpf age 
+
+0.58 0.04 0.05 0.31 0.11 -0.04 0.07 gtt 
+
+(0.043) (0.040) (0.025) (0.037) (0.031) (0.037) (0.023) 0.89 0.06 -0.04 0.21 -0.12 0.09 dpb 
+
+(0.074) (0.029) (0.041) (0.042) (0.054) (0.027) 
+
+gtt 0.59 0.37 0.02 0.21 -0.04 0.00 tsft 
+
+(0.044) (0.041) (0.032) (0.034) (0.034) (0.022) 
+
+dpb 0.02 0.88 0.73 0.14 -0.02 0.07 si 
+
+(0.038) (0.067) (0.070) (0.041) (0.048) (0.024) 
+
+tsft 0.05 0.05 0.38 0.65 0.01 0.02 bmi 
+
+(0.023) (0.029) (0.041) (0.053) (0.043) (0.024) 
+
+si 0.30 -0.05 0.01 0.71 0.93 0.06 dpf 
+
+(0.038) (0.041) (0.032) (0.072) (0.069) (0.027) 
+
+bmi 0.09 0.19 0.22 0.12 0.66 0.26 age 
+
+(0.030) (0.039) (0.035) (0.041) (0.055) (0.022) 
+
+dpf -0.03 -0.10 -0.03 -0.01 0.03 0.95 (0.035) (0.049) (0.032) (0.045) (0.041) (0.064) 
+
+age 0.08 0.08 0.00 0.08 0.03 0.08 0.26 (0.021) (0.026) (0.023) (0.023) (0.021) (0.024) (0.021) 
+
+## 7 Concluding Remarks and Future Challenges 
+
+We study a general SCED for unsupervised learning and develop two estimation procedures: a pseudo-maximum likelihood estimator and a pseudo-maximum marginal likelihood estimator. The frame-work further yields an asymptotically optimal clustering rule—maximizing the probability of correct membership—and a semiparametric information criterion for selecting the number of clusters. While pseudo-maximum likelihood estimator is asymptotically more efficient, simulations show that pseudo-maximum marginal likelihood estimator delivers superior finite-sample performance when samples are small, cluster means are weakly separated, or the parameter dimension is high. The methodology extends naturally to SCEDs with cluster-specific scatter matrices and density generators. Important open questions include characterizing the asymptotics of the proposed esti-mators when the number of variables and clusters grows with sample size and formalizing model 25 adequacy tests. In practice, adequacy of a parametric clusterwise elliptical model can be assessed by comparing its maximized likelihood with the proposed pseudo-likelihood, though a fuller treatment of this comparison warrants further study. For clusterwise location models with an unspecified mul-tivariate density, the framework supports valid inference when data are sufficiently dense to enable high-dimensional function estimation; under data sparsity, modifications such as regularization or dimension reduction are needed to keep estimation and clustering feasible. In the Pima Indian Diabetes application, the clinical indicators we analyze are standard inputs to existing diabetes classifiers. Our results corroborate prior findings while revealing that biomarker-outcome associations vary across latent patient subgroups. This heterogeneity argues for subgroup-aware evaluation—e.g., cluster-conditional receiver operating characteristic analysis—when assessing classifiers. More broadly, because labeling is costly or time-consuming in domains such as food authentication, medical imaging, and web categorization, many real-world classification tasks mix labeled and unlabeled observations. Leveraging both types of data—e.g., by combining SCED-based representations with semi-supervised classification—can improve estimation efficiency and predictive accuracy. 
+
+## References 
+
+An, L. T. H. and Tao, P. D. (2005). The DC (difference of convex functions) programming and DCA revisited with DC models of real world nonconvex optimization problems. Annals of Operations Research 133, 23–46. Banfield, J. D. and Raftery, A. E. (1993). Model-based Gaussian and non-Gaussian clustering. Bio-metrics 49, 803–821. Bickel, P. J., Klaassen, C. A. J., Ritov, Y., and Wellner, J. A. (1998). Efficient and Adaptive Estimation for Semiparametric Models . New York: Springer. Bowman, A. W. (1984). An alternative method of cross-validation for the smoothing of density estimates. Biometrika 71, 353–360. Boyd, S., Parikh, N., Chu, E., Peleato, B., and Eckstein, J. (2011). Distributed optimization and statistical learning via the alternating direction method of multipliers. Foundations and Trends in Machine Learning 3, 1–122. Celeux, G. and Govaert, G. (1992). A classification EM algorithm for clustering and two stochastic versions. Computational statistics & Data analysis 14, 315–332. 26 Celeux, G. and Govaert, G. (1995). Gaussian parsimonious clustering models. Pattern Recognition 
+
+28, 781–793. Chi, E. C. and Lange, K. (2015). Splitting methods for convex clustering. Journal of Computational and Graphical Statistics 24, 994–1013. Chiang, C.-T., Fan, S.-H., Huang, M.-Y., Teng, J.-C., and Lim, A. (2024). A general semi-parametric elliptical distribution model for semi-supervised learning. Journal of Nonparametric Statistics 37, 
+
+453–490. Cormack, R. M. (1971). A review of classification. Journal of the Royal Statistical Society A134, 
+
+321–353. Cowling, A. and Hall, P. (1996). On pseudodata methods for removing boundary effects in kernel density estimation. Journal of the Royal Statistical Society Series B58, 551–563. Day, N. E. (1969). Estimating the components of a mixture of normal distributions. Biometrika 56, 
+
+463–474. Forgy, E. W. (1965). Cluster analysis of multivariate data: efficiency versus interpretability of clas-sifications. Biometrics 21, 768–769. Fraley, C. and Raftery, A. E. (1998). How many clusters? Which clustering method? Answers via model-based cluster analysis. Computer Journal 41, 578–588. Fraley, C. and Raftery, A. E. (2002). Model-based clustering, discriminant analysis, and density estimation. Journal of the American Statistical Association 97, 611–631. Friedman, H. P. and Rubin, J. (1967). On some invariant criteria for grouping data. Journal of the American Statistical Association 62, 1159–1178. Gomes, M. A. and Meisen, T. (2023). A review on customer segmentation methods for personalized customer targeting in e-commerce use cases. Information Systems and e-Business Management 21, 
+
+527–570. Gordon, A. D. (1987). A review of hierarchical classification. Journal of the Royal Statistical Society 
+
+A150, 119–137. Gordon, A. D. (1999). Classification . London: Chapman and Hall. Hastie, T., Tibshirani, R., Friedman, J. H., and Friedman, J. H. (2009). The Elements of Statistical Learning: Data Mining, Inference, and Prediction . New York: Springer. Hoeffding, W. (1948). Probability inequalities for sums of random variables. Annals of Statistics 10, 
+
+293–325. Jambu, M. and Lebeaux, M. (1978). Classification Automatique pour l’Analyse des Donn´ ees, I-M´ ethodes et Algorithms . Paris: Dunod. Lance, G. N. and Williams, W. T. (1966). A generalized sorting strategy for computer classifications. 
+
+Nature 212, 218–218. Lance, G. N. and Williams, W. T. (1967). A general theory of classificatory sorting strategies: I. Hierarchical systems. Computer Journal 9, 373–380. 27 Liebscher, E. (2005). A semiparametric density estimator based on elliptical distributions. Journal of Multivariate Analysis 92, 205–225. Liu, Y., Hayes, D. N., Nobel, A., and Marron, J. S. (2008). Statistical significance of clustering for high-dimension, low–sample size data. Journal of the American Statistical Association 103, 
+
+1281–1293. Lloyd, S. (1982). Least squares quantization in PCM. IEEE Transactions on Information Theory 28, 
+
+129–137. Macnaughton-Smith, P., Williams, W., Dale, M., and Mockett, L. (1964). Dissimilarity analysis: a new technique of hierarchical sub-division. Nature 202, 1034–1035. MacQueen, J. (1967). Some methods for classification and analysis of multivariate observations. 
+
+Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and Probability 1, 281– 297. Marriott, F. H. C. (1971). Practical problems in a method of cluster analysis. Biometrics 27, 501–514. McLachlan, G. J. (1982). The classification and mixture maximum likelihood approaches to cluster analysis. In Handbook of Statistics . ed. P. R. Krishnaiah and L. N. Kanal, 199–208. Amsterdam: North-Holland. McLachlan, G. J. and Basford, K. E. (1988). Mixture Models: Inference and Applications to Cluster-ing . New York: Dekker. McLachlan, G. J. and Peel, D. (1998). Robust cluster analysis via mixtures of multivariate t-distributions. Advances in Pattern Recognition 1451, 658–666. McLachlan, G. J. and Peel, D. (2000). Finite Mixture Models . New York: Wiley. Nelson, R. G., Knowler, W. C., Kretzler, M., Lemley, K. V., Looker, H. C., Mauer, M., Mitch, W. E., Najafian, B., and Bennett, P. H. (2021). Pima indian contributions to our understanding of diabetic kidney disease. Diabetes 70, 1603–1616. Nolan, D. and Pollard, D. (1987). U -processes: rates of convergence. Annals of Statistics 15, 780–799. Pollard, D. (1984). Convergence of Stochastic Processes. New York: Springer. Rand, W. M. (1971). Objective criteria for the evaluation of clustering methods. Journal of the American Statistical Association 66, 846–850. Rousseeuw, P. J. (1987). Silhouettes: a graphical aid to the interpretation and validation of cluster analysis. Journal of Computational and Applied Mathematics 20, 53–65. Salih, M. S., Ibrahim, R. K., Zeebaree, S. R. M., Zebari, D. A., Abdulrahman, L. M., and Abdulka-reem, N. M. (2024). Diabetic prediction based on machine learning using pima indian dataset. 
+
+Communications on Applied Nonlinear Analysis 31, 138–147. Sherman, R. P. (1994). Maximal inequalities for degenerate U -processes with applications to opti-mization estimators. Annals of Statistics 22, 439–459. Steinhaus, H. (1956). Sur la division des corps mat´ eriels en parties. Bulletin L’Acad´ emie Polonaise des Science 1, 801. 28 Symons, M. J. (1981). Clustering criteria and multivariate normal mixtures. Biometrics 37, 35–43. Tang, X., Xue, F., and Qu, A. (2021). Individualized multidirectional variable selection. Journal of the American Statistical Association 116, 1280–1296. Thorndike, R. L. (1953). Who belongs in the family? Psychometrika 18, 267–276. Tsiatis, A. A. (2006). Semiparametric Theory and Missing Data . New York: Springer. Wolfe, J. H. (1965). A computer program for the maximum likelihood analysis of types. Technical Bulletin 65, 15. Zhang, S., Karunamuni, R. J., and Jones, M. C. (1999). An improved estimator of the density function at the boundary. Journal of the American Statistical Association 94, 1231–1240. 29 Appendix 
+
+A.1 Assumptions 
+
+Let Dμ = min {c1̸ =c2} ∥W 1/2(μo 
+
+> c1
+
+− μo 
+
+> c2
+
+)∥1. The following assumptions are imposed to establish the oracle property of ( ˆβ, ˆμ): A1. There exists a constant d0 > 0 such that 
+
+P  |a⊤U | > ∥a∥v ≤ 2 exp   − d0v2 for all a ∈ Rp and v > 0.
+
+A2. B = {β : sup {1≤i≤n} ∥W 1/2(βi − βo 
+
+> i
+
+)∥1 ≤ Dμ/4} and U = {μ : sup {c∈C} ∥W 1/2(μc − μo 
+
+> c
+
+)∥1 ≤
+
+Dμ/4}.A3. λ ≥ 2p W 12
+
+plog n/d 0.Assumption A1 imposes a sub-Gaussian tail condition on U , which facilitates the theoretical devel-opment of the subject-specific model in high-dimensional settings. Assumptions A2 and A3 ensure that, with probability converging to one, the strict inequality SS sp (β, μ ; λ) > SS sp ( ˆβor , ˆμor ; λ) holds for all ( β, μ ) ∈ B × U such that β̸ = ˆβor or μ̸ = ˆ μor .The following additional assumptions are imposed for Lemma A.1 and Theorems 2–4: A4. h ∈  h1n−1/5, h 2n−1/8 for some constants h1, h 2 > 0. A5. X and H are compact. A6. f [m](x, c ; η) is Lipschitz continuous in x for c ∈ C and m ∈ { 0, 1, 2}, with Lipschitz constants independent of η.A7. inf {x,c,η } f [0] (x, c ; η) > 0. A8. V1 is positive definite. A9. V2 is positive definite. Assumption A4 specifies the bandwidth rate required for the √n-consistency of ˜ η and ˇ η. The com-pactness condition in A5 can be relaxed to suitable moment conditions. Assumption A6 imposes smoothness for the uniform convergence of the estimated functions to their targets. Assumptions A7–A9 provide the remaining regularity conditions needed to establish the asymptotic properties of ˜η and ˇ η.
+
+A.2 Technical Lemma 
+
+Lemma A.1. Under assumptions A4–A7, 
+
+sup 
+
+> {x,c,η }
+
+∂mη ˆfh(x, c ; η) − f [m](x, c ; η) = sup 
+
+> {x,c,η }
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ξi,m (x, c ; η) = O(h2) + op
+
+r log nnh 1+2 m
+
+!
+
+,
+
+where ξi,m (x, c ; η) = ∂mη
+
+ πcw(yc)Kh(Yi, y c) − f [m](x, c ; η), i = 1 , . . . , n , m = 0 , 1, 2.
+
+Proof. Under assumption A5, Theorem 22 in Nolan and Pollard (1987) implies that the classes 
+
+Fm = ∂mη
+
+ πcw(yc)Kh(Y, y c) : x ∈ X , η ∈ H , c ∈ C , m = 0 , 1, 2,
+
+are Euclidean. The mth-order partial derivative with respect to η can be computed by the product rule, yielding 
+
+∂mη
+
+ πcw(yc)Kh(Y, y c) =
+
+> m
+
+X
+
+> s=0
+
+ms
+
+ ∂sη(πcw(yc)) ∂m−sη Kh(Y, y c).
+
+30 To evaluate the derivatives of the kernel component, observe that for each m = 0 , 1, 2, the mth-order derivative of Kh(Y, y c) with respect to η admits the decomposition 
+
+∂mη Kh(Y, y c) = 
+
+> m
+
+X
+
+> q=0 1
+
+X
+
+> r=0
+
+1
+
+hq+1 K(q)
+
+ Y + ( −1) ryc
+
+h
+
+
+
+M mq,r (X, x ),
+
+where the functions M mq,r (X, x ), m = 0 , 1, 2, q = 0 , . . . , m , r = 0 , 1, encapsulate the dependence on X
+
+and x, and are given by 
+
+M mq,r (X, x ) = 
+
+ ∂η
+
+ Y + ( −1) ryc
+
+ ⊗m q = m, ∂2
+
+> η
+
+ Y + ( −1) ryc
+
+ (q, m ) = (1 , 2) ,
+
+0 otherwise. For each m = 0 , 1, 2, the second moments of the vectorized derivatives are uniformly bounded in the following sense: sup 
+
+> {x,c,η }
+
+E
+
+h 
+
+vec 
+
+
+
+∂mη
+
+ πcw(yc)Kh(Y, y c) ⊗2i
+
+= O
+
+ 1
+
+h2m+1 
+
+
+
+, m = 0 , 1, 2, (A.1) where vec( ·) denotes the vectorization operator. Define ¯fh(x, c ; η) := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+πcw(yc)Kh(Yi, y c) and N mq,r (y, x ) := E M mq,r (X, x )|Y = y.
+
+By Theorem II.37 in Pollard (1984), it follows that sup 
+
+> {x,c,η }
+
+∂mη ¯fh(x, c ; η) − E
+
+h
+
+∂mη
+
+ πcw(yc)Kh(Y, y c)i
+
+= op
+
+r log nnh 2m+1 
+
+!
+
+, m = 0 , 1, 2. (A.2) Applying Taylor’s theorem, we obtain E
+
+h
+
+∂mη
+
+ πcw(yc)Kh(Y, y c)i
+
+= E 
+
+" mX
+
+> s=0
+
+ms
+
+ ∂sηπcw(yc) m−sX
+
+> q=0 1
+
+X
+
+> r=0
+
+1
+
+hq+1 K(q)
+
+ Y + ( −1) ryc
+
+h
+
+
+
+M m−sq,r (X, x )
+
+#
+
+= E 
+
+" mX
+
+> s=0
+
+ms
+
+ ∂sηπcw(yc) m−sX
+
+> q=0 1
+
+X
+
+> r=0
+
+1
+
+hq+1 K(q)
+
+ Y + ( −1) ryc
+
+h
+
+
+
+E
+
+h
+
+M m−sq,r (X, x ) Y
+
+i#
+
+= E 
+
+" mX
+
+> s=0
+
+ms
+
+ ∂sηπcw(yc) m−sX
+
+> q=0 1
+
+X
+
+> r=0
+
+1
+
+hq+1 K(q)
+
+ Y + ( −1) ryc
+
+h
+
+
+
+N m−sq,r (Y, x )
+
+#
+
+=
+
+> m
+
+X
+
+> s=0
+
+ms
+
+ ∂sηπcw(yc) m−sX
+
+> q=0 1
+
+X
+
+> r=0
+
+1
+
+hq+1 
+
+Z
+
+K(q)
+
+ y + ( −1) ryc
+
+h
+
+
+
+N m−sq,r (y, x )g(y; θ)dy 
+
+=
+
+> m
+
+X
+
+> s=0
+
+ms
+
+ ∂sηπcw(yc) m−sX
+
+> q=0 1
+
+X
+
+> r=0
+
+∂qy
+
+ N m−sq,r (yc, x )g(yc; θ) + rm(x, c ; η)
+
+> △
+
+= f [m](x, c ; η) + rm(x, c, η ), (A.3) where the remainder term satisfies sup 
+
+> {x,c,η }
+
+∥rm(x, c ; η)∥ = O(h2), m = 0 , 1, 2.
+
+31 Substituting (A.3) into (A.2), we conclude that for each m = 0 , 1, 2, sup 
+
+> {x,c,η }
+
+∂mη ¯fh(x, c ; η) − f [m](x, c ; η) = sup 
+
+> {x,c,η }
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ξi,m (x, c ; η) = O(h2) + op
+
+r log nnh 1+2 m
+
+!
+
+. (A.4) Since P   bG = G −→ 1 as n −→ ∞ , it follows that sup 
+
+> {i,c }
+
+I i ∈ bGc
+
+ − I i ∈ G c
+
+ = op
+
+ 1
+
+n
+
+
+
+. (A.5) Under assumptions A5–A7, the partial derivatives of order m = 0 , 1, 2 of Kh(Yc1 , y c) and w(yc) with respect to η are uniformly bounded over c1, c ∈ C . Combining this uniform boundedness with the convergence result in (A.5), we obtain sup 
+
+> {x,c,η }
+
+∂mη ˆfh(x, c ; η) − ∂mη ¯fh(x, c ; η)
+
+≤ sup 
+
+> {i,c }
+
+I i ∈ bGc
+
+ − I i ∈ G c
+
+ sup 
+
+> {x,c,η }
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c1=1
+
+∂mη
+
+
+
+πcw(yc)Kh(Yic 1 , y c)
+
+
+
+= op
+
+ 1
+
+n
+
+
+
+(A.6) Lemma A.1 follows directly from (A.4) and (A.6). 
+
+A.3 Proof of Theorem 1 
+
+The oracle property of the separation penalty estimator ( ˆβ, ˆμ) holds if, with probability converging to one, the strict inequality: 
+
+SS sp (β, μ ; λ) > SS sp 
+
+  ˆβor , ˆμor ; λ (A.7) holds for all ( β, μ ) ∈ B × U such that β̸ = ˆβor or μ̸ = ˆ μor . It suffices to show that, with probability converging to one, 
+
+SS sp (β∗, μ ∗; λ) > SS sp 
+
+  ˆβor , ˆμor ; λ and SS sp (β, μ ; λ) ≥ SS sp (β∗, μ ∗; λ),
+
+where 
+
+μ∗ 
+
+> c
+
+= 1
+
+|G c|
+
+X
+
+> {i∈G c}
+
+βi and β∗ 
+
+> i
+
+=
+
+> k
+
+X
+
+> c=1
+
+μ∗ 
+
+> c
+
+I i ∈ G c
+
+.
+
+By definition of the pair ( β∗, μ ∗), the penalty term λ Pni=1 min c ∥W 1/2(β∗ 
+
+> i
+
+− μ∗ 
+
+> c
+
+)∥1 is equal to zero. Thus, the objective function simplifies to 
+
+SS sp 
+
+ β∗, μ ∗; λ = 12
+
+> n
+
+X
+
+> i=1
+
+ Xi − β∗
+
+> i
+
+⊤W (Xi − β∗ 
+
+> i
+
+)= 12
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I(Ci = c)( Xi − μ∗ 
+
+> c
+
+)⊤W (Xi − μ∗ 
+
+> c
+
+) △
+
+= SS w(μ∗). (A.8) Since ˆ μor is the unique minimizer of SS w(μ∗), it follows that 
+
+SS sp 
+
+ β∗, μ ∗; λ > SS sp 
+
+  ˆβor , ˆμor ; λ for β∗̸ = ˆβor . (A.9) We expand the first term in SS sp (β, μ ; λ) as a first-order Taylor series around β = β∗, yielding the following expression: 
+
+SS sp (β, μ ; λ) − SS sp (β∗, μ ∗; λ) = −
+
+> n
+
+X
+
+> i=1
+
+ Xi − ¯βi
+
+⊤W  βi − β∗
+
+> i
+
+ + λ
+
+> n
+
+X
+
+> i=1
+
+min  
+
+> c
+
+W 12 (βi − μc) 1∆
+
+= I1 + I2, (A.10) where ¯βi = αβ i + (1 − α)β∗ 
+
+> i
+
+for some α ∈ (0 , 1), i = 1 , . . . , n .32 A direct calculation leads to the following expression for I1:
+
+I1 =
+
+> k
+
+X
+
+> c=1
+
+X
+
+> {i∈G c}
+
+  − Xi + ¯βi
+
+⊤W X
+
+> {j∈G c}
+
+βi − βj
+
+|G c|
+
+= −
+
+> k
+
+X
+
+> c=1
+
+X
+
+> {i,j ∈G c,i<j }
+
+  − Xi + ¯βi −   − Xj + ¯βj
+
+ ⊤W (βi − βj )
+
+|G c| . (A.11) By the inequality ∥U ∥1 ≥ ∥ U ∥, Boole’s inequality, and assumption A1, we deduce 
+
+P
+
+
+
+∥U ∥ > p 
+
+r log nd0
+
+
+
+≤ P
+
+
+
+∥U ∥1 > p 
+
+r log nd0
+
+
+
+≤ P
+
+ p[
+
+> j=1
+
+
+
+|Uj | >
+
+r log nd0
+
+ 
+
+≤
+
+> p
+
+X
+
+> j=1
+
+P
+
+
+
+|Uj | >
+
+r log nd0
+
+
+
+< 2pn . (A.12) Using this result, along with the triangle inequality, we establish 
+
+  − Xi + ¯βi − (−Xj + ¯βj )⊤W 12 ≤  ∥Xi − βo 
+
+> i
+
+∥ + ∥Xj − βo 
+
+> j
+
+∥ + ∥ ¯βi − βo 
+
+> i
+
+∥ + ∥ ¯βj − βo 
+
+> j
+
+∥ W 12
+
+≤
+
+
+
+∥Xi − βo 
+
+> i
+
+∥ + ∥Xj − βo 
+
+> j
+
+∥ + Dμ
+
+2
+
+
+
+W 12 < 2p W 12
+
+r log nd0
+
+(1 + op(1)) . (A.13) Substituting this bound into (A.11), we obtain 
+
+I1 ≥ − 2p W 12
+
+r log nd0
+
+ kX
+
+> c=1
+
+1
+
+|G c|
+
+X
+
+> {i,j ∈G c,i<j }
+
+W 12 (βi − βj )
+
+
+
+(1 + op(1)) . (A.14) For i ∈ G c1 with c1̸ = c2, assumption A2 and the triangle inequality give 
+
+W 12 (βi − μc2 ) 1 ≥ W 12 (μo 
+
+> c1
+
+− μo 
+
+> c2
+
+) 1 − W 12 (μc2 − μo 
+
+> c2
+
+) 1 − W 12 (βi − βo 
+
+> i
+
+) 1 > Dμ
+
+2and 
+
+W 12 (βi − μc1 ) 1 ≤ W 12 (μc1 − μo 
+
+> c1
+
+) 1 + W 12 (βi − βo 
+
+> i
+
+) 1 < Dμ
+
+2 . (A.15) These bounds allow us to derive the following expression for I2:
+
+I2 = λ
+
+> k
+
+X
+
+> c=1
+
+X
+
+> {i∈G c}
+
+W 12 (βi − μc) 1 = λ
+
+> k
+
+X
+
+> c=1
+
+12|G c|
+
+X
+
+> {i,j ∈G c}
+
+
+
+W 12 (βi − μc) 1 + W 12 (βj − μc) 1
+
+
+
+. (A.16) Rearranging the terms above yields the inequality 
+
+I2 ≥ λ
+
+> k
+
+X
+
+> c=1
+
+12|G c|
+
+X
+
+> {i,j ∈G c}
+
+W 12 (βi − βj ) 1 > λ 
+
+> k
+
+X
+
+> c=1
+
+1
+
+|G c|
+
+X
+
+> {i,j ∈G c,i<j }
+
+W 12 (βi − βj ) . (A.17) Substituting (A.14) and (A.17) into (A.10) and invoking assumption A3, we conclude that, with probability converging to one, 
+
+SS sp (β, μ ; λ) − SS sp (β∗, μ ∗; λ)
+
+>
+
+
+
+λ − 2p W 12
+
+r log nd0
+
+ kX
+
+> c=1
+
+1
+
+|G c|
+
+X
+
+> {i,j ∈G c,i<j }
+
+W 12 (βi − βj )
+
+!
+
+(1 + op(1)) ≥ 0. (A.18) The assertion in Theorem 1 follows directly from (A.9) and (A.18). 33 A.4 Proof of Theorems 2 and 3 
+
+Define 
+
+pS s(η) = ∂ηpℓ s(η), pI s(η) = ∂2 
+
+> η
+
+pℓ s(η), s = 1 , 2, f [m](x; η) = 
+
+> k
+
+X
+
+> c=1
+
+f [m](x, c ; η), m = 0 , 1, 2,ℓ1(η) = 
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I(i ∈ G c) log  f [0] (Xi, c ; η), and ℓ2(η) = 
+
+> n
+
+X
+
+> i=1
+
+log  f [0] (Xi; η).
+
+Applying the triangle inequality, we obtain sup 
+
+> η
+
+1
+
+n pℓ 1(η) − 1
+
+n ℓ1(η) ≤ sup 
+
+> {i,c }
+
+I(i ∈ bGc) − I(i ∈ G c)
+
+ 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+sup 
+
+> η
+
+log( ˆfh(Xi, c ; η)) 
+
+
+
++ sup 
+
+> {x,c,η }
+
+log 
+
+
+
+1 + ˆfh(x, c ; η) − f [0] (x, c ; η)
+
+f [0] (x, c ; η)
+
+
+
+(A.19) and sup 
+
+> η
+
+1
+
+n pℓ 2(η) − 1
+
+n ℓ2(η) ≤ sup 
+
+> {x,η }
+
+log 
+
+
+
+1 + ˆfh(x; η) − f [0] (x; η)
+
+f [0] (x; η)
+
+
+
+. (A.20) By (A.5), the uniform consistency of ˆfh(x, c ; η) to f [0] (x, c ; η) in Lemma A.1, and log(1 + x) = O(x)for x = o(1), it follows that under assumptions A4–A7, sup 
+
+> {i,c }
+
+I(i ∈ bGc) − I(i ∈ G c)
+
+ 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+sup 
+
+> η
+
+log( ˆfh(Xi, c ; η)) 
+
+
+
+= op
+
+ 1
+
+n
+
+
+
+, (A.21) sup 
+
+> {x,c,η }
+
+log 
+
+
+
+1 + ˆfh(x, c ; η) − f [0] (x, c ; η)
+
+f [0] (x, c ; η)
+
+
+
+= O
+
+ sup {x,c,η } ˆfh(x, c ; η) − f [0] (x, c ; η)
+
+inf {x,c,η } f [0] (x, c ; η)
+
+
+
+= O(h2) + op
+
+r log nnh 
+
+!
+
+, (A.22) and sup 
+
+> {x,η }
+
+log 
+
+
+
+1 + ˆfh(x; η) − f [0] (x; η)
+
+f [0] (x; η)
+
+
+
+= O
+
+ sup {x,η } ˆfh(x; η) − f [0] (x, η )
+
+inf {x,η } f [0] (x; η)
+
+
+
+= O(h2) + op
+
+r log nnh 
+
+!
+
+. (A.23) Substituting (A.21) and (A.22) into (A.19) and substituting (A.23) into (A.20), we deduce that sup 
+
+> η
+
+1
+
+n pℓ s(η) − 1
+
+n ℓs(η) = op(1) , s = 1 , 2. (A.24) Assumptions A5 and A6 imply that f [0] (x, c ; η) has bounded variation in x, uniformly over c ∈ C and 
+
+η ∈ H . By Theorem 22 in Nolan and Pollard (1987), it follows that the classes 
+
+f [0] (x, c ; η) : c ∈ C , η ∈ H and f [0] (x; η) : η ∈ H 
+
+are Euclidean. Applying Corollary 4 in Sherman (1994), we further obtain sup 
+
+> η
+
+1
+
+n ℓ1(η) − E log( f [0] (X, C ; η))  = Op
+
+ 1
+
+√n
+
+
+
+and sup 
+
+> η
+
+1
+
+n ℓ2(η) − E log( f [0] (X; η))  = Op
+
+ 1
+
+√n
+
+
+
+. (A.25) 34 Thus, combining (A.24) and (A.25) yields sup 
+
+> η
+
+1
+
+n pℓ 1(η) − E log( f [0] (X, C ; η))  = op(1) and sup 
+
+> η
+
+1
+
+n pℓ 2(η) − E log( f [0] (X; η))  = op(1) . (A.26) Using Jensen’s inequality, we obtain E log( f [0] (X, C ; η))  − E log( f [0] (X, C ; ηo))  ≤ log E 
+
+"
+
+f [0] (X, C ; η)
+
+f [0] (X, C ; ηo)
+
+#
+
+= log 1 = 0 and E log( f [0] (X; η))  − E log( f [0] (X; ηo))  ≤ log E 
+
+"
+
+f [0] (X; η)
+
+f [0] (X; ηo)
+
+#
+
+= log 1 = 0 ∀η ∈ H . (A.27) Moreover, the inequalities in (A.27) are strict whenever η̸ = ηo, thereby establishing that ηo is the unique maximizer of E  log( f [0] (X, C ; η))  and E  log( f [0] (X; η)) . By the uniform convergence results in (A.26), it follows that, with probability converging to one, 1
+
+n pℓ 1(ηo) ≥ 1
+
+n pℓ 1(˜ η) and 1
+
+n pℓ 2(ηo) ≥ 1
+
+n pℓ 2(ˇ η).
+
+Since ˜ η and ˇ η are the maximizers of pℓ 1(η) and pℓ 2(η), respectively, the reverse inequalities also hold: 1
+
+n pℓ 1(˜ η) ≥ 1
+
+n pℓ 1(ηo) and 1
+
+n pℓ 2(ˇ η) ≥ 1
+
+n pℓ 2(ηo).
+
+Together, these inequalities imply that 1
+
+n pℓ 1(˜ η) − 1
+
+n pℓ 1(ηo) p
+
+−→ 0 and 1
+
+n pℓ 2(ˇ η) − 1
+
+n pℓ 2(ηo) p
+
+−→ 0.
+
+Owing to the continuity of pℓ 1(η) and pℓ 2(η) over H, ˜ η and ˇ η are consistent estimators of ηo.Let v ∈ Rd be an arbitrary constant vector. A first-order Taylor expansion of v⊤pS 1(˜ η)/√n
+
+around ηo yields 1
+
+√n v⊤pS 1(˜ η) = 1
+
+√n v⊤pS 1(ηo) + 1
+
+√n v⊤pI 1(¯ η)(˜ η − ηo), (A.28) where ¯ η lies on the line segment between ˜ η and ηo. Similarly, a first-order expansion of v⊤pS 2(ˇ η)/√n
+
+around ηo gives 1
+
+√n v⊤pS 2(ˇ η) = 1
+
+√n v⊤pS 2(ηo) + 1
+
+√n v⊤pI 2(¯ η∗)(ˇ η − ηo), (A.29) where ¯ η∗ lies on the line segment between ˇ η and ηo. Rewriting the normalized pseudo-score vectors in (A.28) and (A.29), we obtain the decomposition 1
+
+√n pS 1(ηo) = 1
+
+√n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I(i ∈ G c) f [1] (Xi, c ; ηo)
+
+f [0] (Xi, c ; ηo) + 1
+
+√n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+(I(i ∈ bGc) − I(i ∈ G c)) ∂η ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)+ 1
+
+√n
+
+> n
+
+X
+
+> i=1 1
+
+X
+
+> m=0
+
+(−1) 1−mf [1 −m](Xi, C i; ηo)
+
+
+
+∂mη ˆfh(Xi, C i; ηo) − f [m](Xi, C i; ηo)
+
+
+
+f [0] (Xi, C i; ηo)
+
+
+
+f [0] (Xi, C i; ηo) + ˆfh(Xi, C i; ηo) − f [0] (Xi, C i; ηo)
+
+
+
+> △
+
+= 1
+
+√n S(ηo) + II 1 + II 2 (A.30) 35 and 1
+
+√n pS 2(ηo) = 1
+
+√n
+
+> n
+
+X
+
+> i=1 1
+
+X
+
+> m=0
+
+(−1) 1−mf [1 −m](Xi; ηo)
+
+
+
+∂mη ˆfh(Xi; ηo) − f [m](Xi; ηo)
+
+
+
+f [0] (Xi; ηo)
+
+
+
+f [0] (Xi; ηo) + ˆfh(Xi; ηo) − f [0] (Xi; ηo)
+
+
+
++ 1
+
+√n
+
+> n
+
+X
+
+> i=1
+
+f [1] (Xi; ηo)
+
+f [0] (Xi; ηo)
+
+> △
+
+= II 3 + 1
+
+√n S2(ηo). (A.31) By (A.5), the uniform consistency of ∂mη ˆfh(x, c ; ηo) to f [m](x, c ; ηo) in Lemma A.1 for m = 0 , 1, and under assumptions A4 – A7, it follows that 
+
+|II 1| ≤ k sup 
+
+> {i,c }
+
+√n I i ∈ bGc
+
+ − I i ∈ G c
+
+ sup 
+
+> {x,c }
+
+∂η ˆfh(x, c ; ηo)ˆfh(x, c ; ηo)
+
+≤ k sup 
+
+> {i,c }
+
+√n I i ∈ bGc
+
+ − I i ∈ G c
+
+ sup {x,c } ∂η ˆfh(x, c ; ηo) − f [1] (x, c ; ηo) + sup {x,c } f [1] (x, c ; ηo)
+
+inf {x,c } f (x, c ; ηo) − sup {x,c } ˆfh(x, c ; ηo) − f (x, c ; ηo)
+
+= op
+
+ 1
+
+√n
+
+
+
+, (A.32) 
+
+II 2 = √n
+
+> 1
+
+X
+
+> m=0
+
+(−1) 1−m
+
+ 1
+
+n2
+
+> n
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+f [1 −m](Xi, C i; ηo)
+
+f 2(Xi, C i; ηo) ξj,m (Xi, C i; ηo)
+
+
+
++ Op
+
+√nh 4 +
+
+r 1
+
+nh 4
+
+
+
+= √n
+
+> 1
+
+X
+
+> m=0
+
+(−1) 1−m
+
+ 1
+
+n2
+
+> n
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+U [m] 
+
+> ij
+
++ 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+V [m]
+
+> i
+
+
+
++ op(1) , (A.33) and 
+
+II 3 = √n
+
+> 1
+
+X
+
+> m=0
+
+(−1) 1−m
+
+ 1
+
+n2
+
+> n
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+f [1 −m](Xi; ηo)
+
+f 2(Xi; ηo) ξ∗
+
+> j,m
+
+(Xi; ηo)
+
+
+
++ Op
+
+√nh 4 +
+
+r 1
+
+nh 4
+
+
+
+= √n
+
+> 1
+
+X
+
+> m=0
+
+(−1) 1−m
+
+ 1
+
+n2
+
+> n
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+U ∗[m] 
+
+> ij
+
++ 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+V ∗[m]
+
+> i
+
+
+
++ op(1) , (A.34) where 
+
+U [m] 
+
+> ij
+
+= f [1 −m](Xi, C i; ηo)
+
+f 2(Xi, C i; ηo) ξj,m (Xi, C i; ηo) − V [m] 
+
+> i
+
+, V [m] 
+
+> i
+
+= E 
+
+ f [1 −m](Xi, C i; ηo)
+
+f 2(Xi, C i; ηo) ξj,m (Xi, C i; ηo) i
+
+
+
+,ξ∗
+
+> j,m
+
+(x; ηo) = 
+
+> k
+
+X
+
+> c=1
+
+ξj,m (x, c ; ηo), U ∗[m] 
+
+> ij
+
+= f [1 −m](Xi; ηo)
+
+f 2(Xi; ηo) ξ∗
+
+> j,m
+
+(Xi; ηo) − V ∗[m] 
+
+> i
+
+, and 
+
+V ∗[m] 
+
+> i
+
+= E 
+
+ f [1 −m](Xi; ηo)
+
+f 2(Xi; ηo) ξ∗
+
+> j,m
+
+(Xi; ηo) i
+
+
+
+, i, j = 1 , . . . , n, m = 0 , 1.
+
+The conditional moment identities E(X − μc)⊗2 | Yc, C = c = 1
+
+p
+
+(1 + Yc) p 
+
+> 2
+
+− 1Σc, E
+
+ ξj, 1(Xi, C i; ηo)
+
+f (Xi, C i; ηo) Xj , C j
+
+
+
+= 0 ,
+
+and Ef [1] (X, c ; ηo) | Yc, C = c = 0 (A.35) imply that E U [m] 
+
+> ij
+
+j = 0 and E U ∗[m] 
+
+> ij
+
+j = 0. Thus, U [m] 
+
+> ij
+
+and U ∗[m] 
+
+> ij
+
+are degenerate U -statistics with 36 variances of order O(h−2m−1) for m = 0 , 1. By Theorem 8.1 in Hoeffding (1948), we obtain 1
+
+n2
+
+> n
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+U [m] 
+
+> ij
+
+= Op
+
+ 1
+
+n√h2m+1 
+
+
+
+and 1
+
+n2
+
+> n
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+U ∗[m] 
+
+> ij
+
+= Op
+
+ 1
+
+n√h2m+1 
+
+
+
+, m = 0 , 1. (A.36) Moreover, the central limit theorem implies that 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+V [m] 
+
+> i
+
+= Op
+
+ h2
+
+√n
+
+
+
+and 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+V ∗[m] 
+
+> i
+
+= Op
+
+ h2
+
+√n
+
+
+
+, m = 0 , 1. (A.37) Combining (A.36) and (A.37) yields 
+
+II 2 = op(1) (A.38) and 
+
+II 3 = op(1) . (A.39) Substituting (A.38) and (A.32) into (A.30), and (A.39) into (A.31), and applying the central limit theorem, we conclude that 1
+
+√n pS 1(ηo) = 1
+
+√n S(ηo) + op(1) d
+
+−→ N  0, V −11
+
+ (A.40) and 1
+
+√n pS 2(ηo) = 1
+
+√n S2(ηo) + op(1) d
+
+−→ N  0, V −12
+
+. (A.41) The normalized pI 1(ηo) admits the following decomposition: 1
+
+n pI 1(ηo) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ G c
+
+"
+
+∂η ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+!⊗2
+
+− ∂2 
+
+> η
+
+ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+#
+
++ 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+ I i ∈ bGc
+
+ − I i ∈ G c
+
+ "
+
+∂η ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+!⊗2
+
+− ∂2 
+
+> η
+
+ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+#
+
+. (A.42) By (A.5), the uniform consistency of ∂mη ˆfh(x, c ; ηo) to f [m](x, c ; ηo) in Lemma A.1 for m = 0 , 1, 2, and under assumptions A4 and A7, we obtain 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ G c
+
+"
+
+∂η ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+!⊗2
+
+− ∂2 
+
+> η
+
+ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+#
+
+= 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+I i ∈ G c
+
+"
+
+f [1] (Xi, c ; ηo)
+
+f (Xi, c ; ηo)
+
+!⊗2
+
+− f [2] (Xi, c ; ηo)
+
+f (Xi, c ; ηo)
+
+#
+
++ op(1) , (A.43) 
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+ I i ∈ bGc
+
+ − I i ∈ G c
+
+ "
+
+∂η ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+!⊗2
+
+− ∂2 
+
+> η
+
+ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+#
+
+≤ sup 
+
+> {i,c }
+
+ I i ∈ bGc
+
+ − I i ∈ G c
+
+ 1
+
+n
+
+> n
+
+X
+
+> i=1
+> k
+
+X
+
+> c=1
+
+"
+
+∂η ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+!⊗2
+
+− ∂2 
+
+> η
+
+ˆfh(Xi, c ; ηo)ˆfh(Xi, c ; ηo)
+
+#
+
+= op
+
+ n−1, (A.44) and 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+"
+
+∂η ˆfh(Xi; ηo)ˆfh(Xi; ηo)
+
+!⊗2
+
+− ∂2 
+
+> η
+
+ˆfh(Xi; ηo)ˆfh(Xi; ηo)
+
+#
+
+= 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+"
+
+f [1] (Xi; ηo)
+
+f (Xi; ηo)
+
+!⊗2
+
+− f [2] (Xi; ηo)
+
+f (Xi; ηo)
+
+#
+
++ op(1) (A.45) 37 Substituting (A.43) and (A.44) into (A.42), (A.45), and invoking the law of large numbers yield 1
+
+n pI 1(ηo) p
+
+−→ E
+
+"
+
+I i ∈ G c
+
+ f [1] (Xi, c ; ηo)
+
+f (Xi, c ; ηo)
+
+!⊗2
+
+− f [2] (Xi, c ; ηo)
+
+f (Xi, c ; ηo)
+
+!# 
+
+(A.46) and 1
+
+n pI 2(ηo) p
+
+−→ E
+
+"
+
+f [1] (Xi; ηo)
+
+f (Xi; ηo)
+
+!⊗2
+
+− f [2] (Xi; ηo)
+
+f (Xi; ηo)
+
+!# 
+
+. (A.47) By the uniform convergence of ∂2 
+
+> η
+
+ˆfh(x, c ; ηo) to f [2] (x, c ; ηo) in Lemma A.1, the uniform integrability of I(i ∈ G c)∂2 
+
+> η
+
+ˆfh(X, c ; ηo)/f (X, c ; ηo) and ∂2 
+
+> η
+
+ˆfh(X; ηo)/f (X; ηo), and the fact that E
+
+"
+
+I i ∈ G c
+
+ ∂2 
+
+> η
+
+ˆfh(X, c ; ηo)
+
+f (X, c ; ηo)
+
+#
+
+=
+
+Z ∂2 
+
+> η
+
+ˆfh(x, c ; ηo)
+
+f (x, c ; ηo) f (x, c ; ηo)dx = ∂2
+
+> η
+
+Z
+
+ˆfh(x, c ; ηo)dx = 0 and E
+
+" ∂2 
+
+> η
+
+ˆfh(X; ηo)
+
+f (X; ηo)
+
+#
+
+=
+
+Z ∂2 
+
+> η
+
+ˆfh(x; ηo)
+
+f (x; ηo) f (x; ηo)dx = ∂2
+
+> η
+
+Z
+
+ˆfh(x; ηo)dx = 0 ,
+
+it follows that E
+
+"
+
+I i ∈ G c
+
+ f [2] (Xi, c ; ηo)
+
+f (Xi, c ; ηo)
+
+#
+
+= 0 and E 
+
+"
+
+f [2] (Xi; ηo)
+
+f (Xi; ηo)
+
+#
+
+= 0 .
+
+Thus, by the continuity of pI 1(η) and pI 2(η) in η and the consistency properties of ˜ η and ˇ η, we conclude that 1
+
+n pI 1(¯ η) p
+
+−→ V1 (A.48) and 1
+
+n pI 2(¯ η∗) p
+
+−→ V2. (A.49) Substituting (A.40) and (A.48) into (A.28), and (A.41) and (A.49) into (A.29), and involking Slutsky’s theorem under assumption A8, together establish the asymptotic normality of ˜ η and ˇ η.
+
+A.5 Derivation of the Semiparametric Efficiency Bound 
+
+To derive the nuisance tangent space Λ associated with {f (x, c ; η)}, we consider the collection of nui-sance score vectors corresponding to all possible parametric submodels {fγ (x, c ; η)}, where γ denotes a q × 1 parameter vector. A generic submodel takes the form 
+
+fγ (x, c ; ηo) = πcw(yc)gγ (yc) with gγ (y) = lim  
+
+> h→0+
+
+EKh
+
+ Yγ , y  ,
+
+where Yγ is defined analogously to Y in Section 2, with θ replaced by γ. By construction, we have 
+
+fηo (x, c ; ηo) = f (x, c ; ηo) for each c ∈ C . Following the formulation in Tsiatis (2006), the nuisance tangent space Λ is characterized as the mean-square closure of the tangent spaces generated by all such submodels. That is, for each parametric submodel, the associated tangent space is given by Λ = 
+
+(
+
+D
+
+> k
+
+X
+
+> c=1
+
+I(C = c) ∂γ fγ (X, c ; ηo) |γ=γo
+
+fγo (X, c ; ηo)
+
+)
+
+,
+
+where D is an arbitrary constant matrix of dimension d × q.Denote by Λ ⊥ the orthogonal complement of Λ. Let ℓ(η) denote the log-likelihood contribution 
+
+ℓ(η) = 
+
+> k
+
+X
+
+> c=1
+
+I(C = c) log f [0] (X, c ; η),
+
+38 and define the score-type function as 
+
+pS (η) = 
+
+> k
+
+X
+
+> c=1
+
+I(C = c) f [1] (X, c ; η)
+
+f [0] (X, c ; η) .
+
+According to the semiparametric efficiency theory of Bickel et al. (1998), the efficient score for esti-mating η is given by the orthogonal projection of ∂ηℓ(ηo) onto Λ ⊥. Therefore, the function pS (ηo)coincides with the efficient score if it equals this projection. For any v ∈ Λ, it depends on the entire collection {Y1, . . . , Y k}, whereas the function f (X, c ; ηo)depends solely on Yc. This structural distinction, together with (A.35), implies that Ev⊤pS (ηo) = E 
+
+ kX
+
+> c=1
+
+I(C = c) v⊤
+
+f (X, c ; ηo) Ef [1] (X, c ; ηo)|Yc, C = c
+
+= 0 .
+
+It follows that 
+
+pS (ηo) ∈ Λ⊥. (A.50) Next, observe that 
+
+pS (ηo) − ∂ηℓ(ηo) = 
+
+> k
+
+X
+
+> c=1
+
+I(C = c) ∂γ fγ (X, c ; ηo)|γ=ηo
+
+f (X, c ; ηo) ,
+
+from which it follows that 
+
+pS (ηo) − ∂ηℓ(ηo) ∈ Λ. (A.51) Combining (A.50) and (A.51), we conclude that pS (ηo) is the orthogonal projection of ∂ηℓ(ηo) onto Λ⊥. Consequently, pS (ηo) coincides with the efficient score in the semiparametric model. The effi-ciency of the estimator ˜ η thus follows as a direct consequence. 
+
+A.6 Proof of Theorem 4 
+
+Following an argument analogous to that used in the proof of Lemma A.1, we obtain sup 
+
+> {x,η }
+
+˜f˘h(x; η) − f [0] (x; η) = sup 
+
+> {x,η }
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ξi, 0(x; η) = op
+
+ √log nn 25
+
+
+
+, (A.52) where ξi, 0(x; η) = Pkc=1 ξi, 0(x, c ; η), i = 1 , . . . , n . From the proof of Theorem 2, it follows that ˘η − ηo = Op
+
+ n−1/2 whenever G ∈ C G . In contrast, when G /∈ C G , ˘ η remains consistent to ηo, but does not attain the √n-consistency due to the presence of a nonzero expectation in the score function. Accordingly, the convergence rate of ˘ η is summarized as ˘η − ηo =
+
+(
+
+Op
+
+
+
+n− 12
+
+
+
+G ∈ C G ,op(1) otherwise. (A.53) Using the properties in (A.52) and (A.53) with a Taylor expansion and assumption A6, we obtain sup 
+
+> x
+
+| ˜f˘h(x; ˘ η) − f (x; ηo)| ≤ sup 
+
+> x
+
+| ˜f˘h(x; ˘ η) − f [0] (x; ˘ η)| + sup 
+
+> {x,η }
+
+∥∂ηf [0] (x; η)∥∥ ˘η − ηo∥
+
+=
+
+
+
+op
+
+ √log nn 25
+
+
+
++ Op
+
+
+
+n− 12
+
+
+
+Go ∈ C G ,op
+
+ √log nn 25
+
+
+
++ Op
+
+ ∥˘η − ηo∥ otherwise. (A.54) By applying a Taylor expansion and the uniform convergence property in (A.22), the log-pseudo-likelihood function admits the following decomposition: 
+
+− 1
+
+n pℓ (k) = − 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+log f (Xi; ηo) − 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+˜f −i 
+
+> ˘h
+
+(Xi; ˘ η) − f (Xi; ηo)
+
+f (Xi; ηo) + Op
+
+ ∥˘η − ηo∥2 + op
+
+ log nn 45
+
+
+
+39 △
+
+=
+
+
+
+III 1(k) + III 2(k) + op
+
+ log nn 45
+
+
+
+Go ∈ C G ,III 1(k) + III 2(k) + op
+
+ log nn 45
+
+
+
++ Op
+
+ ∥˘η − ηo∥2 otherwise. (A.55) When Go ∈ C G , it follows by construction that III 1(k) = III 1(k∗). Otherwise, applying the law of large numbers yields III 1(k) − III 1(k∗) = b2(k)(1 + op(1)). Thus, we summarize 
+
+III 1(k) − III 1(k∗) = 
+
+ 0 Go ∈ C G ,b2(k)(1 + op(1)) otherwise. (A.56) Substituting the i.i.d. representation from (A.52) into III 2(k), we obtain 
+
+III 2(k) = − 1
+
+n(n − 1) 
+
+> n
+
+X
+
+> i=1
+
+X 
+
+> j̸=i
+
+ξj, 0(Xi; ˘ η)
+
+f [0] (Xi; ηo) − E
+
+ ξj, 0(Xi; ˘ η)
+
+f [0] (Xi; ηo) i
+
+
+
+− 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+E
+
+ ξj, 0(Xi; ˘ η)
+
+f [0] (Xi; ηo) i
+
+
+
+. (A.57) Since ξ0(x; η)/f [0] (x; ηo) is of bounded variation in x, uniformly over c ∈ C and η ∈ H , Lemma 22 in Nolan and Pollard (1987) implies that the class 
+
+ ξj, 0(Xi; η)
+
+f [0] (Xi; ηo) : η ∈ H 
+
+
+
+is Euclidean. When Go ∈ C G , the second-order U -process in (A.57) is degenerate, and the variances of the summands in the two terms of (A.57) are of orders O(n1/5) and O(n−4/5), respectively. By Corollary 4 in Sherman (1994), 
+
+− 1
+
+n(n − 1) 
+
+> n
+
+X
+
+> i=1
+
+X 
+
+> j̸=i
+
+ ξj, 0(Xi; ˘ η)
+
+f [0] (Xi; ηo) − E
+
+ ξj, 0(Xi; ˘ η)
+
+f [0] (Xi; ηo) i
+
+ 
+
+= Op
+
+
+
+n− 910 
+
+
+
+,
+
+and 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+E
+
+ ξj, 0(Xi; ˘ η)
+
+f [0] (Xi; ηo) i
+
+
+
+= Op
+
+
+
+n− 910 
+
+
+
+.
+
+Thus, 
+
+III 2(k) = Op
+
+
+
+n− 910 
+
+
+
+. (A.58) When Go /∈ C G , the corresponding U -process is non-degenerate. Together with the bound in (A.54), this yields 
+
+III 2(k) = op
+
+ √log nn 25
+
+
+
+if Go /∈ C G . (A.59) Combining the results in (A.56), (A.58), and (A.59) with the expression of SPIC( k), we obtain SPIC( k) − SPIC 2(k∗) = 
+
+(
+
+max 
+
+n
+
+b2(k), 2( k − k∗) log nn 45
+
+o
+
+(1 + op(1)) k > k ∗,b2(k)(1 + op(1)) k < k ∗. (A.60) The assertion in Theorem 4 follows directly from (A.60). 40 A.7 Pseudocode 
+
+Pseudocode of the computational algorithm for the separation penalty estimation Initialize ˆβ(0) and ˆ μ(0) Set ˆδ(0) 
+
+ic ← W 12 ( ˆβ(0) 
+
+i − ˆμ(0) 
+
+c ), ˆ ν(0) ← 0, and ε ← predefined tolerance begin for m = 0 , 1, 2, . . . do 
+
+Compute ˆβ(m+1) using (4.8) Compute ˆ μ(m+1) using (4.9) Compute ˆδ(m+1) using (4.10) Com-pute ˆ ν(m+1) using (4.11) if 1
+
+n
+
+Pni=1 
+
+Pkc=1 ∥ ˆβ(m+1) 
+
+i − ˆμ(m+1) 
+
+c − ˆδ(m+1) 
+
+ic ∥ < ε then 
+
+Set ˆβλ = ˆβ(m+1) , ˆ μλ = ˆ μ(m+1) and exist the loop 
+
+else 
+
+m = m + 1 
+
+end end end 
+
+A.8 Supplementary Figures and Tables 
+
+Table S1: Means of 500 RI values (scaled by 10 2) of the underlying clusters and clustering estimates from various methods under model M2. (p, k ) (6,2) (10,2) (10,3) 
+
+σ n k-means IS SP OC OC n OC t k-means IS SP OC OC n OC t k-means IS SP OC OC n OC t
+
+1 125 95.47 98.17 98.21 98.25 98.29 98.31 97.21 99.56 99.56 99.60 99.58 99.64 97.21 98.63 98.65 98.65 98.65 98.66 250 95.58 98.49 98.50 98.55 98.56 98.56 97.36 99.75 99.75 99.76 99.76 99.76 97.51 98.98 98.98 98.98 98.98 98.98 500 95.66 98.64 98.64 98.68 98.69 98.69 97.34 99.78 99.78 99.79 99.78 99.78 97.60 99.08 99.08 99.08 99.08 99.08 750 95.67 98.69 98.69 98.72 98.73 98.73 97.40 99.78 99.78 99.79 99.80 99.80 97.63 99.14 99.14 99.13 99.13 99.14 1000 95.62 98.67 98.67 98.71 98.72 98.72 97.42 99.79 99.79 99.79 99.80 99.80 97.66 99.16 99.16 99.16 99.16 99.16 1.2 125 89.54 94.58 94.61 94.82 94.82 94.81 92.70 97.87 97.92 98.10 98.22 98.21 93.14 96.06 96.14 96.21 96.18 96.18 250 89.90 95.59 95.61 95.69 95.74 95.71 93.05 98.70 98.70 98.76 98.80 98.79 93.66 96.88 96.88 96.85 96.87 96.87 500 89.98 95.83 95.84 95.95 95.96 95.95 93.03 98.89 98.89 98.93 98.95 98.95 93.91 97.14 97.14 97.13 97.15 97.15 750 90.19 96.03 96.03 96.14 96.17 96.15 93.10 98.94 98.94 98.97 98.97 98.97 94.04 97.26 97.26 97.25 97.27 97.27 1000 90.17 96.11 96.11 96.23 96.22 96.21 93.10 98.96 98.96 98.98 98.99 98.99 94.02 97.27 97.27 97.28 97.30 97.29 1.4 125 82.72 88.18 88.23 88.80 88.80 88.66 86.35 93.83 93.90 94.32 94.73 94.70 87.51 90.92 90.95 91.08 91.04 91.01 250 83.18 91.02 91.03 91.51 91.51 91.30 86.70 96.46 96.48 96.64 96.79 96.76 88.11 93.14 93.15 93.18 93.18 93.17 500 83.22 92.01 92.01 92.29 92.29 92.21 86.73 97.00 96.99 97.07 97.10 97.09 88.66 93.93 93.93 93.91 93.92 93.94 750 83.44 92.30 92.30 92.54 92.58 92.52 86.84 97.10 97.10 97.21 97.21 97.21 88.84 94.17 94.17 94.18 94.23 94.19 1000 83.42 92.36 92.36 92.59 92.60 92.58 86.85 97.18 97.18 97.27 97.29 97.29 88.90 94.21 94.21 94.23 94.26 94.24 1.6 125 76.38 81.29 81.35 81.91 81.82 81.62 79.41 87.29 87.38 87.94 88.45 88.42 80.93 83.36 83.42 83.35 83.39 83.42 250 76.39 84.52 84.52 85.22 85.22 84.86 79.57 92.22 92.22 92.76 93.07 93.05 81.76 86.99 86.99 86.96 86.97 86.99 500 76.37 86.93 86.93 87.51 87.52 87.28 79.82 94.10 94.10 94.31 94.35 94.34 82.39 89.80 89.80 89.78 89.80 89.81 750 76.56 87.68 87.68 88.31 88.31 88.06 79.91 94.29 94.29 94.51 94.55 94.53 82.52 90.34 90.34 90.36 90.36 90.35 1000 76.62 87.92 87.92 88.45 88.48 88.31 79.87 94.39 94.39 94.61 94.65 94.63 82.61 90.51 90.51 90.54 90.55 90.55 41 Table S2: Means of 500 RSEs (scaled by 10 2) of the proposed, competing, and oracle estimates of the cluster-specific mean vectors under model M2. (p, k ) σ n k-means IS SP PML PMML RPML RPMML MML n MML t ASPE AE (6,2) 1 125 1.12 1.03 1.02 1.04 1.02 1.04 1.02 1.02 1.02 1.02 1.01 250 0.79 0.72 0.72 0.71 0.71 0.71 0.71 0.72 0.72 0.72 0.71 500 0.59 0.51 0.52 0.51 0.52 0.51 0.52 0.51 0.51 0.50 0.49 750 0.51 0.41 0.41 0.41 0.41 0.41 0.41 0.41 0.41 0.41 0.41 1000 0.47 0.37 0.37 0.37 0.37 0.37 0.37 0.37 0.37 0.37 0.37 1.2 125 1.60 1.23 1.23 1.26 1.23 1.26 1.23 1.23 1.23 1.23 1.19 250 1.27 0.85 0.85 0.84 0.84 0.84 0.84 0.84 0.84 0.85 0.84 500 1.04 0.64 0.64 0.64 0.63 0.64 0.63 0.62 0.62 0.60 0.60 750 0.95 0.51 0.51 0.51 0.51 0.51 0.51 0.51 0.51 0.49 0.48 1000 0.91 0.46 0.46 0.46 0.46 0.46 0.46 0.45 0.45 0.45 0.45 1.4 125 2.29 1.79 1.77 1.78 1.60 1.78 1.60 1.61 1.62 1.37 1.37 250 2.02 1.12 1.12 1.10 1.03 1.10 1.03 1.05 1.05 0.96 0.94 500 1.74 0.78 0.78 0.78 0.76 0.78 0.76 0.77 0.77 0.71 0.70 750 1.71 0.66 0.66 0.64 0.62 0.64 0.62 0.64 0.64 0.58 0.57 1000 1.67 0.59 0.59 0.59 0.56 0.59 0.56 0.59 0.59 0.51 0.50 1.6 125 3.32 2.63 2.62 2.62 2.28 2.62 2.28 2.26 2.28 1.63 1.58 250 2.92 1.76 1.76 1.67 1.43 1.67 1.43 1.32 1.33 1.11 1.08 500 2.74 1.12 1.12 1.06 0.96 1.06 0.96 0.94 0.95 0.83 0.81 750 2.77 0.90 0.90 0.85 0.79 0.85 0.79 0.81 0.81 0.68 0.68 1000 2.71 0.83 0.83 0.75 0.68 0.75 0.68 0.72 0.73 0.58 0.56 (10,2) 1 125 0.64 0.62 0.62 0.62 0.62 0.62 0.62 0.61 0.62 0.61 0.61 250 0.44 0.42 0.42 0.42 0.42 0.42 0.42 0.42 0.42 0.42 0.42 500 0.34 0.31 0.31 0.31 0.31 0.31 0.31 0.31 0.31 0.31 0.31 750 0.28 0.25 0.25 0.25 0.25 0.25 0.25 0.25 0.24 0.24 0.24 1000 0.25 0.21 0.21 0.21 0.21 0.21 0.21 0.21 0.21 0.21 0.21 1.2 125 0.89 0.72 0.72 0.72 0.70 0.72 0.70 0.70 0.71 0.70 0.69 250 0.64 0.51 0.51 0.50 0.50 0.50 0.50 0.50 0.50 0.49 0.50 500 0.51 0.36 0.36 0.36 0.35 0.36 0.35 0.35 0.35 0.35 0.35 750 0.47 0.31 0.31 0.31 0.31 0.31 0.31 0.31 0.31 0.30 0.30 1000 0.44 0.26 0.26 0.26 0.26 0.26 0.26 0.26 0.26 0.26 0.26 1.4 125 1.27 0.95 0.95 0.92 0.85 0.92 0.85 0.84 0.84 0.81 0.79 250 1.08 0.61 0.61 0.60 0.59 0.60 0.59 0.58 0.59 0.59 0.57 500 0.96 0.44 0.44 0.44 0.44 0.44 0.44 0.44 0.44 0.45 0.44 750 0.90 0.37 0.36 0.36 0.36 0.36 0.36 0.35 0.35 0.34 0.34 1000 0.83 0.30 0.30 0.30 0.30 0.30 0.30 0.30 0.30 0.30 0.30 1.6 125 1.83 1.34 1.34 1.30 1.12 1.30 1.12 1.13 1.12 0.96 0.96 250 1.63 0.78 0.78 0.76 0.73 0.76 0.73 0.71 0.71 0.69 0.68 500 1.54 0.55 0.55 0.53 0.52 0.53 0.52 0.53 0.52 0.49 0.49 750 1.45 0.42 0.42 0.41 0.42 0.41 0.42 0.41 0.41 0.39 0.38 1000 1.46 0.37 0.37 0.36 0.36 0.36 0.36 0.36 0.36 0.36 0.36 (10,3) 1 125 1.18 1.11 1.11 1.11 1.12 1.11 1.13 1.07 1.12 1.00 1.00 250 0.77 0.74 0.74 0.74 0.73 0.74 0.74 0.73 0.73 0.70 0.70 500 0.55 0.50 0.50 0.50 0.50 0.50 0.50 0.51 0.50 0.50 0.49 750 0.45 0.41 0.41 0.41 0.41 0.41 0.41 0.41 0.41 0.41 0.40 1000 0.40 0.36 0.36 0.36 0.36 0.36 0.36 0.37 0.36 0.36 0.36 1.2 125 1.51 1.34 1.33 1.33 1.36 1.33 1.37 1.37 1.40 1.19 1.16 250 1.06 0.89 0.89 0.90 0.89 0.90 0.90 0.87 0.90 0.87 0.85 500 0.78 0.64 0.64 0.64 0.63 0.63 0.63 0.63 0.63 0.61 0.60 750 0.66 0.52 0.52 0.52 0.51 0.52 0.52 0.53 0.51 0.50 0.48 1000 0.62 0.44 0.44 0.45 0.45 0.45 0.44 0.45 0.45 0.44 0.41 1.4 125 2.24 1.88 1.88 1.86 1.77 1.86 1.77 1.74 1.81 1.41 1.35 250 1.68 1.17 1.17 1.17 1.14 1.17 1.14 1.15 1.14 0.98 0.96 500 1.34 0.83 0.83 0.83 0.82 0.83 0.82 0.80 0.82 0.76 0.69 750 1.28 0.67 0.67 0.66 0.65 0.66 0.65 0.64 0.65 0.62 0.56 1000 1.22 0.60 0.60 0.58 0.57 0.58 0.57 0.55 0.57 0.54 0.49 1.6 125 3.35 2.91 2.89 2.91 2.66 2.92 2.66 2.82 2.80 1.70 1.58 250 2.84 1.90 1.90 1.94 1.66 1.94 1.66 1.60 1.62 1.24 1.10 500 2.63 1.12 1.12 1.12 1.07 1.12 1.07 1.09 1.04 0.93 0.78 750 2.61 0.92 0.92 0.90 0.85 0.89 0.85 0.85 0.84 0.77 0.65 1000 2.67 0.82 0.82 0.81 0.79 0.82 0.79 0.78 0.79 0.72 0.56 Table S3: Means of 500 RSEs (scaled by 10 2)of proposed, competing, and oracle estimates of the cluster-invariant variance matrix under model M2. (p, k ) σ n k-means IS SP PML PMML RPML RPMML MML n MML t ASPE AE (6,2) 1 125 2.82 2.61 2.61 2.74 2.75 2.74 2.74 2.59 2.64 2.68 2.51 250 2.14 1.85 1.85 1.94 1.96 1.94 1.95 1.84 1.88 1.90 1.80 500 1.71 1.31 1.31 1.37 1.41 1.37 1.41 1.31 1.35 1.35 1.28 750 1.56 1.08 1.08 1.13 1.18 1.13 1.17 1.07 1.11 1.10 1.05 1000 1.49 0.93 0.93 0.98 1.03 0.98 1.02 0.92 0.97 0.95 0.90 1.2 125 4.88 4.07 4.07 4.21 4.17 4.21 4.16 3.88 3.94 3.86 3.61 250 4.04 2.81 2.80 2.92 2.93 2.92 2.92 2.74 2.80 2.75 2.60 500 3.58 2.02 2.02 2.11 2.12 2.11 2.11 1.96 2.02 1.95 1.85 750 3.40 1.67 1.67 1.72 1.76 1.72 1.75 1.59 1.65 1.59 1.51 1000 3.35 1.45 1.45 1.47 1.53 1.47 1.52 1.35 1.42 1.37 1.30 1.4 125 8.00 6.45 6.43 6.48 6.12 6.48 6.11 5.68 5.76 5.29 4.93 250 7.05 4.35 4.35 4.34 4.21 4.34 4.19 3.91 3.99 3.75 3.54 500 6.58 3.05 3.05 3.08 2.96 3.08 2.95 2.74 2.83 2.65 2.51 750 6.38 2.55 2.55 2.55 2.48 2.55 2.46 2.23 2.31 2.15 2.05 1000 6.32 2.26 2.26 2.27 2.20 2.27 2.18 1.94 2.02 1.85 1.77 1.6 125 11.91 10.07 10.04 9.97 9.08 9.97 9.07 8.52 8.51 6.87 6.41 250 10.98 7.13 7.12 6.90 6.17 6.90 6.16 5.61 5.72 4.91 4.62 500 10.51 4.88 4.88 4.77 4.25 4.77 4.22 3.82 3.92 3.46 3.29 750 10.33 3.99 3.99 3.80 3.43 3.80 3.41 3.06 3.15 2.80 2.70 1000 10.26 3.57 3.57 3.40 3.00 3.40 2.97 2.62 2.73 2.39 2.31 (10,2) 1 125 2.62 2.46 2.46 2.46 2.46 2.46 2.46 2.45 2.50 2.52 2.44 250 1.96 1.76 1.76 1.83 1.79 1.83 1.79 1.77 1.81 1.81 1.76 500 1.50 1.25 1.25 1.29 1.26 1.29 1.26 1.25 1.29 1.28 1.25 750 1.31 1.02 1.02 1.05 1.03 1.05 1.03 1.02 1.06 1.04 1.01 1000 1.20 0.89 0.89 0.91 0.90 0.91 0.90 0.89 0.93 0.90 0.88 1.2 125 4.42 3.72 3.71 3.90 3.62 3.90 3.62 3.66 3.72 3.64 3.52 250 3.49 2.58 2.58 2.68 2.60 2.68 2.60 2.57 2.63 2.61 2.53 500 2.98 1.82 1.82 1.88 1.84 1.88 1.84 1.81 1.88 1.83 1.79 750 2.81 1.48 1.48 1.51 1.50 1.51 1.50 1.47 1.53 1.48 1.46 1000 2.70 1.29 1.29 1.31 1.30 1.31 1.30 1.28 1.35 1.28 1.27 1.4 125 7.17 5.50 5.48 5.76 5.22 5.76 5.22 5.14 5.19 4.97 4.79 250 6.16 3.65 3.65 3.76 3.61 3.76 3.61 3.58 3.66 3.54 3.44 500 5.65 2.56 2.56 2.61 2.55 2.61 2.55 2.52 2.61 2.48 2.44 750 5.47 2.08 2.08 2.10 2.08 2.10 2.08 2.05 2.13 2.00 1.98 1000 5.37 1.82 1.82 1.82 1.82 1.82 1.82 1.78 1.88 1.74 1.73 1.6 125 10.81 8.30 8.27 8.56 7.41 8.56 7.41 7.19 7.29 6.48 6.25 250 9.82 5.29 5.29 5.33 4.93 5.33 4.93 4.84 4.95 4.61 4.50 500 9.28 3.51 3.51 3.52 3.43 3.52 3.43 3.36 3.49 3.21 3.18 750 9.11 2.89 2.89 2.86 2.79 2.86 2.79 2.73 2.83 2.61 2.59 1000 9.01 2.53 2.53 2.50 2.43 2.50 2.43 2.37 2.50 2.27 2.26 (10,3) 1 125 2.78 2.62 2.62 2.83 2.67 2.79 2.67 2.84 2.73 2.64 2.46 250 2.05 1.84 1.84 1.95 1.88 1.94 1.88 1.81 1.90 1.86 1.77 500 1.56 1.28 1.28 1.35 1.30 1.34 1.30 1.26 1.33 1.30 1.25 750 1.39 1.06 1.06 1.12 1.08 1.11 1.08 1.03 1.10 1.07 1.03 1000 1.28 0.92 0.92 0.95 0.92 0.94 0.92 0.91 0.96 0.91 0.89 1.2 125 4.76 4.04 4.04 4.33 4.08 4.27 4.08 4.17 4.25 3.81 3.56 250 3.76 2.80 2.80 3.01 2.81 2.97 2.81 2.75 2.90 2.66 2.55 500 3.16 1.99 1.99 2.11 1.96 2.08 1.96 1.89 2.00 1.85 1.79 750 2.97 1.68 1.68 1.75 1.61 1.73 1.61 1.55 1.66 1.51 1.47 1000 2.87 1.48 1.48 1.51 1.40 1.50 1.40 1.37 1.46 1.28 1.27 1.4 125 7.92 6.49 6.49 6.85 6.07 6.80 6.07 6.36 6.49 5.16 4.84 250 6.91 4.39 4.39 4.64 4.16 4.60 4.16 4.13 4.20 3.61 3.47 500 6.15 3.17 3.17 3.28 2.86 3.25 2.86 2.77 2.92 2.51 2.44 750 5.93 2.75 2.75 2.79 2.34 2.78 2.34 2.24 2.39 2.03 2.00 1000 5.79 2.50 2.50 2.51 2.02 2.50 2.02 1.97 2.09 1.74 1.73 1.6 125 12.55 10.93 10.93 11.34 9.54 11.30 9.54 9.79 10.02 6.74 6.31 250 11.51 7.77 7.77 7.94 6.28 7.90 6.28 6.22 6.32 4.68 4.54 500 10.69 5.12 5.12 5.15 4.03 5.13 4.03 3.88 4.07 3.23 3.19 750 10.49 4.49 4.49 4.49 3.34 4.48 3.34 3.16 3.32 2.64 2.62 1000 10.34 4.11 4.11 4.10 2.80 4.09 2.80 2.74 2.87 2.27 2.26 42 Table S4: Means of 500 estimated number of clusters using different information criteria under model M2. (p, k ) (6,2) (10,2) (10,3) 
+
+σ n SPIC BIC n BIC t SPIC BIC n BIC t SPIC BIC n BIC t
+
+1 125 2.00 1.99 2.01 2.00 1.99 2.00 3.00 3.04 2.97 250 2.00 2.00 1.98 2.00 2.00 2.00 3.00 3.00 3.00 500 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 750 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 1000 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 1.2 125 2.00 1.98 2.00 1.96 1.95 2.00 2.98 3.00 2.67 250 2.01 1.99 2.00 2.00 2.00 2.00 3.01 3.00 3.00 500 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 750 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 1000 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 1.4 125 1.85 1.96 1.86 1.87 1.94 1.97 2.67 2.94 2.10 250 2.00 1.98 1.90 2.00 1.98 2.00 2.98 3.00 2.93 500 2.01 1.99 2.00 2.00 1.99 2.00 3.00 3.00 3.00 750 2.00 1.98 2.00 2.00 2.00 2.00 3.00 3.00 3.00 1000 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.00 1.6 125 1.62 1.95 1.44 1.52 1.93 1.69 2.20 2.45 2.00 250 1.99 1.96 1.59 1.96 1.96 1.99 2.78 2.94 2.29 500 2.00 1.96 2.00 2.00 1.98 2.00 3.00 3.00 3.00 750 2.00 1.97 2.00 2.00 1.99 2.00 3.00 3.00 3.00 1000 2.00 2.00 2.00 2.00 2.00 2.00 3.00 3.00 3.01 Table S5: Average weekly purchase amounts (AWPA) and average purchase amounts (APA), with standard errors in parentheses, for the nine major product categories, stratified by cluster. AWPA APA Cluster Cluster Product category 1 2 3 1 2 3Cold Beverages 0.67 0.44 0.56 1.21 0.80 1.03 (0.020) (0.021) (0.048) (0.036) (0.039) (0.091) Fruit 0.71 0.38 0.57 1.27 0.70 1.06 (0.017) (0.017) (0.042) (0.030) (0.031) (0.080) Household 0.08 0.04 0.05 0.15 0.07 0.09 (0.004) (0.003) (0.004) (0.008) (0.005) (0.008) In-Store 0.58 0.46 0.39 1.04 0.84 0.73 (0.017) (0.021) (0.022) (0.030) (0.038) (0.042) Meal Makers 0.56 0.27 0.41 1.01 0.51 0.76 (0.012) (0.012) (0.022) (0.022) (0.023) (0.041) Milk & Eggs 0.84 0.51 0.62 1.51 0.94 1.15 (0.018) (0.021) (0.032) (0.031) (0.038) (0.060) Snacks 0.90 0.52 0.67 1.62 0.96 1.25 (0.017) (0.018) (0.031) (0.031) (0.033) (0.057) Natural Foods 1.47 0.61 1.04 2.67 1.12 1.94 (0.050) (0.041) (0.091) (0.091) (0.075) (0.169) Vegetables 1.32 0.60 1.03 2.38 1.11 1.92 (0.024) (0.023) (0.047) (0.043) (0.042) (0.086) Table S6: Sample means (standard errors) of six biomarkers and age , stratified by diabetes status, gravidity status, and ( ds , gs )-based grouping. 
+
+ds gs (ds ,gs )Variable 0 1 0 1 (0,0) (1,0) (0,1) (1,1) 
+
+gtt -0.36 0.72 -0.20 0.24 -0.47 0.63 -0.19 0.78 (0.054) (0.075) (0.066) (0.074) (0.066) (0.123) (0.09) (0.095) 
+
+dpb -0.14 0.27 -0.16 0.18 -0.25 0.14 0.04 0.36 (0.06) (0.088) (0.071) (0.07) (0.077) (0.166) (0.096) (0.098) 
+
+tsft -0.18 0.37 -0.04 0.05 -0.21 0.50 -0.13 0.28 (0.064) (0.072) (0.072) (0.071) (0.083) (0.112) (0.101) (0.094) 
+
+si -0.24 0.49 -0.12 0.14 -0.29 0.41 -0.18 0.54 (0.06) (0.077) (0.071) (0.071) (0.077) (0.145) (0.096) (0.087) 
+
+bmi -0.19 0.39 0.01 -0.01 -0.20 0.69 -0.19 0.20 (0.064) (0.073) (0.077) (0.063) (0.086) (0.133) (0.091) (0.077) 
+
+dpf -0.14 0.29 0.02 -0.02 -0.08 0.32 -0.25 0.27 (0.06) (0.088) (0.069) (0.075) (0.078) (0.145) (0.096) (0.11) 
+
+age -0.26 0.53 -0.49 0.58 -0.62 -0.06 0.32 0.90 (0.053) (0.094) (0.044) (0.078) (0.039) (0.118) (0.098) (0.117) 43 12345678910 
+
+T1 T 2 T3 T 4 T 5 T 6
+
+> Purchase amounts
+
+Cold Beverages 
+
+12345678910 
+
+T1 T 2 T3 T 4 T 5 T 6
+
+Fruit 
+
+0.0 0.2 0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0 
+
+T1 T 2 T 3 T 4 T 5 T 6
+
+Household 
+
+12345678
+
+T1 T 2 T 3 T 4 T5 T 6
+
+> Purchase amounts
+
+In−Store 
+
+01234567
+
+T1 T 2 T 3 T 4 T5 T 6
+
+Meal Makers 
+
+12345678910 
+
+T1 T 2 T3 T 4 T 5 T 6
+
+Milk & Eggs 
+
+12345678910 
+
+T1 T 2 T3 T 4 T 5 T 6
+
+> Purchase amounts
+
+Snacks 
+
+246810 12 14 16 18 20 
+
+T1 T 2 T3 T 4 T 5 T 6
+
+Natural Foods 
+
+246810 12 14 16 
+
+T1 T 2 T3 T 4 T 5 T 6
+
+Vegetables Figure S1: Average purchase amounts and approximate 95% confidence intervals for the nine major product categories, stratified by cluster. Results for Clusters 1, 2, and 3 are shown in red, blue, and black, respectively. 
+
+44 Table S7: Sample means (standard errors) of six biomarkers and age , stratified by diabetes status within each cluster (top panel) and by gravidity status within each cluster (bottom panel). Cluster 1 2 3 4Variable ds = 0 ds = 1 ds = 0 ds = 1 ds = 0 ds = 1 ds = 0 ds = 1 
+
+gtt -0.90 -0.61 0.49 0.95 -0.39 0.57 -0.03 0.84 (0.066) (0.164) (0.082) (0.09) (0.084) (0.276) (0.154) (0.11) 
+
+dpb -0.29 -0.04 0.34 0.17 -0.40 -0.11 0.25 0.59 (0.097) (0.257) (0.123) (0.151) (0.109) (0.219) (0.134) (0.12) 
+
+tsft 0.38 0.41 0.57 0.74 -1.33 -1.27 0.24 0.31 (0.063) (0.084) (0.076) (0.074) (0.061) (0.229) (0.146) (0.098) 
+
+si -0.66 -0.34 0.72 0.65 -0.39 0.02 -0.12 0.65 (0.084) (0.178) (0.109) (0.116) (0.097) (0.193) (0.149) (0.121) 
+
+bmi 0.24 0.42 0.43 0.71 -1.01 -0.62 -0.11 0.26 (0.085) (0.172) (0.132) (0.106) (0.082) (0.16) (0.159) (0.107) 
+
+dpf -0.25 -0.12 0.45 0.48 -0.30 0.43 -0.30 0.13 (0.099) (0.303) (0.132) (0.126) (0.098) (0.27) (0.172) (0.147) 
+
+age -0.58 -0.34 -0.36 -0.15 -0.58 -0.07 1.52 1.75 (0.041) (0.125) (0.072) (0.064) (0.046) (0.174) (0.128) (0.091) Cluster 1 2 3 4Vairable gs = 0 gs = 1 gs = 0 gs = 1 gs = 0 gs = 1 gs = 0 gs = 1 
+
+gtt -0.86 -0.87 0.59 0.93 -0.37 -0.11 0.79 0.43 (0.072) (0.121) (0.085) (0.097) (0.107) (0.143) (0.303) (0.108) 
+
+dpb -0.27 -0.23 0.21 0.3 -0.47 -0.16 0.45 0.45 (0.105) (0.184) (0.148) (0.122) (0.118) (0.179) (0.276) (0.097) 
+
+tsft 0.41 0.33 0.72 0.59 -1.31 -1.35 0.36 0.27 (0.069) (0.096) (0.075) (0.075) (0.068) (0.119) (0.187) (0.092) 
+
+si -0.62 -0.62 0.64 0.73 -0.39 -0.24 0.71 0.27 (0.091) (0.147) (0.114) (0.11) (0.113) (0.146) (0.302) (0.108) 
+
+bmi 0.31 0.13 0.75 0.35 -1.04 -0.8 0.31 0.07 (0.099) (0.108) (0.122) (0.1) (0.095) (0.121) (0.225) (0.101) 
+
+dpf -0.24 -0.23 0.57 0.34 -0.15 -0.34 -0.34 0(0.114) (0.17) (0.117) (0.142) (0.121) (0.152) (0.24) (0.125) 
+
+age -0.66 -0.28 -0.43 -0.01 -0.71 -0.14 1.63 1.65 (0.038) (0.083) (0.055) (0.072) (0.037) (0.094) (0.217) (0.082) 45

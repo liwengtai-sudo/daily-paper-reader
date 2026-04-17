@@ -1,0 +1,695 @@
+Title: From Ground Truth to Measurement: A Statistical Framework for Human Labeling
+
+URL Source: https://arxiv.org/pdf/2604.07591v1
+
+Published Time: Fri, 10 Apr 2026 00:13:18 GMT
+
+Number of Pages: 30
+
+Markdown Content:
+Measurement Error Labeling 
+
+# From Ground Truth to Measurement: A Statistical Framework for Human Labeling 
+
+Robert Chew * rchew@rti.org 
+
+Stephanie Eckman † steph@umd.edu 
+
+Christoph Kern ‡§ christoph.kern@lmu.de 
+
+Frauke Kreuter †‡§ fkreuter@umd.edu 
+
+> *
+
+Department of AI, Data, and Product Engineering, RTI International 
+
+> †
+
+Social Data Science Center, University of Maryland 
+
+> ‡
+
+Department of Statistics, LMU Munich 
+
+> §
+
+Munich Center for Machine Learning (MCML) 
+
+Abstract 
+
+Supervised machine learning assumes that labeled data provide accurate measurements of the concepts models are meant to learn. Yet in practice, human labeling introduces systematic variation arising from ambiguous items, divergent interpretations, and simple mistakes. Machine learning research commonly treats all disagreement as noise, which ob-scures these distinctions and limits our understanding of what models actually learn. This paper reframes annotation as a measurement process and introduces a statistical frame-work for decomposing labeling outcomes into interpretable sources of variation: instance difficulty, annotator bias, situational noise, and relational alignment. The framework ex-tends classical measurement-error models to accommodate both shared and individualized notions of truth, reflecting traditional and human label variation interpretations of error, and provides a diagnostic for assessing which regime better characterizes a given task. Ap-plying the proposed model to a multi-annotator natural language inference dataset, we find empirical evidence for all four theorized components and demonstrate the effectiveness of our approach. We conclude with implications for data-centric machine learning and outline how this approach can guide the development of a more systematic science of labeling. 
+
+Keywords: data-centric AI, supervised learning, measurement error, label noise, human label variation (HLV) 
+
+1 Introduction 
+
+Machine learning models are only as good as the data they learn from. In supervised learning, that data depends on human annotators who assign labels to training and evalu-ation examples. A single mislabeled instance can propagate downstream into model errors (Fr´ enay and Verleysen, 2013; Song et al., 2022; Northcutt et al., 2021b), fairness disparities (Sap et al., 2022; Paulus and Kent, 2020), and misleading benchmarks (Northcutt et al., 2021a). Labeling is thus not only a practical bottleneck but also a scientific one: the re-liability of labeled data constrains what supervised models can learn (Sculley et al., 2015; Sambasivan et al., 2021) and how we can meaningfully evaluate them (Paullada et al., 2021; Geiger et al., 2021). 
+
+1
+
+> arXiv:2604.07591v1 [stat.ME] 8 Apr 2026 Chew et al.
+
+Despite these well-documented effects, relatively little work examines the labeling pro-cess itself, such as how and why annotation errors arise, and what factors make certain instances, annotators, or contexts more error-prone. Existing approaches often treat la-beling errors as random or adversarial that can be corrected post hoc rather than as a structured outcome of human judgment and cognitive effort. Understanding this structure is essential if we wish to model, mitigate, or meaningfully interpret labeling error. The social and behavioral sciences have long confronted analogous problems under the broader concept of measurement error . In survey research and psychometrics, measure-ment models formalize how observed responses deviate from latent “true” values through systematic and random components (Groves et al., 2011; Lord and Novick, 2008). These frameworks provide principled tools to reason about concepts such as reliability, validity, and bias that map directly onto challenges in human labeling and evaluation for machine learning. This paper adapts and extends the classical measurement error model to annotation for supervised learning tasks. We first recast annotation as a measurement process, in which each observed label is a noisy realization of an underlying true label. We then extend this framework to account for human label variation (Plank, 2022), recognizing that the “true” label may differ across annotators for subjective or value-laden tasks such as hate speech detection or sentiment analysis. The resulting model decomposes observed labeling outcomes into components attributable to the instance, the annotator, and the annotation context, offering a principled way to quantify and interpret label noise. We then empirically demonstrate how this framework isolates structured sources of annotation error on the Variation versus Error (VariErr) dataset (Weber-Genzel et al., 2024) and provide a method to help assess which interpretive regime (global or individual ground truth) is more plausible for a given task. More broadly, a measurement perspective complements recent calls for data-centric ma-chine learning (Jarrahi et al., 2023). While most approaches to dataset quality rely on heuristic filtering or post hoc label correction, our framework provides a principled statistical basis for understanding why labeling errors occur and how they propagate through model training and evaluation. Because the framework decomposes variance into interpretable components, it can guide practical decisions about dataset construction (e.g., identifying ambiguous instances), annotator management (e.g., detecting consistent biases), and eval-uation design (e.g., quantifying the reliability of benchmarks). Although we demonstrate the framework using a natural language inference task, the underlying logic generalizes to any supervised setting involving human annotation, from image classification to toxicity de-tection, where understanding the structure of disagreement is crucial for responsible model development. 
+
+Contributions. Our contributions are both conceptual and empirical, motivated by the broader claim that a measurement error perspective offers diagnostic, theoretical, and mod-eling advantages for understanding label quality in supervised learning. 1. A general measurement error framework for supervised learning. We formal-ize annotation as a measurement process in which observed labels are noisy realizations of latent truths. This provides a diagnostic basis for analyzing error: by decomposing variance into instance-, annotator-, and residual components, the framework identifies 
+
+> 2Measurement Error Labeling
+
+whether labeling errors arise from ambiguous items, systematic annotator tendencies, or unstable within-person factors (Section 3). These distinctions, in turn, inform how labeling tasks can be redesigned to address the underlying sources of error. 2. Extension to individual ground truths. We extend the classical model to tasks where multiple valid interpretations coexist, linking human label variation to long-standing notions of reliability and validity in measurement theory. This extension provides theoretical clarity about when disagreement reflects meaningful interpretive diversity rather than simple error, offering a principled bridge between psychometrics and contemporary annotation practice (Section 4). 3. Empirical demonstration using real annotation data. Applying the framework to the Variation versus Error (VariErr) dataset, we show how instance-, annotator-, and context-level factors jointly shape labeling accuracy and disagreement. The anal-ysis reveals structured sources of variance that standard label-noise models obscure, illustrating how the framework can quantify and diagnose distinct patterns of labeling error (Section 6). 4. A diagnostic for identifying measurement regimes. We develop a method to evaluate whether a labeling task behaves as if it reflects a single shared “global” truth or structured individual variation. This assessment clarifies the boundary between labeling regimes and provides modeling guidance —indicating when aggregation, per-sonalization, or distributional modeling of labels is most appropriate (Section 6.2). 
+
+2 Related Works 
+
+Label Noise. A substantial body of work in machine learning examines the effects of label noise and methods for mitigating it. This literature typically treats mislabeling as a statis-tical nuisance that corrupts the true signal in supervised learning. Classical studies show that even modest rates of incorrect labels can bias parameter estimates, reduce predictive accuracy, and degrade generalization performance (Fr´ enay and Verleysen, 2013; Song et al., 2022). In response, recent approaches in deep learning propose algorithmic strategies to detect or correct mislabeled instances, including sample reweighting, noise-robust loss func-tions, and confidence-based label correction (Northcutt et al., 2021b; Patrini et al., 2017; Han et al., 2018). While these methods improve model robustness, they largely abstract away from the human and cognitive processes that generate label noise in the first place. Moreover, they often rely on simplifying assumptions, such as random or class-conditional label flips, because the real-world mechanisms that produce annotation errors remain poorly understood (Fr´ enay and Verleysen, 2013). Our work complements this line of research by shifting attention from algorithmic mitigation to the source of label noise itself, treating labeling as a structured measurement process shaped by instance characteristics, annotator traits, and contextual factors. 
+
+Crowdsourcing and Annotation Models. The crowdsourcing literature provides a parallel line of work that explicitly models disagreement among annotators rather than assuming a single ground truth. Seminal probabilistic models such as Dawid and Skene’s 
+
+> 3Chew et al.
+
+(1979) expectation–maximization framework estimate latent true labels jointly with annota-tor reliability parameters, effectively distinguishing systematic annotator bias from random error. Subsequent extensions, such as the Generative model of Labels, Abilities, and Diffi-culties (GLAD) (Whitehill et al., 2009), introduce item difficulty and annotator expertise as interacting latent variables, formalizing how harder instances and less reliable annotators jointly contribute to labeling noise. More recent Bayesian and neural variants further refine these ideas for large-scale crowdsourced datasets (Raykar et al., 2010; Chu et al., 2021). Our work complements this literature by drawing on its insight that annotation errors are structured and predictable, but reframes the problem through the lens of measurement theory. Whereas crowdsourcing models primarily focus on recovering a consensus or esti-mating annotator accuracy, our approach decomposes annotation variability into distinct, interpretable components, providing a complementary perspective on the factors that give rise to disagreement. 
+
+Annotation Disagreement and Human Label Variation. A growing line of research in natural language processing and human-centered machine learning challenges the assump-tion that there exists a single, objective “ground truth” label for every instance. Instead, it emphasizes that annotators bring diverse perspectives, experiences, and values to labeling tasks, leading to systematic variation in their judgments (Fleisig et al., 2024; Prabhakaran et al., 2021; Sorensen et al., 2024). Such human label variation (HLV) is particularly salient in socially and linguistically subjective domains such as toxicity detection, hate speech, or sentiment analysis, where disagreement often reflects pluralism in meaning rather than annotator error (Aroyo and Welty, 2015; Plank, 2022). Recent work has therefore argued for modeling and preserving disagreement rather than collapsing it into a single consensus label (Uma et al., 2021; Davani et al., 2022; Orlikowski et al., 2023). Our approach builds on these insights by offering a measurement-theoretic perspective that helps distinguish be-tween disagreement arising from interpretive variation and disagreement arising from other sources of annotation variability. 
+
+Data-Centric Machine Learning. Data-centric machine learning highlights that im-provements in data quality can yield larger gains than increasingly complex model architec-tures (Sculley et al., 2015; Sambasivan et al., 2021; Northcutt et al., 2021a). This movement reframes dataset construction, annotation, and curation as core components of the ML de-velopment pipeline rather than as pre-processing steps. Data-centric research investigates methods to detect, characterize, and correct low-quality or mislabeled data, often combin-ing automated auditing tools with human-in-the-loop validation (Northcutt et al., 2021b; Paullada et al., 2021; Geiger et al., 2021). Our work contributes to this paradigm by pro-viding a formal statistical framework for reasoning about labeling quality and annotator reliability. Whereas most data-centric approaches focus on dataset-level diagnostics or au-tomated error detection, we model the underlying measurement process that generates label variation. This perspective complements practical data auditing by explaining why certain instances, annotators, or contexts are systematically more error-prone, thereby linking the goals of data-centric AI to the foundational theory of measurement error (Eckman et al., 2024). 
+
+Measurement and Machine Learning. Lastly, recent work frames machine learning as a problem of measurement, emphasizing that prediction and evaluation depend on how 
+
+> 4Measurement Error Labeling
+
+abstract constructs are operationalized in data. Jacobs and Wallach (2021) argue that many fairness and validity failures arise from mismatches between theoretical constructs, such as “toxicity,” “risk,” or “merit,” and the proxies used to represent them. Boeschoten et al. (2020) extend this reasoning, showing that fairness assessments can be misleading when target variables are error-prone proxies rather than true outcomes, and proposing latent-variable models to recover fair inferences on underlying constructs. Relatedly, Gruber et al. (2023) formalize errors in outcome variables as a distinct source of uncertainty, demonstrating that training on error-prone labels induces systematic bias even when errors are unsystematic at the individual level. Wallach et al. (2025) further generalize this view, contending that the evaluation of generative AI systems is itself a social-scientific measurement problem requiring explicit definition, operationalization, and validation of what benchmarks purport to measure. While these works primarily focus on measurement at the level of system outputs and evaluation targets, our work turns this lens inward to the generation of labeled data itself. We treat human annotation as a measurement process in which each observed label reflects both a latent property of interest and the structured cognitive, contextual, and social factors shaping its expression. 
+
+3 Conceptual Model 
+
+3.1 The Measurement Error Framework 
+
+Across the social sciences, psychology, and biostatistics, researchers have long recognized that what we observe is rarely identical to what we want to measure. The standard solution is the measurement error model , which treats an observed response as the sum of a “true” underlying value and an error term. Formally: 
+
+Yit = μi + ϵit , (1) where μi is the true latent value for individual i, Yit is the observed response for individual 
+
+i on trial t, and ϵit is an error term capturing random deviation. Here, “individual” refers broadly to the unit being measured, such as a person or experimental unit, depending on the application. The inclusion of the trial index t reflects the fact that, in principle, the same individual can be measured repeatedly. Each repetition (or “trial”) provides a noisy realization of the respondent’s true value. For example, suppose a survey asks the same person twice how many hours of television they watched on average per day last week. Their true value μi
+
+might be 3, but due to imperfect recall, they might report 2 hours in one response and 4 hours in another. These repeated observations differ, not because the true value changed, but because small random fluctuations (e.g., recall errors, rounding, or distraction) enter the response. The error term ϵit captures this trial-to-trial variability for a given respondent. In addition to variation within respondents across trials, there is also systematic varia-tion between respondents . Different individuals genuinely differ in their true values μi. In the television example, one respondent’s true value might be 3 hours while another’s might be 0 hours. Classical measurement models recognize both sources of variation: (a) stable differences across individuals (true scores) and (b) random deviations around those scores due to error. This distinction is crucial because it allows researchers to separate signal 
+
+> 5Chew et al.
+
+from noise, partitioning the variance of observed responses into components attributable to systematic individual differences versus measurement error. This deceptively simple model has served as the backbone for a wide range of fields. In psychometrics, it underpins Classical Test Theory , which defines the reliability of a test as the proportion of variance in observed scores attributable to the true score (Lord and Novick, 2008). In survey methodology, it provides the starting point for analyzing response error and bias in opinion measurement (Groves et al., 2011). In epidemiology and econometrics, it motivates models of misclassification and attenuation bias in regression analysis (Carroll et al., 2006; Wooldridge, 2010). Despite differences in terminology across disciplines, the shared core idea is that observed data are imperfect indicators of an unobserved ground truth. 
+
+3.2 Adapting the Framework to Machine Learning 
+
+In supervised machine learning, however, the measurement problem differs: the “true score” is attached not to the annotator but to the instance being labeled. A minimal adaptation of the classical model is 
+
+Yijt = μj + ϵijt , (2) where μj is the true label for instance j, Yijt is annotator i’s observed label during trial t,and ϵijt is the associated error term. This formulation highlights that in ML practice, observed training data are rarely perfect reflections of the ground truth. Annotators may disagree with one another, make occasional mistakes, or interpret ambiguous inputs differently. From the perspective of model training, these discrepancies manifest as label noise. Much of the literature treats this noise as if it were homogeneous or purely random, but decades of research in other fields suggest that error is often structured. Some items are inherently more difficult to classify, some annotators are consistently more or less reliable, and even the same annotator may perform differently depending on their circumstances. 
+
+3.3 Decomposing Annotation Error 
+
+Following traditions in psychometrics (Shavelson et al., 1992), we move beyond the minimal model and decompose the error into three conceptually distinct components: 
+
+ϵijt = βj + ρi + σijt , (3) where βj captures instance-level difficulty, ρi captures stable annotator-specific tendencies, and σijt captures situational noise that varies across labeling sessions. Figure 1 depicts illustrative examples of what each of these components are attempting to characterize. 
+
+Instance-level Error ( βj ). Instance-level error arises from attributes of the instance itself that make it inherently challenging to annotate. Even highly skilled and attentive annotators may disagree or make mistakes when the input is ambiguous or degraded. For example, in image annotation tasks, poor resolution, occlusion, or cluttered visual fields can obscure key features (Snow et al., 2008). In text annotation, structural or semantic ambiguity can generate uncertainty—for instance, the sentence “There is a bird in a cage that can talk” raises questions about whether it is the bird or the cage that possesses the 
+
+> 6
+
+Measurement Error Labeling Type of Error Ground Truth Claim Trial Label Correct? Label Correct?                               
+
+> Instance -level ( !!)False “A recent study proves that coffee
+> cures depression.”
+> 1Unverifiable ❌False ✅
+> 2Unverifiable ❌False ✅
+> Between -person ( "")True “Vitamin D deficiency can increase
+> the risk of bone fractures.”
+> 1True ✅False ❌
+> 2True ✅False ❌
+> Within -person ( #"!# )True “Venus is closer to the Sun than
+> Earth.”
+> 1True ✅True ✅
+> 2True ✅False ❌
+
+# ! !
+
+Task: Claim Veracity Classification      
+
+> Goal: Label each claim as True ,False , or Unverifiable based on background knowledge.
+
+Figure 1: Illustration of error components in the Global Ground Truth model .Each row demonstrates a different source of annotation error using a claim veri-fication task. Instance-level error (βj ): Both annotators make the same mistake on an ambiguous claim where multiple interpretations are justifiable. Between-person error (ρi): Annotators differ consistently across trials due to stable indi-vidual characteristics (here, medical expertise). Within-person error (σijt ): The same annotator produces inconsistent labels across trials due to transient factors such as fatigue or distraction. ability to talk. More generally, the intrinsic difficulty of an instance often depends on its complexity: longer texts or documents with dense technical content require more cognitive effort and thus tend to produce higher error rates. Models in psychometrics and crowd-sourcing frequently formalize this dimension as “item difficulty,” such as in Item Response Theory (Lord and Novick, 2008) and probabilistic crowdsourcing models like GLAD (White-hill et al., 2009). In our framework, βj represents systematic error attributable to instance ambiguity and difficulty. 
+
+Between-person Error ( ρi). Between-person error reflects persistent differences among annotators that carry across tasks and trials. These errors stem from characteristics of the annotator, such as expertise, aptitude, or personality traits. In specialized domains like medical imaging or legal document classification, domain-specific knowledge is often essen-tial; annotators lacking sufficient training are systematically more prone to misclassification (Gur et al., 2003; Snow et al., 2008). Beyond expertise, individual tendencies can contribute to stable differences in annotation. For example, annotators who are less conscientious may be more error-prone, while those with strong priors or ideological biases may consistently favor one label over another. In the survey methodology literature, this parallels the notion of “response styles” (Krosnick, 1991), while in crowdsourcing, it aligns with models that estimate annotator-specific accuracy and bias parameters, such as the Dawid–Skene model (Dawid and Skene, 1979). Here, ρi captures those systematic annotator-specific sources of error. 
+
+Within-person Error ( σijt ). Within-person error captures the trial-to-trial variation in annotation that arises from situational factors affecting an annotator’s performance. Even knowledgeable and conscientious annotators can produce inconsistent labels if their imme-
+
+7Chew et al. 
+
+diate circumstances interfere with careful judgment. For example, fatigue, distraction, or hunger can reduce attentiveness, leading to transient mistakes (Hauser et al., 2019). Simi-larly, environmental conditions—such as working in a noisy or uncomfortable setting—can diminish labeling accuracy. Unlike between-person error, which reflects enduring annotator characteristics, within-person error represents ephemeral influences that vary across trials and even within a single labeling session. In psychometric terms, this source of error cor-responds most closely to “state-related” variability (Shavelson et al., 1992). In practice, such error is often modeled as unsystematic noise, but acknowledging it explicitly helps distinguish between persistent annotator tendencies and situational fluctuations. 
+
+3.4 From Conceptual to Statistical Models 
+
+The decomposition in Equations 2–3 describes the structure of annotation error on a latent continuous scale. For categorical labeling tasks, this latent structure must be linked to observed responses through an appropriate measurement model (Figure 2). Conceptual: Yijt = μj + βj + ρi + σijt                        
+
+> Latent: Y∗
+> ijt =μj+βj+ρi+σijt ∈R
+> Observed: Yijt ∼Bernoulli(Φ( Y∗
+> ijt ))
+> operationalize as latent propensity
+> link function Φ (logit/probit)
+> Components: μj(true label), βj(instance difficulty),
+> ρi(annotator bias), σijt (situational noise)
+
+Figure 2: Measurement model structure. The conceptual error decomposition (top) is operationalized as a latent propensity Y ∗ 
+
+> ijt
+
+(middle), which is transformed via link function Φ to generate observed categorical labels (bottom). The additive structure on the latent scale implies multiplicative effects on the probability/odds scale. Following the tradition of Item Response Theory (Lord and Novick, 2008) and general-ized linear mixed models, we posit that each annotator i evaluating instance j has a latent propensity Y ∗ 
+
+> ijt
+
+to assign the correct label: 
+
+Y ∗ 
+
+> ijt
+
+= μj + βj + ρi + σijt (4) 
+
+8Measurement Error Labeling 
+
+This latent propensity determines the probability of observed categorical responses through a link function. For binary outcomes (correct/incorrect): 
+
+P (Yijt = correct) = Φ( Y ∗
+
+> ijt
+
+) (5) where Φ is the cumulative distribution function of an appropriate distribution (logistic for logit models, normal for probit). The observed label represents a realization from this probability distribution. Importantly, the additive structure on the latent scale implies that the effects of instance difficulty, annotator tendencies, and situational noise combine multiplicatively on the prob-ability/odds scale. A highly difficult instance (large |βj |) or unreliable annotator (large |ρi|)shifts the latent propensity, changing the probability of error in a nonlinear fashion. This framework generalizes naturally to multi-class outcomes via multinomial or ordered logit models, as we demonstrate in the empirical application in Section 6. 
+
+4 Extending the Framework to Human Label Variation 
+
+The conceptual model presented above assumes a single underlying ground truth μj for each instance j. This assumption aligns with classical test theory and with the dominant paradigm in supervised machine learning, where the goal is to reproduce a unique, objec-tive label for every observation. Recent work in NLP and ML increasingly challenges this assumption by emphasizing human label variation (HLV)—the idea that annotators may hold multiple, equally defensible interpretations of the same instance due to differences in perspective, experience, background knowledge, or values. Under an HLV perspective, the “true” label for an item is not a single fixed point but a 
+
+latent interpretive construct . Different annotators may perceive different aspects of the same instance as relevant or salient, yielding stable, systematic differences in their intended labels. Thus, rather than assuming a single latent truth μj , we acknowledge annotator-specific latent truths μij that govern the labels each annotator believes to be correct. This view is especially relevant for subjective or socially grounded tasks, such as toxicity, sentiment, or stance, where disagreement arises from genuine interpretive diversity rather than error. Incorporating human label variation into the measurement framework therefore requires relaxing the assumption of a single population-level latent truth and explicitly modeling individual-level interpretations. Conceptually, we treat Yijt as a categorical observation informed by an annotator-specific latent construct μij , together with noise arising from the labeling process. Here, μij is not a numeric label but a latent representation of annotator 
+
+i’s intended meaning for instance j, and transient deviations from this intended response are captured by ϵijt .Individual-level latent truths can themselves be decomposed into a population-level construct and annotator-specific interpretive deviations: 
+
+μij = μj + δij ,
+
+where μj represents the shared population-level interpretation of the item, and δij captures stable, systematic differences in how annotator i interprets or evaluates that item. The term δij thus formalizes the idea of individual ground truth : annotators may differ in their 
+
+> 9Chew et al.
+
+internal representation of what the correct label should be, even before situational noise or task difficulty is considered. Importantly, allowing annotator-specific interpretive variation does not eliminate other sources of measurement error. Even when annotators hold stable interpretive stances, some instances are more ambiguous or complex than others, making them harder to classify and increasing disagreement regardless of who labels them. Likewise, annotators may ex-hibit stable tendencies across tasks (e.g., stricter vs. more permissive labeling styles), and momentary fluctuations such as fatigue or distraction introduce additional within-person variability. To accommodate these multiple sources of variation, the full conceptual model distin-guishes between variation in what annotators believe the truth to be and variation in how reliably they express that belief . We therefore view the observed label as arising from: 
+
+Yijt ∼ f  μj + δij , β j , ρ i, σ ijt 
+
+, (6) where μj and δij jointly describe the latent truth as perceived by annotator i, βj cap-tures shared instance-level ambiguity or difficulty that makes it hard for any annotator, ρi
+
+captures stable annotator-level tendencies across items, and σijt captures transient within-person noise. The function f (·) represents the process by which latent constructs and error components generate categorical observations. Figure 3 depicts illustrative examples of these recontextualized components. This formulation makes explicit that disagreement can arise from at least two separable sources: (1) interpretive variation in what different annotators believe the correct label should be, and (2) measurement error in how consistently annotators express those beliefs. Together, these components define the structure of human label variation in annotation data and clarify when a single shared ground truth is appropriate and when interpretive diversity must be modeled directly. 
+
+5 Choosing the Appropriate Ground Truth Perspective 
+
+The framework above highlights that not all labeling tasks share the same underlying notion of “truth.” For some domains, such as object recognition or digit classification, it may be reasonable to assume a single, shared ground truth ( μj ) to which all annotators approximate. In others, such as sentiment analysis or toxicity detection, disagreement may reflect multi-ple coherent interpretations rather than random error. Determining which of these regimes a dataset occupies is not trivial: it depends on whether disagreement arises primarily from shared item difficulty, from systematic annotator differences, or from stable relational pat-terns among annotators. In measurement terms, the question is whether the construct being labeled functions as a single latent variable or as a family of context-dependent judgments. Before deploying supervised learning models, researchers must therefore assess which inter-pretation of “truth” is empirically more warranted for the task at hand. 
+
+Connection to Classical Measurement Theory. In traditional measurement research, determining whether a construct can be represented by a single latent dimension is a prereq-uisite to modeling it. Psychometricians routinely test for unidimensionality (Segars, 1997) and measurement invariance (Putnick and Bornstein, 2016); that is, whether different in-dicators or raters reflect the same underlying trait in comparable ways. If these conditions 
+
+> 10
+
+Measurement Error Labeling Type of Variation Personal Truth Statement Trial Label Validates? Label Validates?                                               
+
+> Interpretive variation ( $"! )#: OOensive
+> $: Not “You’re being ridiculous.”
+> 1Offensive ✅Not ✅
+> 2Offensive ✅Not ✅
+> Instance Ambiguity (!!)#:Uncertain
+> $:Uncertain “Oh, that’s just perfect.”
+> 1Offensive ❌Not ❌
+> 2Not ❌Offensive ❌
+> Between -person ( "$)#:OOensive
+> $:OOensive “Whatever you say, boss.” 1Offensive ✅Not ❌
+> 2Offensive ✅Not ❌
+> Within -person ( #$%& )#: Not
+> $: Not
+> “That’s the dumbest thing I’ve
+> ever heard.”
+> 1Not ✅Offensive ❌
+> 2Not ✅Not ✅
+
+# ! !
+
+Task: Offensiveness Detection         
+
+> Goal: Label each statement as Offensive or Not Offensive based on personal judgement.
+
+Figure 3: Illustration of variation components in the Individual Ground Truth model. Interpretive variation (δij ): Both annotators are internally consistent but apply different offensiveness thresholds. Instance ambiguity (βj ): Context-dependence creates genuine uncertainty; neither annotator can consistently self-validate any interpretation across trials, demonstrating that some instances resist stable judgment even within individual frameworks. Between-person error (ρi): Both annotators believe sarcasm is offensive, but Annotator 2 has a stable ten-dency to miss subtle cues, consistently failing self-validation. Within-person error 
+
+(σijt ): Annotator 2 makes a transient error in Trial 1 but shares Annotator 1’s interpretive standard. Note: “Validates?” indicates whether the annotator, upon later review, affirms their own prior judgment ( ✓ = self-consistent; × =self-contradictory). Each annotator is evaluated against their own interpretive framework, not an external ground truth. 
+
+11 Chew et al. 
+
+fail, a single composite score is not meaningful, and the construct must be treated as mul-tidimensional or context-dependent. The same logic applies to labeled data in machine learning: before treating consensus labels as ground truth, we must ask whether the anno-tation process behaves as if all annotators are measuring the same latent variable. When disagreement is dominated by instance-level difficulty, the global-truth model is appropri-ate; when disagreement is structured across annotators or relationships, the assumption of a single latent truth breaks down, motivating individualized or rater-aware approaches. 
+
+5.1 Operationalizing the Framework: A General Modeling Strategy 
+
+This logic can be implemented empirically using hierarchical models that partition the variance in labeling outcomes into interpretable components. At a conceptual level, the approach estimates how much of the observed disagreement among annotators can be at-tributed to three sources: (a) systematic properties of the item being labeled (instance difficulty, βj ), (b) stable annotator-specific tendencies ( ρi), and (c) residual or interaction-level variability ( σijt and, where data permit, δij ). In practice, this can be achieved through mixed-effects or generalized linear mixed models (GLMMs), which treat anno-tations as nested observations within items and annotators. These models estimate fixed effects for measurable item characteristics and random effects for annotator and item iden-tities, thereby decomposing disagreement into structured and unstructured components. The same framework naturally extends to relational designs, such as pairwise validation, where additional random effects capture compatibility between annotators or between an-notators and items. Together, these models provide a general method for testing whether disagreement in a labeling task more closely reflects a single shared construct (favoring a global-truth perspective) or structured interpretive variation (favoring an individual or HLV perspective). 
+
+6 Case Study: VariErr NLI 
+
+To demonstrate the practical utility of the measurement-error framework, we apply it to the 
+
+Variation versus Error Natural Language Inference (VariErr NLI) dataset (Weber-Genzel et al., 2024). Natural language inference (NLI) requires deciding whether a “hypothesis” statement logically follows from a “premise” statement, with labels of entailment (hypoth-esis follows), contradiction (hypothesis does not follow), or neutral (premise and hypothesis unrelated). VariErr draws 500 items from the MNLI subset of ChaosNLI (Nie et al., 2020), each labeled by four independent annotators. The VariErr data is ideal for this work because it provides a richer annotation structure than conventional NLI datasets. Annotators supplied not only categorical labels but also written explanations justifying their decisions. These ecologically valid explanations (Jiang et al., 2023) capture reasoning at the time of labeling rather than retrospective rationaliza-tion. Two months later, the same annotators re-evaluated the pooled (label, explanation) pairs under blinded conditions, producing a second round of annotations that enable direct assessment of within- and between-annotator consistency. This multi-round design allows estimation of both instance-level difficulty and stable annotator differences, as well as the relational structure of mutual validation. 
+
+> 12 Measurement Error Labeling
+
+6.1 Modeling Structured Sources of Annotation Error 
+
+Following the modeling strategy outlined in Section 5.1, we treat each annotation as a nested observation within annotator and item. We fit mixed-effects logistic regressions to estimate how instance- and annotator-level factors contribute to labeling errors, using both global and individual ground truth definitions described above. 
+
+Global Ground Truth Model. For the global-truth model, we operationalize error as Zijt = 1(Yijt ̸ = μj ), where Yijt is annotator i’s observed categorical label for instance j
+
+on trial t, and μj is the inferred consensus label. We estimate: logit P (Zijt = 1) = Xj β + ρi + σijt (7) where Zijt = 1 indicates an error (deviation from consensus). The vector Xj contains item-level predictors such as ambiguity, sentence length, and lexical overlap, and β repre-sents the corresponding fixed-effect coefficients. The random intercept ρi captures stable annotator tendencies across items, while σijt represents residual trial-level variation. 
+
+Individual Truth Model. For the individual-truth model, error is defined relative to each annotator’s self-assessed interpretation. We define Zindiv  
+
+> ij
+
+= 1(Yij ̸ = μij ), where μij 
+
+represents annotator i’s self-validated label for instance j. In practice, Zindiv  
+
+> ij
+
+= 1 when annotator i later rejected their own (label, explanation) pair as incoherent. We estimate: logit P (Zindiv  
+
+> ij
+
+= 1) = Xj β + ρi (8) Because each annotator evaluates the validity of their own annotations, this specification omits trial-level variability ( σijt ), meaning residual variation conflates any instability in personal interpretation with situational factors during validation. Further details on the construction of these outcome variables and instance features are provided in Appendix A. 
+
+6.2 Measurement Design Diagnostic 
+
+The previous models estimate how instance- and annotator-level factors contribute to la-beling error under alternative definitions of truth. We now introduce a complementary diagnostic that evaluates whether a labeling task behaves as if it reflects a single shared construct or structured individual variation. Rather than comparing annotators to an ex-ternal ground truth, this approach examines the relational structure of agreement among annotators themselves. We posit that if disagreement arises primarily from shared instance difficulty, we should observe high labeler–judge consistency once item effects are accounted for. If, however, disagreement follows stable patterns across annotators or annotator pairs, this indicates systematic interpretive alignment, supporting an individual or human label variation (HLV) perspective. Formally, we model the probability that judge k validates labeler i’s annotation for item 
+
+j as: logit  P (Vkij = 1)  = α + u(l) 
+
+> i
+
++ u(j) 
+
+> k
+
++ u(t) 
+
+> j
+
++ u(lj ) 
+
+> ik
+
+, (9) 
+
+> 13 Chew et al.
+
+where Vkij = 1 if judge k validated labeler i’s label for item j; u(l) 
+
+> i
+
+, u(j) 
+
+> k
+
+, and u(t)
+
+> j
+
+are random intercepts for labeler, judge, and item, respectively; and u(lj ) 
+
+> ik
+
+is a random labeler–judge interaction capturing structured relational alignment (i.e., if some pairs of annotators understand each other better than others, even after accounting for labeler and judge effects). The variance of each component ( σ2 
+
+> l
+
+, σ2 
+
+> j
+
+, σ2 
+
+> t
+
+, and σ2 
+
+> lj
+
+) quantifies how strongly that source contributes to overall variation in validation probability. The relative magnitudes of these variance components serve as a diagnostic of the un-derlying measurement regime :
+
+• Global Ground Truth regime. Disagreement is dominated by shared instance difficulty. The ideal variance profile is characterized by: 
+
+σ2 
+
+> t
+
+≫ σ2 
+
+> l
+
+, σ 2 
+
+> j
+
+, σ 2 
+
+> lj
+
+.
+
+High item-level variance ( u(t) 
+
+> j
+
+) indicates that some instances are broadly confusing or ambiguous, but annotators otherwise behave similarly. Producer and judge effects are small once item difficulty is considered, suggesting that all annotators approximate a single common construct. 
+
+• Individual Ground Truth regime. Disagreement reflects stable individual ten-dencies and structured pairwise alignment. The ideal variance profile reverses: 
+
+σ2 
+
+> l
+
+and σ2 
+
+> lj
+
+≫ σ2 
+
+> t
+
+.
+
+High labeler- or judge-level variance ( u(l) 
+
+> i
+
+, u(j) 
+
+> k
+
+) indicates persistent personal bias, reli-ability, or interpretive stance. High interaction variance ( u(lj ) 
+
+> ik
+
+) reveals consistent pair-wise agreement patterns—some annotator pairs systematically validate each other’s reasoning, implying interpretive subcommunities. Together, these patterns reflect a task better modeled as aggregating coherent but divergent human perspectives rather than measuring deviations from a single truth. In practice, most labeling tasks are unlikely to conform perfectly to either extreme. Tasks involving complex or socially grounded judgments may empirically display a hybrid of the two regimes, where shared ambiguity and stable individual interpretation coexist. Some items may be genuinely confusing for everyone (global difficulty), while others in-vite divergent yet internally coherent readings (individual interpretation). Identifying the relative balance of these components therefore helps determine whether a dataset behaves more like a shared measurement of one construct or a structured aggregation of plural perspectives. In summary, this relational diagnostic complements the earlier mixed-effects models by providing a direct, data-driven assessment of the structure of disagreement. A dominance of item-level variance supports a shared or “global” ground-truth interpretation, whereas dominance of labeler and pairwise variances supports an individual-truth or HLV interpre-tation. 
+
+> 14
+
+Measurement Error Labeling 
+
+Table 1: Mixed-effects logistic regression models predicting annotation error under the global ground truth definition. 
+
+Random-only Baseline Features + Ambiguity Fixed Effects (OR [95% CI]) 
+
+Intercept 0.22 [0.14, 0.34] ∗∗∗ 0.25 [0.16, 0.37] ∗∗∗ 0.06 [0.04, 0.10] ∗∗∗ 
+
+Ambiguity (TRUE) — — 9.05 [7.31, 11.20] ∗∗∗ 
+
+Lexical Overlap (1 SD) — 0.99 [0.91, 1.07] 1.02 [0.93, 1.11] Avg. Toks/Sent (1 SD) — 0.98 [0.90, 1.06] 1.06 [0.96, 1.17] Neg. Presence Flip — 1.22 [1.02, 1.47] ∗ 0.97 [0.80, 1.18] Entity Jaccard (1 SD) — 0.98 [0.90, 1.06] 1.00 [0.91, 1.09] Norm. Overlap (1 SD) — 1.03 [0.95, 1.12] 1.01 [0.93, 1.11] 
+
+Random Effects (Var / SD) 
+
+Document (Intercept) 0.55 / 0.74 — —Labeler (Intercept) 0.09 / 0.30 0.08 / 0.28 0.09 / 0.30 Trial (Intercept) 0.05 / 0.22 0.04 / 0.21 0.06 / 0.24 
+
+Model Fit 
+
+Log-Likelihood −1916 .55 −1943 .64 −1663 .86 AIC 3841 .1 3903 .3 3345 .7
+
+N 3814 3814 3814    
+
+> ORs are odds ratios with 95% Wald confidence intervals. Continuous predictors standardized (per 1 SD). Significance: ∗p < . 05, ∗∗ p < . 01, ∗∗∗ p < . 001.
+
+7 Results 
+
+In the Global Ground Truth model (Table 1), we assumed a shared consensus label for each instance and modeled deviations from this as annotation error. To closely match our concep-tual model, we first fit a random-effects–only model across documents, labelers, and trials to capture structured variability that comes from the data’s grouping or hierarchy. This model reveals substantial variance across documents (SD = 0 .74), labelers (SD = 0 .30), and trials (SD = 0 .22), confirming our theory that annotation errors are structured rather than purely random. We then replace the document random effect with lexical and structural text variables to test the hypothesis that NLI errors can be explained by features of the text. None of these new fixed effects variables were statistically significant, except for the feature capturing negation flip between the premise and hypothesis statement. Introduc-ing ambiguity as a fixed predictor (a post-hoc diagnostic derived from annotation patterns themselves; see Appendix A.2) dramatically improved model fit (∆AIC ≈ − 560), with ambiguous items roughly nine times more likely to be mislabeled. Other lexical or struc-tural features remained near-null once ambiguity was included, suggesting that semantic ambiguity rather than surface textual form is the dominant source of instance-level error. Additionally, random intercepts for annotators and trials remained nonzero even in the full model, indicating persistent between-annotator and within-person variability in labeling accuracy. The Individual Ground Truth model (Table 2) reframes “error” from each annotator’s perspective, treating their own self-evaluations as the reference standard. A random-
+
+15 Chew et al. 
+
+Table 2: Mixed-effects logistic regression models predicting annotation error under the in-dividual ground truth definition. 
+
+Random-only Baseline Features + Ambiguity Fixed Effects (OR [95% CI]) 
+
+Intercept 0.08 [0.02, 0.26] ∗∗∗ 0.07 [0.02, 0.24] ∗∗∗ 0.09 [0.03, 0.29] ∗∗∗ 
+
+Ambiguity (TRUE) — — 0.68 [0.50, 0.92] ∗
+
+Lexical Overlap (1 SD) — 1.03 [0.88, 1.20] 1.02 [0.87, 1.19] Avg. Toks/Sent (1 SD) — 1.14 [1.01, 1.29] ∗ 1.12 [0.99, 1.28] †
+
+Neg. Presence Flip — 1.14 [0.81, 1.62] 1.21 [0.85, 1.71] Entity Jaccard (1 SD) — 0.98 [0.84, 1.16] 0.98 [0.83, 1.15] Norm. Overlap (1 SD) — 1.17 [0.97, 1.40] 1.17 [0.98, 1.41] †
+
+Random Effects (Var / SD) 
+
+Document (Intercept) 0.00 / 0.05 — —Labeler (Intercept) 1.41 / 1.19 1.41 / 1.19 1.39 / 1.18 
+
+Model Fit 
+
+Log-Likelihood −590 .99 −586 .79 −583 .68 AIC 1188 .0 1187 .6 1183 .4
+
+N 1907 1907 1907     
+
+> ORs are odds ratios with 95% Wald confidence intervals. Continuous predictors standardized (per 1 SD). Significance: †p < . 10, ∗p < . 05, ∗∗ p < . 01, ∗∗∗ p < . 001.
+
+effects–only baseline showed large between-labeler variance (SD = 1 .19) and negligible document-level variance (SD = 0 .05), in stark contrast to the Global Ground Truth model with had relatively larger document-level variance and smaller between-labeler variance. This implies that, under the Individual Ground Truth assumption, disagreement primarily reflects stable annotator tendencies rather than inherent item difficulty and challenges folk wisdom that more or better data would resolve the disagreement. Strikingly, while in the Global Ground Truth model ambiguity predicts more error (shared confusion), in the Indi-vidual Ground Truth model it predicts fewer self-perceived errors (OR = 0.68 [0.50, 0.92], 
+
+p = .013). This result suggests annotators appeared to interpret their own ambiguous deci-sions as internally coherent, even when others disagreed. Like in the Global Ground Truth models, the textual and lexical features do not explain much about individual annotator’s self-perceived correctness, indicating that most structured variation is captured by stable annotator-specific effects rather than measurable item features. To further assess the structure of disagreement, the Pairwise Validation model (Table 3) decomposed validation outcomes across labelers, judges, items, and their interactions. This model revealed substantial variance across judges (SD = 1 .08), items (SD = 0 .97), and labeler–judge interactions (SD = 0 .48), indicating that interpretive alignment depends jointly on who produced and who evaluated a label. The relative magnitudes of these variance components provide a diagnostic view of where disagreement originates. The sizable item-level variance ( u(t)j) indicates that some instances are inherently more difficult to evaluate, consistent with a global ground-truth regime in which shared ambiguity drives labeling error. At the same time, the large judge-
+
+16 Measurement Error Labeling 
+
+Table 3: Mixed-effects logistic regression model predicting pairwise validation outcomes (Vkij ).               
+
+> Estimate Fixed Effect (OR [95% CI])
+> Intercept 9.57 [3.20, 28.59] ∗∗∗
+> Random Effects (Var / SD)
+> Document 0.94 / 0.97 Judge 1.16 / 1.08 Labeler 0.02 / 0.13 Labeler–Judge (Interaction) 0.23 / 0.48
+> Model Fit
+> Log-Likelihood −2987 .82 AIC 5985 .65
+> N(observations) 7710 Groups Items = 500; Judges = 4; Labelers = 4; L–J pairs = 16
+> ORs are odds ratios with 95% Wald confidence intervals. Model estimated using maximum likelihood with a binomial link. Significance: ∗p < . 05, ∗∗ p < . 01, ∗∗∗ p < . 001.
+
+level variance ( u(j)k) reveals persistent differences in how strictly individual annotators evaluate others’ labels, pointing to stable individual tendencies or biases. Most notably, the substantial labeler–judge interaction variance ( u(pl ) 
+
+> ik
+
+) shows that certain annotator pairs consistently align or diverge in their interpretations. This pattern captures structured rela-tional alignment, the hallmark of human label variation, demonstrating that disagreement follows predictable interpretive relationships rather than random fluctuation. The model’s high intercept (OR = 9.57 [3.20, 28.59]) corresponds to an overall validation probability of approximately 0.90, indicating broad consensus with selective pockets of dis-agreement rather than pervasive unreliability. In combination, these results reveal a layered structure of variation: item-level difficulty contributes to shared uncertainty, annotator-level differences capture enduring individual stances, and interaction-level variance exposes rela-tional dynamics of agreement and tension. When such relational variance is nontrivial, the assumption of a single shared ground truth becomes less defensible, and the data are better conceptualized under a human label variation framework—one in which multiple, internally consistent interpretations coexist within a generally reliable annotation process. Across all models, the pattern of variance points toward the individual-ground-truth perspective as a better description of the VariErr NLI task. Disagreement is not dominated by item-level ambiguity alone as would be expected under a single shared truth but by stable, annotator-specific tendencies and consistent relational alignments among annotators. In other words, for this case study, the label disagreement reflects interpretable and systematic human variation rather than random noise around a common target. This interpretation is consistent with recent work showing that disagreement in NLI arises from systematic and interpretable sources, such as differing reasoning strategies, linguistic interpretations, or epistemic stances, rather than random annotation error (Gruber et al., 2024; Jiang et al., 2023; Hong et al., 2025). 
+
+> 17 Chew et al.
+
+8 Discussion 
+
+This paper reframes annotation as a measurement process and demonstrates how a decom-position of variance across instances, annotators, and relationships can help diagnose the structure of disagreement in labeled data. Using mixed-effects models under two notions of truth, global consensus and individual self-assessment, together with a relational (pairwise validation) design, we find that disagreement in the VariErr NLI dataset is not dominated by shared item difficulty alone, but by stable annotator tendencies and structured labeler–judge alignments. In the language of our framework, the empirical signal concentrates on ρi and 
+
+δij more than on βj , indicating that this task sits closer to the human label variation (HLV) regime than to a single shared ground truth. This work’s central contribution is not another method for post hoc denoising, but a framework and diagnostic lens for deciding how to conceptualize and model ground truth in the first place. When item-level variance dominates and fixed effects such as ambigu-ity strongly and consistently predict error, a global-truth assumption is defensible. When annotator-level variance dominates and relational (labeler–judge) interactions are substan-tial, individualized or rater-aware approaches are more appropriate. In our case study, the latter pattern prevails: ambiguity does explain shared difficulty, but residual structure sits with annotators and their relationships, and ambiguity even reduces self-perceived error under individual truth. This pattern implies that preserving, modeling, and potentially training on distributions of labels, rather than collapsing to consensus, may better reflect the construct being measured. The VariErr case study also provides empirical support for the conceptual measurement-error framework itself. Each theoretically proposed component of the model manifests in the data with the expected structure and magnitude. Instance-level difficulty ( βj ) appears through the strong effect of ambiguity in the global-truth model; annotator bias ( ρi) is captured by the large between-labeler variance in the individual-truth model; and struc-tured interpretive alignment ( δij ) emerges in the pairwise validation model as significant producer–judge interaction variance. Even situational noise ( σijt ) is reflected in nonzero trial-level variability. The presence of all four components in the empirical data provides direct evidence that the proposed decomposition corresponds to real, measurable phenom-ena possible in human annotation behavior, supporting the framework’s use as both a conceptual advance and a practical diagnostic. In addition to its theoretical contribution, this work also has several implications for ML practice. First, dataset curation should be guided by an explicit measurement per-spective. If diagnostics suggest a global-truth regime, resources are best spent on disam-biguating items and improving instructions. If diagnostics indicate HLV, collecting richer rater signals (calibration tasks, repeated measures, explanation quality, rater covariates) and preserving disagreement become priorities. Appendix B highlights additional poten-tial strategies for addressing sources of labeling error under each of these regimes. Second, modeling should match the regime: consensus targets and standard losses are coherent in global-truth settings; in HLV settings, multi-annotator training, mixture-of-raters, or con-ditional label distributions (conditioned on rater or rater clusters) are preferable. Third, evaluation should mirror the measurement assumption: accuracy against a single label may be appropriate for global truth, but HLV calls for distributional or conditional metrics (e.g., 
+
+> 18 Measurement Error Labeling
+
+calibration to rater-conditioned label distributions or agreement with specific rater commu-nities). By articulating how item, annotator, and relational components map to alternative truth regimes, we provide a principled way to reason about labeling pipelines before com-mitting to a training or evaluation strategy. These choices connect directly to data-centric ML and to recent calls to align evaluation with measurement theory. 
+
+8.1 Limitations and Future Work 
+
+This work has several limitations that are suggestive of areas for future research. First, our decomposition assumes that item difficulty ( βj ), annotator tendencies ( ρi), and relational alignment ( δij or u(lj ) 
+
+> ik
+
+) are separable given the available design. In sparse or unbalanced set-tings (few annotators, few repeats, limited crossing), these components can be confounded, and some random effects may approach boundary solutions. Stronger designs tailored for the purposes of studying labeling errors (more raters, crossed rather than nested structure, repeated measures over time) should improve identifiability and the stability of variance es-timates. Second, while VariErr NLI was useful for demostrating how the conceptual model could be operationalized, it only reflects a single specific task and design. Future work could perform simliar decompositions on a wider variety of tasks that vary in subjectivity, domain expertise, and stakes. Third, though we model item features (e.g., ambiguity) and include random intercepts for annotators and trials, we did not include other model components implied by our conceptual model, such as rater covariates (expertise, ideology, conscientious-ness), temporal dynamics (learning, fatigue), or richer context (instructions, environment). Without these, variance attributed to ρi may conflate multiple mechanisms. Collecting annotator metadata, time-on-task, and session context would enable mixed-effects loca-tion–scale (Hedeker et al., 2012) or dynamic models (Finkelman et al., 2016) that separate mean tendencies from within-person variability over time. Additionally, future work could extend the framework to address other labeling phenomena identified in the literature, such as task effects (Kern et al., 2023), order effects (Beck et al., 2024), and the impact of annotator demographics (Pei and Jurgens, 2023). Lastly, while high labeler–judge interac-tion variance indicates structured pairwise alignment, it does not, by itself, prove epistemic pluralism. The presence of relational structure shows that certain annotators interpret items in systematically similar or divergent ways, but the meaning of that structure depends on context. Several alternative mechanisms can generate the same statistical signature. For example, two annotators might consistently agree because they share a heuristic, such as over-weighting lexical overlap in NLI judgments, or because they learned from the same annotation guidelines or training examples. Conversely, structured disagreement might reflect differential access to expertise rather than genuine plural truths: domain specialists could cluster in one interpretive group and novices in another. Future work that highlights the representativeness of annotator pools (e.g., Eckman et al. (2025)) may help address these concerns. Accordingly, the diagnostic approach presented here should be read as evidence toward, not a proof of, human label variation, with further validation and contextual inquiry required before establishing epistemic meaning. Lastly, our empirical analysis focuses on a single NLI task, reflecting the rarity of anno-tation datasets with sufficient structure (repeated measures, crossed annotators, validation 
+
+> 19 Chew et al.
+
+rounds) for complete variance decomposition. However, this limitation points toward both methodological opportunities and practical recommendations. Methodologically, simpli-fied versions of our framework can be applied to any multi-annotator dataset to partition variance between instances and annotators, even without repeated trials. Practically, the framework highlights design principles for future annotation efforts: collecting repeated judgments, using crossed sampling designs, and recording annotator metadata would en-able richer measurement-theoretic analysis at modest additional cost. We view the VariErr demonstration as proof of concept for a broader research program testing how variance structures differ across task types, domains, and annotation contexts. We conclude with some future directions implied by our work. First, this research could be a first step toward developing a science of labeling: a cumulative enterprise with theory, a mechanistic understanding of labeling processes, and a growing evidence base of what does and does not work. Such a program would mirror mature measurement traditions in psychology and survey research, where construct validity and reliability are empirically studied, synthesized in meta-analyses, and used to guide practice. Second, future research could systematically map sources and structures of label variation across domains and task types, building a taxonomy of when individual versus global ground truths are most defensible. This taxonomy would allow the community to move from ad hoc denoising toward principled measurement design, where annotation protocols, model architectures, and evaluation metrics are jointly aligned with the underlying epistemic structure of the task. Third, integrating this framework with large-scale behavioral and linguistic data opens the door to computational social measurement, using patterns of labeling disagreement as data about human reasoning, norms, and interpretive communities themselves. In this way, the study of annotation ceases to be peripheral to machine learning and becomes a scientific lens on how humans make sense of language, meaning, and truth. With the rapid advancement of AI across society, such a human-centric approach offers a way to keep human judgment at the center of what machine learning systems learn and evaluate. 
+
+Broader Impact Statement 
+
+This work reframes labeling as a complex human measurement process. By decomposing labeling disagreement into item-, annotator-, trial-, and relational-level components, the proposed framework helps determine whether consensus labeling is appropriate or whether disagreement reflects meaningful diversity of perspective. Applied responsibly, such diag-nostics can improve both the validity and fairness of machine learning systems by guiding dataset refinement when disagreement stems from ambiguity and preserving plural view-points when disagreement reflects genuine interpretive variation. More broadly, treating labeling as a process of measurement encourages transparency about how human differ-ences shape the data used to train and evaluate models. The framework does not resolve the ethical tension between consensus and pluralism, but it makes that tension empirically visible, enabling more principled decisions about what “truth” machine learning should learn to reproduce. 
+
+Acknowledgments and Disclosure of Funding 
+
+> 20 Measurement Error Labeling
+
+We would like to thank the RTI International Fellows Program for their generous funding of this work. 
+
+References 
+
+Lora Aroyo and Chris Welty. Truth is a lie: Crowd truth and the seven myths of human annotation. AI Magazine , 36(1):15–24, 2015. Jacob Beck. Quality aspects of annotated data: A research synthesis. AStA Wirtschafts-und Sozialstatistisches Archiv , 17(3):331–353, 2023. Jacob Beck, Stephanie Eckman, Bolei Ma, Rob Chew, and Frauke Kreuter. Order effects in annotation tasks: Further evidence of annotation sensitivity. In Proceedings of the 1st Workshop on Uncertainty-Aware NLP (UncertaiNLP 2024) , pages 81–86, 2024. Laura Boeschoten, Erik-Jan van Kesteren, Ayoub Bagheri, and Daniel L Oberski. Fair inference on error-prone outcomes. arXiv preprint arXiv:2003.07621 , 2020. Raymond J Carroll, David Ruppert, Leonard A Stefanski, and Ciprian M Crainiceanu. 
+
+Measurement error in nonlinear models: a modern perspective . Chapman and Hall/CRC, 2006. Rob Chew, Michael Wenger, Caroline Kery, Jason Nance, Keith Richards, Emily Hadley, and Peter Baumgartner. Smart: An open source data labeling platform for supervised learning. Journal of Machine Learning Research , 20(82):1–5, 2019. Zhendong Chu, Jing Ma, and Hongning Wang. Learning from crowds by modeling common confusions. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 35, pages 5832–5840, 2021. Aida Mostafazadeh Davani, Mark Diaz, and Vinodkumar Prabhakaran. Dealing with dis-agreement: Looking beyond the majority vote in subjective annotations. In Transactions of the Association for Computational Linguistics , 2022. Alexander Philip Dawid and Allan M Skene. Maximum likelihood estimation of observer error-rates using the em algorithm. Journal of the Royal Statistical Society: Series C (Applied Statistics) , 28(1):20–28, 1979. Naihao Deng, Xinliang Frederick Zhang, Siyang Liu, Winston Wu, Lu Wang, and Rada Mihalcea. You are what you annotate: Towards better models through annotator repre-sentations. arXiv preprint arXiv:2305.14663 , 2023. Stephanie Eckman, Barbara Plank, and Frauke Kreuter. Position: insights from survey methodology can improve training data. In Proceedings of the 41st International Confer-ence on Machine Learning , ICML’24. JMLR.org, 2024. Stephanie Eckman, Bolei Ma, Christoph Kern, Rob Chew, Barbara Plank, and Frauke Kreuter. Aligning nlp models with target population perspectives using pair: Population-aligned instance replication. In The 4th Workshop on Perspectivist Approaches to NLP ,page 100, 2025. 
+
+> 21 Chew et al.
+
+Brian S Finkelman, Benjamin French, and Stephen E Kimmel. The prediction accuracy of dynamic mixed-effects models in clustered data. BioData mining , 9(1):5, 2016. Eve Fleisig, Su Lin Blodgett, Dan Klein, and Zeerak Talat. The perspectivist paradigm shift: Assumptions and challenges of capturing human labels. arXiv preprint arXiv:2405.05860 ,2024. Benoˆ ıt Fr´ enay and Michel Verleysen. Classification in the presence of label noise: a survey. 
+
+IEEE transactions on neural networks and learning systems , 25(5):845–869, 2013. R Stuart Geiger, Dominique Cope, Jamie Ip, Marsha Lotosh, Aayush Shah, Jenny Weng, and Rebekah Tang. ” garbage in, garbage out” revisited: What do machine learn-ing application papers report about human-labeled training data? arXiv preprint arXiv:2107.02278 , 2021. Robert M Groves, Floyd J Fowler Jr, Mick P Couper, James M Lepkowski, Eleanor Singer, and Roger Tourangeau. Survey methodology . John Wiley & Sons, 2011. Cornelia Gruber, Patrick Oliver Schenk, Malte Schierholz, Frauke Kreuter, and G¨ oran Kauermann. Sources of uncertainty in machine learning–a statisticians’ view. arXiv preprint arXiv:2305.16703 , 2023. Cornelia Gruber, Katharina Hechinger, Matthias Assenmacher, G¨ oran Kauermann, and Barbara Plank. More labels or cases? assessing label variation in natural language infer-ence. In Proceedings of the third workshop on understanding implicit and underspecified language , pages 22–32, 2024. David Gur, Howard E Rockette, Derek R Armfield, Arye Blachar, Jennifer K Bogan, Giuseppe Brancatelli, Cynthia A Britton, Manuel L Brown, Peter L Davis, James V Ferris, et al. Prevalence effect in a laboratory environment. Radiology , 228(1):10–14, 2003. Bo Han, Quanming Yao, Xingrui Yu, Gang Niu, Miao Xu, Weihua Hu, Ivor Tsang, and Masashi Sugiyama. Co-teaching: Robust training of deep neural networks with extremely noisy labels. Advances in neural information processing systems , 31, 2018. David Hauser, Gabriele Paolacci, and Jesse Chandler. Common concerns with mturk as a participant pool: Evidence and solutions. In Handbook of research methods in consumer psychology , pages 319–337. Routledge, 2019. Donald Hedeker, Robin J Mermelstein, and Hakan Demirtas. Modeling between-subject and within-subject variances in ecological momentary assessment data using mixed-effects location scale models. Statistics in medicine , 31(27):3328–3336, 2012. Pingjun Hong, Beiduo Chen, Siyao Peng, Marie-Catherine de Marneffe, and Barbara Plank. Litex: A linguistic taxonomy of explanations for understanding within-label variation in natural language inference. arXiv preprint arXiv:2505.22848 , 2025. 
+
+> 22 Measurement Error Labeling
+
+Abigail Z. Jacobs and Hanna Wallach. Measurement and fairness. In Proceedings of the 2021 ACM Conference on Fairness, Accountability, and Transparency , FAccT ’21, page 375–385, New York, NY, USA, 2021. Association for Computing Machinery. ISBN 9781450383097. doi: 10.1145/3442188.3445901. URL https://doi.org/10.1145/ 3442188.3445901 .Mohammad Hossein Jarrahi, Ali Memariani, and Shion Guha. The principles of data-centric ai. Communications of the ACM , 66(8):84–92, 2023. Nan-Jiang Jiang, Chenhao Tan, and Marie-Catherine de Marneffe. Ecologically valid explanations for label variation in NLI. In Houda Bouamor, Juan Pino, and Kalika Bali, editors, Findings of the Association for Computational Linguistics: EMNLP 2023 ,pages 10622–10633, Singapore, December 2023. Association for Computational Linguis-tics. doi: 10.18653/v1/2023.findings-emnlp.712. URL https://aclanthology.org/ 2023.findings-emnlp.712/ .Christoph Kern, Stephanie Eckman, Jacob Beck, Rob Chew, Bolei Ma, and Frauke Kreuter. Annotation sensitivity: Training data collection methods affect model performance. arXiv preprint arXiv:2311.14212 , 2023. J Peter Kincaid, Robert P Fishburne Jr, Richard L Rogers, and Brad S Chissom. Derivation of new readability formulas (automated readability index, fog count and flesch reading ease formula) for navy enlisted personnel. Technical report, 1975. Jan-Christoph Klie, Richard Eckart de Castilho, and Iryna Gurevych. Analyzing dataset annotation quality management in the wild. Computational Linguistics , 50(3):817–866, 2024. Jon A Krosnick. Response strategies for coping with the cognitive demands of attitude measures in surveys. Applied cognitive psychology , 5(3):213–236, 1991. Yexiong Lin, Yu Yao, and Tongliang Liu. Learning the latent causal structure for modeling label noise. Advances in Neural Information Processing Systems , 37:120549–120577, 2024. Frederic M Lord and Melvin R Novick. Statistical theories of mental test scores . IAP, 2008. Yixin Nie, Xiang Zhou, and Mohit Bansal. What can we learn from collective human opinions on natural language inference data? In Bonnie Webber, Trevor Cohn, Yulan He, and Yang Liu, editors, Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP) , pages 9131–9143, Online, November 2020. Association for Computational Linguistics. doi: 10.18653/v1/2020.emnlp-main.734. URL 
+
+https://aclanthology.org/2020.emnlp-main.734/ .Curtis Northcutt, Anish Athalye, and Jonas Mueller. Pervasive label errors in test sets desta-bilize machine learning benchmarks. In J. Vanschoren and S. Yeung, editors, Proceedings of the Neural Information Processing Systems Track on Datasets and Benchmarks , vol-ume 1, 2021a. URL https://datasets-benchmarks-proceedings.neurips.cc/paper_ files/paper/2021/file/f2217062e9a397a1dca429e7d70bc6ca-Paper-round1.pdf .
+
+> 23 Chew et al.
+
+Curtis Northcutt, Lu Jiang, and Isaac Chuang. Confident learning: Estimating uncertainty in dataset labels. Journal of Artificial Intelligence Research , 70:1373–1411, 2021b. Matthias Orlikowski, Paul R¨ ottger, Philipp Cimiano, and Dirk Hovy. The ecological fallacy in annotation: Modelling human label variation goes beyond sociodemographics. arXiv preprint arXiv:2306.11559 , 2023. Rahul Pandey, Hemant Purohit, Carlos Castillo, and Valerie L Shalin. Modeling and miti-gating human annotation errors to design efficient stream processing systems with human-in-the-loop machine learning. International Journal of Human-Computer Studies , 160: 102772, 2022. Alicia Parrish, Sarah Laszlo, and Lora Aroyo. ” is a picture of a bird a bird”: Policy recommendations for dealing with ambiguity in machine vision models. arXiv preprint arXiv:2306.15777 , 2023. Giorgio Patrini, Alessandro Rozza, Aditya Krishna Menon, Richard Nock, and Lizhen Qu. Making deep neural networks robust to label noise: A loss correction approach. In 
+
+Proceedings of the IEEE conference on computer vision and pattern recognition , pages 1944–1952, 2017. Amandalynne Paullada, Inioluwa Deborah Raji, Emily M Bender, Emily Denton, and Alex Hanna. Data and its (dis) contents: A survey of dataset development and use in machine learning research. Patterns , 2(11), 2021. Jessica K Paulus and David M Kent. Predictably unequal: understanding and addressing concerns that algorithmic clinical prediction may increase health disparities. NPJ digital medicine , 3(1):99, 2020. Jiaxin Pei and David Jurgens. When do annotator demographics matter? measuring the influence of annotator demographics with the popquorn dataset. arXiv preprint arXiv:2306.06826 , 2023. Barbara Plank. The’problem’of human label variation: On ground truth in data, modeling and evaluation. arXiv preprint arXiv:2211.02570 , 2022. Vinodkumar Prabhakaran, Ben Hutchinson, and Margaret Mitchell. Perturbing the per-spective: How explanation impacts annotator labels. In Proceedings of the 2021 ACM Conference on Fairness, Accountability, and Transparency , 2021. Diane L Putnick and Marc H Bornstein. Measurement invariance conventions and reporting: The state of the art and future directions for psychological research. Developmental review , 41:71–90, 2016. Valentina Pyatkin, Frances Yung, Merel CJ Scholman, Reut Tsarfaty, Ido Dagan, and Vera Demberg. Design choices for crowdsourcing implicit discourse relations: Revealing the biases introduced by task design. Transactions of the Association for Computational Linguistics , 11:1014–1032, 2023. 
+
+> 24 Measurement Error Labeling
+
+Vikas C Raykar, Shipeng Yu, Linda H Zhao, Gerardo Hermosillo Valadez, Charles Florin, Luca Bogoni, and Linda Moy. Learning from crowds. Journal of machine learning re-search , 11(4), 2010. Nils Reimers and Iryna Gurevych. Sentence-bert: Sentence embeddings using siamese bert-networks. In Proceedings of the 2019 Conference on Empirical Methods in Nat-ural Language Processing . Association for Computational Linguistics, 11 2019. URL 
+
+https://arxiv.org/abs/1908.10084 .Nithya Sambasivan, Shivani Kapania, Hannah Highfill, Diana Akrong, Praveen Paritosh, and Lora M Aroyo. “everyone wants to do the model work, not the data work”: Data cascades in high-stakes ai. In proceedings of the 2021 CHI Conference on Human Factors in Computing Systems , pages 1–15, 2021. Maarten Sap, Swabha Swayamdipta, Laura Vianna, Xuhui Zhou, Yejin Choi, and Noah A. Smith. Annotators with attitudes: How annotator beliefs and identities bias toxic lan-guage detection. In Marine Carpuat, Marie-Catherine de Marneffe, and Ivan Vladimir Meza Ruiz, editors, Proceedings of the 2022 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies , pages 5884–5906, Seattle, United States, July 2022. Association for Computational Linguis-tics. doi: 10.18653/v1/2022.naacl-main.431. URL https://aclanthology.org/2022. naacl-main.431/ .David Sculley, Gary Holt, Daniel Golovin, Eugene Davydov, Todd Phillips, Dietmar Ebner, Vinay Chaudhary, Michael Young, Jean-Francois Crespo, and Dan Dennison. Hidden technical debt in machine learning systems. Advances in neural information processing systems , 28, 2015. Albert H Segars. Assessing the unidimensionality of measurement: A paradigm and il-lustration within the context of information systems research. Omega , 25(1):107–121, 1997. Richard J Shavelson, Noreen M Webb, and Glenn L Rowley. Generalizability theory. Amer-ican Psychological Association, 1992. Rion Snow, Brendan O’connor, Dan Jurafsky, and Andrew Y Ng. Cheap and fast–but is it good? evaluating non-expert annotations for natural language tasks. In Proceedings of the 2008 conference on empirical methods in natural language processing , pages 254–263, 2008. Hwanjun Song, Minseok Kim, Dongmin Park, Yooju Shin, and Jae-Gil Lee. Learning from noisy labels with deep neural networks: A survey. IEEE transactions on neural networks and learning systems , 34(11):8135–8153, 2022. Taylor Sorensen, Jared Moore, Jillian Fisher, Mitchell Gordon, Niloofar Mireshghallah, Christopher Michael Rytting, Andre Ye, Liwei Jiang, Ximing Lu, Nouha Dziri, Tim Althoff, and Yejin Choi. Position: a roadmap to pluralistic alignment. In Proceedings of the 41st International Conference on Machine Learning , ICML’24. JMLR.org, 2024. 
+
+> 25 Chew et al.
+
+Alexandra Uma, Tommaso Fornaciari, Silviu Paun, Barbara Plank, Dirk Hovy, and Massimo Poesio. Learning from disagreement: A survey. In Proceedings of the 2021 Conference of the European Chapter of the Association for Computational Linguistics , 2021. Hanna Wallach, Meera Desai, A Feder Cooper, Angelina Wang, Chad Atalla, Solon Barocas, Su Lin Blodgett, Alexandra Chouldechova, Emily Corvi, P Alex Dow, et al. Position: Evaluating generative ai systems is a social science measurement challenge. arXiv preprint arXiv:2502.00561 , 2025. Leon Weber-Genzel, Siyao Peng, Marie-Catherine De Marneffe, and Barbara Plank. VariErr NLI: Separating annotation error from human label variation. In Lun-Wei Ku, Andre Martins, and Vivek Srikumar, editors, Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 2256–2269, Bangkok, Thailand, August 2024. Association for Computational Linguistics. doi: 10. 18653/v1/2024.acl-long.123. URL https://aclanthology.org/2024.acl-long.123/ .Jacob Whitehill, Ting-fan Wu, Jacob Bergsma, Javier Movellan, and Paul Ruvolo. Whose vote should count more: Optimal integration of labels from labelers of unknown expertise. 
+
+Advances in neural information processing systems , 22, 2009. Jeffrey M Wooldridge. Econometric analysis of cross section and panel data . MIT press, 2010. Ben Wu, Yue Li, Yida Mu, Carolina Scarton, Kalina Bontcheva, and Xingyi Song. Don’t waste a single annotation: Improving single-label classifiers through soft labels. arXiv preprint arXiv:2311.05265 , 2023. Yan Yan, R´ omer Rosales, Glenn Fung, Mark Schmidt, Gerardo Hermosillo, Luca Bogoni, Linda Moy, and Jennifer Dy. Modeling annotator expertise: Learning when everybody knows a bit of something. In Proceedings of the thirteenth international conference on artificial intelligence and statistics , pages 932–939. JMLR Workshop and Conference Pro-ceedings, 2010. 
+
+Appendix A. Adapting the VariErr Dataset for the Measurement Models 
+
+A.1 Outcome Variables 
+
+Supervised learning tasks implicitly assume that all annotators approximate a single, ob-jective truth. However, in subjective or socially grounded tasks such as natural language inference or toxicity detection, this assumption may not hold. Different annotators can interpret the same text through distinct, yet individually consistent, reasoning processes. To empirically compare these perspectives, we construct parallel outcome definitions corre-sponding to two competing views of ground truth: (1) a Global Ground Truth representing consensus across annotators, and (2) an Individual Ground Truth representing each anno-tator’s own validated interpretation. 
+
+> 26 Measurement Error Labeling
+
+A.1.1 Global Ground Truth 
+
+Under the Global Ground Truth assumption, we treat the consensus label for each instance as the correct answer and code an annotation as an error when it differs from that label. VariErr includes both categorical labels and a subsequent round in which annotators eval-uate whether each (label, explanation) pair “makes sense.” We leverage this second-round information to infer a more reliable benchmark of the true label for each instance and to assess correspondence between individual annotations and this inferred truth. We first excluded responses labeled as “I don’t know” ( idk ) to focus on substantive labeling decisions. For each instance j, we then derived a global ground truth label, denoted 
+
+μj , defined as the label that received the highest total number of valid judgments across annotators. This procedure prioritizes labels whose justifications were judged as coherent rather than relying purely on majority voting over label categories. Next, we constructed two binary error indicators to operationalize annotation error at different levels of stringency. For annotator i labeling instance j:
+
+• Zlabel  
+
+> ij
+
+(label-level error): equals 1 if annotator i’s categorical label Yij differs from the consensus μj , and 0 otherwise. Formally, Zlabel  
+
+> ij
+
+= 1(Yij ̸ = μj ). This measure captures disagreement with the inferred ground truth, irrespective of explanation quality. 
+
+• Zexplain  
+
+> ij
+
+(explanation-adjusted error): refines this definition by incorporating whether the annotator’s explanation was judged as making sense. Specifically: 
+
+– Label matches μj and explanation makes sense → No error (0) 
+
+– Label matches μj but explanation does not make sense → Error (1) 
+
+– Label differs from μj and explanation makes sense → Error (1) 
+
+– Label differs from μj and explanation does not make sense → No error (0) Rather than treating these as conceptually distinct forms of error, we interpret Zlabel 
+
+> ij
+
+and Zexplain  
+
+> ij
+
+as two trials or repeated realizations of the same underlying measurement process. Each trial represents an independent but related assessment of whether a given annotation constitutes an error, with the second trial providing an explanation-adjusted evaluation that reflects a slightly different operationalization of the same construct. We restructured the data to align with this interpretation and with the notation of the measurement model. Because each annotator contributed two such assessments relative to the consensus, we treat them as repeated measurements indexed by trial ( t ∈ { 1, 2}). Specifically, we retained only cases in which the original annotator also served as the judge to ensure consistency in how explanations were interpreted. The dataset was then reshaped from wide to long format so that each (annotator, instance) pair appears twice, once for each trial, yielding an outcome variable Zijt indexed by t:
+
+Zij 1 = Zlabel  
+
+> ij
+
+= 1(Yij ̸ = μj )
+
+Zij 2 = Zexplain  
+
+> ij
+
+= explanation-adjusted error indicator 
+
+> 27 Chew et al.
+
+This design provides two observations per annotator–instance pair, enabling estimation of within- and between-person sources of variation in annotation error in a manner consistent with the repeated-measurement structure of the classical measurement error model. 
+
+A.1.2 Individual Ground Truth 
+
+To operationalize the Individual Ground Truth perspective, we again leverage the second round of VariErr judgments in which annotators evaluated whether their own prior (label, explanation) pairs “made sense.” An annotation is coded as an error if the same annotator later judged their own prior justification as incoherent. For annotator i and instance j, the individual ground truth is denoted μij , representing annotator i’s own validated interpretation of instance j. The individual error indicator is formally defined as: 
+
+Zindiv  
+
+> ij
+
+= 1(Yij ̸ = μij )where Yij is annotator i’s original categorical label and μij represents the label that anno-tator i validated as coherent upon reevaluation. Equivalently: 
+
+Zindiv  
+
+> ij
+
+=
+
+(
+
+1, if annotator i judged their own explanation as not making sense, 0, if annotator i affirmed their own explanation as making sense. This variable captures whether an annotator retrospectively perceives inconsistency in their own reasoning, providing a within-person measure of self-perceived labeling error. By using self-evaluations as the benchmark, we shift from modeling disagreement relative to others (as in the global model) to modeling inconsistency relative to one’s own interpretive standard. We restricted analysis to cases in which the original annotator also served as the judge to ensure interpretive consistency. Unlike the global truth operationalization, which yields two trials per annotator–instance pair ( Zij 1 and Zij 2), the individual truth model has no natural trial structure: each annotator provides a single retrospective validation of their own work. The resulting dataset therefore contains one observation per annotator–instance pair, Zindiv  
+
+> ij
+
+, indicating whether that annotator still endorsed their prior judgment upon reevaluation. This single-observation structure has modeling implications. In Equation 8 (Section 6.1), we omit the trial-level random effect σijt because there is no repeated measurement to estimate within-person variability. Consequently, any instability in how annotators validate their own prior judgments is absorbed into the residual variance rather than being separately identified as situational noise. 
+
+A.2 Instance-level Features 
+
+We include a set of instance-level covariates that capture structural and semantic properties of each NLI pair, shown in Table 4. These features serve two complementary purposes: (1) to test whether systematic properties of the text predict labeling error, and (2) to illustrate which kinds of instances contribute most to disagreement under alternative ground-truth assumptions. The variables encompass both objective textual characteristics (e.g., length, 
+
+> 28
+
+Measurement Error Labeling 
+
+Table 4: Instance-level covariates and their hypothesized relation to labeling error. 
+
+Variable Description and expected relation to error 
+
+ambiguity If an instance was had more than one class deemed as valid by the annotators. High ambiguity increase error likelihood. 
+
+similarity Semantic proximity between premise and hypothesis (semantic similarity score) using the ms-marco-MiniLM-L6-v2 cross-encoder embeddings within SentenceBERT (Reimers and Gurevych, 2019). Mid-range similarity indi-cates ambiguity and increases error likelihood; very high or very low similar-ity generally reduces disagreement. 
+
+lexical overlap Proportion of shared unigrams between premise and hypothesis. Medium or low overlap raises error risk because inference is required; very high overlap can also mislead annotators on non-entailments. 
+
+avg toks per sent Average sentence length across premise and hypothesis. Longer sentences impose greater cognitive load and slightly increase error rates. 
+
+fk grade Flesch–Kincaid readability grade (Kincaid et al., 1975). Harder or less read-able text modestly increases the chance of labeling mistakes. 
+
+neg presence flip Binary indicator for negation or polarity mismatch between premise and hypothesis. Presence of a negation flip increases error likelihood, especially for contradictions. 
+
+entity jaccard Degree of named-entity alignment (persons, locations, dates). Lower overlap implies substitutions or mismatches and greater labeling difficulty. 
+
+num norm overlap Overlap of normalized numeric values (counts, dates, quantities). Higher overlap reduces error probability; mismatched numbers often trigger contra-dictions. 
+
+lexical overlap, negation) and more interpretive measures such as semantic similarity and ambiguity. Together, they operationalize the idea that some instances are inherently more difficult or underspecified than others, allowing us to evaluate whether observed labeling errors are driven by item-level ambiguity or annotator-level variation. The variable ambiguity deserves particular comment. Rather than being a purely tex-tual property, it is derived from the annotations themselves: an instance is coded as ambigu-ous if multiple label classes were judged as valid by at least one annotator. This measure therefore reflects shared uncertainty among annotators rather than a fixed linguistic fea-ture of the text. Including it as a covariate does not imply that ambiguity causes error; instead, it serves as a descriptive diagnostic indicating whether mislabeling tends to cluster on instances that elicit multiple plausible interpretations. In this way, ambiguity comple-ments the exogenous text features by summarizing where disagreement arises collectively, providing insight into whether annotation errors stem primarily from shared item difficulty or from idiosyncratic individual tendencies. 
+
+Appendix B. Addressing Error Components in Labeling Design and Modeling 
+
+The measurement error framework not only clarifies where annotation variance arises but also suggests distinct levers for improving data quality and interpretability. Each error 
+
+29 Chew et al. 
+
+Table 5: Strategies for addressing sources of labeling error across task design and modeling. 
+
+Error Source Design-time Mitigation Post-hoc Modeling / Adjustment Interpretation under Global vs. HLV Instance-level 
+
+(βj )Clarify task framing and guidelines (Parrish et al., 2023); pilot ambiguous items (Pyatkin et al., 2023); collect rationales to separate semantic ambiguity from misunderstanding (Jiang et al., 2023). Model instance difficulty (Whitehill et al., 2009); down-weight/flag high-variance items; use probabilistic or soft labels for ambiguous cases (Wu et al., 2023). 
+
+Global: shared confusion to reduce. 
+
+HLV: meaningful interpretive variation—retain/stratify. 
+
+Between-person (ρi)Recruit/screen for expertise (Beck, 2023); calibration rounds (Klie et al., 2024); if HLV is of interest, sample diverse perspectives (Plank, 2022). Model annotator behavior (Yan et al., 2010); bias adjustment or clustering into interpretive communities; condition models on annotator embeddings (Deng et al., 2023). 
+
+Global: unwanted annotator bias—correct/reweight. 
+
+HLV: stable, meaningful differences across individuals/groups. 
+
+Within-person 
+
+(σijt )Shorter sessions/breaks (Pandey et al., 2022); randomize item order (Beck et al., 2024); monitor response time for fatigue/inattention (Chew et al., 2019). Filter rushed/inconsistent responses (Northcutt et al., 2021b); include session-level effects; treat residual as baseline noise (Lin et al., 2024). 
+
+Global: random error to minimize. 
+
+HLV: still noise—distinguish from systematic variation. 
+
+component in the model, instance-level ( βj ), between-person ( ρi), and within-person ( σijt )— points to different design or analytical strategies. These interventions can occur before 
+
+labeling (through task design) or after labeling (through modeling or quality control). Their interpretation also depends on whether the labeling process is conceptualized under a Global Ground Truth regime (where deviations are noise) or an Individual / HLV regime (where deviations may encode meaningful human diversity). In sum, the same statistical decomposition that explains error also informs data collec-tion and analysis. Under a global-truth perspective, the goal is to minimize each source of error to approximate a single latent construct. Under an individual-truth or HLV per-spective, however, certain components, especially instance difficulty and between-person variation, may reflect legitimate pluralism rather than error. Recognizing this distinction reframes annotation design not simply as a process of error reduction but as one of mea-surement design, in which we decide which kinds of human variation to suppress, and which to measure. 
+
+30

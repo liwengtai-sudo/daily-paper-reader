@@ -1,0 +1,521 @@
+Title: Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification
+
+URL Source: https://arxiv.org/pdf/2604.08502v1
+
+Published Time: Fri, 10 Apr 2026 01:25:45 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+Kabilan Elangovan 1 2 Daniel Ting 1 2 
+
+> 1
+
+Singapore Health Services, Singapore 2Singapore Eye Research Institute, Singapore 
+
+# Abstract 
+
+Class Activation Mapping (CAM) methods are widely used to generate visual explanations for deep learn-ing classifiers in medical imaging. However, existing evaluation frameworks assess whether explanations are 
+
+correct measured by localisation fidelity against radiologist annotations rather than whether they are consis-tent : whether the model applies the same spatial reasoning strategy across different patients with the same pathology. We propose the C-Score (Consistency Score), a confidence-weighted, annotation-free metric that quantifies intra-class explanation reproducibility via intensity-emphasised pairwise soft-IoU across correctly classified instances. We evaluate six CAM techniques GradCAM, GradCAM++, LayerCAM, EigenCAM, ScoreCAM, and MS-GradCAM++ across three CNN architectures (DenseNet201, InceptionV3, ResNet50V2) over thirty training epochs on the Kermany chest X-ray dataset, covering transfer learning and fine-tuning phases. We identify three distinct mechanisms of AUC–consistency dissociation invisible to standard classi-fication metrics: threshold-mediated gold-list collapse, technique-specific attribution collapse at peak AUC, and class-level consistency masking in global aggregation. C-Score provides an early-warning signal of im-pending model instability ScoreCAM deterioration on ResNet50V2 is detectable one full checkpoint before catastrophic AUC collapse and yields architecture-specific clinical deployment recommendations grounded in explanation quality rather than predictive ranking alone. 
+
+# 1 Introduction 
+
+1.1 The Clinical Deployment Gap in Medical AI 
+
+Deep learning models for medical image analysis have achieved, and in some domains exceeded, expert-level dis-criminative performance [1, 2]. Convolutional neural net-works trained on chest X-ray datasets now achieve AUC values exceeding 0.99 for pneumonia detection [3], and similar performance has been reported across ophthalmol-ogy, dermatology, and radiology [4]. However, a fundamental tension exists between classifica-tion performance and clinical trustworthiness. High AUC certifies that a model correctly ranks pathological cases above normal ones in terms of predicted probability. It does not certify what image features the model is using to make that ranking, nor whether those features correspond to genuine pathological findings. The “Clever Hans” phe-nomenon — where models exploit dataset-specific short-cuts rather than genuine pathological features — is now well-documented across medical imaging domains [5, 6, 7]. Chest X-ray classifiers have been shown to lever-age equipment markers, patient positioning artefacts, and pacemaker presence as proxy discriminators [8, 9, 10]. Moreover, recent perspectives highlight that AI often relies on “subvisual” or “nonvisual” statistical patterns—features mathematically present but imperceptible to radiologists— creating a fundamental verification gap where physicians cannot visually confirm the model’s reasoning [11]. 
+
+1.2 The Reliability Problem: CAM Methods Fail Basic Sanity Checks 
+
+Class Activation Mapping methods were introduced to ad-dress the deployment trust gap by making CNN spatial rea-soning visible and auditable [12]. However, a series of foundational studies has revealed that CAM methods them-selves suffer from reliability failures that are independent of — and invisible to — classification performance met-rics. 
+
+Model Parameter Randomization [13]: Several widely used explanation methods produce nearly identical heatmaps for a fully trained model and for a model with randomly re-initialised weights. If an explanation method cannot distinguish between a trained model and a random one, it is not measuring the model’s learned reasoning. 
+
+Input Invariance Problem [14]: A constant shift applied to all input pixels — a transformation with exactly zero ef-fect on model predictions — produces completely different 1
+
+> arXiv:2604.08502v1 [cs.CV] 9 Apr 2026 Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification
+
+saliency attributions in many popular methods. 
+
+Interpretation Fragility [15]: Imperceptible adversarial perturbations bounded by L∞=2 — leaving model predic-tions unchanged — can redirect spatial attention to arbi-trary image regions. 
+
+Faithfulness vs. Visual Appeal [16]: GradCAM’s spatial pooling of gradients causes it to highlight regions larger than those the model actually uses, creating visually ap-pealing but spatially imprecise attributions. 
+
+1.3 Gaps in Current CAM Evaluation Approaches 
+
+The recognition of CAM reliability failures has stimulated research into quantitative evaluation frameworks, yet four systematic gaps remain. 
+
+First , perturbation-based metrics (deletion and insertion curves) create out-of-distribution masked inputs and con-flate attribution quality with model behaviour on corrupted data [17, 18]. 
+
+Second , localisation metrics compare CAM-predicted at-tention regions to ground-truth annotations. The pointing game and IoU-with-bounding-box require expensive per-image annotation unavailable at scale and are not applica-ble across training checkpoints. 
+
+Third , and most critically: no existing evaluation frame-work addresses intra-class consistency . Current metrics ask whether the model attends to the correct spatial region on a per-image basis. The fundamentally different clini-cal question — does the model consistently apply the same visual reasoning strategy across different patients with the same diagnosis? — remains unanswered. 
+
+Fourth , the disagreement problem extends to the choice of evaluation metric itself: different faithfulness metrics select different methods as “best” on the same model and data [19, 20]. 
+
+1.4 Why Consistency is the Fundamental Clinical Requirement 
+
+The traditional assumption has been that explainability is equivalent to highlighting the clinically correct region of interest. A critical reconceptualisation follows from the re-liability failures documented above. Clinical ROI align-ment is desirable, but is not the fundamental requirement for trust. What is fundamental is whether the model con-sistently applies its learned decision strategy across similar cases. Consistent “wrong” focus is addressable. Inconsistent fo-cus is unpredictable. In a clinical deployment context, a physician can learn to interpret and mentally correct for a systematic bias in AI attention; they cannot develop a re-liable mental model of a system whose attention is arbi-trarily variable. As Ghorbani et al. [15] noted, even if a pathology predictor is robust, a fragile interpretation would still be highly disconcerting if a clinician is using that inter-pretation to guide clinical decision-making. Furthermore, as McLeod et al. [11] note, because deep learning models lack causal common sense and may diverge from human visual search patterns, ensuring that these divergent strate-gies are at least consistent across patient populations is a necessary safeguard against spurious correlations. Yet, the field currently lacks a standardized, quantifiable metric to evaluate this fundamental requirement. 
+
+1.5 The C-Score: Contribution and Positioning 
+
+We propose the C-Score (Consistency Score) as a metric that directly addresses the intra-class consistency gap. The core thesis is that explainability itself cannot be proven be-cause there is no objective ground truth for what a “correct” explanation looks like, but consistency in explainability can be quantified. A model that consistently attends to the same anatomical regions across patients with the same diagnosis demonstrates at minimum that its explanations are repro-ducible. This reproducibility is a necessary precondition for clinical interpretability. The C-Score is formulated as a confidence-weighted, intensity-emphasised mean pairwise soft IoU across cor-rectly classified instances of the same class at a given model checkpoint. The metric is designed specifically for image classification tasks trained with image-level labels and no pixel-level annotations, where spatial explanations are de-rived post hoc using CAM-based attribution methods. Un-der this setting, C-Score provides an annotation-free mea-sure of spatial explanation consistency that can be com-puted at every training epoch and applied across different CAM techniques and CNN architectures. This paper reports five primary contributions: (i) Formal specification of the C-Score metric with com-plete mathematical definition, intensity emphasis ra-tionale ( α=2 .0), confidence weighting, and gold-list formation under threshold τ =0 .5.(ii) Comprehensive evaluation across six CAM tech-niques, three CNN architectures, and thirty training epochs on the Kermany chest X-ray dataset, reveal-ing both intra-phase and inter-phase consistency dy-namics. (iii) Identification and characterisation of three distinct mechanisms of AUC–consistency dissociation invis-ible to standard classification metrics. (iv) Empirical demonstration of C-Score as a pre-collapse monitoring signal, with ScoreCAM deteri-oration on ResNet50V2 detected one training check-2Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+point before catastrophic AUC collapse. (v) Architecture- and technique-specific clinical deploy-ment recommendations grounded in both AUC and C-Score trajectory evidence. 
+
+# 2 Related Work 
+
+2.1 CAM Methods for Medical Image Explainability 
+
+Selvaraju et al. [12] introduced GradCAM as a class-discriminative visualisation method anchored to the final convolutional layer’s gradient-weighted activation. The method produced substantially more useful explanations than prior pixel-wise gradient methods and achieved wide adoption in medical imaging contexts. Subsequent gradient-based methods refined spatial attribution preci-sion: GradCAM++ [21] introduced second-order gradi-ent weighting; LayerCAM [22] preserved full spatial res-olution through pixel-wise gradient–activation products. Gradient-free alternatives such as ScoreCAM [23] and EigenCAM [24] avoid gradient pathologies at increased computational cost. Multi-scale aggregation strategies have been proposed to balance semantic strength at deep layers with spatial resolution at shallow layers [21]. Reviews of CAM methods in medical imaging (2024– 2025) have consistently identified the lack of standard-ised evaluation as the primary obstacle to clinical adoption [25, 26]. Both van der Velden et al. [27] and Suara et al. [28] conclude that consistency, alongside faithfulness, must be a primary evaluation criterion. 
+
+2.2 Evaluation of Explanation Quality 
+
+Perturbation-based metrics [17, 18], localisation metrics [29], and human-grounded assessments [30] constitute the dominant evaluation paradigms. The ERASER benchmark [31] and Quantus toolkit [32, 33] provide multi-metric eval-uation but do not address intra-class consistency. The dis-agreement problem — different faithfulness metrics yield conflicting rankings of explanation methods — has been documented by Krishna et al. [19] and confirmed across multiple benchmarks [20]. 
+
+2.3 Consistency and Reproducibility in Prior Literature 
+
+The closest existing work to C-Score is the Difference of Means (DoM) metric proposed by Ozer et al. [34], which measures consistency of saliency detectors across different network architectures by comparing mean activation maps. DoM addresses inter-architecture consistency. C-Score ad-dresses intra-class consistency: whether the same model consistently attends to the same regions for different pa-tients with the same diagnosis . C-Score complements the Lago et al. [35] FDA-aligned consistency dimension and differs from HAAS [30] in being annotation-free and con-tinuously computable across the training trajectory. 
+
+# 3 Methodology 
+
+3.1 Experimental Setup 
+
+Experiments were conducted on the Kermany chest X-ray dataset [3], comprising 5,856 images with a test split of 317 Normal and 855 Pneumonia images. Three CNN architec-tures were evaluated: DenseNet201 [36] (20M parameters), InceptionV3 [37] (24M parameters), and ResNet50V2 [38] (25M parameters), each initialised from ImageNet [39] pre-trained weights. Training followed a deliberate two-phase protocol. Phase 1 — Transfer Learning (epochs 1–20): frozen backbone weights, classification head trained with the Adam opti-miser [40] at lr = 1 ×10 −4 with cosine annealing. Phase 2 — Fine-Tuning (epochs 21–30): all layers unfrozen at lr = 1 ×10 −5 with label smoothing ( ε=0 .1) and gradient clipping (norm = 1 .0). 
+
+3.2 The C-Score: A Consistency Metric for CAM-Based Explanations 
+
+3.2.1 MOTIVATION 
+
+The dominant evaluation paradigm in medical AI — AUC-ROC — quantifies discriminative ranking ability but pro-vides no information about how the model reaches its de-cisions. A model achieving AUC = 0.99 may do so through spurious correlations with acquisition artefacts or demographic proxies. CAM methods were introduced to expose spatial reasoning patterns [12]. However, exist-ing CAM evaluations focus on localisation fidelity and do not assess whether explanations are reproducibly consistent across different patients with the same pathology. C-Score fills this gap: rather than asking where the model attends, it asks how consistently it attends to that location across the clinical population. 3.2.2 FORMAL DEFINITION 
+
+Let a CNN classifier f (x; θ) be parameterised by weights 
+
+θ with sigmoid output p = σ(f (x; θ)) ∈ (0 , 1) . The gold list G(c, θ ) for class c at checkpoint θ is: 
+
+G(c, θ ) = i ∈ D test : yi = c ∧ p(c,θ ) 
+
+> i
+
+≥ τ , τ = 0 .5.
+
+(1) 
+
+Soft-IoU between two normalised heatmaps Hi, H j ∈
+
+[0 , 1] W ×H :
+
+sIoU (Hi, H j ) = 
+
+P 
+
+> u,v
+
+min  Hi(u, v ), H j (u, v )P 
+
+> u,v
+
+max  Hi(u, v ), H j (u, v ) . (2) 3Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+Table 1. C-Score notation and definitions. 
+
+Symbol Definition 
+
+C(c, θ, m ) C-Score for class c, checkpoint θ, method 
+
+m; C ∈ [0 , 1] 
+
+G(c, θ ) Gold list: correctly classified test images for class c at θ under τ =0 .5
+
+H(c,θ,m ) 
+
+> i
+
+Normalised CAM heatmap; Hi ∈
+
+[0 , 1] W ×H
+
+p(c,θ ) 
+
+> i
+
+Sigmoid confidence for class c on image 
+
+iwi Confidence weight: wi = pi/ P 
+
+> j
+
+pj
+
+(normalised over gold list) 
+
+sIoU (Hi, H j ) Soft-IoU: P min( Hi, H j )/ P max( Hi, H j ),element-wise 
+
+ˆHi = H αi Intensity emphasis; α = 2 .0
+
+Cglobal (θ, m ) Support-weighted global C-Score across classes 
+
+τ = 0 .5 Classification threshold for gold list membership 
+
+ℓ∗ Target layer: DenseNet201 →conv5_block32_concat ;InceptionV3 →mixed10 ;ResNet50V2 →conv5_block3_out 
+
+Intensity emphasis (α = 2.0 suppresses diffuse back-ground): ˆHi = H αi , α = 2 .0. (3) 
+
+Confidence weighting :
+
+wi = p(c,θ )
+
+> i
+
+P 
+
+> j∈G(c,θ )
+
+p(c,θ )
+
+> j
+
+. (4) 
+
+Per-class C-Score (confidence-weighted mean pairwise soft-IoU): 
+
+C(c, θ, m ) = 
+
+X
+
+> i,j ∈G(c,θ )
+> i<j
+
+(wi + wj ) · sIoU ( ˆHi, ˆHj )
+
+Z , (5) where Z is the normalisation constant over all pairs. 
+
+Global support-weighted C-Score :
+
+Cglobal (θ, m ) = X
+
+> c
+
+|G(c, θ )|
+
+P 
+
+> c′
+
+|G(c′, θ )| · C(c, θ, m ). (6) Table 1 summarises the notation. 3.2.3 THEORETICAL MOTIVATION : T HE GRADIENT 
+
+FLOW –C ONSISTENCY CONNECTION 
+
+We hypothesize that during transfer learning, frozen back-bone weights restrict gradient signals to flow only through the classification head, resulting in early explanations that lack consistency. At the target layer ℓ∗, gradients therefore reflect a domain-incomplete pathway. Consequently, two pneumonia patients activating different ImageNet-derived features are likely to produce uncorrelated gradients, pre-dicting a low initial C-Score for gradient-based attribution methods. In contrast, fine-tuning is expected to propagate chest X-ray–specific gradients through the entire backbone, align-ing internal activations toward domain-relevant feature axes and thereby increasing cross-patient heatmap similar-ity. EigenCAM, which is entirely gradient-free, should the-oretically remain unaffected by this phenomenon. 3.2.4 RELATIONSHIP TO EXISTING FRAMEWORKS 
+
+C-Score complements the Lago et al. [35] FDA-aligned consistency dimension and differs from HAAS [30] in be-ing annotation-free and continuously computable. It op-erationalises a property not captured by deletion/insertion metrics, pointing game, or IoU with bounding box, each of which requires per-image evaluation rather than intra-class population assessment. 
+
+3.3 CAM Methods Evaluated 
+
+Six CAM techniques were evaluated, ap-plied to fixed target layers (DenseNet201: 
+
+conv5_block32_concat ; InceptionV3: mixed10 ;ResNet50V2: conv5_block3_out ). 
+
+GradCAM [12]: Weighted linear combination of feature maps using globally average-pooled class-specific gradi-ents: αck = 1
+
+> Z
+
+P 
+
+> i,j
+
+∂y c/∂A kij ; Lc = ReLU (P 
+
+> k
+
+αck · Ak).Reference baseline method. Global pooling discards spa-tial gradient structure, producing coarse attribution blobs. 
+
+GradCAM++ [21]: Spatially resolved second-order gradi-ent weighting: αck = P 
+
+> i,j
+
+wij,c k · ReLU (∂y c/∂A kij ). More effective for multi-instance patterns; consistently outper-forms GradCAM in C-Score due to finer spatial discrim-ination. 
+
+LayerCAM [22]: Element-wise product of positive gra-dients and activations: Lc = ReLU (∂y c/∂A ) ⊙ A. Re-tains full spatial resolution, producing compact attribution footprints. Achieves C-Score values comparable to Grad-CAM++ across all architectures. 
+
+EigenCAM [24]: SVD of the activation tensor Aflat =
+
+U ΣV ⊤; first right singular vector v1 reshaped to spatial attribution. Entirely gradient-free: insensitive to gradient noise, saturation, and sparsity. Achieves uniquely stable C-Score throughout transfer learning (DenseNet201: 0.635 at E1, 0.635 at E20; InceptionV3: 0.758 at E1, 0.756 at E20). 
+
+ScoreCAM [23]: Per-channel input masking with forward-pass class probability measurement: wk = f c(X ⊙ M k) −
+
+4Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+f c(Xbaseline ). Gradient-free; O(C) forward passes; sub-sampling at max_N=32 applied. Its collapse trajectory on ResNet50V2 provides the study’s clearest pre-collapse early-warning signal. 
+
+MS-GradCAM++ (Multi-Scale GradCAM++): To ad-dress the trade-off between semantic strength at deep lay-ers and spatial resolution at shallow layers, we imple-ment a multi-scale aggregation strategy. We compute GradCAM++ heatmaps at K distinct points in the fea-ture hierarchy (e.g., for DenseNet201: conv3_block12 ,
+
+pool4 , and conv5_block32 ) and compute their pixel-wise arithmetic mean: 
+
+Lc 
+
+> MS
+
+= 1
+
+K
+
+X
+
+> ℓ∈L
+
+↑  Lc
+
+> GradCAM++
+
+(ℓ), (7) where ↑ (·) denotes bilinear upsampling to the input res-olution. This approach stabilises the attribution map by smoothing layer-specific gradient noise, providing robust-ness against severe architectural instabilities (ResNet50V2 net ∆ = −0.098 vs. ScoreCAM ∆ = −0.612 ), at the cost of diluted semantic specificity in fully fine-tuned models. 
+
+3.4 Evaluation Protocol 
+
+C-Score was computed at seven checkpoints per architec-ture (epochs 1, 5, 10, 15, 20, 25, 30) from per-architecture trajectory CSV logs. Test AUC and accuracy were ex-tracted from epoch_metrics.csv training logs for all three architectures across all 30 epochs. The gold list was anchored to the epoch-30 reference model at τ = 0.5,yielding 317 Normal and 855 Pneumonia test-set images for binary evaluation. 
+
+# 4 Results 
+
+Complete result tables and visualisations are provided in Appendix A. 
+
+4.1 Full Classification Performance Trajectory 
+
+Table 2 presents the complete per-epoch AUC and test accuracy for all three architectures across all 30 training epochs. DenseNet201 achieves monotonically increasing AUC in transfer learning (0.9184 →0.9902, E1 →E20), suf-fers boundary-reorganisation accuracy collapse at E21–23 (27–28% accuracy, AUC >0.984), recovers by E24, and peaks at E30 (AUC = 0.9945). InceptionV3 grows more slowly through transfer learning and undergoes a sharper accuracy collapse at E23 (28.75%) before resolving at E25 (96.76%). ResNet50V2 experiences catastrophic mode collapse at E23 (AUC = 0.0287) and again at E30 (AUC 
+
+= 0.1034), representing a complete failure of fine-tuning stability. 
+
+4.2 Global Weighted C-Score Trajectory 
+
+Tables 3–5 present the global weighted C-Score at seven checkpoints for all three architectures. Figure 1 visualises the trajectories; Figure 2 compares heatmaps at E20 vs. E30. 4.2.1 DENSE NET 201 — S YSTEMATIC FINE -T UNING 
+
+IMPROVEMENT 
+
+Every technique shows positive net change E20 →E30. GradCAM achieves the largest absolute gain (+0.610: 0.197 →0.807), consistent with the gradient flow– consistency coupling hypothesis. GradCAM++, Layer-CAM, and ScoreCAM converge to 0.870–0.880 at E30, indicating method-equivalence for a well-trained stable model. EigenCAM maintains high stability throughout (≈0.635) and further improves at fine-tuning (0.846). 4.2.2 INCEPTION V3 — T RANSFER -L EARNING 
+
+STASIS , F INE -T UNING RESOLUTION 
+
+All gradient-based techniques plateau during trans-fer learning (GradCAM: 0.169 →0.196; ScoreCAM: 0.392 →0.379), reflecting gradient dispersion across par-allel inception modules. EigenCAM maintains stability throughout (0.758 →0.756). Fine-tuning produces a dra-matic step-change but with non-monotonic GradCAM be-haviour (0.875 at E25, collapsing to 0.244 at E30). 4.2.3 RES NET 50V2 — F INE -T UNING DEGRADATION 
+
+PRECEDING MODE COLLAPSE 
+
+All techniques show net negative E20 →E30 change (Fig-ure 3). ScoreCAM provides the clearest diagnostic sig-nal: 0.612 (E20) → 0.014 (E25) → 0.000 (E30), detectable one full checkpoint before the AUC collapse at E30. This demonstrates C-Score’s potential as an annotation-free de-ployment monitoring metric for production systems. 
+
+4.3 Per-Class C-Score: All Architectures 
+
+Tables 6–8 present per-class C-Score at seven checkpoints; Figure 4 visualises the trajectories. 4.3.1 THE GRAD CAM C LASS GAP : D ENSE NET 201 TRANSFER LEARNING 
+
+GradCAM on DenseNet201 produces a Pneumonia C-Score that remains near-zero throughout the entire trans-fer learning phase (0.078 at E1, 0.007 at E5, 0.002 at E10, 0.004 at E15, 0.014 at E20) while Normal C-Score reaches 0.664 — a class gap of 0.650 at equal AUC = 0.9902. The model classifies pneumonia cases correctly but attends to entirely different regions for each patient. No classification metric — AUC, accuracy, or F1 — provides any signal of 5Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+this class-level explanation failure. 
+
+4.4 The Fine-Tuning Paradox: Three Mechanisms of AUC–Consistency Dissociation Mechanism 1 — Threshold-mediated gold-list collapse. 
+
+DenseNet201 epochs 21–23: accuracy ≈ 27%, AUC >
+
+0.984. C-Score correctly reports zero explanation consis-tency for the Normal class because no Normal image passes 
+
+τ = 0 .5. AUC conceals this operational failure entirely. Deploying at E22 (AUC = 0.9852) would mean deploying a model that generates empty explanations for the Normal class. 
+
+Mechanism 2 — Technique-specific attribution collapse at peak AUC. ScoreCAM on ResNet50V2 at E30: AUC 
+
+= 0.1034 (collapsed), C-Score = 0.000. More critically, ScoreCAM C-Score degrades to 0.014 at E25 while AUC remains at 0.9902 — the consistency failure precedes the classification failure by a full checkpoint. No classification metric provides any signal of this impending collapse. 
+
+Mechanism 3 — Class-level consistency masking in global metrics. DenseNet201 GradCAM at E20: global C-Score = 0.197, Normal = 0.664, Pneumonia = 0.014. Global aggregation masks near-total explanation failure for the clinically critical Pneumonia class. Per-class reporting is essential. These three mechanisms collectively demonstrate that nei-ther AUC nor global C-Score alone suffices for clinical AI quality assurance. The minimum acceptable evalua-tion framework is per-class C-Score tracked across the full training trajectory, using multiple CAM techniques, with explicit reporting of gold-list population at each check-point. 
+
+# 5 Discussion 
+
+5.1 Architecture Recommendations 
+
+DenseNet201 is recommended for clinical deployment: highest stable AUC (0.9945), broadest consistency im-provement across fine-tuning (average ∆ = +0 .340 across six techniques), smallest class gap, and no catastrophic failures. InceptionV3 achieves marginally higher AUC (0.9949) at the cost of pronounced GradCAM instability between E25 and E30, making technique selection critical if deployed. ResNet50V2 is not recommended for clini-cal use: fine-tuning consistently degrades explanation con-sistency, ScoreCAM collapse preceded AUC collapse, and both classes register zero C-Score at E30. 
+
+5.2 C-Score as a Deployment Monitoring Tool 
+
+The pre-collapse ScoreCAM signal on ResNet50V2 (C-Score 0.612 → 0.014 at E25, one checkpoint before AUC collapse at E30) demonstrates that explanation consistency can deteriorate ahead of classification performance. In pro-duction systems with periodic weight updates or contin-ued learning, C-Score monitoring provides an additional safety layer not available from AUC monitoring alone. The annotation-free nature of C-Score makes this monitoring scalable across deployment environments without requir-ing radiologist input at each update cycle. 
+
+5.3 Broader Implications for Clinical AI Validation 
+
+The three AUC–consistency dissociation mechanisms doc-umented here have direct regulatory implications. The Eu-ropean AI Act [41] designates medical AI as high-risk and requires providers to demonstrate that high-risk AI systems produce consistent and interpretable outputs. FDA guid-ance [42] on AI/ML-based software as a medical device emphasises the need for performance monitoring across the model lifecycle. C-Score provides a concrete, continuously computable metric for both requirements: it quantifies ex-planation consistency without requiring ground-truth anno-tations and can be computed at any post-deployment check-point using only the existing test set. The analogy to inter-rater reliability in clinical practice [43] grounds C-Score within established clinical validation methodology. 
+
+# 6 Limitations 
+
+CAM scope. C-Score is formulated for 2D spatial heatmaps from convolutional layers. Not directly applica-ble to input-space methods (SmoothGrad [44], Integrated Gradients [45]) or model-agnostic methods (SHAP [46], LIME [47]). 
+
+Layer sensitivity. C-Score values are sensitive to tar-get layer depth. Shallower layers produce diffuse activa-tions that may affect C-Score independently of classifica-tion quality. Systematic layer-depth sensitivity analysis is required for cross-architecture standardisation. 
+
+Threshold dependency. The τ = 0.5 threshold de-termines gold-list membership. Degenerate threshold-crossing regimes produce empty gold lists. Threshold-adaptive variants and calibrated probability weighting should be explored. 
+
+Training log completeness. InceptionV3 shows transient accuracy collapse events at epochs 23 and 26 whose mech-anistic origins — gradient explosion, learning-rate sched-ule artefacts, or batch variance — were not fully diag-nosed. Future work should instrument training with per-layer gradient-norm logging. 6Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+Single dataset. Results are from one binary classification task on one publicly available dataset. Generalisation to multi-class settings, CT/MRI modalities, and transformer-based architectures [48, 49, 50] requires dedicated investi-gation. 
+
+Consistency ̸ = Correctness. High C-Score certifies spa-tial reproducibility, not clinical correctness. A model con-sistently attending to spurious correlates achieves high C-Score. Validation against radiologist-annotated ground-truth is necessary to confirm that consistent explanations are also clinically faithful [51]. 
+
+# 7 Conclusion 
+
+We proposed the C-Score (Consistency Score), aconfidence-weighted, annotation-free metric for quantify-ing intra-class explanation reproducibility of CAM-based methods in medical image classification. Evaluated across six CAM techniques, three CNN architectures, and thirty training epochs on the Kermany chest X-ray dataset, C-Score revealed three distinct mechanisms of AUC– consistency dissociation invisible to standard classification metrics. DenseNet201 demonstrated the most favourable profile for clinical deployment across both dimensions. C-Score provides a practical, continuously computable qual-ity assurance signal that complements existing evalua-tion frameworks and satisfies the consistency requirements emerging from regulatory guidance on clinical AI. 
+
+# References 
+
+[1] Varun Gulshan, Lily Peng, Marc Coram, Martin C Stumpe, Derek Wu, Arunachalam Narayanaswamy, Subhashini Venugopalan, Kasumi Widner, Tom Madams, Jorge Cuadros, et al. Development and validation of a deep learning algorithm for detec-tion of diabetic retinopathy in retinal fundus pho-tographs. JAMA , 316(22):2402–2410, 2016. doi: 10.1001/jama.2016.17216. [2] Andre Esteva, Brett Kuprel, Roberto A Novoa, Justin Ko, Susan M Swetter, Helen M Blau, and Sebastian Thrun. Dermatologist-level classification of skin can-cer with deep neural networks. Nature , 542:115–118, 2017. doi: 10.1038/nature21056. [3] Daniel S Kermany, Michael Goldbaum, Wenjia Cai, Carolina C S Valentim, Huiying Liang, Sally L Bax-ter, Alex McKeown, Ge Yang, Xiaokang Wu, Fang-bing Yan, et al. Identifying medical diagnoses and treatable diseases by image-based deep learning. Cell ,172(5):1122–1131, 2018. doi: 10.1016/j.cell.2018. 02.010. [4] Pranav Rajpurkar, Jeremy Irvin, Robyn L Ball, Kaylie Zhu, Brandon Yang, Hershel Mehta, Tony Duan, Daisy Ding, Aarti Bagul, Curtis P Langlotz, et al. CheXNet: Radiologist-level pneumonia detection on chest x-rays with deep learning. arXiv preprint arXiv:1711.05225 , 2017. doi: 10.48550/arXiv.1711. 05225. [5] Alex J DeGrave, Joseph D Janizek, and Su-In Lee. AI for radiographic COVID-19 detection selects short-cuts over signal. Nature Machine Intelligence , 3:610– 619, 2021. doi: 10.1038/s42256-021-00338-7. [6] John R Zech, Marcus A Badgeley, Manway Liu, An-thony B Costa, Joseph J Titano, and Eric Karl Oer-mann. Variable generalization performance of a deep learning model to detect pneumonia in chest radio-graphs: A cross-sectional study. PLOS Medicine ,15(11):e1002683, 2018. doi: 10.1371/journal.pmed. 1002683. [7] Luke Oakden-Rayner, Jared Dunnmon, Gustavo Carneiro, and Christopher Ré. Hidden stratifica-tion causes clinically meaningful failures in machine learning for medical imaging. In Proceedings of the ACM Conference on Health, Inference, and Learn-ing (CHIL) , pages 151–159, 2020. doi: 10.1145/ 3368555.3384468. [8] Julia K Winkler, Christine Fink, Ferdinand Toberer, Alexander Enk, Teresa Deinlein, Rainer Hofmann-Wellenhof, Luc Thomas, Aimilios Lallas, Andreas Blum, Wilhelm Stolz, et al. Association between surgical skin markings in dermoscopic images and diagnostic performance of a deep learning convo-lutional neural network for melanoma recognition. 
+
+JAMA Dermatology , 155(10):1135–1141, 2019. doi: 10.1001/jamadermatol.2019.1735. [9] Michael Roberts, Derek Driggs, Matthew Thorpe, Julian Gilbey, Michael Yeung, Stephan Ursprung, Angelica I Aviles-Rivero, Christian Etmann, Cathal McCague, Lucian Beer, et al. Common pit-falls and recommendations for using machine learn-ing to detect and prognosticate for COVID-19 us-ing chest radiographs and ct scans. Nature Ma-chine Intelligence , 3:199–217, 2021. doi: 10.1038/ s42256-021-00307-0. [10] Ziad Obermeyer, Brian Powers, Christine Vogeli, and Sendhil Mullainathan. Dissecting racial bias in an algorithm used to manage the health of populations. 
+
+Science , 366(6464):447–453, 2019. doi: 10.1126/ science.aax2342. [11] Graham A McLeod, Emma A M Stanley, Tom Rose-nal, and Nils D Forkert. Distinct visual biases affect humans and artificial intelligence in medical imaging 7Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+diagnoses. npj Digital Medicine , 9(62), 2026. doi: 10.1038/s41746-025-02226-5. [12] Ramprasaath R Selvaraju, Michael Cogswell, Ab-hishek Das, Ramakrishna Vedantam, Devi Parikh, and Dhruv Batra. Grad-CAM: Visual explanations from deep networks via gradient-based localization. In Proceedings of the IEEE International Conference on Computer Vision (ICCV) , pages 618–626, 2017. doi: 10.1109/ICCV.2017.74. [13] Julius Adebayo, Justin Gilmer, Michael Muelly, Ian Goodfellow, Moritz Hardt, and Been Kim. Sanity checks for saliency maps. In Advances in Neural In-formation Processing Systems (NeurIPS) , volume 31, pages 9525–9536, 2018. [14] Pieter-Jan Kindermans, Sara Hooker, Julius Adebayo, Maximilian Alber, Kristof T Schütt, Sven Dähne, Dumitru Erhan, and Been Kim. The (un)reliability of saliency methods. In Explainable AI: Inter-preting, Explaining and Visualizing Deep Learning ,pages 267–280. Springer, 2019. doi: 10.1007/ 978-3-030-28954-6_14. [15] Amirata Ghorbani, Abubakar Abid, and James Zou. Interpretation of neural networks is fragile. In Pro-ceedings of the AAAI Conference on Artificial Intel-ligence , volume 33, pages 3681–3688, 2019. doi: 10.1609/aaai.v33i01.33013681. [16] Rachel Lea Draelos and Lawrence Carin. Use HiResCAM instead of Grad-CAM for faithful ex-planations of convolutional neural networks. arXiv preprint arXiv:2011.08891 , 2020. [17] Wojciech Samek, Alexander Binder, Grégoire Mon-tavon, Sebastian Lapuschkin, and Klaus-Robert Müller. Evaluating the visualization of what adeep neural network has learned. IEEE Transac-tions on Neural Networks and Learning Systems , 28 (11):2660–2673, 2017. doi: 10.1109/TNNLS.2016. 2599820. [18] Richard Tomsett, Dan Harborne, Supriyo Chakraborty, Prudhvi Gurram, and Alun Preece. Sanity checks for saliency metrics. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 6021–6029, 2020. doi: 10.1609/aaai.v34i04.6064. [19] Satyapriya Krishna, Tessa Han, Alex Gu, Javin Pom-bra, Shahin Jabbari, Steven Wu, and Himabindu Lakkaraju. The disagreement problem in explain-able machine learning: A practitioner’s perspective. 
+
+Transactions on Machine Learning Research , 2024. doi: 10.48550/arXiv.2202.01602. arXiv:2202.01602 (2022); TMLR publication (2024). [20] Ethan Barr et al. The disagreement problem in faith-fulness metrics. arXiv preprint arXiv:2311.07763 ,2023. doi: 10.48550/arXiv.2311.07763. [21] Aditya Chattopadhay, Anirban Sarkar, Prantik Howlader, and Vineeth N Balasubramanian. Grad-CAM++: Generalized gradient-based visual expla-nations for deep convolutional networks. In 2018 IEEE Winter Conference on Applications of Com-puter Vision (WACV) , pages 839–847. IEEE, 2018. doi: 10.1109/WACV.2018.00097. [22] Peng-Tao Jiang, Chang-Bin Zhang, Qibin Hou, Ming-Ming Cheng, and Yunchao Wei. LayerCAM: Explor-ing hierarchical class activation maps for localization. 
+
+IEEE Transactions on Image Processing , 30:5875– 5888, 2021. doi: 10.1109/TIP.2021.3089943. [23] Haofan Wang, Zifan Wang, Mengnan Du, Fan Yang, Zijian Zhang, Sirui Ding, Piotr Mardziel, and Xia Hu. Score-CAM: Score-weighted visual explanations for convolutional neural networks. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition Workshops , pages 111–119, 2020. doi: 10.1109/CVPRW50498.2020.00020. [24] Mohammed Bany Muhammad and Mohammed Yeasin. Eigen-CAM: Class activation map using principal components. In 2020 International Joint Conference on Neural Networks (IJCNN) , pages 1– 7. IEEE, 2020. doi: 10.1109/IJCNN48605.2020. 9206626. [25] Siddharth Bhati, Fnu Neha, and Md Amiruzzaman. A survey on explainable artificial intelligence (XAI) techniques for visualizing deep learning models in medical imaging. Journal of Imaging , 10(10):239, 2024. [26] Deyang Tang, Jie Chen, Liyuan Ren, Xiuqin Wang, Dan Li, and Haibing Zhang. Reviewing CAM-based deep explainable methods in healthcare. Ap-plied Sciences , 14(10):4124, 2024. doi: 10.3390/ app14104124. [27] Bas H M van der Velden, Hugo J Kuijf, Kenneth G A Gilhuijs, and Max A Viergever. Explainable artifi-cial intelligence (XAI) in deep learning-based med-ical image analysis. Medical Image Analysis , 79: 102470, 2022. doi: 10.1016/j.media.2022.102470. [28] Suman Suara et al. Is grad-CAM explainable in med-ical images? arXiv preprint arXiv:2307.10506 , 2023. doi: 10.48550/arXiv.2307.10506. [29] Bolei Zhou, Aditya Khosla, Agata Lapedriza, Aude Oliva, and Antonio Torralba. Learning deep features 8Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+for discriminative localization. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , pages 2921–2929, 2016. doi: 10.1109/CVPR.2016.319. [30] Junhee Lee, Hyeonseong Cho, Yun Jang Pyun, Suk-Ju Kang, and Hyoungsik Nam. Heatmap assisted ac-curacy score evaluation method for machine-centric explainable deep neural networks. IEEE Access , 10: 64832–64849, 2022. doi: 10.1109/ACCESS.2022. 3184453. [31] Sara Hooker, Dumitru Erhan, Pieter-Jan Kindermans, and Been Kim. A benchmark for interpretability methods in deep neural networks. In Advances in Neural Information Processing Systems (NeurIPS) ,2019. doi: 10.48550/arXiv.1806.10758. [32] Anna Hedström, Leander Weber, Daniel Krakowczyk, Dilyara Bareeva, Franz Motzkus, Wojciech Samek, Sebastian Lapuschkin, and Marina M-C Müller. Quantus: An explainable AI toolkit for responsible evaluation of neural network expla-nations and beyond. Journal of Machine Learning Research , 24(34):1–11, 2023. [33] Anna Hedström, Philine Bommer, Kristoffer K Wick-ström, Wojciech Samek, Sebastian Lapuschkin, and Marina M-C Müller. The meta-evaluation problem in explainable AI: Identifying reliable estimators with MetaQuantus. Transactions on Machine Learning Re-search , 2023. Featured Certification. [34] Cemre Ozer et al. Consistent explainable image quality assessment for medical imaging. Health In-formation Science and Systems , 14:31, 2025. doi: 10.1007/s13755-025-00411-0. [35] Miguel A. Lago, Ghada Zamzmi, Brandon Eich, and Jana G. Delfino. Evaluating explainability: Aframework for systematic assessment and reporting of explainable ai features, 2025. URL https:// arxiv.org/abs/2506.13917 .[36] Gao Huang, Zhuang Liu, Laurens van der Maaten, and Kilian Q Weinberger. Densely connected convo-lutional networks. In Proceedings of the IEEE Con-ference on Computer Vision and Pattern Recognition (CVPR) , pages 2261–2269, 2017. [37] Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jon Shlens, and Zbigniew Wojna. Rethinking the inception architecture for computer vision. In Pro-ceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , pages 2818–2826, 2016. doi: 10.1109/CVPR.2016.308. [38] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Identity mappings in deep residual net-works. In European Conference on Computer Vi-sion (ECCV) , volume 9908 of Lecture Notes in Com-puter Science , pages 630–645. Springer, 2016. doi: 10.1007/978-3-319-46493-0_38. [39] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Fei-Fei Li. ImageNet: A large-scale hierar-chical image database. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recog-nition (CVPR) , pages 248–255, 2009. doi: 10.1109/ CVPR.2009.5206848. [40] Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In International Confer-ence on Learning Representations (ICLR) , 2015. doi: 10.48550/arXiv.1412.6980. [41] European Parliament and Council of the European Union. Regulation on artificial intelligence (AI Act). Technical Report EU 2024/1689, Official Journal of the European Union, 2024. [42] U.S. Food and Drug Administration. AI/ML-based software as a medical device (SaMD) action plan. Technical report, U.S. Food and Drug Administration, 2021. [43] J Richard Landis and Gary G Koch. The measurement of observer agreement for categorical data. Biomet-rics , 33(1):159–174, 1977. doi: 10.2307/2529310. [44] Daniel Smilkov, Nikhil Thorat, Been Kim, Fer-nanda Viégas, and Martin Wattenberg. SmoothGrad: Removing noise by adding noise. arXiv preprint arXiv:1706.03825 , 2017. doi: 10.48550/arXiv.1706. 03825. [45] Mukund Sundararajan, Ankur Taly, and Qiqi Yan. Axiomatic attribution for deep networks. In Pro-ceedings of the 34th International Conference on Ma-chine Learning (ICML) , pages 3319–3328, 2017. doi: 10.48550/arXiv.1703.01365. [46] Scott M Lundberg and Su-In Lee. A unified ap-proach to interpreting model predictions. In Advances in Neural Information Processing Systems (NeurIPS) ,pages 4765–4774, 2017. doi: 10.48550/arXiv.1705. 07874. [47] Marco Tulio Ribeiro, Sameer Singh, and Carlos Guestrin. “Why Should I Trust You?”: Explaining the predictions of any classifier. In Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining , pages 1135– 1144, 2016. doi: 10.1145/2939672.2939778. 9Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+[48] Mingxing Tan and Quoc Le. EfficientNet: Rethinking model scaling for convolutional neural networks. In 
+
+Proceedings of the 36th International Conference on Machine Learning (ICML) , pages 6105–6114, 2019. doi: 10.48550/arXiv.1905.11946. [49] Zhuang Liu, Hanzi Mao, Chao-Yuan Wu, Christoph Feichtenhofer, Trevor Darrell, and Saining Xie. AConvNet for the 2020s. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition (CVPR) , pages 11976–11986, 2022. [50] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, et al. An image is worth 16 ×16 words: Transformers for im-age recognition at scale. In International Conference on Learning Representations (ICLR) , 2021. doi: 10.48550/arXiv.2010.11929. [51] Agustina J Larrazabal, Nicolás Nieto, Victoria Peter-son, Diego H Milone, and Enzo Ferrante. Gender im-balance in medical imaging datasets produces biased classifiers for computer-aided diagnosis. Proceedings of the National Academy of Sciences , 117(23):12592– 12594, 2020. doi: 10.1073/pnas.1919012117. 10 Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+# A Result Tables and Figures 
+
+Table 2. Complete 30-epoch test AUC and accuracy for all three architectures. TL = Transfer Learning (epochs 1–20); FT = Fine-Tuning (epochs 21–30). Red : AUC < 0.50 (mode collapse). Amber : accuracy < 50% with intact AUC (threshold-crossing, rankings preserved). DenseNet201 epochs 21–23 exhibit boundary-reorganisation accuracy collapse while AUC remains high. 
+
+DenseNet201 InceptionV3 ResNet50V2 Ep. Phase AUC Acc. AUC Acc. AUC Acc. 
+
+1 TL 0.9184 61.60% 0.8705 66.13% 0.9582 81.48% 2 TL 0.9656 84.64% 0.9310 64.33% 0.9760 94.20% 3 TL 0.9657 45.48% 0.9509 69.97% 0.9807 82.42% 4 TL 0.9804 90.96% 0.9542 86.35% 0.9800 94.71% 5 TL 0.9848 94.03% 0.9592 78.33% 0.9876 95.82% 6 TL 0.9855 92.58% 0.9626 80.46% 0.9885 95.56% 7 TL 0.9859 94.97% 0.9602 85.49% 0.9859 95.82% 8 TL 0.9865 90.44% 0.9641 84.13% 0.9888 90.79% 9 TL 0.9882 94.80% 0.9633 87.63% 0.9894 94.71% 10 TL 0.9886 94.88% 0.9664 86.86% 0.9892 93.52% 11 TL 0.9889 94.88% 0.9673 87.20% 0.9908 95.05% 12 TL 0.9890 95.14% 0.9672 87.03% 0.9909 94.28% 13 TL 0.9893 95.31% 0.9675 88.99% 0.9895 95.90% 14 TL 0.9893 94.80% 0.9661 88.23% 0.9900 84.39% 15 TL 0.9903 90.79% 0.9679 88.91% 0.9902 94.97% 16 TL 0.9890 95.73% 0.9661 89.25% 0.9893 92.06% 17 TL 0.9901 95.73% 0.9678 87.88% 0.9901 92.49% 18 TL 0.9902 95.90% 0.9676 87.46% 0.9891 94.62% 19 TL 0.9899 95.14% 0.9684 88.82% 0.9888 95.14% 20 TL 0.9902 94.80% 0.9680 89.33% 0.9898 94.20% 21 FT 0.9842 27.73% 0.9297 84.30% 0.9876 79.86% 22 FT 0.9852 27.05% 0.9648 72.95% 0.9807 42.49% 23 FT 0.9891 27.05% 0.9836 28.75% 0.0287 70.99% 24 FT 0.9910 83.70% 0.9892 69.20% 0.9885 44.45% 25 FT 0.9867 72.95% 0.9902 96.76% 0.9902 78.75% 26 FT 0.9844 72.95% 0.9930 38.23% 0.9868 82.34% 27 FT 0.9931 96.93% 0.9925 87.46% 0.9933 95.39% 28 FT 0.9927 96.76% 0.9949 97.61% 0.9938 74.91% 29 FT 0.9941 86.77% 0.9943 94.62% 0.9947 97.01% 30 FT 0.9945 94.20% 0.9949 94.62% 0.1034 72.95% 
+
+Table 3. Global weighted C-Score for DenseNet201. Green : C-Score ≥ 0.80 ; amber : < 0.30 ; red : 0.000 . Step-change improve-ment at TL →FT transition observable across all methods. 
+
+Technique E1 E5 E10 E15 E20 
+
+(TL End) 
+
+E25 
+
+(Mid-FT) 
+
+E30 
+
+(FT End) GradCAM 0.113 0.168 0.170 0.198 0.197 0.744 0.807 GradCAM++ 0.358 0.461 0.546 0.566 0.549 0.916 0.870 LayerCAM 0.403 0.479 0.569 0.583 0.559 0.915 0.871 ScoreCAM 0.460 0.563 0.622 0.632 0.630 0.933 0.880 EigenCAM 0.635 0.634 0.635 0.636 0.635 0.908 0.846 MS-GradCAM++ 0.322 0.380 0.439 0.460 0.445 0.644 0.618 
+
+∆ (E30 −E20): +0.610 (GradCAM); +0.321 (GradCAM++); +0.312 (LayerCAM); +0.250 (ScoreCAM); +0.211 (EigenCAM); avg: +0.267 
+
+11 Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+Table 4. Global weighted C-Score for InceptionV3. 
+
+Technique E1 E5 E10 E15 E20 
+
+(TL End) 
+
+E25 
+
+(Mid-FT) 
+
+E30 
+
+(FT End) GradCAM 0.169 0.242 0.209 0.195 0.196 0.875 0.244 GradCAM++ 0.475 0.508 0.492 0.484 0.485 0.808 0.762 LayerCAM 0.567 0.583 0.572 0.567 0.568 0.802 0.763 ScoreCAM 0.392 0.386 0.383 0.381 0.379 0.790 0.759 EigenCAM 0.758 0.759 0.758 0.757 0.756 0.896 0.852 MS-GradCAM++ 0.419 0.417 0.417 0.415 0.419 0.659 0.654 
+
+∆ (E30 −E20): +0.048 (GradCAM); +0.277 (GradCAM++); +0.195 (LayerCAM); +0.380 (ScoreCAM); +0.096 (EigenCAM); avg: +0.158 
+
+Table 5. Global weighted C-Score for ResNet50V2. Net E20 →E30 change negative for majority of techniques. ScoreCAM trajectory 
+
+0.612 → 0.014 → 0.000 provides pre-collapse early-warning signal one checkpoint before AUC collapse at E30. 
+
+Technique E1 E5 E10 E15 E20 
+
+(TL End) 
+
+E25 
+
+(Mid-FT) 
+
+E30 
+
+(FT End) GradCAM 0.422 0.387 0.573 0.400 0.385 0.272 0.370 GradCAM++ 0.320 0.613 0.642 0.607 0.593 0.676 0.478 LayerCAM 0.513 0.667 0.681 0.662 0.654 0.675 0.489 ScoreCAM 0.517 0.698 0.629 0.621 0.612 0.014 0.000 EigenCAM 0.589 0.685 0.693 0.692 0.688 0.678 0.495 MS-GradCAM++ 0.313 0.508 0.527 0.508 0.507 0.533 0.409 
+
+∆ (E30 −E20): −0.015 (GradCAM); −0.115 (GradCAM++); −0.165 (LayerCAM); −0.612 (ScoreCAM); −0.193 (EigenCAM); avg: 
+
+−0.162 
+
+Figure 1. Global weighted C-Score trajectory across training phases. 
+
+12 Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+Figure 2. C-Score heatmap comparison at transfer learning end (E20) and fine-tuning end (E30). 
+
+Figure 3. Net C-Score change (E30 −E20) by architecture and method. 
+
+13 Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+Table 6. Per-class C-Score for DenseNet201. E25 shows 0.000 for all Normal-class techniques (gold-list population effect, not method failure): no Normal images pass τ = 0 .5 at this checkpoint during boundary reorganisation. 
+
+Technique E1 E5 E10 E15 E20 
+
+(TL) 
+
+E25 
+
+(FT) 
+
+E30 
+
+(FT) 
+
+Normal (Class 0) 
+
+GradCAM 0.159 0.593 0.606 0.663 0.664 0.000 0.924 GradCAM++ 0.424 0.669 0.694 0.728 0.718 0.000 0.918 LayerCAM 0.471 0.672 0.696 0.729 0.716 0.000 0.919 ScoreCAM 0.539 0.621 0.688 0.738 0.714 0.000 0.907 EigenCAM 0.680 0.682 0.688 0.689 0.688 0.000 0.895 MS-GradCAM++ 0.370 0.504 0.535 0.586 0.573 0.000 0.674 
+
+Pneumonia (Class 1) 
+
+GradCAM 0.078 0.007 0.002 0.004 0.014 0.744 0.761 GradCAM++ 0.310 0.382 0.490 0.498 0.483 0.916 0.851 LayerCAM 0.352 0.406 0.520 0.522 0.498 0.915 0.852 ScoreCAM 0.401 0.541 0.597 0.587 0.597 0.933 0.869 EigenCAM 0.603 0.615 0.615 0.614 0.614 0.908 0.826 MS-GradCAM++ 0.286 0.333 0.402 0.408 0.395 0.644 0.596 
+
+Table 7. Per-class C-Score for InceptionV3. GradCAM Pneumonia achieves 0.887 at E25 but collapses to 0.008 at E30, reflecting non-monotonic attribution dynamics post fine-tuning. 
+
+Technique E1 E5 E10 E15 E20 
+
+(TL) 
+
+E25 
+
+(FT) 
+
+E30 
+
+(FT) 
+
+Normal (Class 0) 
+
+GradCAM 0.047 0.288 0.380 0.317 0.335 0.840 0.847 GradCAM++ 0.469 0.542 0.536 0.516 0.509 0.872 0.851 LayerCAM 0.613 0.642 0.631 0.620 0.623 0.866 0.852 ScoreCAM 0.292 0.332 0.303 0.286 0.286 0.845 0.852 EigenCAM 0.770 0.777 0.775 0.774 0.774 0.938 0.922 MS-GradCAM++ 0.393 0.407 0.407 0.400 0.396 0.753 0.759 
+
+Pneumonia (Class 1) 
+
+GradCAM 0.244 0.218 0.138 0.146 0.140 0.887 0.008 GradCAM++ 0.479 0.491 0.474 0.471 0.475 0.785 0.728 LayerCAM 0.539 0.553 0.548 0.546 0.546 0.779 0.728 ScoreCAM 0.453 0.414 0.416 0.419 0.417 0.770 0.723 EigenCAM 0.750 0.750 0.750 0.750 0.749 0.881 0.825 MS-GradCAM++ 0.435 0.422 0.421 0.421 0.429 0.626 0.613 
+
+14 Quantifying Explanation Consistency: The C-Score Metric for CAM-Based Explainability in Medical Image Classification 
+
+Table 8. Per-class C-Score for ResNet50V2. Normal class registers 0.000 across all techniques at E30 (mode collapse). Pneumonia GradCAM at E25 drops to 0.000 while GradCAM++ and LayerCAM remain above 0.600. 
+
+Technique E1 E5 E10 E15 E20 
+
+(TL) 
+
+E25 
+
+(FT) 
+
+E30 
+
+(FT) 
+
+Normal (Class 0) 
+
+GradCAM 0.333 0.095 0.573 0.455 0.481 0.798 0.000 GradCAM++ 0.364 0.656 0.662 0.643 0.634 0.798 0.000 LayerCAM 0.517 0.715 0.711 0.696 0.688 0.798 0.000 ScoreCAM 0.508 0.882 0.652 0.645 0.649 0.041 0.000 EigenCAM 0.593 0.745 0.727 0.728 0.723 0.802 0.000 MS-GradCAM++ 0.333 0.495 0.518 0.508 0.508 0.595 0.000 
+
+Pneumonia (Class 1) 
+
+GradCAM 0.463 0.493 0.572 0.379 0.348 0.000 0.370 GradCAM++ 0.300 0.598 0.635 0.593 0.578 0.613 0.478 LayerCAM 0.511 0.650 0.669 0.648 0.640 0.611 0.489 ScoreCAM 0.521 0.632 0.621 0.611 0.597 0.000 0.000 EigenCAM 0.587 0.664 0.680 0.678 0.675 0.614 0.495 MS-GradCAM++ 0.303 0.512 0.530 0.507 0.507 0.500 0.409 
+
+Figure 4. Per-class C-Score trajectory by architecture. 
+
+15

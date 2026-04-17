@@ -1,0 +1,2804 @@
+Title: CLion: Efficient Cautious Lion Optimizer with Enhanced Generalization
+
+URL Source: https://arxiv.org/pdf/2604.14587v1
+
+Published Time: Fri, 17 Apr 2026 00:28:10 GMT
+
+Number of Pages: 30
+
+Markdown Content:
+# CLion: Efficient Cautious Lion Optimizer with Enhanced Generalization 
+
+## Feihu Huang ∗
+
+## , Guanyi Zhang †
+
+## , Songcan Chen ‡
+
+Abstract 
+
+Lion optimizer is a popular learning-based optimization algorithm in machine learning, which shows impressive performance in training many deep learning models. Although con-vergence property of the Lion optimizer has been studied, its generalization analysis is still missing. To fill this gap, we study generalization property of the Lion via algorithmic stability based on the mathematical induction. Specifically, we prove that the Lion has a generalization error of O( 1  
+
+> N τ T
+
+), where N is training sample size, and τ > 0 denotes the smallest absolute value of non-zero element in gradient estimator, and T is the total iteration number. In addition, we obtain an interesting byproduct that the SignSGD algorithm has the same generalization error as the Lion. To enhance generalization of the Lion, we design a novel efficient Cautious Lion (i.e., CLion) optimizer by cautiously using sign function. Moreover, we prove that our CLion has a lower generalization error of O( 1 
+
+> N
+
+) than O( 1  
+
+> N τ T
+
+) of the Lion, since the parameter 
+
+τ generally is very small. Meanwhile, we study convergence property of our CLion optimizer, and prove that our CLion has a fast convergence rate of O( √dT 1/4 ) under ℓ1-norm of gradient for nonconvex stochastic optimization, where d denotes the model dimension. Extensive numerical experiments demonstrate effectiveness of our CLion optimizer. 
+
+# 1 Introduction 
+
+Efficient optimization algorithms [Bottou et al., 2018] have become one of central attention in machine learning, with ever-increasing costs of learning large models. In recent years, training large models has been dominated by the handcrafted optimizers such as stochastic gradient de-scent (SGD) [Robbins and Monro, 1951], momentum-based SGD (SGDM) [Sutskever et al., 2013], Adam [Kingma and Ba, 2014] and AdamW [Loshchilov and Hutter, 2017] algorithms. For exam-ple, Adam [Kingma and Ba, 2014] algorithm is designed by using the first-order momentum to obtain gradient estimator and using the second-order momentum to get adaptive learning rate. AdamW [Loshchilov and Hutter, 2017] is designed by using the decoupled weight decay in Adam algorithm. Recently, these handcrafted optimizers are still the mainstream optimizers for training 
+
+> ∗
+
+Feihu Huang is with College of Computer Science and Technology, Nanjing University of Aeronautics and Astro-nautics, Nanjing, China; and also with MIIT Key Laboratory of Pattern Analysis and Machine Intelligence, Nanjing, China. Email: huangfeihu2018@gmail.com 
+
+> †
+
+Guanyi Zhang is with College of Computer Science and Technology, Nanjing University of Aeronautics and Astronautics, Nanjing, China. 
+
+> ‡
+
+Songcan Chen is with College of Computer Science and Technology, Nanjing University of Aeronautics and Astronautics, Nanjing, China; and also with MIIT Key Laboratory of Pattern Analysis and Machine Intelligence, Nanjing, China. 
+
+1
+
+> arXiv:2604.14587v1 [cs.LG] 16 Apr 2026
+
+Table 1: Generalization error comparison of our CLion optimizer and other representative optimizers. Here N denotes the training sample size, and τ denotes the absolute value of the smallest non-zero element in gradient estimator, which is generally very small . T is the iteration number.                             
+
+> Algorithm Reference Generalization Error Using Sign Function
+> SGD Hardt et al. [2016] O(1
+> N)
+> SGDM Ramezani-Kebrya et al. [2024] O(1
+> N)
+> SignSGD Bernstein et al. [2018] O(1
+> N τ T)✓
+> Lion Chen et al. [2023b] O(1
+> N τ T)✓
+> CLion Ours O(1
+> N)✓
+
+deep learning models including language models [Vaswani et al., 2017] and vision models [Wu et al., 2020]. Another direction is to automatically find some efficient optimization algorithms via learning algorithms [Harrison et al., 2022, Chen et al., 2022, 2023b]. More recently, learning-based opti-mization algorithms have been begun to attract attention in machine learning. For example, the Lion optimizer [Chen et al., 2023b] is a typical learning-based optimization algorithm, which is found by Google via program search. Specifically, the Lion uses the incorporation of two distinct interpolations between the previous step momentum and the current step gradient, as well as the integration of decoupled weight decay. Lion [Chen et al., 2023b] shows impressive performance in training many deep learning models, and performs comparably or favorably to AdamW but with greater memory efficiency. Recently, some works [Chen et al., 2023a, Dong et al., 2024, Sfyraki and Wang, 2025, Jiang and Zhang, 2025, Yu et al., 2026] studied convergence properties of the Lion. For example, Chen et al. [2023a] studied convergence properties of the Lion optimizer for solving a class of bound-constrained optimization problems. Dong et al. [2024] further studied convergence properties of the Lion optimizer for solving the nonconvex unconstrained optimization problems. Sfyraki and Wang [2025] studied convergence properties of the Lion and its variance reduced vari-ant via stochastic Frank-Wolfe [Frank et al., 1956, Reddi et al., 2016] under the light-tailed and heavy-tailed noise settings, respectively. Jiang and Zhang [2025] proposed a variance reduced Lion and its distributed version, and provided its convergence analysis. Subsequently, Yu et al. [2026] further studied convergence properties of the Lion under the heavy-tailed noise setting. Meanwhile, some variants [Liu et al., 2024, Rong et al., 2025, Yuan et al., 2024, Sfyraki and Wang, 2025, Jiang and Zhang, 2025] of Lion optimizer have been developed. For example, Liu et al. [2024] proposed a communication efficient distributed Lion algorithm for distributed optimization and provided its convergence analysis. Yuan et al. [2024], Sfyraki and Wang [2025], Jiang and Zhang [2025] independently proposed a class of variance reduced Lion optimizers based on the momentum-based variance reduced technique [Cutkosky and Orabona, 2019, Tran-Dinh et al., 2022]. More recently, Rong et al. [2025] proposed a refined lion optimizer by using a continuous function arctan instead of sign function and only studied its non-asymptotic convergence under the convex setting. Although the convergence property (i.e., optimization error [Bottou et al., 2018]) of the Lion optimizer and its variants, its generalization property (i.e., generalization error [Shalev-Shwartz et al., 2010]) is still missing. In fact, optimization error [Bottou et al., 2018] only shows how quickly the empirical training loss decreases. While the ultimate goal of machine learning models has a good performance on unseen examples. Naturally, generalization error [Shalev-Shwartz et al., 2010, Hardt et al., 2016, Zhang, 2023] measures the gap between training loss and population loss, and a 2small generalization error shows strong performance on unseen examples. However, it generally can remain large even when optimization error is small, leading to overfitting of models. So far, although optimization error of the Lion optimizer has been studied, its rigorous generalization analysis is still unexplored. To fill this critical blind spot, we study generalization error of the Lion optimizer, and propose a novel efficient cautious Lion (i.e., CLion) optimizer to improve its generalization. 
+
+## Contributions 
+
+In the paper, our main contributions are given as follows: 1) We study generalization error of the Lion optimizer via algorithmic stability based on the mathematical induction, and prove that it has a generalization error of O( 1  
+
+> N τ T
+
+) under the un-convex setting, where N is the training sample size, and τ denotes the smallest absolute value of non-zero element in gradient estimator, and T is the total iteration number. Meanwhile, we obtain an interesting byproduct that the SignSGD algorithm [Bernstein et al., 2018] also has a generalization error of O( 1  
+
+> N τ T
+
+), since the Lion algorithm reduces to SignSGD algorithm when β1 = β2 = λ = 0 in Algorithm 1. 2) To improve generalization of the Lion, we propose a novel CLion optimizer by cautiously using sign function. Moreover, we prove that our CLion has a lower generalization error of O( 1 
+
+> N
+
+)
+
+than O( 1  
+
+> N τ T
+
+) of the Lion, since the value τ generally is very small. In particular, our CLion reaches the same generalization error of SGD [Hardt et al., 2016] and momentum-based SGD (i.e., SGDM) [Ramezani-Kebrya et al., 2024] (Please see Table 1). 3) Meanwhile, we study the convergence property of our CLion optimizer, and prove that our CLion has a fast convergence rate of O( √dT 1/4 ) under ℓ1-norm of gradient for nonconvex stochas-tic optimization, which is the same convergence rate of the Lion [Dong et al., 2024, Jiang and Zhang, 2025]. 4) We conduct some numerical experiments on training vision and language models to demon-strate efficiency of the CLion optimizer. 
+
+# Notations 
+
+sign (·) denotes a sign function, i.e., sign (a) = 1 when a > 0, and sign (a) = 0 when a = 0 , otherwise sign (a) = −1. I(·) denotes an index function, i.e., I(a) = 1 when a̸ = 0 , otherwise I(a) = 0 for 
+
+a = 0 . Let [N ] = {1, 2, · · · , N }. R+ denotes non-negative real number set. For vectors x, y ∈ Rd,
+
+⟨x, y ⟩ denotes inner product. ∥x∥ and ∥x∥1 denote the ℓ2 and ℓ1 norms of vector x, respectively. 
+
+at = O(bt) denotes that at ≤ cb t for some constant c > 0.
+
+# 2 Preliminaries 
+
+## 2.1 Problem 
+
+In the paper, we study the following nonconvex stochastic optimization problem 
+
+min 
+
+> w∈Rd
+
+F (w) = Eξ∼D [f (w; ξ)] , (1) 3where f (w; ξ) : Rd → R+ denotes a loss function on a sample ξ ∼ D , which is possibly nonconvex. Here ξ is a random variable drawn some fixed but unknown distribution D. F (w) = Eξ∼D [f (w; ξ)] 
+
+denotes a population loss (risk) of machine learning tasks such as training deep learning models. In general, we only access a finite set of training data S = {ξ1, ξ 2, · · · , ξ N } drawn i.i.d. from D, since the fixed distribution D is unknown. Thus we could use the empirical risk 
+
+FS (w) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+f (w; ξi) (2) to approximate the population risk F (w) = Eξ∼D [f (w; ξ)] .
+
+## 2.2 Definition of Generalization Error 
+
+Given a training dataset S, we run a randomized algorithm A to minimize the empirical risk to get a model A(S). In fact, it does not necessarily show that the output model A(S) would have a good performance on test examples, which is measured by the population risk F (w) = Eξ∼D [f (w; ξ)] . We are interested in the excess population risk F (A(S)) − F (w∗), which measures the relative behavior of the output model as compared to the best model 
+
+w∗ = arg min 
+
+> w∈Rd
+
+F (w).
+
+Then we can decompose this excess population risk into the following formation 
+
+F (A(S)) − F (w∗) = F (A(S)) − FS (A(S)) 
+
+| {z }
+
+> (i)
+
++ FS (A(S)) − FS (w∗)
+
+| {z }
+
+> (ii )
+
++FS (w∗) − F (w∗), (3) where the term (i) F (A(S)) − FS (A(S)) is generalization error (generalization gap), which mea-sures the gap between training loss and population loss, and the term (ii ) FS (A(S)) − FS (w∗) is optimization error, which quantifies how well the algorithm minimizes the empirical risk. Tak-ing expectation on this inequality (3) with random algorithm A and training dataset S, since 
+
+EA,S [FS (w∗) − F (w∗)] = 0 , i.e., w∗ is independent of A and S, we have 
+
+EA,S [F (A(S)) − F (w∗)] = EA,S [F (A(S)) − FS (A(S))] + EA,S [FS (A(S)) − FS (w∗)] .
+
+## 2.3 Definition of Algorithmic Stability 
+
+In the paper, we study the generalization by using the algorithmic stability. We first introduce the uniform stability, on-average stability and generalization gap. For notational simplicity, let 
+
+S = {ξ1, ξ 2, · · · , ξ N } and ˜S = { ˜ξ1, ˜ξ2, · · · , ˜ξN } be two independent datasets drawn from the same distribution D. Here we denote the dataset S(i) = {ξ1, ξ 2, · · · , ˜ξi, · · · , ξ N } by replacing the i-th example ξi with an independent sample ˜ξi for any i ∈ [N ].
+
+Definition 1. (Stability in Loss Function ) Let A be a random algorithm and A(S) denote the output of the algorithm A run on dataset S. If for any S and S(i)
+
+sup 
+
+> ξ
+
+EA[f (A(S), ξ ) − f (A(S(i)), ξ )] ≤ ϵ, 
+
+the random algorithm A is ϵ-uniform stable. 
+
+4Lemma 1. (Generalization via Stability ) [Shalev-Shwartz et al., 2010, Hardt et al., 2016]. Let algorithm A be ϵ-uniformly stable in function values. Then we have 
+
+|EA,S [F (A(S)) − FS (A(S))] | ≤ ϵ.    
+
+> (a) (b) (c) (d)
+
+Figure 1: Illustration of different active functions: (a) Lion [Chen et al., 2023b] uses h(ct) = 
+
+sign (ct); (b) Lion-K [Chen et al., 2023a] uses h(ct) = ∇K (ct) = I(|ct| > e )sign (ct), where e > 0;
+
+(c) Lion-K [Chen et al., 2023a] uses h(ct) = ∇K (ct) = tanh (ac t), where a > 0, and RLion [Rong et al., 2025] uses h(ct) = 2 
+
+> π
+
+arctan (αc t), where α > 0; (d) our CLion uses h(ct) = sign (ct) when 
+
+min j∈St |(ct)j | ≥ ν > 0, otherwise h(ct) = ct, where St = {j|(ct)j̸ = 0 , j = 1 , · · · , d }.
+
+# 3 Cautious Lion Optimizer 
+
+In this section, we propose an efficient cautious Lion (i.e., CLion) optimizer to solve the above non-convex stochastic problem (1) by cautiously using sign function based on the Lion optimizer [Chen et al., 2023b]. Algorithm 1 shows an an algorithmic framework for the Lion optimizer [Chen et al., 2023b]. When β1 = β2 = λ = 0 in Algorithm 1, it also reduces to the SignSGD algorithm [Bernstein et al., 2018]. 
+
+Algorithm 1 Lion Optimizer [Chen et al., 2023b]  
+
+> 1:
+
+Input : η > 0, β1, β 2 ∈ [0 , 1) and λ ≥ 0; 
+
+> 2:
+
+Initialize: w0 ∈ Rd and m0 = 0 ; 
+
+> 3:
+
+for t = 1 , 2, . . . , T do  
+
+> 4:
+
+Draw a sample ξt ∼ D ; 
+
+> 5:
+
+gt = ∇f (wt−1; ξt); 
+
+> 6:
+
+ct = β1mt−1 + (1 − β1)gt; 
+
+> 7:
+
+wt = wt−1 − η(sign (ct) + λw t−1); 
+
+> 8:
+
+mt = β2mt−1 + (1 − β2)gt. 
+
+> 9:
+
+end for  
+
+> 10:
+
+Output: wT .Algorithm 2 provides an algorithmic framework of our CLion optimizer. At the lines 6 and 12 of Algorithm 2, our CLion optimizer uses the same gradient estimator ct as the standard Lion optimizer [Chen et al., 2023b] shown in Algorithm 1. In Algorithm 2, when min j∈St |(ct)j | ≥ ν with 5St = {j|(ct)j̸ = 0 , j = 1 , · · · , d }, i.e., the smallest absolute value of non-zero element in gradient estimator ct is larger than a threshold ν > 0, we update the variable w as the standard Lion algorithm, defined as 
+
+wt = wt−1 − η(sign (ct) + λw t−1). (4) Otherwise, we update the variable w as follows: 
+
+wt = wt−1 − η(ct + λw t−1). (5) Here we define a unified framework of active function h(·) to update variable w as follows: 
+
+wt = wt−1 − η(h(ct) + λw t−1). (6) Figure 1 (a) shows that the Lion [Chen et al., 2023b] optimizer uses h(ct) = sign (ct). Figure 1 (b) shows that the Lion-K [Chen et al., 2023a] uses h(ct) = ∇K (ct) = I(|ct| > e )sign (ct), where e > 0.Figure 1 (c) shows that Lion-K [Chen et al., 2023a] uses h(ct) = ∇K (ct) = tanh (ac t), where a > 0,and it also could show that the RLion [Rong et al., 2025] uses h(ct) = 2 
+
+> π
+
+arctan (αc t), where the curve parameter α > 0. In Figure 1 (d), our CLion uses h(ct) = sign (ct) when min j∈St |(ct)j | ≥ ν > 0,otherwise h(ct) = ct, where St = {j|(ct)j̸ = 0 , j = 1 , · · · , d }. We could find that our active function not only has a good continuous property, but also more approaches the discontinuous sign function than other active functions. 
+
+Algorithm 2 Cautious Lion ( CLion ) Optimizer  
+
+> 1:
+
+Input : η > 0, β1, β 2 ∈ (0 , 1) , λ > 0 and ν > 0; 
+
+> 2:
+
+Initialize: w0 ∈ Rd and m0 = 0 ; 
+
+> 3:
+
+for t = 1 , 2, . . . , T do  
+
+> 4:
+
+Draw a sample ξt ∼ D ; 
+
+> 5:
+
+gt = ∇f (wt−1; ξt); 
+
+> 6:
+
+ct = β1mt−1 + (1 − β1)gt; 
+
+> 7:
+
+if min j∈St |(ct)j | ≥ ν with St = {j|(ct)j̸ = 0 , j = 1 , · · · , d } then  
+
+> 8:
+
+wt = wt−1 − η(sign (ct) + λw t−1); 
+
+> 9:
+
+else  
+
+> 10:
+
+wt = wt−1 − η(ct + λw t−1); 
+
+> 11:
+
+end if  
+
+> 12:
+
+mt = β2mt−1 + (1 − β2)gt. 
+
+> 13:
+
+end for  
+
+> 14:
+
+Output: wT .Compared to the Lion [Chen et al., 2023b], our CLion optimizer has the following advantages: 1) Our CLion cautiously uses the identity function instead of the sign function for some small absolute values of non-zero element in gradient estimator ct below the threshold ν > 0. Thus our CLion could relieve the gradient explosion case of Lion optimizer. 2) From the following generalization analysis, our CLion has a lower generalization error than the Lion. Compared to the RLion [Rong et al., 2025], our CLion has the following advantages: 1) Although our CLion and the RLion use continuous active functions instead of discontinuous sign function used in Lion (see Figure 1), our active function more approaches the sign function, so our CLion keep 6more good properties of the Lion. For example, from the following convergence analysis, our CLion has a fast convergence rate as the Lion under the nonconvex setting. Meanwhile, our CLion also shows better performances than the RLion in the following numerical experiments. 2) Our CLion could easily choose the threshold ν > 0 based on the smallest absolute value of non-zero element in gradient estimator ct. While the curve parameter α in RLion algorithm can not easily control in training process, which is totally rely on manually set. Meanwhile, by choosing a suitable threshold 
+
+ν > 0, our CLion also has a lower generalization error than the Lion (see the following generalization analysis). Note that although the Lion-K [Chen et al., 2023a] optimizer could use a class of active functions including h(ct) = ∇K (ct) = I(|ct| > e )sign (ct) and h(ct) = ∇K (ct) = tanh (ac t) (see Figure 1 (b) (c)), it only is suitable for solving a class of bound-constrained optimization problems. While our Clion optimizer does not rely on the bound constraint in solving nonconvex optimization. 
+
+# 4 Generalization Analysis 
+
+In this section, we provide generalization analysis for the Lion and our CLion optimizers, respec-tively. We first give some mild conditions for this generalization analysis. 
+
+Assumption 1 (Smoothness of Component Function ). Each component function f (w; ξ) is 
+
+L-Lipschitz smooth, such that 
+
+∥∇ f (w1; ξ) − ∇ f (w2; ξ)∥ ≤ L∥w1 − w2∥, w 1, w 2 ∈ Rd. (7) 
+
+Assumption 2 (Lipschitzness ). Each component function f (w; ξ) for all ξ ∼ D is Lipschitz continuous, such that 
+
+∥f (w1; ξ) − f (w2; ξ)∥ ≤ G∥w1 − w2∥, w 1, w 2 ∈ Rd, G > 0. (8) 
+
+Assumption 3 (Bounded Variance ). ∇f (w; ξ) is an unbiased stochastic estimator of the true gradient ∇F (w) and has a bounded variance, i.e., 
+
+E[∇f (w; ξ)] = ∇F (w), E∥∇ f (w; ξ) − ∇ F (w)∥2] ≤ σ2. (9) Assumption 1 shows smoothness of each component function f (w; ξ), which is widely used in generalization analysis [Hardt et al., 2016, Lei and Ying, 2020, Ramezani-Kebrya et al., 2024]. Assumption 2 provides the Lipschitz continuous of objective function, which is widely used in gen-eralization analysis [Hardt et al., 2016, Lei and Ying, 2020, Lei, 2023, Ramezani-Kebrya et al., 2024]. Assumption 3 shows a standard bounded variance assumption used in stochastic optimiza-tion [Bottou et al., 2018, Ghadimi and Lan, 2013]. According to Assumptions 1 and 3, we have 
+
+∥∇ F (w1) − ∇ F (w2)∥ = ∥E[∇f (w1; ξ) − ∇ f (w2; ξ)] ∥ ≤ E∥∇ f (w1; ξ) − ∇ f (w2; ξ)∥ ≤ L∥w1 − w2∥.Thus, we could use smoothness of each component function f (w; ξ) to obtain smoothness of popu-lation function F (w).
+
+## 4.1 Generalization Error of Lion Optimizer 
+
+In this subsection, we provide generalization analysis for the Lion optimizer. All detailed proofs are provided in Appendix A. 7Lemma 2. Assume the sequences {ct}Tt=1 and {c(i) 
+
+> t
+
+}Tt=1 are generated from Algorithm 1 based on the dataset S and S(i), respectively, we have 
+
+sign (ct) − sign (c(i) 
+
+> t
+
+) ≤ 2√dτ ∥ct − c(i) 
+
+> t
+
+∥, (10) 
+
+where τ = min t≥1(min j∈St (|(ct)j |)) > 0 with St = j| | (ct)j |̸ = 0 , j = 1 , 2 · · · , d .
+
+Theorem 1. Assume the sequence {wt, c t}Tt=1 is generated from Algorithm 1 on dataset S =
+
+{ξ1, ξ 2, · · · , ξ N }. Under the Assumptions 1, 2, 3, let η = O( 1√d ), λ = O(1) with λ ∈ [0 , 1 
+
+> η
+
+),
+
+β1 = O(1) with β1 ∈ [0 , 1) , β2 = O(1) with β2 ∈ [0 , 1) , σ = O(1) and L = O(1) , we have 
+
+|E[F (wT ) − FS (wT )] | ≤ O( 1
+
+τ T N ), (11) 
+
+where τ = min t≥1(min j∈St (|(ct)j |)) > 0 with St = j| | (ct)j |̸ = 0 , j = 1 , 2 · · · , d .Proof. Here we provide a sketched proof. In this proof, we use the mathematical induction to obtain the above result. We first prove 
+
+E∥m1 − m(i)1 ∥ ≤ 2(1 − β2)σN = ψ1
+
+N , (12) where ψ1 = 2(1 − β2)σ. We also prove 
+
+E∥w1 − w(i)1 ∥ ≤ 2η√dτ
+
+2(1 − β1)σN = ϕ1
+
+τ N , (13) where ϕ1 = 4 η√d(1 − β1)σ. Let η = O( 1√d ), β1 = O(1) with β1 ∈ [0 , 1) and σ = O(1) , we have 
+
+ϕ1 = 4 η√d(1 − β1)σ = O(1) and ψ1 = 2(1 − β2)σ = O(1) . Then we have 
+
+E∥w1 − w(i)1 ∥ ≤ O( 1
+
+τ N ). (14) Based on mathematical induction, we assume E∥wt − w(i) 
+
+> t
+
+∥ ≤ ϕt 
+
+> τ N
+
+with ϕt = O( 1  
+
+> τt−1
+
+), and 
+
+E∥mt − m(i) 
+
+> t
+
+∥ ≤ ψt 
+
+> N
+
+with ψt = O( 1  
+
+> τt−1
+
+). Then we prove 
+
+E∥mt+1 − m(i)
+
+> t+1
+
+∥ ≤ β2ψt
+
+N + 2(1 − β2)σN + (1 − β2)Lϕ t
+
+τ N = ϕt+1 
+
+N , (15) where ψt+1 = β2ψt + 2(1 − β2)σ + (1 − β2)L ϕt 
+
+> τ
+
+. Let ϕt+1 = (1 − λη )ϕt + 2 η√d β1ψt + 2(1 − β1)σ +(1 − β1)L ϕt
+
+> τ
+
+, we have 
+
+E∥wt+1 − w(i)
+
+> t+1
+
+∥ ≤ (1 − λη )E∥wt − w(i) 
+
+> t
+
+∥ + 2η√dτ E∥ct+1 − c(i)
+
+> t+1
+
+∥≤ (1 − λη ) ϕt
+
+τ N + 2η√dτ
+
+  β1ψt
+
+N + 2(1 − β1)σN + (1 − β1)Lϕ t
+
+τ N 
+
+ = ϕt+1 
+
+τ N . (16) 8Let η = O( 1√d ), λ = O(1) with λ ∈ [0 , 1 
+
+> η
+
+), β1 = O(1) with β1 ∈ [0 , 1) , β2 = O(1) with β2 ∈ [0 , 1) ,
+
+σ = O(1) and L = O(1) . Since ψt = O( 1  
+
+> τt−1
+
+) and ϕt = O( 1  
+
+> τt−1
+
+), we can obtain ψt+1 = O( 1  
+
+> τt
+
+) and 
+
+ϕt+1 = O( 1  
+
+> τt
+
+). Then we have 
+
+E∥wt+1 − w(i)
+
+> t+1
+
+∥ ≤ ϕt+1 
+
+τ N = O( 1
+
+τ t+1 N ). (17) By using mathematical induction, then we have 
+
+E∥wT − w(i) 
+
+> T
+
+∥ ≤ O( 1
+
+τ T N ). (18) By using Assumption 2, i.e., the condition of G-Lipschitz f (w; ξ) (i.e.,), we have for any ξ ∼ D 
+
+E|f (wT ; ξ) − f (w(i) 
+
+> T
+
+; ξ)| ≤ GE∥wT − w(i) 
+
+> T
+
+∥ ≤ O( 1
+
+τ T N ), (19) where the last inequality holds by the above inequality (18) and G = O(1) .By using the lemma 1, i.e., the uniform stability bound [Shalev-Shwartz et al., 2010, Hardt et al., 2016], and taking expectations over S, S(i) and the algorithm’s randomness on the above inequality (19), we can obtain 
+
+|E[F (wT ) − FS (wT )] | ≤ O( 1
+
+τ T N ). (20) 
+
+Remark 1. In Theorem 1, we provide a novel generalization analysis framework for the Lion optimizer based on the mathematical induction. Moreover, we discover a meaningful finding that the smallest absolute value of non-zero element in gradient estimators {ct}t≥1 affects generalization error of the Lion optimizer. When β1 = β2 = λ = 0 in Algorithm 1, the Lion algorithm will reduce to SignSGD algorithm. Thus, from Theorem 1, the SignSGD algorithm [Bernstein et al., 2018] also has a generalization error of O( 1  
+
+> N τ T
+
+).
+
+## 4.2 Generalization Error of our CLion Optimizer 
+
+In this subsection, we provide a generalization error for our CLion optimizer. 
+
+Theorem 2. Assume the sequence {wt}Tt=1 is generated from Algorithm 2 on dataset S. Under the Assumptions 1, 2, 3, without loss of generality, let ν ≥ 1, λ = O(1) with 0 < λ ≤ 1 
+
+> η
+
+, β1 = O(1) with 
+
+β1 ∈ (0 , 1) , β2 = O(1) with β2 ∈ (0 , 1) , σ = O(1) , L = O(1) and G = O(1) . When the iteration number is relatively small (i.e., T = O(1) ) set η = 1√d , otherwise set η = 1√dT , we have 
+
+|E[F (wT ) − FS (wT )] | ≤ O( 1
+
+N ). (21) 
+
+Proof. This proof basically follows proof of the Theorem 1. All detailed proof is provided in Ap-pendix B. 
+
+Remark 2. From Theorem 2, under the same conditions, our CLion optimizer has a lower gen-eralization error of O( 1 
+
+> N
+
+) than O( 1   
+
+> τTN
+
+) of the Lion optimizer, since the value τ generally is very small. 
+
+95 Convergence Analysis 
+
+In this section, we provide the convergence properties of our CLion optimizer. All detailed proofs of convergence analysis of our CLion optimizer is provided in Appendix C. 
+
+Assumption 4 (Smoothness of Population Function ). Population function F (w) is L-Lipschitz smooth, if for any w1, w 2 ∈ Rd, we have 
+
+∥∇ F (w1) − ∇ F (w2)∥ ≤ L∥w1 − w2∥. (22) 
+
+Assumption 5. The function F (w) has a lower bounded, i.e., F ∗ = inf w∈Rd F (w) > −∞ .
+
+Assumption 4 shows smoothness of population function F (w), which is widely used in nonconvex optimization [Bottou et al., 2018, Ghadimi and Lan, 2013]. Assumption 5 guarantees feasibility of the above problem (1), which also is widely used in optimization [Bottou et al., 2018, Ghadimi and Lan, 2013]. 
+
+Lemma 3. Assume the sequence {wt}Tt=1 is generated from Algorithm 2, let ∥w0∥ ≤ η ˆG and 
+
+λ ≤ 12η ˆGT α with α > 1, we have 
+
+∥wt∥ ≤ (t + 1) η ˆG, ∥wt − wt−1∥ ≤ 2η ˆG, (23) 
+
+where ˆG = max( G, √d).
+
+Lemma 4. Assume the sequence {ct}Tt=1 is generated from Algorithm 2, let ∥w0∥ ≤ η ˆG and λ ≤   
+
+> 12ηˆGT α
+
+with α > 1, we have 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥ct+1 − ∇ F (wt)∥ ≤ 
+
+p2( σ2 + G2)
+
+p(1 − β2)T + 2√2L ˆGη 
+
+1 − β2
+
++
+
+√2|β1 − β2|√1 − β2
+
+σ + 1 − β1
+
+√1 − β2
+
+σ, (24) 
+
+where ˆG = max( G, √d).
+
+Theorem 3. Assume the sequence {wt}Tt=1 is generated from Algorithm 2. Under the Assump-tions 4, 2, 3, 5, and let 0 < λ ≤ 12η ˆGT α , η = O( 1  
+
+> T3/4
+
+), β1 = 1 − O( 1√T ), β2 = 1 − O( 1√T ),
+
+|β1 − β2| = O( 1√T ) and 0 < ν 0 ≤ ν, and further set α = 54 and ν0 ≥ O( 1√d ), we can obtain 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥∇ F (wt)∥1 ≤ O(
+
+√dT 1/4 ). (25) 
+
+Remark 3. From the above Theorem 3, our CLion has a fast convergence rate of O( √dT 1/4 ) on 
+
+ℓ1-norm of gradient, which has the same convergence rate as the Lion optimizer [Dong et al., 2024, Jiang and Zhang, 2025]. 
+
+# 6 Numerical Experiments 
+
+In the section, we conduct some numerical experiments to demonstrate efficiency of our CLion optimizer on image classification and language modeling tasks. In the experiment, we compare our CLion optimizer with some representative optimizers including the SGD, SGDM, Adam [Kingma and Ba, 2014], AdamW [Loshchilov and Hutter, 2017], Lion [Chen et al., 2023b] and RLion [Rong et al., 2025]. 10 (a) Train Loss (b) Train Perplexity (c) Test Loss (d) Test Perplexity 
+
+Figure 2: Language modeling at Wikitext-2 dataset.    
+
+> (a) Train Loss (b) Train Perplexity (c) Test Loss (d) Test Perplexity
+
+Figure 3: Language modeling at Wikitext-103 dataset. 
+
+## 6.1 Language Modeling 
+
+In this experiment, given some training samples {zi}Ni=1 , we conduct language modeling task by solving the following nonconvex problem 
+
+min 
+
+> w∈Rd
+
+− 1
+
+N
+
+> N
+
+X
+
+> i=1
+> mi
+
+X
+
+> t=1
+
+log  p(zit |zi
+
+> 1: t−1
+
+; w), (26) where each sample zi includes mi tokens, and p(zit |zi
+
+> 1: t−1
+
+; w) denotes a probability function of token 
+
+zit given the tokens zi
+
+> 1: t−1
+
+, and w ∈ Rd denotes parameters of the language model. In the experiment, we first evaluate the language modeling task on the WikiText-2 [Merity et al., 2016] dataset. This language model is modeled as a 7-layer Transformer [Vaswani et al., 2017] encoder with 768-dimensional embeddings and 8 attention heads per layer, which employs a feed-forward network dimension of 1024 and uses sinusoidal positional encodings. Meanwhile, it uses a dropout rate of 0.1 throughout the network. The final output layer projects the representa-tions back to vocabulary size for token prediction. Then we evaluate the language modeling task on the WikiText-103 [Merity et al., 2016] dataset. This language model is modeled as a 21-layer Trans-former encoder with 768-dimensional embeddings and 8 attention heads per layer, which employs a feed-forward network dimension of 2048 and uses sinusoidal positional encodings. Meanwhile, it uses a dropout rate of 0.15 throughout the network. 11 In the experiment, for all hyper-parameters, we do grid search and report the best one for each optimizer. When training 7-layer Transformer model at WikiText2 dataset, we set batch size be 10 for all algorithms. We set the learning rate 2 × 10 −5 for SGD and SGDM, and set momentum parameter β = 0 .9 for SGDM. Adam and AdamW use the basic learning rate 2×10 −5, ε = 10 −8, the first-order momentum parameter β1 = 0 .9, and the second-order momentum parameter β2 = 0 .999 .Meanwhile, AdamW uses the weight decay parameter λ = 10 −8. We set the learning rate 2 × 10 −6,
+
+β1 = 0 .9, β2 = 0 .99 and λ = 10 −8 for the Lion. RLion uses the learning rate 2 × 10 −5, β1 = 0 .9,
+
+β2 = 0 .99 , λ = 10 −8 and α = 10 4. Our CLion uses the learning rate 2 × 10 −5, β1 = 0 .9, β2 = 0 .99 ,
+
+λ = 10 −8 and the threshold ν = 10 −13 .When training 21-layer Transformer model at WikiText103 dataset, we set the batch size be 10 for all algorithms. We set the learning rate 2 × 10 −5 for SGD and SGDM, and set momentum parameter β = 0 .9 for SGDM. Adam and AdamW use the basic learning rate 2×10 −5, ε = 10 −8, the first-order momentum parameter β1 = 0 .9, and the second-order momentum parameter β2 = 0 .99 .Meanwhile, AdamW uses the weight decay parameter λ = 10 −6. We set the learning rate 2 × 10 −5,
+
+β1 = 0 .9, β2 = 0 .99 and λ = 10 −9 for the Lion. RLion uses the learning rate 2 × 10 −5, β1 = 0 .9,
+
+β2 = 0 .99 , λ = 10 −9 and α = 10 4. Our CLion uses the learning rate 2 × 10 −5, β1 = 0 .9, β2 = 0 .99 ,
+
+λ = 10 −4 and the threshold ν = 10 −15 .Figures 2 and 3 show that our CLion optimizer outperforms other optimizers such as Lion and RLion on training and test errors, which demonstrate efficiency of our CLion optimizer. Meanwhile, these results also verify that our CLion optimizer has better generalization than the Lion.    
+
+> (a) Train Loss (b) Train Accuracy (c) Test Loss (d) Test Accuracy
+
+Figure 4: Image classification at Cifar-10 dataset. 
+
+## 6.2 Image Classification 
+
+In this experiment, we train two deep learning models to image classification. Given training samples {xi, y i}Ni=1 , where xi denotes features and yi denotes label, we train deep learning model by solving the following problem 
+
+min 
+
+> w∈Rd
+
+1
+
+N
+
+> N
+
+X
+
+> i=1
+
+ℓ χ(xi; w), y i
+
+, (27) where χ(·; w) represents deep learning model, and ℓ(·, ·) denotes a cross-entropy loss function. In the experiment, we first evaluate ResNet18 [He et al., 2016] on the Cifar-10 [Krizhevsky et al., 2009] dataset, where the training and test datesets contain 50000 and 10000 samples, respectively. 12 (a) Train Loss (b) Train Accuracy (c) Test Loss (d) Test Accuracy 
+
+Figure 5: Image classification at tiny-ImageNet dataset. Then we evaluate the ResNet34 [He et al., 2016] on tiny-ImageNet [Le and Yang, 2015] dataset, where the training and test datesets contain 80000 and 20000 samples, respectively. In the experiment, for all hyper-parameters, we do grid search and report the best one for each optimizer. When training Resnet18 at CIFAR-10 dataset, we set the batch size be 64 for all algorithms. We set the learning rate 3 × 10 −4 for SGD, and set the learning rate 10 −4 and momentum parameter β = 0 .9 for SGDM. Adam and AdamW use the basic learning rate 10 −4, the tuning parameter ε = 10 −8, the first-order momentum parameter β1 = 0 .9, and the second-order momentum parameter β2 = 0 .99 . Meanwhile, AdamW uses the weight decay parameter λ = 10 −6.We set the learning rate 10 −4, β1 = 0 .9, β2 = 0 .99 and λ = 10 −2 for the Lion. RLion uses the learning rate 10 −4, β1 = 0 .9, β2 = 0 .99 , λ = 10 −2 and α = 10 . Our CLion uses the learning rate 
+
+10 −4, β1 = 0 .9, β2 = 0 .99 , λ = 10 −2 and the threshold ν = 10 −6.When training ResNet34 at Tiny-ImageNet dataset, we set the batch size be 64 for all algorithms. We set the learning rate 10 −3 for SGD, and set the learning rate 10 −3 and momentum parameter 
+
+β = 0 .9 for SGDM. Adam and AdamW use the basic learning rate 10 −3, the tuning parameter ε =10 −8, the first-order momentum parameter β1 = 0 .9, and the second-order momentum parameter 
+
+β2 = 0 .99 . Meanwhile, AdamW uses the weight decay parameter λ = 10 −6. We set the learning rate 10 −4, β1 = 0 .9, β2 = 0 .99 and λ = 10 −2 for the Lion. RLion uses the learning rate 10 −3,
+
+β1 = 0 .9, β2 = 0 .99 , λ = 10 −2 and α = 10 . Our CLion uses the learning rate 10 −3, β1 = 0 .9,
+
+β2 = 0 .99 , λ = 10 −6 and the threshold ν = 10 −8.From Figures 4 and 5, we could find that our CLion optimizer basically outperforms other optimizers such as Lion and RLion on test accuracy. These results also verify that our CLion optimizer has a good generalization. 
+
+# 7 Conclusions 
+
+In this paper, we first studied generalization property of the Lion optimizer via algorithmic stability, and discovered a useful finding that the smallest absolute value of non-zero element in gradient estimators affects generalization error of the Lion optimizer. To improve generalization of the Lion, we proposed a novel efficient cautious Lion (i.e., CLion) optimizer by cautiously using sign function. Moreover, we proved that our CLion optimizer has a lower generalization error O( 1 
+
+> N
+
+) than O( 1  
+
+> N τ T
+
+)
+
+of the Lion, since the value τ generally is very small. Meanwhile, we proved that our CLion has a fast convergence rate as the Lion optimizer. In addition, we obtain an interesting byproduct that 13 the SignSGD algorithm has a generalization error of O( 1  
+
+> N τ T
+
+) under the nonconvex setting. 
+
+# References 
+
+Jeremy Bernstein, Yu-Xiang Wang, Kamyar Azizzadenesheli, and Animashree Anandkumar. signsgd: Com-pressed optimisation for non-convex problems. In International conference on machine learning , pages 560–569. PMLR, 2018. Léon Bottou, Frank E Curtis, and Jorge Nocedal. Optimization methods for large-scale machine learning. 
+
+SIAM review , 60(2):223–311, 2018. Lizhang Chen, Bo Liu, Kaizhao Liang, and Qiang Liu. Lion secretly solves constrained optimization: As lyapunov predicts. arXiv preprint arXiv:2310.05898 , 2023a. Xiangning Chen, Chen Liang, Da Huang, Esteban Real, Kaiyuan Wang, Hieu Pham, Xuanyi Dong, Thang Luong, Cho-Jui Hsieh, Yifeng Lu, et al. Symbolic discovery of optimization algorithms. Advances in neural information processing systems , 36:49205–49233, 2023b. Xuxi Chen, Tianlong Chen, Yu Cheng, Weizhu Chen, Ahmed Awadallah, and Zhangyang Wang. Scalable learning to optimize: A learned optimizer can train big models. In European Conference on Computer Vision , pages 389–405. Springer, 2022. Ashok Cutkosky and Francesco Orabona. Momentum-based variance reduction in non-convex sgd. Advances in neural information processing systems , 32, 2019. Yiming Dong, Huan Li, and Zhouchen Lin. Convergence rate analysis of lion. arXiv preprint arXiv:2411.07724 , 2024. Marguerite Frank, Philip Wolfe, et al. An algorithm for quadratic programming. Naval research logistics quarterly , 3(1-2):95–110, 1956. Saeed Ghadimi and Guanghui Lan. Stochastic first-and zeroth-order methods for nonconvex stochastic programming. SIAM journal on optimization , 23(4):2341–2368, 2013. Moritz Hardt, Ben Recht, and Yoram Singer. Train faster, generalize better: Stability of stochastic gradient descent. In International conference on machine learning , pages 1225–1234. PMLR, 2016. James Harrison, Luke Metz, and Jascha Sohl-Dickstein. A closer look at learned optimization: Stability, robustness, and inductive biases. Advances in neural information processing systems , 35:3758–3773, 2022. Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In Proceedings of the IEEE conference on computer vision and pattern recognition , pages 770–778, 2016. Wei Jiang and Lijun Zhang. Convergence analysis of the lion optimizer in centralized and distributed settings. arXiv preprint arXiv:2508.12327 , 2025. Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980 , 2014. Alex Krizhevsky, Geoffrey Hinton, et al. Learning multiple layers of features from tiny images. 2009. Ya Le and Xuan Yang. Tiny imagenet visual recognition challenge. CS 231N , 7(7):3, 2015. Yunwen Lei. Stability and generalization of stochastic optimization with nonconvex and nonsmooth prob-lems. In The Thirty Sixth Annual Conference on Learning Theory , pages 191–227. PMLR, 2023. 
+
+14 Yunwen Lei and Yiming Ying. Fine-grained analysis of stability and generalization for stochastic gradient descent. In International Conference on Machine Learning , pages 5809–5819. PMLR, 2020. Bo Liu, Lemeng Wu, Lizhang Chen, Kaizhao Liang, Jiaxu Zhu, Chen Liang, Raghuraman Krishnamoorthi, and Qiang Liu. Communication efficient distributed training with distributed lion. Advances in Neural Information Processing Systems , 37:18388–18415, 2024. Ilya Loshchilov and Frank Hutter. Decoupled weight decay regularization. arXiv preprint arXiv:1711.05101 ,2017. Stephen Merity, Caiming Xiong, James Bradbury, and Richard Socher. Pointer sentinel mixture models. 
+
+arXiv preprint arXiv:1609.07843 , 2016. Yurii Nesterov et al. Lectures on convex optimization , volume 137. Springer, 2018. Ali Ramezani-Kebrya, Kimon Antonakopoulos, Volkan Cevher, Ashish Khisti, and Ben Liang. On the generalization of stochastic gradient descent with momentum. Journal of Machine Learning Research ,25(22):1–56, 2024. Sashank J Reddi, Suvrit Sra, Barnabás Póczos, and Alex Smola. Stochastic frank-wolfe methods for non-convex optimization. In 2016 54th annual Allerton conference on communication, control, and computing (Allerton) , pages 1244–1251. IEEE, 2016. Herbert Robbins and Sutton Monro. A stochastic approximation method. The annals of mathematical statistics , pages 400–407, 1951. Jian Rong, Chenhao Ma, Qinghui Zhang, Yong Cao, and Weili Kou. A refined lion optimizer for deep learning. Scientific Reports , 15(1):23082, 2025. Maria-Eleni Sfyraki and Jun-Kun Wang. Lions and muons: Optimization via stochastic frank-wolfe. arXiv preprint arXiv:2506.04192 , 2025. Shai Shalev-Shwartz, Ohad Shamir, Nathan Srebro, and Karthik Sridharan. Learnability, stability and uniform convergence. The Journal of Machine Learning Research , 11:2635–2670, 2010. Ilya Sutskever, James Martens, George Dahl, and Geoffrey Hinton. On the importance of initialization and momentum in deep learning. In International conference on machine learning , pages 1139–1147. pmlr, 2013. Quoc Tran-Dinh, Nhan H Pham, Dzung T Phan, and Lam M Nguyen. A hybrid stochastic optimization framework for composite nonconvex optimization. Mathematical Programming , 191(2):1005–1071, 2022. Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. Advances in neural information processing systems , 30, 2017. Bichen Wu, Chenfeng Xu, Xiaoliang Dai, Alvin Wan, Peizhao Zhang, Zhicheng Yan, Masayoshi Tomizuka, Joseph Gonzalez, Kurt Keutzer, and Peter Vajda. Visual transformers: Token-based image representation and processing for computer vision, 2020. Dingzhi Yu, Hongyi Tao, Yuanyu Wan, Luo Luo, and Lijun Zhang. Sign-based optimizers are effective under heavy-tailed noise. arXiv preprint arXiv:2602.07425 , 2026. Huizhuo Yuan, Yifeng Liu, Shuang Wu, Xun Zhou, and Quanquan Gu. Mars: Unleashing the power of variance reduction for training large models. arXiv preprint arXiv:2411.10438 , 2024. Tong Zhang. Mathematical analysis of machine learning algorithms . Cambridge University Press, 2023. 
+
+15 A Generalization Analysis of Lion Optimizer 
+
+Lemma 5. (Restatement of Lemma 2) Assume the sequences {ct}Tt=1 and {c(i) 
+
+> t
+
+}Tt=1 are generated from Algorithm 1 based on the dataset S and S(i), respectively, we have 
+
+sign (ct) − sign (c(i) 
+
+> t
+
+) ≤ 2√dτ ∥ct − c(i) 
+
+> t
+
+∥, (28) 
+
+where τ = min t≥1(min j∈St (|(ct)j |)) > 0 with St = {j| | (ct)j |̸ = 0 , j = 1 , 2 · · · , d }.Proof. When (ct)j and (c(i) 
+
+> t
+
+)j have the same sign, i.e., sign (( ct)j ) = sign (( c(i) 
+
+> t
+
+)j ), we have 
+
+|(ct)j − (c(i) 
+
+> t
+
+)j | ≥ 0 = |sign (ct)j − sign (c(i) 
+
+> t
+
+)j |. (29) Let τ = min t(min j∈St (|(ct)j |)) > 0 with St = {j| | (ct)j |̸ = 0 , j = 1 , 2 · · · , d }, where ct is gener-ated from Algorithm 1 for any t ≥ 1. Since c(i) 
+
+> t
+
+also is generated from Algorithm 1, we have τ =min t(min j∈St (|(c(i) 
+
+> t
+
+)j |)) > 0 with St = {j| | (c(i) 
+
+> t
+
+)j |̸ = 0 , j = 1 , 2 · · · , d }.When (ct)j and (c(i) 
+
+> t
+
+)j have different sign, i.e., |sign (( ct)j )−sign (( c(i) 
+
+> t
+
+)j )| = 2 or |sign (( ct)j )−sign (( c(i) 
+
+> t
+
+)j )| =1,
+
+2
+
+τ |(ct)j − (c(i) 
+
+> t
+
+)j | = 2
+
+τ (|(ct)j | + |(c(i) 
+
+> t
+
+)j |) (i)
+
+≥ 2 ≥ | sign (ct)j − sign (c(i) 
+
+> t
+
+)j |, (30) where the above inequality (i) is due to |(ct)j | + |(c(i) 
+
+> t
+
+)j | ≥ τ .Thus, we have for all j ∈ [d]2
+
+τ |(ct)j − (c(i) 
+
+> t
+
+)j | ≥ | sign (ct)j − sign (c(i) 
+
+> t
+
+)j |. (31) Then we can obtain 
+
+2
+
+τ ∥ct − c(i) 
+
+> t
+
+∥1 ≥ sign (ct) − sign (c(i) 
+
+> t
+
+) 1. (32) Since ∥ · ∥ ≤ ∥ · ∥ 1 ≤ √d∥ · ∥ , we have 
+
+sign (ct) − sign (c(i) 
+
+> t
+
+) ≤ sign (ct) − sign (c(i) 
+
+> t
+
+)∥1
+
+≤ 2
+
+τ ∥ct − c(i) 
+
+> t
+
+∥1 ≤ 2√dτ ∥ct − c(i) 
+
+> t
+
+∥.
+
+Theorem 4. (Restatement of Theorem 1) Assume the sequence {wt, c t}Tt=1 is generated from Algorithm 1 on dataset S = {ξ1, ξ 2, · · · , ξ N }. Under the Assumptions 1, 2, 3, let η = O( 1√d ), λ = O(1) with λ ∈ [0 , 1 
+
+> η
+
+),
+
+β1 = O(1) with β1 ∈ [0 , 1) , β2 = O(1) with β2 ∈ [0 , 1) , σ = O(1) and L = O(1) , we have 
+
+|E[F (wT ) − FS (wT )] | ≤ O( 1
+
+τ T N ), (33) 
+
+where τ = min t≥1(min j∈St (|(ct)j |)) > 0 with St = {j| | (ct)j |̸ = 0 , j = 1 , 2 · · · , d }.Proof. Implementing Algorithm 1 on datasets S and S(i) with the same random index sequence {jt}Tt=1 ,and let {wt}Tt=1 and {w(i) 
+
+> t
+
+}Tt=1 be generated from Algorithm 1 with S and S(i), respectively. From Algorithm 1, since wt = wt−1 − η(sign (ct) + λw t−1) and w(i) 
+
+> t
+
+= w(i) 
+
+> t−1
+
+− η(sign (c(i) 
+
+> t
+
+) + λw (i)
+
+> t−1
+
+), we have 
+
+wt − w(i) 
+
+> t
+
+= (1 − ηλ )( wt−1 − w(i)
+
+> t−1
+
+) − η sign (ct) − sign (c(i) 
+
+> t
+
+). (34) 
+
+16 Then we have 
+
+∥wt − w(i) 
+
+> t
+
+∥ = ∥(1 − ηλ )( wt−1 − w(i)
+
+> t−1
+
+) − η sign (ct) − sign (c(i) 
+
+> t
+
+)∥≤ (1 − ηλ )∥wt−1 − w(i)
+
+> t−1
+
+∥ + η∥sign (ct) − sign (c(i) 
+
+> t
+
+)∥≤ (1 − ηλ )∥wt−1 − w(i)
+
+> t−1
+
+∥ + 2η√dτ ∥ct − c(i) 
+
+> t
+
+∥, (35) where λ ∈ [0 , 1 
+
+> η
+
+).If j1̸ = i with probability 1 − 1 
+
+> N
+
+, since c1 = (1 − β1)∇f (w0; ξj1 ), c(i)1 = (1 − β1)∇f (w(i)0 ; ξj1 ), m1 =(1 − β2)∇f (w0; ξj1 ), m(i)1 = (1 − β2)∇f (w(i)0 ; ξj1 ) and w0 = w(i)0 , we have c1 = c(i)1 and m1 = m(i)1 .If j1 = i with probability 1 
+
+> N
+
+, we have 
+
+E∥c1 − c(i)1 ∥
+
+= 1
+
+N E∥(1 − β1)∇f (w0; ξi) − (1 − β1)∇f (w(i)0 ; ˜ξi)∥
+
+= (1 − β1)
+
+N E∥∇ f (w0; ξi) − ∇ F (w0) + ∇F (w0) − ∇ F (w(i)0 ) + ∇F (w(i)0 ) − ∇ f (w(i)0 ; ˜ξi)∥≤ 2(1 − β1)σN + (1 − β1)
+
+N E∥∇ F (w0) − ∇ F (w(i)0 )∥
+
+= 2(1 − β1)σN , (36) where the last equality is due to w0 = w(i)0 . At the same time, we have 
+
+E∥m1 − m(i)1 ∥
+
+= 1
+
+N E∥(1 − β2)∇f (w0; ξi) − (1 − β2)∇f (w(i)0 ; ˜ξi)∥
+
+= (1 − β2)
+
+N E∥∇ f (w0; ξi) − ∇ F (w0) + ∇F (w0) − ∇ F (w(i)0 ) + ∇F (w(i)0 ) − ∇ f (w(i)0 ; ˜ξi)∥≤ 2(1 − β2)σN + (1 − β2)
+
+N E∥∇ F (w0) − ∇ F (w(i)0 )∥
+
+= 2(1 − β2)σN = ψ1
+
+N , (37) where the last inequality holds by ψ1 = 2(1 − β2)σ.Since w0 = w(i)0 , we have 
+
+E∥w1 − w(i)1 ∥ ≤ (1 − ηλ )E∥w0 − w(i)0 ∥ + 2η√dτ ∥c1 − c(i)1 ∥≤ 2η√dτ
+
+2(1 − β1)σN = ϕ1
+
+τ N , (38) where ϕ1 = 4 η√d(1 − β1)σ.Let η = O( 1√d ), β1 = O(1) with β1 ∈ [0 , 1) and σ = O(1) , we have ϕ1 = 4 η√d(1 − β1)σ = O(1) and 
+
+ψ1 = 2(1 − β2)σ = O(1) . Then we have 
+
+E∥w1 − w(i)1 ∥ ≤ O( 1
+
+τ N ). (39) 
+
+17 If j2̸ = i with probability 1 − 1 
+
+> N
+
+, since m2 = β2m1 + (1 − β2)∇f (w1; ξj2 ) and m(i)2 = β2m(i)1 + (1 −
+
+β2)∇f (w(i)1 ; ξj2 ), we have 
+
+E∥m2 − m(i)2 ∥ = (1 − 1
+
+N )E∥β2(m1 − m(i)1 ) + (1 − β2)( ∇f (w1; ξj2 ) − ∇ f (w(i)1 ; zj2 )) ∥≤ (1 − 1
+
+N ) β2E∥m1 − m(i)1 ∥ + (1 − β2)E∥∇ f (w1; ξj2 ) − ∇ f (w(i)1 ; ξj2 )∥
+
+> (i)
+
+≤(1 − 1
+
+N )β2
+
+ψ1
+
+N + (1 − 1
+
+N )(1 − β2)LE∥w1 − w(i)1 ∥≤ (1 − 1
+
+N )β2
+
+ψ1
+
+N + (1 − 1
+
+N )(1 − β2)L ϕ1
+
+τ N , (40) where the inequality (i) holds by Assumption 1, and the last inequality holds by the above inequality (38). Since c2 = β1m1 + (1 − β1)∇f (w1; ξj2 ) and c(i)2 = β1m(i)1 + (1 − β1)∇f (w(i)1 ; ξj2 ), we can obtain 
+
+E∥c2 − c(i)2 ∥ = (1 − 1
+
+N )E β1(m1 − m(i)1 ) + (1 − β1)( ∇f (w1; ξj2 ) − ∇ f (w(i)1 ; zj2 )) 2
+
+≤ (1 − 1
+
+N ) β1E∥m1 − m(i)1 ∥ + (1 − β1)E∥∇ f (w1; ξj2 ) − ∇ f (w(i)1 ; ξj2 )∥
+
+≤ (1 − 1
+
+N )β1
+
+ψ1
+
+N + (1 − 1
+
+N )(1 − β1)LE∥w1 − w(i)1 ∥≤ (1 − 1
+
+N )β1
+
+ψ1
+
+N + (1 − 1
+
+N )(1 − β1)L ϕ1
+
+τ N . (41) If j2 = i with probability 1 
+
+> N
+
+, we have 
+
+E∥m2 − m(i)2 ∥ = 1
+
+N E β2(m1 − m(i)1 ) + (1 − β2)( ∇f (w1; ξi) − ∇ f (w(i)1 ; ˜ξi)) 
+
+≤ 1
+
+N β2E∥m1 − m(i)1 ∥ + 1
+
+N (1 − β2)E∥∇ f (w1; ξi) − ∇ f (w(i)1 ; ˜ξi)∥≤ 1
+
+N β2
+
+ψ1
+
+N + 1 − β2
+
+N E ∇f (w1; ξi) − ∇ F (w1) + ∇F (w1) − ∇ F (w(i)1 )+ ∇F (w(i)1 ) − ∇ f (w(i)1 ; ˜ξi)
+
+≤ 1
+
+N β2
+
+ψ1
+
+N + 1 − β2
+
+N
+
+ E∥∇ f (w1; ξi) − ∇ F (w1)∥ + E∥∇ F (w1) − ∇ F (w(i)1 )∥
+
++ E∥∇ F (w(i)1 ) − ∇ f (w(i)1 ; ˜ξi)∥
+
+> (i)
+
+≤ 1
+
+Nβ2ψ1
+
+N + 2(1 − β2)σN + (1 − β2)LN E∥w1 − w(i)1 ∥≤ 1
+
+Nβ2ψ1
+
+N + 2(1 − β2)σN + (1 − β2)LNϕ1
+
+τ N , (42) 
+
+18 where the above inequality (i) holds by Assumptions 1 and 3. At the same time, we also have 
+
+E∥c2 − c(i)2 ∥ = 1
+
+N E β1(m1 − m(i)1 ) + (1 − β1)( ∇f (w1; ξi) − ∇ f (w(i)1 ; ˜ξi)
+
+≤ 1
+
+N
+
+ β1E∥m1 − m(i)1 ∥ + (1 − β1)E∥∇ f (w1; ξi) − ∇ f (w(i)1 ; ˜ξi)∥
+
+≤ 1
+
+N β1
+
+ψ1
+
+N + 1
+
+N (1 − β1)E∥∇ f (w1; ξi) − ∇ F (w1) + ∇F (w1) − ∇ F (w(i)1 )+ ∇F (w(i)1 ) − ∇ f (w(i)1 ; ˜ξi)∥≤ 1
+
+N β1
+
+ψ1
+
+N + 1
+
+N (1 − β1) 2σ + LE∥w1 − w(i)1 ∥
+
+≤ 1
+
+N β1
+
+ψ1
+
+N + 2σN (1 − β1) + L(1 − β1)
+
+Nϕ1
+
+τ N . (43) Thus, we can obtain 
+
+E∥m2 − m(i)2 ∥ ≤ (1 − 1
+
+N )β2
+
+ψ1
+
+N + (1 − 1
+
+N )(1 − β2)L ϕ1
+
+τ N 
+
++ 1
+
+Nβ2ψ1
+
+N + 2(1 − β2)σN + (1 − β2)LNϕ1
+
+τ N 
+
+= β2
+
+ψ1
+
+N + 2(1 − β2)σN + (1 − β2)L ϕ1
+
+τ N , (44) and 
+
+E∥c2 − c(i)2 ∥ ≤ (1 − 1
+
+N )β1
+
+ψ1
+
+N + (1 − 1
+
+N )(1 − β1)L ϕ1
+
+τ N 
+
++ 1
+
+N β1
+
+ψ1
+
+N + 2σN (1 − β1) + L(1 − β1)
+
+Nϕ1
+
+τ N 
+
+≤ β1
+
+ψ1
+
+N + (1 − β1) 2σN + (1 − β1)L ϕ1
+
+τ N . (45) Then we have 
+
+E∥w2 − w(i)2 ∥ ≤ (1 − ηλ )E∥w1 − w(i)1 ∥ + 2η√dτ ∥c2 − c(i)2 ∥≤ (1 − ηλ ) ϕ1
+
+τ N + 2η√dτ
+
+ β1
+
+ψ1
+
+N + (1 − β1) 2σN + (1 − β1)L ϕ1
+
+τ N 
+
+. (46) Let ψ2 = β2ψ1 + 2(1 − β2)σ + (1 − β2)Lϕ 1 and ϕ2 = (1 − ηλ )ϕ1 + 2 η√d β1ψ1 + 2(1 − β1)σ + (1 − β1)Lϕ 1
+
+.Let η = O( 1√d ), λ = O(1) with λ ∈ [0 , 1 
+
+> η
+
+), β1 = O(1) with β1 ∈ [0 , 1) , β2 = O(1) with β2 ∈ [0 , 1) ,
+
+σ = O(1) and L = O(1) . Since ψ1 = O(1) and ϕ1 = O(1) , we have 
+
+ψ2 = β2ψ1 + 2(1 − β2)σ + (1 − β2)L ϕ1
+
+τ = O( 1
+
+τ )
+
+ϕ2 = (1 − ηλ )ϕ1 + 2 η√d β1ψ1 + 2(1 − β1)σ + (1 − β1)L ϕ1
+
+τ
+
+ = O( 1
+
+τ ). (47) Thus, we have 
+
+E∥m2 − m(i)2 ∥ ≤ β2
+
+ψ1
+
+N + 2(1 − β2)σN + (1 − β2)L ϕ1
+
+τ N = ψ2
+
+N = O( 1
+
+τ N ), (48) 
+
+19 and 
+
+E∥w2 − w(i)2 ∥ ≤ (1 − ηλ ) ϕ1
+
+τ N + 2η√dτ
+
+ β1
+
+ψ1
+
+N + (1 − β1) 2σN + (1 − β1)L ϕ1
+
+τ N 
+
+
+
+= ϕ2
+
+τ N = O( 1
+
+τ 2N ). (49) Based on mathematical induction, we assume E∥wt−w(i) 
+
+> t
+
+∥ ≤ ϕt 
+
+> τ N
+
+with ϕt = O( 1  
+
+> τt−1
+
+), and E∥mt−m(i) 
+
+> t
+
+∥ ≤  
+
+> ψt
+> N
+
+with ψt = O( 1  
+
+> τt−1
+
+).If jt+1 ̸ = i with probability 1 − 1 
+
+> N
+
+, since mt+1 = β2mt + (1 − β2)∇f (wt; ξjt+1 ) and m(i) 
+
+> t+1
+
+= β2m(i) 
+
+> t
+
++(1 − β2)∇f (w(i) 
+
+> t
+
+; ξjt+1 ), we have 
+
+E∥mt+1 − m(i)
+
+> t+1
+
+∥ = (1 − 1
+
+N )E∥β2(mt − m(i) 
+
+> t
+
+) + (1 − β2)( ∇f (wt; ξjt+1 ) − ∇ f (w(i) 
+
+> t
+
+; ξjt+1 )) ∥≤ (1 − 1
+
+N ) β2E∥mt − m(i) 
+
+> t
+
+∥ + (1 − β2)E∥∇ f (wt; ξjt+1 ) − ∇ f (w(i) 
+
+> t
+
+; ξjt+1 )∥
+
+≤ (1 − 1
+
+N )β2
+
+ψt
+
+N + (1 − 1
+
+N )(1 − β2)LE∥wt − w(i) 
+
+> t
+
+∥≤ (1 − 1
+
+N )β2
+
+ψt
+
+N + (1 − 1
+
+N )(1 − β2)L ϕt
+
+τ N , (50) where the second last inequality holds by Assumption 1. Since ct+1 = β1mt + (1 − β1)∇f (wt; ξjt+1 ) and 
+
+c(i) 
+
+> t+1
+
+= β1m(i) 
+
+> t
+
++ (1 − β1)∇f (w(i) 
+
+> t
+
+; ξjt+1 ), then we have 
+
+E∥ct+1 − c(i)
+
+> t+1
+
+∥ = (1 − 1
+
+N )E β1(mt − m(i) 
+
+> t
+
+) + (1 − β1)( ∇f (wt; ξjt+1 ) − ∇ f (w(i) 
+
+> t
+
+; ξjt+1 )
+
+≤ (1 − 1
+
+N ) β1E∥mt − m(i) 
+
+> t
+
+∥ + (1 − β1)E∥∇ f (wt; ξjt+1 ) − ∇ f (w(i) 
+
+> t
+
+; ξjt+1 )∥
+
+≤ (1 − 1
+
+N )β1
+
+ψt
+
+N + (1 − 1
+
+N )(1 − β1)E∥∇ f (wt; ξjt+1 ) − ∇ f (w(i) 
+
+> t
+
+; ξjt+1 )∥≤ (1 − 1
+
+N )β1
+
+ψt
+
+N + (1 − 1
+
+N )(1 − β1)LE∥wt − w(i) 
+
+> t
+
+∥≤ (1 − 1
+
+N )β1
+
+ψt
+
+N + (1 − 1
+
+N )(1 − β1)L ϕt
+
+τ N . (51) If jt+1 = i with probability 1 
+
+> N
+
+, we can obtain 
+
+E∥mt+1 − m(i)
+
+> t+1
+
+∥ = 1
+
+N E β2(mt − m(i) 
+
+> t
+
+) + (1 − β2)( ∇f (wt; ξi) − ∇ f (w(i) 
+
+> t
+
+; ˜ξi)) 
+
+≤ 1
+
+N β2E∥mt − m(i) 
+
+> t
+
+∥ + 1
+
+N (1 − β2)E∥∇ f (wt; ξi) − ∇ f (w(i) 
+
+> t
+
+; ˜ξi)∥≤ 1
+
+N β2
+
+ψt
+
+N + 1 − β2
+
+N E ∇f (wt; ξi) − ∇ F (wt) + ∇F (wt) − ∇ F (w(i) 
+
+> t
+
+)+ ∇F (w(i) 
+
+> t
+
+) − ∇ f (w(i) 
+
+> t
+
+; ˜ξi)
+
+≤ 1
+
+N β2
+
+ψt
+
+N + 1 − β2
+
+N
+
+ E∥∇ f (wt; ξi) − ∇ F (wt)∥ + E∥∇ F (wt) − ∇ F (w(i) 
+
+> t
+
+)∥
+
++ E∥∇ F (w(i) 
+
+> t
+
+) − ∇ f (w(i) 
+
+> t
+
+; ˜ξi)∥
+
+≤ 1
+
+N β2
+
+ψt
+
+N + 2(1 − β2)σN + (1 − β2)LN E∥wt − w(i) 
+
+> t
+
+∥≤ 1
+
+N β1
+
+ψt
+
+N + 2(1 − β2)σN + (1 − β2)LNϕt
+
+τ N , (52) 
+
+20 and 
+
+E∥ct+1 − c(i)
+
+> t+1
+
+∥ = 1
+
+N E β1(mt − m(i) 
+
+> t
+
+) + (1 − β1)( ∇f (wt; ξi) − ∇ f (w(i) 
+
+> t
+
+; ˜ξi)
+
+≤ 1
+
+N
+
+ β1E∥mt − m(i) 
+
+> t
+
+∥ + (1 − β1)E∥∇ f (wt; ξi) − ∇ f (θ(i) 
+
+> t
+
+; ˜ zi)∥
+
+≤ 1
+
+N β1
+
+ψt
+
+N + 1
+
+N (1 − β1)E∥∇ f (wt; ξi) − ∇ f (w(i) 
+
+> t
+
+; ˜ξi)∥≤ 1
+
+N β1
+
+ψt
+
+N + 1
+
+N (1 − β1)E∥∇ f (wt; ξi) − ∇ F (wt) + ∇F (wt) − ∇ F (w(i) 
+
+> t
+
+)+ ∇F (w(i) 
+
+> t
+
+) − ∇ f (w(i) 
+
+> t
+
+; ˜ξi)∥≤ 1
+
+N β1
+
+ψt
+
+N + 1
+
+N (1 − β1) 2σ + LE∥wt − w(i) 
+
+> t
+
+∥
+
+≤ 1
+
+N β1
+
+ψt
+
+N + 1
+
+N (1 − β1)2 σ + 1
+
+N (1 − β1)L ϕt
+
+τ N . (53) Let ψt+1 = β2ψt + 2(1 − β2)σ + (1 − β2)L ϕt 
+
+> τ
+
+, we have 
+
+E∥mt+1 − m(i)
+
+> t+1
+
+∥ ≤ (1 − 1
+
+N )β2
+
+ψt
+
+N + (1 − 1
+
+N )(1 − β2)L ϕt
+
+τ N 
+
++ 1
+
+N β1
+
+ψt
+
+N + 2(1 − β2)σN + (1 − β2)LNϕt
+
+τ N 
+
+= β2ψt
+
+N + 2(1 − β2)σN + (1 − β2)Lϕ t
+
+τ N 
+
+= ψt+1 
+
+N . (54) At the same time, we also have 
+
+E∥ct+1 − c(i)
+
+> t+1
+
+∥ ≤ (1 − 1
+
+N )β1
+
+ψt
+
+N + (1 − 1
+
+N )(1 − β1)L ϕt
+
+τ N 
+
++ 1
+
+N β1
+
+ψt
+
+N + 1
+
+N (1 − β1)2 σ + 1
+
+N (1 − β1)L ϕt
+
+τ N 
+
+= β1ψt
+
+N + 2(1 − β1)σN + (1 − β1)Lϕ t
+
+τ N . (55) Let ϕt+1 = (1 − λη )ϕt + 2 η√d β1ψt + 2(1 − β1)σ + (1 − β1)L ϕt
+
+> τ
+
+, we have 
+
+E∥wt+1 − w(i)
+
+> t+1
+
+∥ ≤ (1 − λη )E∥wt − w(i) 
+
+> t
+
+∥ + 2η√dτ E∥ct+1 − c(i)
+
+> t+1
+
+∥≤ (1 − λη ) ϕt
+
+τ N + 2η√dτ
+
+  β1ψt
+
+N + 2(1 − β1)σN + (1 − β1)Lϕ t
+
+τ N 
+
+
+
+= ϕt+1 
+
+τ N . (56) Let η = O( 1√d ), λ = O(1) with λ ∈ [0 , 1 
+
+> η
+
+), β1 = O(1) with β1 ∈ [0 , 1) , β2 = O(1) with β2 ∈ [0 , 1) , σ = O(1) 
+
+and L = O(1) . Since ψt = O( 1  
+
+> τt−1
+
+) and ϕt = O( 1  
+
+> τt−1
+
+), we have 
+
+ψt+1 = β2ψt + 2(1 − β2)σ + (1 − β2)L ϕt
+
+τ = O( 1
+
+τ t ),ϕt+1 = (1 − λη )ϕt + 2 η√d β1ψt + 2(1 − β1)σ + (1 − β1)L ϕt
+
+τ
+
+ = O( 1
+
+τ t ). (57) 
+
+21 Then we have 
+
+E∥wt+1 − w(i)
+
+> t+1
+
+∥ ≤ ϕt+1 
+
+τ N = O( 1
+
+τ t+1 N ). (58) By using mathematical induction, then we have 
+
+E∥wT − w(i) 
+
+> T
+
+∥ ≤ O( 1
+
+τ T N ). (59) By using Assumption 2, i.e., the condition of G-Lipschitz f (w; ξ) (i.e.,), we have for any ξ ∼ D 
+
+E|f (wT ; ξ) − f (w(i) 
+
+> T
+
+; ξ)| ≤ GE∥wT − w(i) 
+
+> T
+
+∥ ≤ O( 1
+
+τ T N ), (60) where the last inequality holds by the above inequality (59) and G = O(1) .By using the lemma 1, i.e., the uniform stability bound [Shalev-Shwartz et al., 2010, Hardt et al., 2016], and taking expectations over S, S(i) and the algorithm’s randomness on the above inequality (60), we can obtain 
+
+|E[F (wT ) − FS (wT )] | ≤ O( 1
+
+τ T N ). (61) 
+
+# B Generalization Analysis of our CLion Optimizer 
+
+Theorem 5. (Restatement of Theorem 2) Assume the sequence {wt}Tt=1 is generated from Algorithm 2 on dataset S = {ξ1, ξ 2, · · · , ξ N }. Under the Assumptions 1, 2, 3, without loss of generality, let ν ≥ 1, λ = O(1) 
+
+with 0 < λ ≤ 1 
+
+> η
+
+, β1 = O(1) with β1 ∈ (0 , 1) , β2 = O(1) with β2 ∈ (0 , 1) , σ = O(1) , L = O(1) and G = O(1) .When the iteration number is small (i.e., T = O(1) ) set η = 1√d , otherwise set η = 1√dT , we have 
+
+|E[F (wT ) − FS (wT )] | ≤ O( 1
+
+N ). (62) 
+
+Proof. Let ct be generated from Algorithm 2 for any t ≥ 1. Meanwhile, we combine the line 8 with the line 10 of Algorithm 2 by the following formation, 
+
+wt = wt−1 − η h(ct) + λw t−1
+
+, (63) where h(ct) = sign (ct) when min j∈St |(ct)j | ≥ ν with St = {j|(ct)j̸ = 0 , j = 1 , · · · , d }, otherwise h(ct) = ct.When min j∈St |(ct)j | ≥ ν with St = {j|(ct)j̸ = 0 , j = 1 , · · · , d }, based on the above proof of Lemma 2, we can obtain 
+
+h(ct) − h(c(i) 
+
+> t
+
+) = sign (ct) − sign (c(i) 
+
+> t
+
+) ≤ 2√dν ∥ct − c(i) 
+
+> t
+
+∥. (64) Without loss of generality, let ν ≥ 1, we have 
+
+h(ct) − h(c(i) 
+
+> t
+
+) = sign (ct) − sign (c(i) 
+
+> t
+
+) ≤ 2√dν ∥ct − c(i) 
+
+> t
+
+∥ ≤ 2√d∥ct − c(i) 
+
+> t
+
+∥. (65) When min j∈St |(ct)j | < ν , we have 
+
+h(ct) − h(c(i) 
+
+> t
+
+) = ct − c(i) 
+
+> t
+
+≤ 2√d∥ct − c(i) 
+
+> t
+
+∥. (66) 
+
+22 Thus we have for all t ≥ 0
+
+h(ct) − h(c(i) 
+
+> t
+
+) ≤ 2√d∥ct − c(i) 
+
+> t
+
+∥. (67) Implementing Algorithm 2 on datasets S and S(i) with the same random index sequence {jt}Tt=1 , and let {wt}Tt=1 and {w(i) 
+
+> t
+
+}Tt=1 be generated from Algorithm 2 with S and S(i), respectively. From Algorithm 2, wt = wt−1 − η h(ct) + λw t−1
+
+ and w(i) 
+
+> t
+
+= w(i) 
+
+> t−1
+
+− η h(c(i) 
+
+> t
+
+) + λw (i)
+
+> t−1
+
+, we have 
+
+wt − w(i) 
+
+> t
+
+= (1 − ηλ )( wt−1 − w(i)
+
+> t−1
+
+) − η h(ct) − h(c(i) 
+
+> t
+
+). (68) Then we have 
+
+∥wt − w(i) 
+
+> t
+
+∥ = ∥(1 − ηλ )( wt−1 − w(i)
+
+> t−1
+
+) − η h(ct) − h(c(i) 
+
+> t
+
+)∥≤ (1 − ηλ )∥wt−1 − w(i)
+
+> t−1
+
+∥ + η∥h(ct) − h(c(i) 
+
+> t
+
+)∥≤ (1 − ηλ )∥wt−1 − w(i)
+
+> t−1
+
+∥ + 2 η√d∥ct − c(i) 
+
+> t
+
+∥, (69) where 0 < λ ≤ 1 
+
+> η
+
+.Following the above proof of Theorem 1, by using the above inequalities (56) and (69), we have 
+
+E∥wt+1 − w(i)
+
+> t+1
+
+∥ ≤ (1 − λη )E∥wt − w(i) 
+
+> t
+
+∥ + 2 η√dE∥ct+1 − c(i)
+
+> t+1
+
+∥≤ (1 − λη ) ϕt
+
+N + 2 η√d  β1ψt
+
+N + 2(1 − β1)σN + (1 − β1)Lϕ t
+
+N
+
+ = ϕt+1 
+
+N , (70) where ϕt+1 = (1 − λη )ϕt + 2 η√d β1ψt + 2(1 − β1)σ + (1 − β1)Lϕ t
+
+. Similarly, by using the above inequali-ties (54) and (69), we have 
+
+E∥mt+1 − m(i)
+
+> t+1
+
+∥ ≤ β2ψt
+
+N + 2(1 − β2)σN + (1 − β2)Lϕ t
+
+N = ψt+1 
+
+N , (71) where ψt+1 = β2ψt + 2(1 − β2)σ + (1 − β2)Lϕ t.
+
+When the iteration number is small (i.e., T = O(1) ), following the above proof of Theorem 1, let 
+
+η = 1√d , λ = O(1) with 0 < λ ≤ 1 
+
+> η
+
+, β1 = O(1) with β1 ∈ (0 , 1) , β2 = O(1) with β2 ∈ (0 , 1) , σ = O(1) and 
+
+L = O(1) . Assume E∥wt − w(i) 
+
+> t
+
+∥ ≤ ϕt 
+
+> N
+
+with ϕt = O(1) , and E∥mt − m(i) 
+
+> t
+
+∥ ≤ ψt 
+
+> N
+
+with ψt = O(1) , we can obtain ϕt+1 = O(1) and ψt+1 = O(1) . By using the above inequality (70), then we have 
+
+E∥wt+1 − w(i)
+
+> t+1
+
+∥ ≤ ϕt+1 
+
+N = O( 1
+
+N ). (72) Based on the mathematical induction, we have 
+
+E∥wT − w(i) 
+
+> T
+
+∥ ≤ ϕT
+
+N = O( 1
+
+N ). (73) 
+
+When the totally iteration number T is large, we consider the iteration number t ≥ 1 in the following generalization analysis. By using mathematical induction, due to recursion of the above inequality (70), we assume E∥wt − w(i) 
+
+> t
+
+∥ ≤ ϕt 
+
+> N
+
+with ϕt = O(t), and E∥mt − m(i) 
+
+> t
+
+∥ ≤ ψt 
+
+> N
+
+with ψt = O(t). Following the above proof of Theorem 1, let η = O( 1√d ), λ = O(1) with 0 < λ ≤ 1 
+
+> η
+
+, β1 = O(1) with β1 ∈ (0 , 1) , β2 = O(1) with 
+
+β2 ∈ (0 , 1) , σ = O(1) and L = O(1) , we can obtain ϕt+1 = O(t + 1) and ψt+1 = O(t + 1) . By using the above inequality (70), then we have 
+
+E∥wt+1 − w(i)
+
+> t+1
+
+∥ ≤ ϕt+1 
+
+N = O( t + 1 
+
+N ). (74) 
+
+23 Based on the mathematical induction, we have 
+
+E∥wT − w(i) 
+
+> T
+
+∥ ≤ ϕT
+
+N = O( TN ). (75) Similarly, following the above proof of Theorem 1, let η = O( 1  
+
+> T√d
+
+), λ = O(1) with 0 < λ ≤ 1 
+
+> η
+
+, β1 = O(1) 
+
+with β1 ∈ (0 , 1) , β2 = O(1) with β2 ∈ (0 , 1) , σ = O(1) and L = O(1) , we can obtain 
+
+E∥wT − w(i) 
+
+> T
+
+∥ ≤ ϕT
+
+N = O( 1
+
+N ). (76) By using Assumption 2, i.e., the condition of G-Lipschitz f (w; ξ) (i.e.,), we have for any ξ ∼ D 
+
+E|f (wT ; ξ) − f (w(i) 
+
+> T
+
+; ξ)| ≤ GE∥wT − w(i) 
+
+> T
+
+∥ ≤ O( 1
+
+N ), (77) where the last inequality holds by the above inequality (76) and G = O(1) .By using the lemma 1, i.e., the uniform stability bound [Shalev-Shwartz et al., 2010, Hardt et al., 2016], and taking expectations over S, S(i) and the algorithm’s randomness on the above inequality (77), we can obtain 
+
+|E[F (wT ) − FS (wT )] | ≤ O( 1
+
+N ). (78) 
+
+# C Convergence Analysis of our CLion Optimizer 
+
+Lemma 6. (Lemma A.7. of [Liu et al., 2024]) Let (X, Y ) is a joint random variable on Rd × Rd. For any constant a ∈ (0 , +∞), we have 
+
+E[⟨X, sign (X) − sign (Y )⟩] ≤ 2α√dE∥X/α − Y ∥. (79) 
+
+Lemma 7. (Nesterov et al. [2018]) Assume that f (w) is a differentiable convex function and W is a convex set. w∗ ∈ W is the solution of the constrained problem min w∈W f (w), if 
+
+⟨∇ f (w∗), w − w∗⟩ ≥ 0, ∀w ∈ W .
+
+Lemma 8. (Restatement of Lemma 3) Assume the sequence {wt}Tt=1 is generated from Algorithm 2, let 
+
+∥w0∥ ≤ η ˆG and λ ≤ 12η ˆGT α with α > 1, we have 
+
+∥wt∥ ≤ (t + 1) η ˆG, ∥wt − wt−1∥ ≤ 2η ˆG, (80) 
+
+where ˆG = max( G, √d).Proof. When min j∈St |(ct)j | ≥ ν with St = {j|(ct)j̸ = 0 , j = 1 , · · · , d }, according to the line 8 of Algo-rithm 2, we have 
+
+∥wt∥ = ∥wt−1 − η(sign (ct) + λw t−1)∥
+
+= ∥(1 − ηλ )wt−1 + ηsign (ct)∥≤ (1 − ηλ )∥wt−1∥ + η√d
+
+≤ (1 − ηλ )t∥w0∥ + tη √d
+
+≤ (t + 1) η√d, (81) 
+
+24 where ∥w0∥ ≤ η max( √d, G ).By using Assumption 2, since ∥∇ f (w; ξ)∥ ≤ G and β1, β 2 ∈ (0 , 1) , we can easily obtain ∥mt∥ ≤ G and 
+
+∥ct∥ ≤ G.When min j∈St |(ct)j | < ν , according to the line 10 of Algorithm 2, we have 
+
+∥wt∥ = ∥wt−1 − η(ct + λw t−1)∥
+
+= ∥(1 − ηλ )wt−1 + ηc t∥≤ (1 − ηλ )∥wt−1∥ + η∥ct∥≤ (1 − ηλ )∥wt−1∥ + ηG 
+
+≤ (1 − ηλ )t∥w0∥ + tηG 
+
+≤ (t + 1) ηG, (82) where ∥w0∥ ≤ η max( √d, G ).Let ˆG = max( G, √d), we have ∥wt∥ ≤ (t + 1) η ˆG for all t ≥ 0. When min j∈St |(ct)j | ≥ ν, then we have 
+
+∥wt − wt−1∥2 = ∥η(sign (ct) + λw t−1)∥2
+
+≤ 2η2∥sign (ct)∥2 + 2 η2λ2∥wt−1∥2
+
+≤ 2η2d + 2 η2λ2t2η2 ˆG2
+
+≤ 4η2 ˆG2, (83) where λ ≤ 12η ˆGT α with α > 1.When min j∈St |(ct)j | < ν , then we have 
+
+∥wt − wt−1∥2 = ∥η(ct + λw t−1)∥2
+
+≤ 2η2∥ct∥2 + 2 η2λ2∥wt−1∥2
+
+≤ 2η2G2 + 2 η2λ2t2η2 ˆG2
+
+≤ 4η2 ˆG2, (84) where λ ≤ 12η ˆGT α with α > 1.Thus, we have ∥wt − wt−1∥2 ≤ 4η2 ˆG2 for all t ≥ 1, and it implies that ∥wt − wt−1∥ ≤ 2η ˆG.
+
+Lemma 9. (Restatement of Lemma 4) Assume the sequence {ct}Tt=1 is generated from Algorithm 2, let 
+
+∥w0∥ ≤ η ˆG and λ ≤ 12η ˆGT α with α > 1, we have 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥ct+1 − ∇ F (wt)∥ ≤ 
+
+p2( σ2 + G2)
+
+p(1 − β2)T + 2√2L ˆGη 
+
+1 − β2
+
++
+
+√2|β1 − β2|√1 − β2
+
+σ + 1 − β1
+
+√1 − β2
+
+σ, (85) 
+
+where ˆG = max( G, √d).Proof. At the lines 6 and 12 in Algorithm 2, it has ct = β1mt−1 + (1 − β1)gt and mt = β2mt−1 + (1 − β2)gt
+
+25 for t ≥ 1. Since ct+1 = β1mt + (1 − β1)gt+1 = β1mt + (1 − β1)∇f (wt; ξt+1 ), then we have 
+
+E∥ct+1 − ∇ F (wt)∥2
+
+= E∥β1mt + (1 − β1)∇f (wt; ξt+1 ) − ∇ F (wt)∥2
+
+= E∥β1β2mt−1 + β1(1 − β2)∇f (wt−1; ξt) + (1 − β1)∇f (wt; ξt+1 ) − ∇ F (wt)∥2
+
+= E∥β2(ct − (1 − β1)∇f (wt−1; ξt)) + β1(1 − β2)∇f (wt−1; ξt) + (1 − β1)∇f (wt; ξt+1 ) − ∇ F (wt)∥2
+
+= E∥β2ct + ( β1 − β2)∇f (wt−1; ξt) + (1 − β1)∇f (wt; ξt+1 ) − ∇ F (wt)∥2
+
+= E∥β2(ct − ∇ F (wt−1)) + ( β1 − β2)( ∇f (wt−1; ξt) − ∇ F (wt−1)) + (1 − β1)( ∇f (wt; ξt+1 ) − ∇ F (wt)) + β1(∇F (wt−1) − ∇ F (wt)) ∥2(i)
+
+= E∥β2(ct − ∇ F (wt−1)) + β1(∇F (wt−1) − ∇ F (wt)) ∥2
+
++ E∥(β1 − β2)( ∇f (wt−1; ξt) − ∇ F (wt−1)) + (1 − β1)( ∇f (wt; ξt+1 ) − ∇ F (wt)) ∥2(ii )
+
+≤ β22 (2 − β2)E∥ct − ∇ F (wt−1)∥2 + β21 (1 + 11 − β2
+
+)E∥∇ F (wt−1) − ∇ F (wt)∥2
+
++ 2( β1 − β2)2σ2 + 2(1 − β1)2σ2(iii )
+
+≤ β2E∥ct − ∇ F (wt−1)∥2 + 2L2
+
+1 − β2
+
+E∥wt−1 − wt∥2 + 2(( β1 − β2)2 + (1 − β1)2)σ2
+
+≤ β2E∥ct − ∇ F (wt−1)∥2 + 8L2η2 ˆG2
+
+1 − β2
+
++ 2(( β1 − β2)2 + (1 − β1)2)σ2, (86) where the equality (i) holds by E[∇f (wt; ξt+1 )] = ∇F (wt) and E[∇f (wt−1; ξt)] = ∇F (wt−1) , and the inequality (ii ) holds by Young’s inequality and Assumption 3, and the inequality (iii ) is due to 0 < β 2 < 1
+
+such that β22 (2 − β2) = (1 − (1 − β2)) 2(1 + 1 − β2) = 1 − (1 − β2) − (1 − β2)2 + (1 − β2)3 ≤ 1 − (1 − β2) and 
+
+β22 (1 + 11−β2 ) ≤ 21−β2 , and the last inequality holds by the above Lemma 3. By expanding the recursion to the above inequality (86), we can obtain 
+
+E∥ct+1 − ∇ F (wt)∥2
+
+≤ βt
+
+> 2
+
+E∥c1 − ∇ F (w0)∥2 + ( 8L2η2 ˆG2
+
+1 − β2
+
++ 2(( β1 − β2)2 + (1 − β1)2)σ2)
+
+> t
+
+X
+
+> s=1
+
+βt−s
+
+> 2
+
+≤ βt
+
+> 2
+
+(2 σ2 + 2 G2) + 8L2η2 ˆG2
+
+(1 − β2)2 + 2( β1 − β2)2
+
+1 − β2
+
+σ2 + 2(1 − β1)2
+
+1 − β2
+
+σ2. (87) Then we have 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥ct+1 − ∇ F (wt)∥2
+
+≤ 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ βt
+
+> 2
+
+(2 σ2 + 2 G2) + 8L2η2 ˆG2
+
+(1 − β2)2 + 2( β1 − β2)2
+
+1 − β2
+
+σ2 + (1 − β1)2
+
+1 − β2
+
+σ2)
+
+≤ 2( σ2 + G2)
+
+T (1 − β2) + 8L2η2 ˆG2
+
+(1 − β2)2 + 2( β1 − β2)2
+
+1 − β2
+
+σ2 + (1 − β1)2
+
+1 − β2
+
+σ2, (88) where the last inequality holds by PTt=1 βt 
+
+> 2
+
+≤ 11−β2 .
+
+26 By using Jensen inequality, we have 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥ct+1 − ∇ F (wt)∥ =
+
+vuut  1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥ct+1 − ∇ F (wt)∥2
+
+≤
+
+vuut 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥ct+1 − ∇ F (wt)∥2
+
+≤
+
+s
+
+2( σ2 + G2)
+
+T (1 − β2) + 8L2η2 ˆG2
+
+(1 − β2)2 + 2( β1 − β2)2
+
+1 − β2
+
+σ2 + (1 − β1)2
+
+1 − β2
+
+σ2
+
+≤
+
+p2( σ2 + G2)
+
+p(1 − β2)T + 2√2L ˆGη 
+
+1 − β2
+
++
+
+√2|β1 − β2|√1 − β2
+
+σ + 1 − β1
+
+√1 − β2
+
+σ. (89) 
+
+Theorem 6. (Restatement of Theorem 3) Assume the sequence {wt}Tt=1 is generated from Algorithm 2. Under the Assumptions 4, 2, 3, 5, and let 0 < λ ≤ 12η ˆGT α , η = O( 1  
+
+> T3/4
+
+), β1 = 1 − O( 1√T ), β2 = 1 − O( 1√T ),
+
+|β1 − β2| = O( 1√T ) and 0 < ν 0 ≤ ν, and further set α = 54 and ν0 ≥ O( 1√d ), we can obtain 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥∇ F (wt)∥1 ≤ O(
+
+√dT 1/4 ). (90) 
+
+Proof. When min j∈St |(ct)j | ≥ ν, since wt = wt−1 − η(sign (ct) + λw t−1), we have 
+
+F (wt) ≤ F (wt−1) + ⟨∇ F (wt−1), w t − wt−1⟩ + L
+
+2 ∥wt − wt−1∥2
+
+= F (wt−1) + ⟨∇ F (wt−1), −η(sign (ct) + λw t−1)⟩ + L
+
+2 ∥wt − wt−1∥2
+
+= F (wt−1) − ⟨∇ F (wt−1), η (sign (ct) − sign (∇F (wt−1))) ⟩ − η⟨∇ F (wt−1), sign (∇F (wt−1)) ⟩− ηλ ⟨∇ F (wt−1), w t−1⟩ + L
+
+2 ∥wt − wt−1∥2(i)
+
+≤ F (wt−1) + 2 √dη ∥ct − ∇ F (wt−1)∥ − η∥∇ F (wt−1)∥1
+
+− ηλ ⟨∇ F (wt−1), w t−1⟩ + L
+
+2 ∥wt − wt−1∥2
+
+≤ F (wt−1) + 2 √dη ∥ct − ∇ F (wt−1)∥ − η∥∇ F (wt−1)∥1
+
++ ηλ ∥∇ F (wt−1)∥1∥wt−1∥∞ + 2 Lη 2 ˆG2(ii )
+
+≤ F (wt−1) + 2 √dη ∥ct − ∇ F (wt−1)∥ − η∥∇ F (wt−1)∥1
+
++ ηλ ∥∇ F (wt−1)∥1tη ˆG + 2 Lη 2 ˆG2
+
+≤ F (wt−1) + 2 √dη ∥ct − ∇ F (wt−1)∥ − η
+
+2 ∥∇ F (wt−1)∥1 + 2 Lη 2 ˆG2, (91) where the above inequality (i) holds by the Lemma 6 with α = 1 , and the above inequality (ii ) holds by the Lemma 3, and the last inequality is due to λ ≤ 12η ˆGT α with α > 1. Then we have 
+
+∥∇ F (wt−1)∥1 ≤ 2( F (wt−1) − F (wt)) 
+
+η + 4 √d∥ct − ∇ F (wt−1)∥ + 4 Lη ˆG2. (92) 
+
+27 When min j∈St |(ct)j | < ν , since wt = wt−1 − η(ct + λw t−1), we have 
+
+wt = wt−1 − η(ct + λw t−1)= (1 − ηλ )wt−1 − ηc t
+
+= arg min 
+
+> w∈Rd
+
+⟨ct, w − (1 − ηλ )wt−1⟩ + 12η ∥w − (1 − ηλ )wt−1∥2 . (93) By using the optimality condition of the above subproblem (93), by using Lemma 7, we have 
+
+⟨ct + 1
+
+η
+
+ wt − (1 − λη )wt−1
+
+, w − wt⟩ ≥ 0, ∀w ∈ Rd. (94) Putting w = wt−1 into the above inequality (94), we have 
+
+⟨ct + 1
+
+η
+
+ wt − (1 − λη )wt−1
+
+, w t−1 − wt⟩ ≥ 0. (95) Thus, we can obtain 
+
+⟨ct, w t−1 − wt⟩ ≥ 1
+
+η ⟨wt − wt−1, w t − wt−1⟩ + λ⟨wt−1, w t − wt−1⟩≥ 1
+
+η ∥wt − wt−1∥2 + λ⟨wt−1, w t − wt−1⟩. (96) Since min j∈St |(ct)j | < ν with St = {j|(ct)j̸ = 0 , j = 1 , · · · , d }, there exist a positive number 0 < ν 0 ≤ ν,we have ν0∥ct∥1 ≤ ∥ ct∥2. Then we have −∥ ct∥2 ≤ − ν0∥ct∥1.
+
+28 When min j∈St |(ct)j | < ν , since wt = wt−1 − η(ct + λw t−1), we have 
+
+F (wt) ≤ F (wt−1) + ⟨∇ F (wt−1), w t − wt−1⟩ + L
+
+2 ∥wt − wt−1∥2
+
+= F (wt−1) + ⟨∇ F (wt−1) − ct, w t − wt−1⟩ + ⟨ct, w t − wt−1⟩ + L
+
+2 ∥wt − wt−1∥2
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 + 12η ∥wt − wt−1∥2 + ⟨ct, w t − wt−1⟩ + L
+
+2 ∥wt − wt−1∥2(i)
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 + 12η ∥wt − wt−1∥2
+
+− 1
+
+η ∥wt − wt−1∥2 − λ⟨wt−1, w t − wt−1⟩ + L
+
+2 ∥wt − wt−1∥2
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 + 12η ∥wt − wt−1∥2
+
+− 1
+
+η ∥wt − wt−1∥2 + λ∥wt−1∥∥ wt − wt−1∥ + L
+
+2 ∥wt − wt−1∥2
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 − 14η ∥wt − wt−1∥2 + λtη ˆG2η ˆG
+
+> (ii )
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 − η
+
+8 ∥ct∥2 + λ2η
+
+4 ∥wt−1∥2 + η ˆGT α−1(iii )
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 − ην 0
+
+8 ∥ct∥1 + λ2η
+
+4 ∥wt−1∥2 + η ˆGT α−1
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 − ην 0
+
+8 ∥∇ F (wt−1)∥1 + ην 0
+
+8 ∥ct − ∇ F (wt−1)∥1
+
++ λ2η
+
+4 ∥wt−1∥2 + η ˆGT α−1
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 − ην 0
+
+8 ∥∇ F (wt−1)∥1 + ην 0
+
+√d
+
+8 ∥ct − ∇ F (wt−1)∥
+
++ λ2η
+
+4 t2η2 ˆG2 + η ˆGT α−1
+
+≤ F (wt−1) + η
+
+2 ∥∇ F (wt−1) − ct∥2 − ην 0
+
+8 ∥∇ F (wt−1)∥1 + ην 0
+
+√d
+
+8 ∥ct − ∇ F (wt−1)∥
+
++ η
+
+16 T 2α−2 + η ˆGT α−1 , (97) where the inequality (i) holds by the above inequality (96), and the inequality (ii ) holds by −∥ wt −wt−1∥2 =
+
+−η2∥ct + λw t−1∥2 ≤ − η2 
+
+> 2
+
+∥ct∥2 + η2λ2∥wt−1∥2, and the inequality (iii ) holds by −∥ ct∥2 ≤ − ν0∥ct∥1 with 
+
+0 < ν 0 ≤ ν, and the last inequality is due to λ ≤ 12η ˆGT α with α > 1.Then we have 
+
+∥∇ F (wt−1)∥1 ≤ 8( F (wt−1) − F (wt)) 
+
+ην 0
+
++ 4
+
+ν0
+
+∥∇ F (wt−1) − ct∥2 + √d∥ct − ∇ F (wt−1)∥
+
++ 12ν0T 2α−2 + 8 ˆGν0T α−1 (98) 
+
+29 By combining the above inequalities (92) with (98), we have 
+
+E∥∇ F (wt−1)∥1 ≤ 8( F (wt−1) − F (wt)) 
+
+ην 0
+
++ 4
+
+ν0
+
+E∥∇ F (wt−1) − ct∥2 + √dE∥ct − ∇ F (wt−1)∥
+
++ 12ν0T 2α−2 + 8 ˆGν0T α−1
+
++ 2( F (wt−1) − F (wt)) 
+
+η + 4 √dE∥ct − ∇ F (wt−1)∥ + 4 Lη ˆG2
+
+= 8( F (wt−1) − F (wt)) 
+
+ην 0
+
++ 2( F (wt−1) − F (wt)) 
+
+η + 4
+
+ν0
+
+E∥∇ F (wt−1) − ct∥2
+
++ 5 √dE∥ct − ∇ F (wt−1)∥ + 12ν0T 2α−2 + 8 ˆGν0T α−1 + 4 Lη ˆG2. (99) Then we have 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥∇ F (wt)∥1
+
+≤ 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ 8( F (wt−1) − F (wt)) 
+
+ην 0
+
++ 2( F (wt−1) − F (wt)) 
+
+η
+
+
+
++ 4
+
+ν0
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥∇ F (wt) − ct+1 ∥2
+
+5√d 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥ct+1 − ∇ F (wt)∥ + 12ν0T 2α−2 + 8 ˆGν0T α−1 + 4 Lη ˆG2
+
+≤ 2(4 + ν0)( F (w1) − F ∗)
+
+T ην 0
+
++ 4
+
+ν0
+
+  2( σ2 + G2)
+
+T (1 − β2) + 8L2η2 ˆG2
+
+(1 − β2)2 + 2( β1 − β2)2
+
+1 − β2
+
+σ2 + (1 − β1)2
+
+1 − β2
+
+σ2
+
++ 5 √d  p2( σ2 + G2)
+
+p(1 − β2)T + 2√2L ˆGη 
+
+1 − β2
+
++
+
+√2|β1 − β2|√1 − β2
+
+σ + 1 − β1
+
+√1 − β2
+
+σ
+
++ 12ν0T 2α−2 + 8 ˆGν0T α−1 + 4 Lη ˆG2, (100) where the last inequality holds by Assumption 5. Let η = O( 1  
+
+> T3/4
+
+), β1 = 1 − O( 1√T ), β2 = 1 − O( 1√T ), |β1 − β2| = O( 1√T ) and α = 54 , and let ν0 ≥ O( 1√d ),we can obtain 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥∇ F (wt)∥1 ≤ O(
+
+√dT 1/4 ). (101) 
+
+30
