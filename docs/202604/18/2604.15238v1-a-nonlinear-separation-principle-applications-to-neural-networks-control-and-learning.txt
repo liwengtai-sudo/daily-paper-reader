@@ -1,0 +1,1475 @@
+Title: A Nonlinear Separation Principle: Applications to Neural Networks, Control and Learning
+
+URL Source: https://arxiv.org/pdf/2604.15238v1
+
+Published Time: Fri, 17 Apr 2026 01:16:07 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# A Nonlinear Separation Principle: Applications to Neural Networks, Control and Learning 
+
+Anand Gokhale, Anton V. Proskurnikov, Yu Kawano, Francesco Bullo 
+
+Abstract — This paper investigates continuous-time and discrete-time firing-rate and Hopfield recurrent neural net-works (RNNs), with applications in nonlinear control de-sign and implicit deep learning. First, we introduce anonlinear separation principle that guarantees global ex-ponential stability for the interconnection of a contract-ing state-feedback controller and a contracting observer, alongside parametric extensions for robustness and equi-librium tracking. Second, we derive sharp linear matrix inequality (LMI) conditions that guarantee the contractivity of both firing rate and Hopfield neural network architec-tures. We establish structural relationships among these certificates—demonstrating that continuous-time models with monotone non-decreasing activations maximize the admissible weight space—and extend these stability guar-antees to interconnected systems and Graph RNNs. Third, we combine our separation principle and LMI framework to solve the output reference tracking problem for RNN-modeled plants. We provide LMI synthesis methods for feedback controllers and observers, and rigorously design a low-gain integral controller to eliminate steady-state er-ror. Finally, we derive an exact, unconstrained algebraic parameterization of our contraction LMIs to design highly expressive implicit neural networks, achieving competitive accuracy and parameter efficiency on standard image clas-sification benchmarks. 
+
+I. I NTRODUCTION 
+
+a) Motivation: Recurrent neural networks (RNNs) are a foundational architecture in machine learning. Unlike heavily parameterized models such as transformers, RNNs main-tain low computational and memory requirements, making them well suited for deployment in resource-constrained edge applications and real-time data-driven control [10], [11]. While discrete-time RNNs dominate modern machine learn-ing pipelines, continuous-time formulations offer several ad-vantages. Their dynamics naturally mirror biological neural circuits, making them a biologically plausible model in com-putational neuroscience [32]. In hardware implementations, 
+
+This work was in part supported by AFOSR project FA9550-22-1-0059 and by JST FOREST Program Grant Number JPMJFR222E. Anand Gokhale and Francesco Bullo are with the Center for Control, Dy-namical Systems, and Computation, UC Santa Barbara, Santa Barbara, CA 93106 USA. email: {anand gokhale,bullo }@ucsb.edu .Anton V. Proskurnikov is with Department of Electronics and Telecommunications, Politecnico di Torino, Italy, 10129. email: 
+
+anton.p.1982@ieee.org 
+
+Yu Kawano is with the Graduate School of Advanced Science and Engineering, Hiroshima University, Higashi-Hiroshima 739-8527, Japan. email: ykawano@hiroshima-u.ac.jp 
+
+Anand Gokhale thanks Alexander Davydov for fruitful discussions. 
+
+continuous-time dynamics can also enable faster processing and lower power consumption, motivating long-standing inter-est in analog circuit design [37]. Beyond traditional sequence processing, RNNs have recently become central to implicit deep learning: in architectures such as Deep Equilibrium Models (DEQs) [40], a cascade of layers is replaced by the steady-state equilibrium of an RNN, directly linking model evaluation to the network’s asymptotic dynamics. Across these domains, reliable implementation requires ro-bust stability guarantees to prevent divergent behavior and ensure safe operation in the presence of noise and model uncertainty. To this end, we employ contraction theory [7] as the primary mathematical framework for certifying robustness. Contraction theory provides two key guarantees that are central for the applications considered here: (i) uniqueness and expo-nential stability of an equilibrium point, and (ii) incremental input-to-state stability, which in turn ensures robustness to disturbances, delays, and time-varying environments [12]. A key challenge in applying contraction theory to neu-ral networks is the identification of sharp, computation-ally tractable conditions that guarantee contraction. Recent works [10], [14] derive stability conditions for globally non-expansive activation functions. However, the most widely used activation functions – such as ReLU, tanh , and sigmoid – are not merely nonexpansive but also monotone nondecreasing. Neglecting this additional structure results in overly conserva-tive stability guarantees. Accordingly, we seek to characterize the maximal set of synaptic matrices that guarantee contraction of RNNs for these practically relevant classes of nonlinearities. Furthermore, interconnections and compositions of RNNs have recently attracted significant attention in neuro-science [24], data-driven control design [10], and graph neural networks [4], [20]. Existing contractivity conditions for such interconnections assume that each subsystem is contracting. While it may seem mathematically natural, this assumption can be restrictive in practice. A canonical example is the observer-based stabilization of an open-loop unstable plant, where the plant itself is inherently non-contracting yet can be rendered exponentially stable via output feedback. For linear systems, such designs rely on the classical separation principle. A nonlinear counterpart to the separation principle remains elusive in general, with existing results typically limited to specialized system classes or restrictive structural assumptions such as high gain observers. 
+
+b) Relevant Literature: A contraction-based analysis of continuous-time neural networks in the ℓ1 and ℓ∞ norms is 
+
+> arXiv:2604.15238v1 [eess.SY] 16 Apr 2026
+
+presented in [21], and the sharpest known conditions in the Euclidean norm are limited to the symmetric case [8]. In the discrete-time setting, a parameterization of robust RNNs is presented in [30]. Existing approaches to nonlinear separation principles have relied heavily on time-scale-separation arguments and high-gain observers [2], [38]. These methods require the observer dynamics to be sufficiently faster than the plant dynamics, which may lead to undesirable transient peaks in the closed-loop trajectories and even finite escape time [15]. Under vari-ous structural assumptions on the system, separation principles have been provided for Lur’e systems [34], control-affine systems with linear inputs [26], and SSMs [42]. Control design for discrete time RNNs has been previously studied in the context of asymptotic stability [27] and incre-mental ISS properties [10], without closed loop guarantees. Structurally, RNNs can be considered a subclass of Lur’e-type systems, i.e., feedback interconnections of LTI blocks and static nonlinear maps. A distinguishing feature of RNNs is that their external inputs and outputs may enter and exit the system through a nonlinearity, unlike the affine inputs and linear outputs usually assumed in standard Lur’e-type models [1], [18]. To control RNNs in the general case (in particular, to design a reference tracking controller) we thus employ tools from singular perturbation theory [35]. Finally, in implicit deep learning, recent findings show that increasing the number of fixed-point iterations can signifi-cantly improve model expressivity [25], an effect enabled by the model’s local Lipschitz dependence on its input. Motivated by this insight, we design input-dependent DEQs that are locally Lipschitz by construction.  
+
+> c) Contributions:
+
+This paper derives sharp contractiv-ity conditions for continuous-time and discrete-time firing-rate neural networks (FRNNs) and Hopfield neural networks (HNNs), and establishes a nonlinear separation principle based on contraction. We apply these results to controller design for RNN-modeled plants and to implicit-model architectures in machine learning. Our specific contributions are as follows. First, we introduce a nonlinear separation principle (The-orem 3). This principle states that if a plant can be rendered contracting under full-state feedback and observed through a contracting observer, then the resulting output-feedback closed loop is globally exponentially stable, with explicit estimates of both the observer and state errors. Crucially, this guarantee holds even when the coupled closed-loop system is not itself globally contracting. Building on this framework, we extend the separation principle to parametric systems to es-tablish rigorous robustness guarantees. We derive explicit error bounds for two practical scenarios: robustness against model mismatch when the controller and observer are designed using an estimated parameter, and equilibrium tracking performance when the system is subjected to time-varying parameters. Second, we derive certificates that guarantee the contraction of FRNNs and HNNs across standard classes of activation functions, summarized in Table I, demonstrate their tightness and establish structural relationships among these conditions, summarized by Theorem 14. Our analysis shows that the set of weight matrices guaranteeing contraction expands when passing from discrete-time to continuous-time models, and enlarges further when the activations are monotone non-decreasing rather than merely non-expansive, as is often as-sumed [14]. We also show that our certificates are optimal in the case of symmetric matrices. We establish a necessary condition for our certificate to hold for interconnected RNN systems (Theorem 20): such an interconnection may satisfy our contractivity certificate only if each subsystem is either individually satisfies our certificate or can be made to do so via static output feedback. Given that solving for static output feedback gain is an inherently nonconvex problem, this finding further highlights the utility of our separation principle. We also provide sufficient conditions for the global contractivity of Graph RNNs (Theorem 24), demonstrating that identical contracting subsystems preserve stability when coupled over undirected graphs, thereby enabling scalable, decentralized computation for graph neural networks. Third, we combine the proposed separation principle with our contraction certificates to address the reference-tracking problem for plants modeled by FRNNs. We provide LMI methods to synthesize full-state feedback controllers and state observers that satisfy the assumptions of our separation prin-ciple and also characterize necessary and sufficient conditions for the feasibility of these LMIs. Beyond exponential stabil-ity, we derive a synthesis procedure for a low-gain integral controller. Treating this integral controller as a time-varying parameter, we use the equilibrium tracking corollary of our separation principle to show the resulting closed-loop system achieves reference tracking with global exponential stability. Finally, we translate our sharp contractivity conditions into practical tools for machine learning. We derive an exact, unconstrained algebraic parameterization of the most expres-sive set of synaptic matrices characterized by our contraction LMIs (Theorem 35). Motivated by recent results [25], we leverage our parameterization to design highly expressive implicit neural networks with input-dependent weights. We demonstrate that the resulting architecture demonstrates com-petitive accuracy on the MNIST and CIFAR-10 benchmarks while using fewer parameters. Compared to the early version of this work [19], this extended journal version contains several novel contributions. First, we present a nonlinear separation principle within the framework of contraction theory. Second, we provide an extensive analysis of interconnections of RNNs with special-ized results for Graph RNNs. Third, the results on reference tracking in [19] are substantially generalized; in particular, our analysis accommodates open-loop unstable plants, which are excluded by the conditions in [19]. Finally, we provide a formal analysis with an explicit local Lipschitz bound for our parameter efficient implicit neural networks. The rest of this paper is organized as follows: We introduce some preliminaries in Section II. We present our first main result, a nonlinear separation principle in Section III. Next, we provide an analysis of the conditions for contractivity of FRNNs and HNNs including results on interconnections of RNNs in Section IV. The applications of our theoretical efforts in control design are discussed in Section V and machine learning are discussed in Section VI. II. B ACKGROUND  
+
+> Notation:
+
+We let 0n×m be the n × m all zero matrix, 
+
+In be the n × n identity matrix. For symmetric A, we write 
+
+A ≻ 0 (respectively, A ⪰ 0) if A is positive definite (respectively, semidefinite); A ≻ B means A − B ≻ 0.The opposite relations ≺, ⪯ are defined analogously. Given an n × n matrix P ≻ 0, we let ∥ · ∥ P denote the P -weighted Euclidean norm on Rn, defined by ∥x∥P := √x⊤P x . Given a norm ∥ · ∥ X on Rn, and ∥ · ∥ Y on Rm, and a matrix 
+
+A ∈ Rm×n, we denote the induced matrix norm ∥A∥X →Y =sup ∥x∥X =1  
+
+> ∥Ax ∥Y
+> ∥x∥X
+
+. Given two normed spaces (X , ∥ · ∥ X ) and 
+
+(Y, ∥ · ∥ Y ), a map F : X → Y is Lipschitz with constant 
+
+ρ ≥ 0, if for all x, ˜x ∈ X , ∥F (x) − F (˜ x)∥Y ≤ ρ∥x − ˜x∥X .We denote by Lip (F ) the (smallest) Lipschitz constant of F .If a map depends on several variables, e.g., x and u, we write Lip x(F ) for the Lipschitz constant with respect to the corresponding variable. We let diag( A1, A 2, · · · , A n) denote the block-diagonal matrix, where each Ai is either a matrix or a scalar. For each matrix A ∈ Rm×n, let A⊥ denote any full-column-rank matrix satisfying Im A⊥ = Ker( A), that is, a matrix whose columns form a basis of the kernel of A.
+
+A. Contraction theory 
+
+Unless otherwise stated, all vector fields F (t, x ) ∈ Rn,where t ∈ R≥0 and x ∈ Rn, are supposed to be continuous in t and locally Lipschitz in x. We say that F is strongly infinitesimally contracting with respect to ∥·∥ P with rate c > 0
+
+if for all x, ˜x ∈ Rn and t ≥ 0 the inequality holds 
+
+(F (t, x ) − F (t, ˜x)) ⊤P (x − ˜x) ≤ − c∥x − ˜x∥2 
+
+> P
+
+.
+
+The associated dynamical system ˙x = F (t, x ) is then said to be contracting in the same sense. If x(t) and ˜x(t) are two trajectories of this system, then ∥x(t) − ˜x(t)∥P ≤
+
+e−c(t−t0) ∥x(t0)− ˜x(t0)∥P , for all t ≥ t0 ≥ 0. A discrete-time system x+ = F (t, x ) is strongly contracting with constant ρ
+
+if Lip x(F ) ≤ ρ < 1. We refer to [7] for a recent review of contraction theory. A strongly contracting time-invariant system with F (t, x ) = F (x) always admits a unique and globally exponentially stable equilibrium. 
+
+B. Incremental multipliers 
+
+For our analysis, we utilize incremental matrix multipliers constraints [16] paired with the S-lemma. 
+
+Definition 1 (Incremental multiplier matrix): Consider a function Ψ : Rm → Rm, and a symmetric matrix M ∈
+
+R(2 m)×(2 m). The function Ψ is said to admit the incremental multiplier matrix M , if, for any x, ˜x ∈ Rm,
+
+ x − ˜x
+
+Ψ( x) − Ψ(˜ x)
+
+⊤
+
+M
+
+ x − ˜x
+
+Ψ( x) − Ψ(˜ x)
+
+
+
+≥ 0. (1) Henceforth, we primarily consider diagonal nonlinearities 
+
+Ψ : Rm → Rm, where the coordinate Ψ[i] depends solely on x[i]. We call such a map slope-restricted in [k1, k 2], where 
+
+−∞ < k 1 ≤ k2 < +∞, if all coordinate functions satisfy 
+
+k1 ≤ Ψ[i](x[i]) − Ψ[i](˜ x[i])
+
+x[i] − ˜x[i]
+
+≤ k2 ∀x[i], ˜x[i] ∈ R, x [i]̸ = ˜ x[i].
+
+In the context of neural networks, we define two classes of diagonal nonlinearities based on slope restrictions. 
+
+Definition 2 (CONE and MONE nonlinearities): A diagonal nonlinearity Ψ : Rn → Rn is said to be: (i) component-wise non-expansive (CONE) if it is slope-restricted in [−1, 1] , and (ii) monotonically non-decreasing and non-expansive (MONE) if it is slope-restricted in [0 , 1] .
+
+Lemma 1 (Incremental multiplier matrices, see [7, E3.25]): 
+
+If a diagonal nonlinearity Ψ : Rm → Rm is slope-restricted in 
+
+[k1, k 2], then for each diagonal positive definite Q ∈ Rm×m,
+
+Ψ admits the incremental multiplier matrix: 
+
+M =
+
+ −2k1k2Q (k1 + k2)Q
+
+(k1 + k2)Q −2Q
+
+
+
+.
+
+Consequently, the multiplier matrices 
+
+MCONE =
+
+ Q 0n×n
+
+0n×n −Q
+
+
+
+and MMONE =
+
+0n×n QQ −2Q
+
+
+
+are admitted by CONE and MONE nonlinearities respectively. 
+
+C. Contractivity of Lur’e-type systems 
+
+We consider both the continuous and discrete time Lur’e-type systems. These are presented below, 
+
+˙x = Ax + BΨ( Cx ), and (2) 
+
+x+ = Ax + BΨ( Cx ) (3) Here x ∈ Rn, A ∈ Rn×n, B ∈ Rn×m, C ∈ Rm×n
+
+and Ψ : Rm → Rm is a nonlinearity. We start with criteria for absolute contractivity of systems (2) and (3). The term “absolute” emphasizes that the property of contractivity is guaranteed uniformly over a class of nonlinearities, which, throughout this paper, is characterized by a given incremental multiplier M . Note that if Ψ admits the incremental multiplier 
+
+M , then Ψ( Cx ) admits the incremental multiplier 
+
+MC =
+
+ C 0m×m
+
+0m×n Im
+
+⊤
+
+M
+
+ C 0m×m
+
+0m×n Im
+
+
+
+. (4) The continuous-time part of the next lemma is presented in [9, Theorem 4.2], we present an extension to discrete time. 
+
+Lemma 2 (Absolute contractivity of Lur’e systems): Let 
+
+Ψ admit an incremental multiplier M ∈ R2m×2m, and let 
+
+MC be defined as in (4). Then, the system (2) is strongly infinitesimally contracting with respect to ∥ · ∥ P with rate 
+
+c > 0, where P = P ⊤ ≻ 0 is a n × n matrix, if 
+
+P A + A⊤P + 2 cP P B B⊤P 0m×m
+
+
+
++ MC ⪯ 0. (5) The system (3) is strongly contracting with respect to ∥ · ∥ P
+
+with a constant ρ ∈ [0 , 1) if 
+
+A⊤P A − ρ2P A⊤P B B⊤P A B⊤P B 
+
+
+
++ MC ⪯ 0. (6) 
+
+Proof: The proof is presented in Appendix II. III. A N ONLINEAR SEPARATION PRINCIPLE 
+
+Certifying the stability of an observer-based feedback loop is a fundamental challenge in nonlinear control. While the classical separation principle elegantly resolves this for linear systems, no general analog exists in the nonlinear setting as dy-namic interconnections of nonlinear systems do not inherently preserve stability properties. Existing nonlinear separation results typically rely on time-scale-separation arguments [2], [38] and high-gain observers whose well-known drawbacks are peaking and, in some cases, finite escape times [15]. Departing from high-gain methods, we utilize a contraction-theoretic framework. We seek to characterize the closed loop stability of the interconnection of an open loop unstable plant with an observer and full state feedback controller. Standard interconnection theorems in contraction (For example in [7, Theorem 3.23]) require that each subsystem is contracting, precluding their application to open-loop unstable plants. In fact, [7, Theorem 2.32] may be used to show that contraction of each component is a necessary condition. Instead, we seek to establish the global exponential stability of the closed-loop system. 
+
+Theorem 3 (Separation principle for contracting controllers and observers): Given maps F : Rn×Rm → Rn and h : Rn →
+
+Rp, consider the control system ˙x = F (x, u ) with output y =
+
+h(x). Let L : Rp × Rp × Rm → Rn be an observer, and let 
+
+K : Rn → Rm be a controller. Given norms ∥ · ∥ X and ∥ · ∥ O
+
+on Rn and a ∥ · ∥ U on Rm, assume the following conditions: (A1) (Plant contraction by state feedback) The dynamics ˙x =
+
+F (x, K (x)) is strongly infinitesimally contracting with rate cK with respect to ∥ · ∥ X , whose equilibrium is x⋆.(A2) (Lipschitz controller and plant input) Let K(x) be ℓK -Lipschitz in x from ∥ · ∥ O to ∥ · ∥ U . Let F (x, u ) be 
+
+ℓu-Lipschitz in u, from ∥ · ∥ U to ∥ · ∥ X , uniformly in x.(A3) (Plant-observer matching) L(x, u, h (x)) = F (x, u ) for all x and u.(A4) (Observer contraction) The dynamics ˙z = L(z, u, y ) is strongly infinitesimally contracting with respect to ∥·∥ O
+
+with rate cO , uniformly in inputs u and y.Then the trajectories of the closed-loop system 
+
+˙x = F (x, K (ξ)) , (7a) 
+
+˙ξ = L(ξ, K (ξ), h (x)) (7b) satisfy the exponentially-decaying error bounds: 
+
+∥ξ(t) − x(t)∥O ≤ ∥ ξ(0) − x(0) ∥O e−cO t, (8) 
+
+∥x(t) − x⋆∥X ≤ ∥ x(0) − x⋆∥X e−cK t
+
++ ℓuℓK ∥ξ(0) − x(0) ∥O
+
+
+
+e−cO t − e−cK t
+
+cK − cO
+
+, if cK̸ = cO ,t e−cK t, if cK = cO .
+
+Consequently, (x⋆, x ⋆) is a globally exponentially stable equi-librium with rate min( cK , c O ) (for cK̸ = cO ) or any rate strictly less than cK (for cK = cO ). 
+
+Proof: Combining (A1) and (A3), we find that (x∗, x ∗)
+
+is an equilibrium of the closed-loop system (7), since 
+
+L(x⋆, K (x⋆), h (x⋆)) = F (x⋆, K (x⋆)) = 0 .To establish (8), we observe that z(t) = x(t) and z(t) = 
+
+ξ(t) are both trajectories of ˙z = L(z, u, y ) corresponding to the same input signals u(t) = K(ξ(t)) and y(t) = h(x(t)) .For ξ(t), this follows from (7b); for x(t), it is implied by (7a) and Assumption (A3), because ˙x = F (x, u ) =
+
+L(x, u, h (x)) = L(x, u, y ). Due to the contractivity As-sumption (A4), all solutions of ˙z = L(z, u, y ) converge exponentially to one another, resulting in (8). Next, define the augmented plant dynamics ˙x =
+
+F (x, K (x)) + v = Faug (x, v ). By (A1), Faug is strongly infinitesimally contracting with respect to x, uniformly with respect to exogenous input v, and 1-Lipschitz with respect to 
+
+v, uniformly in x. Consider two trajectories of this system: one with initialization x0 and input v1 = F (x, K (ξ)) −
+
+F (x, K (x)) , and the second the nominal stationary trajectory with initialization x⋆ and input v2 = 0 . Using the incremental ISS property of contracting systems with Lipschitz inputs, we bound the distance between these trajectories: 
+
+D+∥x − x⋆∥X ≤ − cK ∥x − x⋆∥X + ∥v1 − v2∥X
+
+≤ − cK ∥x − x⋆∥X + ℓuℓK ∥ξ − x∥O . (9) The second inequality follows from the Lipschitzness of F
+
+and K by Assumption (A2). Substituting the observer error bound (8) into (9) yields the linear differential inequality: 
+
+D+∥x − x⋆∥X ≤ − cK ∥x − x⋆∥X
+
++ ℓuℓK ∥ξ(0) − x(0) ∥O e−cO t .
+
+Applying the Comparison Lemma, we obtain 
+
+∥x(t)−x⋆∥X ≤ ∥ x(0) − x⋆∥X e−cK t
+
++ ℓuℓK ∥ξ(0) − x(0) ∥O
+
+Z t
+
+> 0
+
+e−cK (t−s) e−cO s ds. 
+
+Upon solving the integral, we obtain the bounds in the theorem. Since these bounds are exponential, the state (x, ξ )
+
+converges to (x⋆, x ⋆) exponentially fast with rate min( cK , c O )
+
+(for cK̸ = cO ) or any rate strictly less than cK (for cK = cO )for any initial condition (x(0) , ξ (0)) .
+
+Remark 4 (Positioning in literature): Our formulation is most directly comparable to the foundational work of [39] and the recent results in [18], [22]. Particularly [39] employs a classical Lyapunov framework which does not provide explicit performance bounds. [18] is limited to Lur’e systems under specific structural conditions and [22] confines its analysis to the Euclidean norms, Theorem 3 provides a generalization to arbitrary norms. 
+
+Remark 5 (Extension to discrete time): Equivalent results hold for the discrete time case, with parallel assumptions on contraction and Lipschitz bounds. 
+
+Remark 6 (Relationship to the linear separation principle): 
+
+In the linear case, with a Luenberger observer, the assump-tions in Theorem 3 reduce to stabilizability of (A, B ), and detectability of (A, C ). The contraction rates cK and cO
+
+correspond to the spectral abscissa of A − BK and A − LC 
+
+respectively. 
+
+Remark 7 (Relationship to iISS and iIOSS): Assump-tions (A1) and (A2) together imply that the plant can be made to be incremental input to state stable (iISS) via full state feedback [7], and assumptions (A4) and (A3) together enforce that the plant is incremental input/output to state stable (iIOSS) [36]. 
+
+Remark 8 (Parametric extensions): Theorem 3 also extends to parameterized systems. If the plant, output map, observer, and controller maps further depend on θ ∈ Θ and Assump-tions (A1)–(A4) hold uniformly over Θ, the system glob-ally exponentially converges to the parameter-dependent fixed point (x∗(θ), x ∗(θ)) , with identical bounds as Theorem 3. Extending these results to parametric systems allows us to import the robustness properties of contracting dynamics to the closed-loop system, with an additional observer error term. We formalize this in two corollaries: First, given a plant with parameter θ, we establish error bounds when the controller and observer are designed with a parameter estimate 
+
+ˆθ and the second bounds the tracking error for a time-varying equilibrium x⋆(θ(t)) .
+
+Corollary 9 (Robustness to model error): Given maps 
+
+F : Rn × Rm × Θ → Rn and h : Rn × Θ → Rp, consider the control system ˙x = F (x, u, θ ) with output y = h(x, θ ).Let L : Rp × Rp × Rm × Θ → Rn be an observer, and let 
+
+K : Rn × Θ → Rm be a controller. Let Assumptions (A1)– (A4) hold uniformly for θ ∈ Θ. Further, let K be ℓK,θ -Lipschitz in θ, uniformly in x, and let L be ℓL,θ -Lipschitz in θ, uniformly in its other arguments. Consider the closed loop system where the plant evolves as per parameter θ, but the controller and the observer are designed with the parameter estimate ˆθ. Specifically 
+
+˙x = F (x, K (ξ, ˆθ), θ ), (10a) 
+
+˙ξ = L(ξ, K (ξ, ˆθ), h (x, θ ), ˆθ). (10b) Then, the observer error and the distance to the nominal equilibrium point x⋆(θ) satisfy the differential inequalities: 
+
+D+∥ξ − x∥O ≤ − cO ∥ξ − x∥O + ℓL,θ ∥ˆθ − θ∥Θ, (11) 
+
+D+∥x − x⋆(θ)∥X ≤ − cK ∥x − x⋆(θ)∥X + ℓuℓK ∥ξ − x∥O
+
++ ℓuℓK,θ ∥ˆθ − θ∥Θ. (12) 
+
+Proof: Consider the trajectory (x(t), ξ (t)) of the closed loop system (7). We drop the arguments in time for the rest of this proof for brevity. Consider two trajectories of the contract-ing dynamics (10b), one initialized at x(0) and with parameter 
+
+θ and the second with initialization ξ(0) and parameter ˆθ.These trajectories are identical to x(t) and ξ(t) respectively. Using the differential form of the iISS property of contracting systems, we obtain (11). Next, consider two trajectories of the dynamics ˙x = F (x, K (x, θ ), θ ) + v, driven by the inputs 
+
+v1 = 0 , and v2 = F (x, K (ξ, ˆθ), θ ) − F (x, K (x, θ ), θ ) re-spectively. Similar to the proof of Theorem 3, these dynamics are contracting. Utilizing the iISS property of contracting dynamics with the two inputs, and using Lipschitz bounds results in (12). 
+
+Corollary 10 (Equilibrium tracking): Given maps F : Rn ×
+
+Rm × Θ → Rn and h : Rn × Θ → Rp, consider the control system ˙x = F (x, u, θ ) with output y = h(x, θ ). Let L : Rp ×
+
+Rp ×Rm ×Θ → Rn be an observer, and let K : Rn ×Θ → Rm
+
+be a controller. Let Assumptions (A1)–(A4) hold uniformly for θ ∈ Θ. Further, let K be ℓK,θ -Lipschitz in θ, uniformly in x, and let F be ℓF,θ -Lipschitz in θ, uniformly in its other arguments. Let the parameter θ evolve along a continuously differentiable trajectory θ(t). Consider the closed loop system 
+
+˙x = F (x, K (ξ, θ (t)) , θ (t)) , (13a) 
+
+˙ξ = L(ξ, K (ξ, θ (t)) , h (x, θ (t)) , θ (t)) . (13b) Let x⋆(θ(t)) be the time-varying equilibrium curve of the ideal nominal system. Then, 
+
+D+∥x − x⋆(θ(t)) ∥X ≤ − cK ∥x − x⋆(θ(t)) ∥X
+
++ℓuℓK ∥ξ − x∥O + ℓuℓK,θ + ℓF,θ 
+
+cK
+
+∥ ˙θ(t)∥Θ. (14) 
+
+Proof: Consider the auxiliary dynamics, 
+
+˙x = F (x, K (x, θ (t)) , θ (t)) + w = T (x, θ (t), w ), (15) where T : Rn × Θ × Rn → Rn. By Assumption (A1), the dy-namics ˙x = T (x, θ, w ) are strongly infinitesimally contracting. Moreover, the map w 7 → T (x, θ, w ) is Lipschitz with constant 
+
+1. Consider the inputs w1(t) = F (x, K (ξ, θ (t)) , θ (t)) −
+
+F (x, K (x, θ (t)) , θ (t)) , and w2(t) = ˙x⋆(θ(t)) . When initial-ized at x(0) = ξ(0) = x⋆(θ(0)) , w2 recovers the trajectory 
+
+x⋆(θ(t)) . Further, for any initialization x(0) , ξ (0) , the x-component of the solution to the dynamics (13) may be recovered by using the auxiliary dynamics (15) with input w1.Now, using the incremental ISS property [7, Theorem 3.16] of contracting systems, 
+
+D+∥x − x⋆(θ(t)) ∥X
+
+≤ − cK ∥x − x⋆(θ(t)) ∥X + ∥w1 − w2∥X
+
+≤ − cK ∥x − x⋆(θ(t)) ∥X + ∥ ˙x⋆(θ(t)) ∥X
+
++ ∥F (x, K (ξ, θ (t)) , θ (t)) − F (x, K (x, θ (t)) , θ (t)) ∥X .
+
+The result follows by applying the Lipschitz bounds to the third term, and since the equilibrium map of a contracting system with parameter θ is globally Lipschitz with constant 
+
+Lip θ (F (x, K (x, θ ), θ )) /c K = ( ℓuℓK,θ + ℓF,θ )/c K .
+
+IV. C ONTRACTION OF FIRING RATE AND HOPFIELD 
+
+NEURAL NETWORKS 
+
+We are specifically motivated by the study of systems modeled by the firing rate neural network (FRNN), and the Hopfield neural network (HNN) in both continuous and discrete time. In this section, we present sharp contraction conditions and related properties for these dynamics. The continuous time FRNN and HNN dynamics are given below: 
+
+˙x = −x + Ψ( W x + Bu ); y = Cx (16) 
+
+˙x = −x + W Ψ( x) + Bu ; y = CΨ( x). (17) Here, the state x ∈ Rn, the bias u ∈ Rm, y ∈ Rp, and the synaptic matrix W ∈ Rn×n, Ψ( ·) is a diagonal, slope restricted nonlinearity. Equation (16) represents the FRNN dynamics, and equation (17) represents the HNN dynamics. The corresponding discrete time dynamics are 
+
+x+ = Ψ( W x + Bu ); y = Cx, (18) 
+
+x+ = W Ψ( x) + Bu ; y = CΨ( x). (19) Remark 11: The state evolution in the FRNN and HNN dynamics (16)-(19) is structurally similar to a Lur’e model, which enables the use of Lemma 2 for the analysis of contractivity. However, in classical Lur’e systems, the input enters linearly, and the output is a linear function of the state. In FRNNs, the input appears inside the nonlinearity, and in HNNs, the output is a nonlinear function of the state. This nonlinear coupling precludes the direct application of results developed for standard Lur’e systems [18]. 
+
+Theorem 12 (Contractivity of FRNN and HNN): Consider the FRNN and HNN dynamics (16)-(19), for some constant u.Let W be the synaptic weight matrix and Ψ( ·) be the activation function belonging to either the CONE or MONE class. Given 
+
+P ≻ 0, the dynamics are strongly contracting with rate c > 0
+
+(in continuous time) or factor ρ ∈ [0 , 1) (in discrete time) in the norm ∥ · ∥ P if there exists a diagonal Q ≻ 0 such that the corresponding matrix inequality in Table I is satisfied. 
+
+Proof: The proof of each of the eight cases follows from Lemma 1 and 2. For simplicity, we provide the proof for only the FRNN case in continuous time for MONE nonlinearities; the other cases follow similarly. We begin by noting that the dynamics (16) is a continuous-time Lur’e system of the form (2), with A = −In, B = In and C = W . Per Lemma 1 a MONE nonlinearity admits the matrix multiplier M =0n×n QQ −2Q
+
+
+
+, for some positive diagonal Q. Substituting these equalities into (5) yields (23). We refer to each entry in Table I as a contraction certificate. 
+
+A. Structural relationships of contractivity conditions 
+
+First we show that the discrete-time CONE certificates for both network architectures are reducible to Schur diagonal stability, generalizing prior results on firing-rate models [10]. 
+
+Lemma 13 (Schur diagonal stability): W ∈ Rn×n satisfies the discrete-time CONE certificates (20) and (24) if and only if W is Schur diagonally stable. 
+
+Proof: Note that (20) ⇐⇒ P ⪯ Q and W ⊤QW ⪯ ρ2P .Similarly, (24) ⇐⇒ Q ⪯ ρ2P and W ⊤P W ⪯ Q. First, for (20), =⇒ follows from observing that W ⊤QW ⪯ ρ2P ⪯
+
+ρ2Q. The ⇐= direction follows from choosing P = Q.Next, for (24), for the =⇒ direction, consider the inequality 
+
+Q ⪯ ρ2P , and right and left multiply by W and its transpose. We get W ⊤QW ⪯ ρ2W ⊤P W ≺ Q. For the ⇐= direction, choosing ρ2P = Q gives us our result. Next, we establish the relationships between the various certificates in Table I. 
+
+Theorem 14 (Reductions and duality of matrix inequalities): 
+
+Let W(M, T , N ) denote the set of synaptic matrices W
+
+satisfying the contraction certificates in Table I for model 
+
+M ∈ {FR , Hop }, time domain T ∈ {CTS , DISC }, and nonlinearity class N ∈ { CONE , MONE }. The following hold: (i) The set of synaptic matrices satisfying the condition for CONE nonlinearities is contained within the correspond-ing set for MONE nonlinearities. 
+
+W(·, ·, CONE ) ⊆ W (·, ·, MONE ).
+
+(ii) If a synaptic matrix W satisfies any discrete-time con-dition with factor ρ ∈ [0 , 1) , then it also satisfies the               
+
+> Disc. CONE
+> W(·,DISC ,CONE )
+> Eq. (20), (24)
+> Cts. CONE
+> W(·,CTS ,CONE )
+> Eq. (21), (25)
+> Disc. MONE
+> W(·,DISC ,MONE )
+> Eq. (22), (26)
+> Cts. MONE
+> W(·,CTS ,MONE )
+> Eq. (23), (27)
+> ⊆
+> ⊆
+> ⊆
+> ⊆⊆
+> Fig. 1. A summary of relationships for the contractivity conditions from Table I. The sets W(·,·,·)are described in Theorem 14. The discrete time CONE condition restricts the weight matrices the most, whereas the continuous time MONE condition enables maximum expressivity.
+
+corresponding continuous-time condition with rate c =(1 − ρ2)/2. Thus: 
+
+W(·, DISC , ·) ⊆ W (·, CTS , ·).
+
+(iii) A matrix W satisfies the firing rate condition for some parameters P ≻ 0 and diagonal Q ≻ 0 if and only if 
+
+W ⊤ satisfies the corresponding Hopfield LMI condition for some parameters P ′ ≻ 0 and diagonal Q′ ≻ 0.
+
+W ∈ W (FR , ·, ·) ⇐⇒ W ⊤ ∈ W (Hop , ·, ·).
+
+Proof: Regarding (i), consider the negative semidefi-nite matrices M1 =
+
+−W ⊤QW W ⊤QQW −Q
+
+
+
+and M2 =
+
+−Q QQ −Q
+
+
+
+. Adding the inequality M1 ⪯ 0 to each of the firing rate CONE inequalities inequalities yields the corre-sponding firing rate MONE inequality. Similarly, adding the inequality M2 ⪯ 0 to each of the Hopfield CONE inequalities yields the corresponding MONE inequality. Next, regarding (ii), we present a proof for the firing rate MONE case. The other three cases follow similarly. Let W
+
+satisfy the discrete-time condition Eq. (22) for some ρ. Using the inverse Schur complement of the identity P −P P −1P ⪰ 0,and setting c = (1 − ρ2)/2, and adding and subtracting the correct terms, 
+
+ P −P
+
+−P P
+
+
+
+⪰ 0 = ⇒
+
+−(1 + ρ2)P P + W ⊤QP + QW −2Q
+
+
+
+⪯
+
+−ρ2P W ⊤QQW P − 2Q
+
+
+
+.
+
+Consequently, if the RHS is negative semidefinite (i.e. (22) holds), so is the LHS (i.e. (23) holds). Finally, for (iii), we shall prove each case separately. First, in the continuous time MONE case, consider the LHS of (23). Let T = diag( P −1, Q −1). Pre- and post-multiplying (23) by 
+
+T yields: 
+
+T
+
+−2(1 − c)P ⋆P + QW −2Q
+
+
+
+T =
+
+−2(1 − c)P −1 ⋆W P −1 + Q−1 −2Q−1
+
+
+
+where ⋆ denotes symmetric terms. This results in the LHS of the Hopfield matrix inequality (27) with parameters W ′ =
+
+W ⊤, P ′ = P −1, and Q′ = Q−1. Next, for the continuous TABLE I CONTRACTIVITY CONDITIONS FOR FIRING RATE AND HOPFIELD MODELS . S EE THEOREM 12 FOR DEFINITIONS OF SYMBOLS .THE NEURAL NETWORK WITH SYNAPTIC MATRIX W CORRESPONDING TO EACH ENTRY IS CONTRACTING (WITH RATE c OR FACTOR ρ) IF THERE EXIST P ≻ 0 AND DIAGONAL Q ≻ 0 SATISFYING THE CORRESPONDING LMI.                                                                                              
+
+> Architecture Nonlinearity Discrete Time Continuous Time Firing Rate CONE [−1,1]
+> −ρ2P+W⊤QW 0n×n
+> 0n×nP−Q
+> ⪯0(20)
+> −2(1 −c)P+W⊤QW PP−Q
+> ⪯0(21)
+> MONE [0 ,1]
+> −ρ2PW⊤QQW P−2Q
+> ⪯0(22)
+> −2(1 −c)PP+W⊤QP+QW −2Q
+> ⪯0(23)
+> Hopfield CONE [−1,1]
+> −ρ2P+Q0n×n
+> 0n×nW⊤P W −Q
+> ⪯0(24)
+> −2(1 −c)P+QP W W⊤P−Q
+> ⪯0(25)
+> MONE [0 ,1]
+> −ρ2PQQW⊤P W −2Q
+> ⪯0(26)
+> −2(1 −c)PP W +QW⊤P+Q−2Q
+> ⪯0(27)
+
+time CONE case, consider the Schur complement of the firing rate matrix inequality (21) about the (2,2) block. We obtain, 
+
+−2(1 − c)P + W ⊤QW + P Q −1P ⪯ 0. (28) Upon left and right multiplying this inequality by P −1,
+
+−2(1 − c)P −1 + P −1W ⊤QW P −1 + Q−1 ⪯ 0. (29) Note that (29) is the Schur complement of the Hopfield matrix inequality (25) with parameters W ′ = W ⊤, P ′ = P −1, and 
+
+Q′ = Q−1. Next, in the discrete time MONE case, consider the Schur complement of the firing rate matrix (22) about the (1,1) block. 
+
+P − 2Q + ρ−2QW P −1W ⊤Q ⪯ 0. (30) Upon left and right multiplying this inequality by Q−1,
+
+Q−1P Q −1 − 2Q−1 + ρ−2W P −1W ⊤ ⪯ 0. (31) Note that (31) is the Schur complement of the Hopfield matrix inequality (26) with parameters W ′ = W ⊤, P ′ = ρ−2P −1,and Q′ = Q−1. Finally, for the discrete time CONE case, both conditions are reducible to Schur diagonal stability as shown in Lemma 13. Therefore, we only need to show that 
+
+W ⊤QW ⪯ ρ2Q if and only if W Q −1W ⊤ ⪯ ρ2Q−1. Via Schur complement, observe that, 
+
+W ⊤QW ⪯ ρ2Q ⇐⇒ 
+
+ρ2Q W ⊤QQW Q
+
+
+
+⪰ 0 (32) 
+
+⇐⇒ 
+
+ρ2Q−1 Q−1W ⊤
+
+W Q −1 Q−1
+
+
+
+⪰ 0. (33) 
+
+⇐⇒ Q−1 − ρ−2W Q −1W ⊤ ⪰ 0. (34) Where the second step follows by pre and post multiplying the Schur complement by diag( Q−1, Q −1), and the final step follows by applying Schur complement with respect to the (1,1) block. 
+
+Corollary 15 (Equivalence to LMI): For a fixed c > 0 or 
+
+ρ ∈ [0 , 1) , each certificate in Table I is equivalent to a Linear Matrix Inequality (LMI) under a bijective change of variables. Consequently, the set of contracting synaptic matrices W, along with the Euclidean weighting P and diagonal multiplier Q, is characterized by a convex feasibility problem. 
+
+Proof: Due to the duality result between HNNs and FRNNs established in Theorem 14, if a certificate can be parameterized as an LMI for one architecture, it is inherently an LMI for the other architecture. For the continuous-time Hopfield networks (both CONE and MONE), applying the variable substitution S = W ⊤P
+
+renders the respective matrix inequalities linear in the variables (P, Q, S ). By duality, the continuous-time fir-ing rate conditions are equivalently LMIs in the variables 
+
+(P −1, Q −1, W ⊤P −1).In discrete time, the firing rate MONE inequality is inher-ently linear in the variables (P, Q, S ) under the substitution 
+
+S = QW . The discrete-time Hopfield MONE case is conse-quently an LMI by duality. Finally, the discrete-time CONE conditions for both ar-chitectures reduce to Schur diagonal stability. This is well known to be an LMI; by applying the Schur complement to 
+
+W ⊤QW ⪯ ρ2Q and substituting S = QW , we obtain the equivalent LMI 
+
+ρ2Q S⊤
+
+S Q
+
+
+
+⪰ 0.
+
+B. Necessary versus sufficient conditions for contractivity 
+
+Theorem 14 implies that continuous-time FRNNs and HNNs with MONE nonlinearities admit the largest set of synaptic matrices. Next, we seek to characterize the sharpness of these certificates. We focus on the FRNN case, as HNN results hold via duality. First we relate this certificate to the Lyapunov Diagonal Stability (LDS) of W −In.
+
+Proposition 16 (Relationship with Lyapunov Diagonal Sta-bility): Let W ∈ Rn×n be a synaptic matrix for the firing rate neural network (16). The following hold (i) If W satisfies (23) for P ≻ 0, diagonal Q ≻ 0 and c > 0,then W − In is Q−LDS. (ii) The converse is not true; W − In being LDS is not sufficient to guarantee contraction in any fixed norm. Proof: To prove (i), we left and right multiply the matrix inequality (23) by the matrix [In, I n] ∈ Rn×2n obtaining, 
+
+−2(1 − c)P + P + W ⊤Q + P + QW − 2Q ⪯ 0 (35) 
+
+=⇒ W ⊤Q + QW ⪯ 2Q − 2cP ≺ 2Q. (36) This proves that the W − In is Q−LDS. We construct a counterexample for (ii). Consider a skew-synaptic weight matrix W =
+
+ 0 4
+
+−4 0
+
+
+
+. Since W + W ⊤ =0 ≺ 2I, W − In is LDS. For contraction in the norm ∥ · ∥ P ,the matrix M(D) = 2 P − P DW − W ⊤DP must be positive definite for all diagonal D ∈ [0 , I ], e.g., see [8]. Testing the vertices D1 = diag(1 , 0) and D2 = diag(0 , 1) ,
+
+M(D1) = 
+
+ 2p11 2p12 − 4p11 
+
+2p12 − 4p11 2p22 − 8p12 
+
+
+
+, (37) 
+
+M(D2) = 
+
+2p11 − 8p12 2p12 − 4p22 
+
+2p12 − 4p22 2p22 
+
+
+
+. (38) Since the determinants of these matrices need to be positive,  
+
+> •
+
+p11 p22 > p 212 + 4 p211 =⇒ p22 > 4p11 . 
+
+> •
+
+p11 p22 > p 212 + 4 p222 =⇒ p11 > 4p22 .These conditions are contradictory for any P ≻ 0. Our result follows. While the insufficiency result is known [24, Theorem 7], we provide a brief proof for completeness. Next, we show that our FRNN MONE certificate is optimal for symmetric matrices, recovering known optimal characterizations [8]. 
+
+Proposition 17 (Log-optimal characterization for symmetric weights): Let W = W ⊤ ∈ Rn×n with spectral abscissa α.(i) For α < 0, the FRNN MONE certificate (23) holds for 
+
+P = −W , Q = In, and c = 1 .(ii) For 0 < α < 1, there exists P ≻ 0 such that W =
+
+P 1/2 − (4 α)−1P , and the FRNN MONE certificate (23) holds for this P , Q = 4 αI n, and c = 1 − α(W ).
+
+Proof: Consider the Schur complement of (23). 
+
+−2(1 − c)P + 12 (P + W ⊤Q)Q−1(P + QW ) ⪯ 0. (39) The first statement follows from substituting P = −W ,
+
+Q = In and c = 1 into (39). From [8, Lemma 10], we may define P ≻ 0 such that 
+
+W = P 1/2 − 14α P . Choosing Q = 4 αI , and substituting W
+
+and Q into the LHS of (39) yields −2(1 − c)P + 2 α(W )P ,which is 0 when c = 1 − α.
+
+Remark 18: The equivalent results to Proposition 17 for HNNs hold via duality. Having shown the sharpness of the FRNN and HNN MONE certificates, and their optimality for the class of symmetric matrices, we define the notion of S-contraction corresponding to these certificates. 
+
+Definition 3 (S-contraction): An FRNN (or HNN) with a MONE nonlinearity is said to be S-contracting if its synaptic matrix satisfies the FRNN(or HNN) MONE contraction cer-tificate (23) (or (27)). 
+
+Remark 19 (Sharpness and Complexity): The term S-contraction signifies the use of the S-procedure to incorporate incremental multiplier matrices. This characterization is: (i) Polynomial-time verifiable: While certifying absolute contractivity for neural networks is generally NP-hard ,S-contraction is a convex feasibility problem solvable in polynomial time via LMIs. (ii) Sharp: The conditions are sharp as they constitute the tightest constraints obtainable via the S-lemma using incremental multipliers for absolute contractivity. 
+
+C. Interconnections of RNNs 
+
+The study of interconnected recurrent neural networks (RNNs) is of interest in both biological [24] and engineer-ing [10] contexts. We first establish a necessary condition for a network of interconnected RNNs to be S-contracting. 
+
+Theorem 20 (Necessary conditions for S-contraction of interconnections of FRNNs): Consider an interconnection of 
+
+N FRNN subsystems, with MONE nonlinearities where the 
+
+ith subsystem is given by 
+
+˙xi = −xi + Ψ i(Wixi + Biui), (40) 
+
+yi = Cixi + Diui, (41) where xi ∈ Rni , u i ∈ Rmi , y i ∈ Rki . Consider an intercon-nection of these systems of the form ui = PNj=1 Aij yj . Let 
+
+A be the block matrix whose (i, j )th block is Aij . Further, let W = diag( W1, . . . , W N ), B = diag( B1, . . . , B N ), C =diag( C1, . . . , C N ), and D = diag( D1, . . . , D N ).If the interconnection is well-posed, meaning Im −
+
+AD is invertible (where m = PNi=1 mi), then, for 
+
+∆ = ( Im − AD)−1A,(i) The interconnected system is an FRNN with synaptic matrix Wnet = W + B∆C.(ii) Further, if the interconnected FRNN is S-contracting, then for each i, the FRNN with the synaptic matrix Wi +
+
+Bi∆ii Ci is S-contracting, where ∆ii is the ith principal diagonal block of ∆.
+
+Proof: Let x = [x⊤ 
+
+> 1
+
+, . . . , x ⊤ 
+
+> N
+
+]⊤, u = [u⊤ 
+
+> 1
+
+, . . . , u ⊤ 
+
+> N
+
+]⊤,and y = [ y⊤ 
+
+> 1
+
+, . . . , y ⊤ 
+
+> N
+
+]⊤ denote the stacked network vectors. Further, the decoupled open-loop dynamics may be written as, 
+
+˙x = −x + Ψ( W x + Bu ) (42) 
+
+y = Cx + Du, (43) where Ψ( z) = [Ψ 1(z1)⊤, . . . , ΨN (zN )⊤]⊤. The relationship between u and y is given by u = Ay, where A is the block matrix whose (i, j )th element is Aij . When Im − AD is invertible, substituting this in the output equation yields 
+
+u = ( Im − AD)−1ACx. (44) Substituting ∆ = ( Im − AD)−1A the interconnected FRNN is given by 
+
+˙x = −x + Ψ(( W + B∆C)x), (45) concluding our proof of item (i). Now, if the system (45) is S-contracting, 
+
+−2(1 − c)P P + ( Wnet )⊤QP + QW net −2Q
+
+
+
+⪯ 0. (46) Any sub-matrix of this block matrix must also be negative definite. Choosing the (i, i )th block within each entry of this block matrix 
+
+ −2(1 − c)Pii Pii + ( Wnet )⊤ 
+
+> ii
+
+Qi
+
+Pii + Qi(Wnet )ii −2Qi
+
+
+
+⪯ 0. (47) Note that (Wnet )ii = Wi + Bi∆ii Ci, where ∆ii is the ith 
+
+diagonal block of ∆. Therefore, an FRNN with synaptic matrix 
+
+Wi + Bi∆ii Ci is S-contracting, with P = Pii , Q = Qi.
+
+Remark 21: Theorem 20 shows that an interconnection of FRNNs can be S-contracting only if each FRNN is S-contracting either independently or via static output feedback. Without feed-through ( Di = 0 ) and self-loops ( Aii = 0 ), output feedback is unavailable, so each FRNN must be S-contracting. 
+
+Remark 22: Parallel results hold for HNNs with the output 
+
+y = CΨ( x)+ Du , as well as in discrete time. Interconnections of RNNs are particularly useful in control design [10]. How-ever, our result shows that one may not use an interconnection of RNNs to stabilize an open-loop unstable plant without solving the static output feedback problem. Given that static output feedback design is inherently nonconvex, this highlights the practical utility of our separation principle (Theorem 3) to perform control design with convex LMIs. 
+
+Remark 23: Conversely, for an interconnection of FRNNs, small gain results for networks may be used to prove exponen-tial stability via contractivity [7, Theorem 3.23] or a Lyapunov analysis [17]. These are conservative, and sharper conditions for interconnected systems remain an open problem. Next, we discuss the special case where each subsystem is identical. Such interconnections are popular in graph neural network architectures, such as implicit graph neural net-works [20], continuous graph neural ODEs [41], and a single layer version of graph convolutional ODEs [28]. Consider the Graph FRNN: 
+
+˙X = −X + Ψ( W XA + BU ). (48) Here, X ∈ Rm×n represents the state, and U ∈ Rp×n
+
+represents the input node features, W ∈ Rm×m is the synaptic matrix of each FRNN, B ∈ Rm×p is the input matrix, and A ∈ Rn×n is the adjacency matrix. While the graph FRNN (48) is expressed in matrix form, its vectorized form is structurally identical to a standard FRNN: 
+
+vec ( ˙X) = −vec (X) + Ψ(( A⊤ ⊗ W )vec (X) + vec (BU )) .
+
+(49) Next, we study the S-contraction of Graph FRNNs. 
+
+Theorem 24 (Contraction of Graph FRNN): Consider the dynamics (49) with a MONE nonlinearity Ψ. If (A1) The adjacency matrix satisfies A = A⊤.(A2) The eigenvalues of A lie in [0 , 1] .(A3) W satisfies matrix inequality (23) for P ≻ 0, diagonal 
+
+Q ≻ 0, rate c > 0, which satisfy P Q −1P ≺ 4(1 − c)P .Then, the dynamics (49) are strongly infinitesimally contract-ing with rate c in the norm ∥ · ∥ In ⊗ P .
+
+Proof: We show that the weight matrix A⊤ ⊗ W satis-fies (23) for weights In ⊗ P and In ⊗ Q. Substituting these weights into (23), and using the mixed product property of Kronecker products Lemma 40 yields 
+
+ −2(1 − c)In ⊗ P In ⊗ P + A ⊗ W ⊤QIn ⊗ P + A⊤ ⊗ QW −2In ⊗ Q
+
+
+
+⪯ 0, (50) where we have used A = A⊤. Performing an SVD for A
+
+yields A = U ΛU ⊤, due to its symmetric nature, where each entry of Λ is in [0 , 1] . Applying the unitary transform T =diag( U ⊗ In, U ⊗ In) to (50) and utilizing U ⊤U = U U ⊤ =
+
+In yields 
+
+ −2(1 − c)In ⊗ P ∗
+
+In ⊗ P + Λ ⊗ QW −2In ⊗ Q
+
+
+
+⪯ 0. (51) Due to the diagonal nature of In and Λ, this matrix may be per-muted into a block diagonal form through the perfect shuffle permutation [31, Proposition 1]. Therefore, the condition (51) is decomposable into n conditions, and the ith condition has the form, 
+
+−2(1 − c)P P + λiW ⊤QP + λiQW −2Q
+
+
+
+⪯ 0, (52) where λi is the ith diagonal element of Λ. Since this condition is linear in λi, and λi ∈ [0 , 1] , it suffices to verify it at λ = 0 
+
+and λ = 1 . At λ = 1 , this condition is identical to (23). At 
+
+λ = 0 , we obtain, 
+
+−2(1 − c)P PP −2Q
+
+
+
+⪯ 0 ⇐⇒ P Q −1P ≺ 4(1 − c)P, 
+
+where the equivalence follows from the Schur complement along the (2 , 2) block. Since W satisfies (23), and P Q −1P ≺
+
+4(1 − c)P as per (A3), the proof holds. 
+
+Remark 25 (Computational Tractability for Large Graphs): 
+
+In applications such as implicit neural networks, one is not interested in the trajectory of the FRNN dynamics, but only the fixed point. In small-scale systems, alternative methods such as Peaceman-Rachford operator splitting can be used to find this fixed point, and allow a larger set of synaptic matrices than S-contraction. However, this approach scales poorly, particularly in the context of graph neural networks [4]. Peaceman-Rachford requires computing the matrix inverse of the form (Inm − αA ⊤ ⊗ W )−1, for some constant α ∈
+
+R. This operation is computationally expensive ( O(m3n3)
+
+in time, O(m2n2) in memory), destroys the natural sparse structure of the adjacency matrix, and prohibits decentralized execution. While utilizing the dynamics (48) limits the set of synaptic matrices, it is computationally efficient, and can be implemented in a decentralized way. 
+
+Remark 26 (Assumptions on Graph Structure): We assume that the underlying graph is undirected. Enforcing a condition on eigenvalues is common in Graph RNNs [23]. For any given adjacency matrix ˜A, we calculate the adjacency matrix A by computing A = 12 (D−1/2 ˜AD −1/2 + In), where D is the diagonal degree matrix of the original graph. Extending our contraction guarantees to undirected graphs remains an open problem. V. A PPLICATIONS TO CONTROL DESIGN WITH RNN S
+
+Now, we seek to use our separation principle in Theorem 3 in conjugation with our S-contraction certificates in Theo-rem 12, in order to design a reference tracking controller for a plant modeled by an RNN. Motivated by our separation prin-ciple in Theorem 3, first, we derive LMI conditions to design a full-state feedback controller which enforces contraction, alongside an observer that is guaranteed to be contracting. (Similar conditions for discrete-time models appear in [10], [27]). We also establish necessary and sufficient feasibility conditions for these LMIs, drawing direct parallels to classical linear stabilizability and detectability. From our separation principle, we know that the interconnection of this observer and controller is exponentially stable. Finally, in order to perform reference tracking, we provide an LMI condition for a low gain integral controller motivated by [35]. Using Corol-lary 10, we design an integral controller for reference tracking. We will consider the continuous time FRNN model (16), with MONE nonlinearities but similar analyses extend to all entries in Table I. 
+
+A. Contraction via full state feedback 
+
+We begin by presenting an LMI condition for the design of a state feedback controller. 
+
+Proposition 27 (Contraction via state feedback controller): 
+
+Consider a plant described by an FRNN (16) with a MONE nonlinearity, with access to the full state, i.e. C = In. For the control law u = Kx , for K ∈ Rm×n, the following hold: (i) The closed-loop system is an FRNN with state x, and the closed-loop weight matrix is Wcl = W + BK .(ii) The closed loop system is S-contracting for a given contraction rate c ∈ (0 , 1] if and only if there exist a positive definite X ∈ Rn×n, a positive diagonal matrix 
+
+D, and a matrix Y ∈ Rm×n satisfying the LMI: 
+
+ −2(1 − c)X D + XW ⊤ + Y ⊤B⊤
+
+D + W X + BY −2D
+
+
+
+⪯ 0. (53) If (53) holds, the state feedback gain guaranteeing con-traction is given by K = Y X −1.
+
+Proof: The proof is presented in Appendix III-A 
+
+Corollary 28 (Necessity of linear stabilizability): An FRNN with synaptic matrix W, and input matrix B can be rendered S-contracting via full state feedback with some c > 0 only if 
+
+(W − In, B ) is stabilizable. 
+
+Proof: Pre- and post-multiplying (53) by In In
+
+ and its transpose, respectively, and simplifying yields 
+
+W X + XW ⊤ − 2X + BY + Y ⊤B⊤ + 2 cX ⪯ 0.
+
+Using the fact that c > 0, and Y = KX , we obtain 
+
+(W − In + BK )X + X(W − In + BK )⊤ ≺ 0.
+
+which is the condition for stabilizability of (W − In, B ).Similar to the problem of control design for linear systems, we may also apply the projection lemma [6, Section 2.6.2]. 
+
+Corollary 29 (Necessary and sufficient conditions for S– contraction via full state feedback): Let ΠB denote a matrix whose columns form a basis for the null space of B⊤, such that B⊤ΠB = 0 . Define TB := diag( In, ΠB ). An FRNN with synaptic matrix W , and input matrix B can be rendered S-contracting via full state feedback with some c > 0 if and only if the following inequality holds 
+
+T ⊤
+
+> B
+
+ −2X D + XW ⊤
+
+D + W X −2D
+
+
+
+TB ≺ 0. (54) 
+
+Proof: Let U = 0m×n B⊤. Let V = In 0n×n
+
+. By continuity, the LMI (53) holds for some c > 0 if and only if 
+
+ −2X D + XW ⊤
+
+D + W X −2D
+
+| {z }
+
+> M
+
++U ⊤Y V + V ⊤Y ⊤U ≺ 0. (55) An application of the Projection Lemma 38 states that the inequality (55) holds if and only if U ⊤⊥ MU⊥ ≺ 0 and 
+
+V ⊤⊥ MV⊥ ≺ 0. The second condition always holds, as the (2,2) block of M is negative definite. The first condition is identical to inequality (54). 
+
+B. Contracting observer design 
+
+We now consider the dual problem of state estimation. We seek to estimate x ∈ Rn, given the output y ∈ Rp, and we propose the following observer architecture: 
+
+˙ˆx = −ˆx + Ψ( W ˆx + Bu + L(y − ˆy)) , ˆy = C ˆx, (56) where ˆx ∈ Rn is the estimated state, and L is the observer gain matrix. 
+
+Proposition 30 (S-Contracting observer design): Consider the observer (56) with exogenous inputs u and y.(i) The observer is an FRNN with state ˆx, and a weight matrix Wobs = W − LC .(ii) The observer is S-contracting for a given contraction rate 
+
+c ∈ (0 , 1] if and only if there exist P ≻ 0, diagonal 
+
+Q ≻ 0 and a matrix M such that, 
+
+ −2(1 − c)P P + W ⊤Q − C⊤M ⊤
+
+P + QW − M C −2Q
+
+
+
+⪯ 0. (57) If (57) holds, the observer gain guaranteeing contraction is given by L = Q−1M .
+
+Proof: The proof is presented in Appendix III-B 
+
+Corollary 31 (Necessity of linear detectability): An FRNN with synaptic matrix W, and output matrix C can be observed by an S-contracting FRNN only if the pair (W − In, C ) is detectable. 
+
+Proof: Pre- and post-multiplying (57) by In In
+
+ and its transpose, respectively, yields 
+
+QW + W ⊤Q − 2Q − M C − C⊤M ⊤ + 2 cP ⪯ 0.
+
+Substituting M = QL and using the fact that −2cP ≺ 0,
+
+Q(W − In − LC ) + ( W − In − LC )⊤Q ≺ 0
+
+which is the standard continuous-time Lyapunov condition for the pair (W − In, C ) to be detectable. 
+
+Corollary 32 (Necessary and sufficient conditions for S– contracting observer design): Let ΠC denote a matrix whose columns form a basis for the null space of C, such that 
+
+CΠC = 0 . Define TC := diag(Π C , In). An FRNN with synaptic matrix W , and output matrix C can be observed by an S-contracting FRNN if and only if the following strict inequality holds for some c > 0:
+
+T ⊤
+
+> C
+
+ −2P P + W ⊤QP + QW −2Q
+
+
+
+TC ≺ 0. (58) 
+
+Proof: Let U = C 0p×n
+
+. Let V = 0n×n In
+
+. Let 
+
+Y = −M ⊤. By continuity, the LMI (57) holds strictly for some c > 0 if and only if 
+
+ −2P P + W ⊤QP + QW −2Q
+
+| {z }
+
+> M
+
++U ⊤Y V + V ⊤Y ⊤U ≺ 0. (59) An application of the Projection Lemma 38 states that the inequality (59) holds if and only if U ⊤⊥ MU⊥ ≺ 0 and 
+
+V ⊤⊥ MV⊥ ≺ 0. The second condition always holds, as the (1,1) block of M is negative definite. The first condition is identical to inequality (58) since U⊥ =
+
+ΠC 00 In
+
+
+
+.
+
+C. Low gain Integral control 
+
+Having designed a controller in Proposition 27, and an ob-server in Proposition 30, which satisfies the assumptions in our separation principle Theorem 3, we now proceed to perform reference tracking via an integral controller and a singular perturbation argument. As a first step, we identify sufficient conditions for the contraction of the reduced dynamics. 
+
+Lemma 33 (Contractivity of the reduced dynamics): Let the map x⋆ : Rm → Rn be well-posed and defined as the solution of the implicit equation, 
+
+x⋆(u) = Ψ( W x ⋆(u) + Bu ) (60) where W ∈ Rn×n, B ∈ Rn×m. Let A = In − W, C ∈ Rp×n,and Q ∈ Rn×n be a diagonal positive matrix. Assume: (A1) Ψ is slope-restricted to [δ, 1] .(A2) There exists u⋆ such that r = Cx ⋆(u⋆), and x⋆(u⋆) = Ψ( W x ⋆(u⋆) + Bu ⋆).(A3) With the shorthands Z = B⊤Q((1 − δ)In + 2 δA ) and 
+
+R = 2 δA ⊤QA + (1 − δ)( QA + A⊤Q), there exist ma-trices Y and P ≻ 0 such that 
+
+2cr P − 2δB ⊤QB Z − Y C 
+
+∗ −R
+
+
+
+⪯ 0. (61) Then, with K = P −1Y , the dynamics 
+
+˙u = εK (r − Cx ⋆(u)) (62) are strongly infinitesimally contracting with rate cr with re-spect to the norm ∥ · ∥ P .
+
+Proof: The dynamics (62) form a Lur’e system, where the nonlinearity is given by x⋆(u). We may use Lemma 39 in conjuction with Lemma 2, to obtain the following LMI condition for contractivity in the norm ∥ · ∥ P .
+
+ 2cr P −P KC 
+
+−CKP 0m×m
+
+
+
++ λ
+
+B W
+
+0 In
+
+⊤
+
+M
+
+B W
+
+0 In
+
+
+
+⪯ 0.
+
+(63) where M is the matrix multiplier for the nonlinearity Ψ. Using Lemma 1, we may substitute M as 
+
+ −2δQ (1 + δ)Q
+
+(1 + δ)Q −2Q
+
+
+
+.The second term in (63) resolves to 
+
+−2δB ⊤QB −2δB ⊤QW + (1 + δ)B⊤Q
+
+∗ (1 + δ)( W ⊤Q + QW ) − 2Q − 2δW ⊤QW 
+
+
+
+Now, let us set A = In − W . First, note that 
+
+−R = −2δW ⊤QW + (1 + δ)( W ⊤Q + QW ) − 2Q, Z = −2δB ⊤QW + (1 + δ)B⊤Q. 
+
+Now, we may rewrite (63) using these simplifications. 
+
+2cr P − 2δB ⊤QB Z − P KC 
+
+∗ −R
+
+
+
+⪯ 0. (64) Reparameterizing Y = P K we get the condition (61). Finally, we may now design a low gain integral controller. 
+
+Theorem 34: Consider the FRNN plant (16) with synaptic matrix W ∈ Rn×n, input matrix B ∈ Rn×m, output matrix 
+
+C ∈ Rp×n, and reference signal r ∈ Rp. Suppose the following conditions hold. (A1) (Plant contraction by state-feedback) There exists amatrix Kf ∈ Rm×n such that the FRNN with synaptic matrix W + BK f is strongly infinitesimally contracting with rate cK > 0 in the norm ∥ · ∥ X .(A2) (Observer contraction) There exists a matrix L ∈ Rn×p
+
+such that the FRNN with synaptic matrix W − LC is strongly infinitesimally contracting with rate cO > 0 in the norm ∥ · ∥ O .(A3) (Contraction of reduced-order dynamics) For each con-stant input u, let x⋆(u) denote the unique equilibrium of the FRNN with synaptic matrix W + BK f and input matrix B. Assume there exists u⋆ ∈ Rm such that 
+
+r = Cx ⋆(u⋆). The reduced dynamics 
+
+˙uext = ε K i
+
+ r − Cx ⋆(uext ) (65) be strongly infinitesimally contracting with rate cr > 0
+
+in the norm ∥ · ∥ R.(A4) (Low-gain condition) Define the induced-norm constants 
+
+ℓu = ∥B∥U→X , ℓK = ∥Kf ∥O→U ,ℓi, R = ∥KiC∥X →R , ℓi, U = ∥KiC∥X →U .
+
+The gain parameter ε > 0 satisfies 
+
+ε ℓi, U ℓu − cK cr
+
+ < c 2 
+
+> K
+
+, (66) 
+
+ε ℓ i, U ℓu
+
+ cK cr + ℓu ℓi, R
+
+ < c r c3 
+
+> K
+
+. (67) Consider the closed-loop system 
+
+˙x = −x + Ψ  W x + BK f ξ + B u ext 
+
+, y = Cx (68a) 
+
+˙ξ = −ξ + Ψ  W ξ + BK f ξ + L(y − Cξ ), (68b) driven by the integral controller 
+
+˙uext = ε K i
+
+ r − y. (69) Then the following statements hold. (i) (Global exponential stability) For every constant uext ,the subsystem (68) possesses a unique equilibrium  x⋆(uext ), x ⋆(uext ) that is globally exponentially sta-ble, uniformly in uext .(ii) (Reference tracking) The full closed-loop system (68)– (69) possesses the globally exponentially stable equilibrium  x⋆(u⋆), x ⋆(u⋆), u ⋆. In particular, 
+
+lim t→∞ Cx (t) = r.
+
+Proof: By Theorem 3, Assumptions (A1)-(A2) and the Lipschitz nature of the controller ensure the closed-loop sys-tem (68) is globally exponentially stable to the unique fixed point (x⋆(uext ), x ⋆(uext )) , uniformly in uext .Now, consider the functions, V1 = ∥ξ − x∥O , V2 = ∥x −
+
+x⋆(uext )∥X , and V3 = ∥uext − u⋆∥R. We will bound each of their Dini derivatives. First, from Assumption (A2) 
+
+D+V1 ≤ − cO V1. (70) Next, utilizing Corollary 10 for V2 and treating the low gain integral controller as the time varying parameter, 
+
+D+V2 ≤ − cK V2 + ℓuℓK ∥ξ − x∥O + ℓu
+
+cK
+
+∥ ˙uext ∥U (71) Substituting r = Cx ⋆(u⋆) in the expression for ∥ ˙uext ∥U ,
+
+∥ ˙uext ∥U = ∥εK iC(x⋆(u⋆) − x)∥U
+
+= ∥εK iC(x⋆(u⋆) − x⋆(uext ) + x⋆(uext ) − x)∥U
+
+≤ εℓ i, U (∥x⋆(u⋆) − x⋆(uext )) ∥X + V2)
+
+Since x⋆(u) is globally Lipschitz in u with constant ℓu/c K ,
+
+∥ ˙uext ∥U ≤ εℓ i, U ℓu
+
+cK
+
+V3 + εℓ i, U V2
+
+Substituting ∥ ˙uext ∥U back into (71) yields: 
+
+D+V2 ≤ − (cK − ε ℓi, U ℓu
+
+cK
+
+)V2 + ℓuℓK V1 + ε ℓi, U ℓ2
+
+> u
+
+c2
+
+> K
+
+V3, (72) In order to find the Dini derivative of V3, we first rewrite the integral controller (69) as 
+
+˙uext = εK iC(x⋆(u⋆) − Cx ⋆(uext )) + εK iC(x⋆(uext ) − x).
+
+Treating the second term as a disturbance to the contracting re-duced order dynamics (65), from the incremental ISS property of contracting systems [7, Theorem 3.16], 
+
+D+V3 ≤ − εc r V3 + εℓ i, R∥x⋆(uext ) − x∥X
+
+= −εc r V3 + εℓ i, RV2. (73) Upon stacking inequalities (70), (72), (73), we obtain the following inequality, 
+
+D+
+
+
+
+V1
+
+V2
+
+V3
+
+ ≤
+
+
+
+−cO 0 0
+
+ℓuℓK −(cK − ε ℓi, U ℓu 
+
+> cK
+
+) ε ℓi, U ℓ2
+
+> u
+> c2
+> K
+
+0 εℓ i, R −εc r
+
+| {z } 
+
+> M(ε)
+
+
+
+V1
+
+V2
+
+V3
+
+
+
+Next, we show that M (ε) is Hurwitz. The eigenvalues of 
+
+M (ε) are obtained upon solving det( M (ε) − λI 3) = 0 . One eigenvalue is −cO , and the other two must be determined by the lower right 2 × 2 block. For both of the remaining eigenvalues to be negative, this block must have a negative 0 200 400 600 800 1000  
+
+> Time [s]
+> −1.0
+> −0.5
+> 0.0
+> 0.5
+> 1.0
+> Output
+> Reference
+> Learned plant
+> True plant
+> Fig. 2. For a two tank system modeled by an FRNN, we utilize our design mechanism for the full state feedback controller, the contracting observer and the integral gain to design a closed loop system capable of tracking references, validating the proposed theoretical results.
+
+trace, and a positive determinant. Both these conditions are met under assumption (A4). By continuity, there exists an η > 0 such that M (ε)+ ηI 3 is also Hurwitz. Since M (ε) + ηI 3 is Metzler, this is equivalent to guaranteeing the existence of an α = [ α1, α 2, α 3]⊤, such that (M (ε) + ηI 3)⊤α is elementwise negative. Therefore, for 
+
+V = α1V1 + α2V2 + α3V3,
+
+D+V ≤ − α⊤M (ε)V ≤ − ηV, (74) guaranteeing exponential stability to the fixed point 
+
+(x⋆(u⋆), x ⋆(u⋆), u ⋆). Since r = Cx ⋆(u⋆), the output of the plant settles exponentially to the value r.To validate our approach numerically, we apply our con-troller synthesis on a normalized version of the two tank benchmark system [33]. We performed system identification using Neuromancer [13], fitting the plant to an FRNN with 
+
+n = 8 neurons and tanh ( ·) activations. We apply Propo-sitions 27 and 30 to design a controller and an observer respectively, and design a gain for the integral controller via Lemma 33. As shown in Figure 2, our control architecture successfully tracks piecewise constant references. 
+
+VI. A PPLICATIONS IN MACHINE LEARNING 
+
+We now utilize S-contraction for Deep Equilibrium Models (DEQs) [3]. DEQs replace finite-depth architectures by defin-ing their output as solution of an implicit equation, which in turn is solved by iterating a dynamical system. For these models to be well-posed, the equilibrium must be unique and globally asymptotically stable—properties natively guaranteed by a contracting continuous-time FRNN. We first derive an unconstrained parameterization of weight matrices that satisfies our contractivity LMI by construction. We then utilize this parameterization to design an architecture where the weight and input matrices are input dependent. This allows the DEQ to model locally Lipschitz functions and improves parameter efficiency. 
+
+A. Parameterization 
+
+We first derive an unconstrained parameterization for synap-tic matrices of S-contracting FRNNs 
+
+Theorem 35 (Parameterization of weight matrices): The following statements are equivalent: (i) The synaptic matrix W satisfies the continuous time MONE FRNN certificate (23) for some P ≻ 0, diagonal matrix Q ≻ 0, and c ∈ [0 , 1] .(ii) W can be written as 
+
+W = 2 √1−c diag(e d)SV ⊤V − diag(e 2d)( V ⊤V )2
+
+where S ∈ Rn×n satisfying S⊤S ⪯ In, V is a full rank matrix in Rn×n, and d ∈ Rn.
+
+Proof: Taking the (1,1) Schur complement of the inequal-ity (23) and simplifying yields 
+
+(P + W ⊤Q)Q−1(P + QW ) ≺ 4(1 − c)P. (75) From the Douglas-Fillmore-Williams Lemma [5, Theorem 8.6.2], the inequality (75) is true if and only if there exists a matrix S ∈ Rn×n satisfying S⊤S ⪯ In and 
+
+Q−1/2(P + QW ) = 2 p(1 − c) SP 1/2. (76) Upon rearranging to solve for W ,
+
+W = 2 √1−c Q −1/2SP 1/2 − Q−1P. (77) Now, the set of all valid Q can be parameterized using 
+
+diag(e −2d), and the set of all P ≻ 0 can be parameterized as V ⊤V for full rank V ∈ Rn×n.
+
+Remark 36 (Unconstrained Optimization Formulation): In numerical implementations, the set of all matrices S such that 
+
+S⊤S ⪯ In may be parameterized via a free variable X ∈
+
+Rn×n by setting S = X(I + X⊤X)−1/2. Similarly, to ensure 
+
+V ⊤V does not lose rank, we may approximate V ⊤V using a free matrix Y ∈ Rn×n and a small constant ϵ > 0 by setting 
+
+P = Y ⊤Y + ϵI n.Theorem 35 provides a constructive mechanism to design continuous-time FRNNs that are contracting by construction. By optimizing over the free variables {X, Y, d }, stability is preserved during learning. 
+
+B. Applications to implicit neural networks 
+
+Recent literature [25] suggests that increasing the number of iterations of a DEQ improves its expressivity. This is due to the fact that one can model locally Lipschitz maps via fixed point equations. In order to canonically integrate this insight into a DEQ, we propose the following architecture. 
+
+Proposition 37 (Local Lipschitz continuity of the equilibrium map): Let W : U → Rn×n and B : U → Rn be globally Lipschitz with constants ℓW and ℓB . Let Ψ : Rn → Rn be MONE. Define the map x⋆ : U → Rn by the implicit equation 
+
+x⋆(u) = Ψ( W (u)x⋆(u) + B(u)) . (78) If W (u) − In is Lyapunov diagonally stable uniformly in u,then the map x⋆(u) is locally Lipschitz for each u ∈ U .
+
+Proof: Let u, u ′ ∈ U , and let x := x⋆(u), x ′ := x⋆(u′).Set ε := ( W (u)−W (u′)) x′ + B(u)−B(u′). Since W − In is LDS, there must exist a positive diagonal Q ≻ 0 and δ > 0
+
+such that QW (u)+ W (u)⊤Q ≤ 2Q−2δI n. Using the MONE incremental matrix multiplier, 
+
+∥x − x′∥2 
+
+> Q
+
+≤ (x−x′)⊤Q(W (u)( x−x′) + ε). (79) Applying the LDS bound to the first term on the right cancels 
+
+∥x − x′∥2 
+
+> Q
+
+from both sides, yielding, 
+
+δ∥x − x′∥22 ≤ (x−x′)⊤Q ε. (80) Through Cauchy Schwarz and global Lipschitz continuity of 
+
+W, B we obtain the Lipschitz bound, 
+
+∥x⋆(u)−x⋆(u′)∥ ≤ ∥D∥
+
+δ
+
+ ℓW ∥x⋆(u′)∥ + ℓB
+
+∥u−u′∥. (81) Fixing u0 ∈ U and r > 0, applying (81) with u′ = u0
+
+yields a uniform bound ∥x⋆(u′)∥ ≤ R(u0, r ) < ∞ for all u′ ∈B(u0, r ). Substituting back into (81) gives Lipschitz constant 
+
+L(u0, r ) = ∥D∥ 
+
+> δ
+
+(ℓW R(u0, r ) + ℓB ) < ∞ on B(u0, r ).To make W and B input-dependent while maintaining the contractivity of the FRNN, we parameterize W according to Theorem 35, replacing each free variable and B with an input-dependent feedforward neural network. Because these feed-forward networks typically consist of compositions of linear transformations and MONE nonlinearities, they are globally Lipschitz. This allows us to design a highly expressive, locally Lipschitz implicit neural network that remains mathematically guaranteed to be well-posed and strictly contracting. We validate this approach on the MNIST and CIFAR-10 image classification benchmarks. As shown in Table II, our model achieves competitive accuracy while remaining parameter effi-cient, due to a higher expressivity. Full implementation details and code are provided in our repository. 1                       
+
+> TABLE II COMPARATIVE PERFORMANCE ON IMAGE CLASSIFICATION
+> BENCHMARKS
+> Method Model size Acc. MNIST
+> LBEN [29] –98.2% monDEQ [40] 84K 99.1 ±0.1%
+> Ours 89K 99.33% CIFAR-10
+> LBEN [29] –71.6% monDEQ [40] 172K 74.0 ±0.1% monDEQ ∗[40] 854K 82.0 ±0.3%
+> Ours 134K 78.27% Ours ∗134K 82.30%
+> ∗indicates models trained with data augmentation.
+
+VII. C ONCLUSION 
+
+In this paper, we establish a comprehensive framework for the robust analysis, control design, and machine learning deployment of recurrent neural networks (RNNs) using con-traction theory. We introduced a nonlinear separation principle based on contraction theory and explored its parametric exten-sions. Next, we derive sharp contraction certificates for FRNNs and HNNs, and investigated the fundamental properties of RNN interconnections, including an extension of our certifi-cates to Graph RNNs. Building upon these theoretical founda-tions, we solve the output reference tracking problem for plants 
+
+> 1https://github.com/AnandGokhale/Contractivity Neural Networks
+
+modeled by RNNs via LMI-based synthesis and low-gain integral control. Finally, we apply our certificates to implicit deep learning by deriving an exact, unconstrained algebraic parameterization. This parameterization enabled the design of parameter-efficient implicit neural networks that demonstrate improved expressivity and competitive benchmark accuracy. Several promising directions for future work remain. First, extensions of the separation principle to stochastic systems would be valuable in practical applications. Second, extending the Graph RNN to undirected graphs would significantly broaden its applicability. Third, while our current analysis is restricted to standard RNNs, extending this contraction-based framework to more complex sequence-modeling architectures, such as LSTMs or transformers, is of major theoretical interest. Finally, deploying our robust contraction certificates in broader application domains, such as learning-to-optimize and large-scale network control, present an exciting avenue for future research. 
+
+APPENDIX IALGEBRAIC RESULTS 
+
+The following result is described in [6, Section 2.6.2] 
+
+Lemma 38 (Projection Lemma): Let U ∈ Rm×p and V ∈
+
+Rn×p, and let Q = Q⊤ ∈ Rp×p. There exists a matrix X ∈
+
+Rm×n satisfying, 
+
+Q + U ⊤XV + V ⊤XU ≺ 0 (82) if and only if 
+
+U ⊤⊥ QU ⊥ ≺ 0 and V ⊤⊥ QV ⊥ ≺ 0. (83) Next, we introduce an incremental matrix multiplier for this fixed point map from [9]. 
+
+Lemma 39: Let the map Ψ : Rn → Rn admit an incremental matrix multiplier M . Let the map x⋆ : Rm → Rn be well-posed and defined as the solution of the implicit equation, 
+
+x⋆(u) = Ψ( W x ⋆(u) + Bu ) (84) where W ∈ Rn×n, B ∈ Rn×m. Then the map x⋆(u) admits the incremental multiplier matrix 
+
+B W
+
+0 In
+
+⊤
+
+M
+
+B W
+
+0 In
+
+
+
+. (85) .
+
+Lemma 40 (Mixed Product Property): Consider matrices 
+
+A ∈ Rn×m, B ∈ Rm×p, C ∈ Rk×l, D ∈ Rl×q . AB ⊗ CD =(A ⊗ C)( B ⊗ D).
+
+APPENDIX II PROOF FOR LEMMA 2
+
+Proof: Given x1, x 2 ∈ Rn, adopt the shorthands 
+
+∆x = x1 − x2 ∈ Rn, ∆y = y1 − y2 = C∆x ∈ Rm, and 
+
+∆Ψ = Ψ( y1) − Ψ( y2) ∈ Rm. Since 
+
+ ∆y
+
+∆Ψ 
+
+
+
+=
+
+C∆x
+
+∆Ψ 
+
+
+
+=
+
+ C 0m×m
+
+0m×n Im
+
+  ∆x
+
+∆Ψ 
+
+
+
+,
+
+we rewrite the incremental multiplier matrix condition (1) as 
+
+ ∆y
+
+∆Ψ 
+
+⊤
+
+M
+
+ ∆y
+
+∆Ψ 
+
+
+
+≥ 0 ⇐⇒ 
+
+ ∆x
+
+∆Ψ 
+
+⊤
+
+MC
+
+ ∆x
+
+∆Ψ 
+
+
+
+≥ 0. (86) The continuous time result is a special case of the result in [9, Theorem 4.2]. In the discrete time case, right and left multiplying (6) by ∆x⊤ ∆Ψ ⊤⊤ and its transpose respectively, and using (86) we get, 
+
+ ∆x
+
+∆Ψ 
+
+⊤ A⊤P A − ρ2P A⊤P B B⊤P A B⊤P B 
+
+  ∆x
+
+∆Ψ 
+
+
+
+≤ 0 (87) 
+
+⇐⇒ ∥ A∆x + B∆Ψ ∥2 
+
+> P
+
+≤ ρ2∥∆x∥2 
+
+> P
+
+. (88) This is precisely the contraction condition for discrete time systems. 
+
+APPENDIX III PROOFS FOR FULL STATE FEEDBACK AND OBSERVER DESIGN 
+
+A. Proof of Proposition 27 
+
+Proof: Under the full state feedback control law u = Kx ,the closed-loop dynamics are given by 
+
+˙x = −x + Ψ( W x + BKx ) = −x + Ψ( Wcl x), (89) where Wcl = W +BK . For a given contraction rate c ∈ (0 , 1] ,the contraction condition (23) for Wcl is 
+
+−2(1 − c)P P + ( QW cl )⊤
+
+P + QW cl −2Q
+
+
+
+⪯ 0, (90) where P ≻ 0 is a symmetric matrix and Q ≻ 0 is a diagonal matrix. To convert this expression into an LMI, we pre- and post-multiply (90) by the block diagonal matrix 
+
+diag( P −1, Q −1). This yields the equivalent inequality: 
+
+ −2(1 − c)P −1 Q−1 + P −1W ⊤
+
+> cl
+
+Q−1 + Wcl P −1 −2Q−1
+
+
+
+⪯ 0. (91) Applying the change of variables X = P −1 and D = Q−1,and substituting Wcl = W + BK , the (2 , 1) block becomes 
+
+D + Wcl X = D + W X + BKX. (92) Defining the variable Y = KX , the transformed inequality is rendered into an LMI in the variables (X, D, Y ), given by, 
+
+ −2(1 − c)X D + XW ⊤ + Y ⊤B⊤
+
+D + W X + BY −2D
+
+
+
+⪯ 0. (93) The original P and Q matrices may be recovered via 
+
+P = X−1 and Q = D−1, and the stabilizing state feedback gain is uniquely recovered via K = Y X −1.
+
+B. Proof of Proposition 30 
+
+Proof: We begin by noting that substituting ˆy = C ˆx into the observer dynamics (56) yields an FRNN with synaptic matrix Wobs = W − LC . Writing (23) for Wobs , substituting 
+
+M = QL , we obtain, 
+
+ −2(1 − c)P P + W ⊤Q − C⊤M ⊤
+
+P + QW − M C −2Q
+
+
+
+⪯ 0. (94) This is an LMI jointly in P, Q, M , and the gain matrix L may be recovered by computing Q−1M .REFERENCES 
+
+[1] V. Andrieu and S. Tarbouriech. LMI conditions for contraction and synchronization. In IFAC Symposium on Nonlinear Control Sys-tems , volume 52, pages 616–621, 2019. doi:10.1016/j.ifacol. 2019.12.030 .[2] A. N. Atassi and H. K. Khalil. A separation principle for the stabilization of a class of nonlinear systems. IEEE Transactions on Automatic Control , 44(9):1672–1687, 2002. doi:10.1109/9.788534 .[3] S. Bai, J. Z. Kolter, and V. Koltun. Deep equilibrium models. In 
+
+Advances in Neural Information Processing Systems , 2019. URL: https://arxiv.org/abs/1909.01377. [4] J. Baker, Q. Wang, C. D. Hauck, and B. Wang. Implicit graph neural networks: A monotone operator viewpoint. In Int. Conf. on Machine Learning , volume 202 of Proceedings of Machine Learning Research , pages 1521–1548, 2023. URL: https://proceedings.mlr.press/ v202/baker23a.html. [5] D. S. Bernstein. Matrix Mathematics . Princeton University Press, 2 edition, 2009, ISBN 0691140391. [6] S. Boyd, L. El Ghaoui, E. Feron, and V. Balakrishnan. Linear Matrix Inequalities in System and Control Theory . SIAM, 1994, ISBN 089871334X. [7] F. Bullo. Contraction Theory for Dynamical Systems . Kindle Direct Publishing, 1.3 edition, 2026, ISBN 979-8836646806. URL: https:// fbullo.github.io/ctds. [8] V. Centorrino, A. Gokhale, A. Davydov, G. Russo, and F. Bullo. Euclidean contractivity of neural networks with symmetric weights. 
+
+IEEE Control Systems Letters , 7:1724–1729, 2023. doi:10.1109/ LCSYS.2023.3278250 .[9] L. D’Alto and M. Corless. Incremental quadratic stability. Numerical Algebra, Control and Optimization , 3:175–201, 2013. doi:10.3934/ naco.2013.3.175 .[10] W. D’Amico, A. La Bella, and M. Farina. An incremental input-to-state stability condition for a class of recurrent neural networks. IEEE Transactions on Automatic Control , 69(4):2221–2236, 2024. doi:10. 1109/tac.2023.3327937 .[11] W. D’Amico, A. La Bella, and M. Farina. Data-driven control of echo state-based recurrent neural networks with robust stability guarantees. 
+
+Systems & Control Letters , 195:105974, 2025. doi:10.1016/j. sysconle.2024.105974 .[12] A. Davydov, V. Centorrino, A. Gokhale, G. Russo, and F. Bullo. Time-varying convex optimization: A contraction and equilibrium tracking approach. IEEE Transactions on Automatic Control , 70(11):7446–7460, 2025. doi:10.1109/TAC.2025.3576043 .[13] J. Drgona, A. Tuor, J. Koch, M. Shapiro, B. Jacob, and D. Vrabie. NeuroMANCER: Neural Modules with Adaptive Nonlinear Constraints and Efficient Regularizations. 2023. URL: https://github.com/pnnl/ neuromancer. [14] L. El Ghaoui, F. Gu, B. Travacca, A. Askari, and A. Tsai. Implicit deep learning. SIAM Journal on Mathematics of Data Science , 3(3):930–958, 2021. doi:10.1137/20M1358517 .[15] F. Esfandiari and H. K. Khalil. Output feedback stabilization of fully linearizable systems. International Journal of Control , 56(5):1007– 1037, 1992. doi:10.1080/00207179208934355 .[16] M. Fazlyab, A. Robey, H. Hassani, M. Morari, and G. J. Pappas. Efficient and accurate estimation of Lipschitz constants for deep neural networks. In Advances in Neural Information Processing Systems , 2019. URL: https://arxiv.org/abs/1906.04893. [17] C. Gatke, J. D. Schiller, and M. A. M¨ uller. Small-gain analysis of exponential incremental input/output-to-state stability for large-scale distributed systems. arXiv preprint arXiv:2604.07081 , 2026. [18] M. Giaccagli, V. Andrieu, S. Tarbouriech, and D. Astolfi. LMI conditions for contraction, integral action, and output feedback stabilization for a class of nonlinear systems. Automatica , 154:111106, 2023. doi: 10.1016/j.automatica.2023.111106 .[19] A. Gokhale, A. Proskurnikov, Y. Kawano, and F. Bullo. Contrac-tivity of neural networks: Classification, integral control and learn-ing, 2026. URL: https://arxiv.org/abs/2604.00119, doi:10.48550/ arXiv.2604.00119 .[20] F. Gu, H. Chang, W. Zhu, S. Sojoudi, and L. El Ghaoui. Implicit graph neural networks. In Advances in Neural Information Processing Systems , 2020. URL: https://arxiv.org/abs/2009.06211. [21] S. Jafarpour, A. Davydov, A. V. Proskurnikov, and F. Bullo. Robust implicit networks via non-Euclidean contractions. In Advances in Neural Information Processing Systems , December 2021. doi:10. 48550/arXiv.2106.03194 .[22] Y. Kawano, A. van der Schaft, and J. M. A. Scherpen. Youla-Ku˜ cera parameterization in contraction framework. IEEE Transactions on Automatic Control , 70(3):1667–1682, 2025. doi:10.1109/tac. 2024.3466868 .[23] T. N. Kipf and M. Welling. Semi-supervised classification with graph convolutional networks. arXiv preprint arXiv:1609.02907 , 2016. [24] L. Kozachkov, M. Ennis, and J.-J. E. Slotine. RNNs of RNNs: Recursive construction of stable assemblies of recurrent neural networks. In 
+
+Advances in Neural Information Processing Systems , December 2022. 
+
+doi:10.48550/arXiv.2106.08928 .[25] J. Liu, L. Ding, S. Osher, and W. Yin. Implicit models: Expressive power scales with test-time compute. arXiv preprint , 2025. doi: 10.48550/arXiv.2510.03638 .[26] I. R. Manchester and J.-J. E. Slotine. Transverse contraction criteria for existence, stability, and robustness of a limit cycle. Systems & Control Letters , 63:32–38, 2014. doi:10.1016/j.sysconle.2013.10. 005 .[27] A. Nikolakopoulou, M. Hong, and R. D. Braatz. Dynamic state feedback controller and observer design for dynamic artificial neural network models. Automatica , 146:110622, 2022. doi:10.1016/j. automatica.2022.110622 .[28] M. Poli, S. Massaroli, J. Park, A. Yamashita, H. Asama, and J. Park. Graph neural ordinary differential equations. arXiv preprint arXiv:1911.07532 , 2019. [29] M. Revay, R. Wang, and I. R. Manchester. Lipschitz bounded equi-librium networks. arXiv preprint arXiv:2010.01732 , 2020. doi: 10.48550/arXiv.2010.01732 .[30] M. Revay, R. Wang, and I. R. Manchester. A convex parameterization of robust recurrent neural networks. IEEE Control Systems Letters ,5(4):1363–1368, 2021. doi:10.1109/LCSYS.2020.3038221 .[31] D. J. Rose. Matrix identities of the fast Fourier transform. Linear Algebra and its Applications , 29:423–443, 1980. doi:10.1016/ 0024-3795(80)90253-0 .[32] C. J. Rozell, D. H. Johnson, R. G. Baraniuk, and B. A. Olshausen. Sparse coding via thresholding and local competition in neural circuits. Neu-ral Computation , 20(10):2526–2563, 2008. doi:10.1162/neco. 2008.03-07-486 .[33] M. Schoukens and J. P. No¨ el. Three benchmarks addressing open challenges in nonlinear system identification. IFAC World Congress ,50(1):446–451, 2017. doi:10.1016/j.ifacol.2017.08.071 .[34] A. Shiriaev, R. Johansson, A. Robertsson, and L. Freidovich. Separation principle for a class of nonlinear feedback systems augmented with observers. IFAC Proceedings Volumes , 41(2):6196–6201, 2008. doi: 10.3182/20080706-5-KR-1001.01046 .[35] J. W. Simpson-Porco. Analysis and synthesis of low-gain integral con-trollers for nonlinear systems. IEEE Transactions on Automatic Control ,66(9):4148–4159, 2021. doi:10.1109/tac.2020.3035569 .[36] E. D. Sontag and Y. Wang. Output-to-state stability and detectability of nonlinear systems. Systems & Control Letters , 29(5):279–290, 1997. 
+
+doi:10.1016/S0167-6911(97)90013-X .[37] D. W. Tank and J. J. Hopfield. Simple ”neural” optimization networks: An A/D converter, signal decision circuit, and a linear programming circuit. IEEE Transactions on Circuits and Systems , 33(5):533–541, 1986. doi:10.1109/TCS.1986.1085953 .[38] A. Teel and L. Praly. Tools for semiglobal stabilization by partial state and output feedback. SIAM Journal on Control and Optimization ,33(5):1443–1488, 1995. doi:10.1137/S0363012992241430 .[39] M. Vidyasagar. On the stabilization of nonlinear systems using state detection. IEEE Transactions on Automatic Control , 25(3):504–509, 1980. doi:10.1109/TAC.1980.1102376 .[40] E. Winston and J. Z. Kolter. Monotone operator equilibrium networks. In Advances in Neural Information Processing Systems , 2020. URL: https://arxiv.org/abs/2006.08591. [41] L.-P. Xhonneux, M. Qu, and J. Tang. Continuous graph neural networks. In International conference on machine learning , pages 10432–10441. PMLR, 2020. [42] M. Zakwan, V. Gupta, A. Karimi, E. C. Balta, and G. Ferrari-Trecate. Controller design for structured state-space models via contraction theory. arXiv preprint arXiv:2604.07069 , 2026.

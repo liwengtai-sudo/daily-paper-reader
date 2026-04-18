@@ -1,0 +1,3948 @@
+Title: Generalization and Scaling Laws for Mixture-of-Experts Transformers
+
+URL Source: https://arxiv.org/pdf/2604.09175v1
+
+Published Time: Mon, 13 Apr 2026 00:53:29 GMT
+
+Number of Pages: 40
+
+Markdown Content:
+# GENERALIZATION AND SCALING LAWS FOR 
+
+# MIXTURE -OF -E XPERTS TRANSFORMERS 
+
+Mansour Zoubeirou a Mayaki ∗
+
+Univ Lyon, Lyon 2, LIRIS UMR 5205 F-69676, Lyon, France 
+
+mansour.mayaki at liris.cnrs.fr 
+
+ABSTRACT 
+
+We develop a theory of generalization and scaling for Mixture-of-Experts (MoE) Transformers that cleanly separates active per-input capacity from routing combinatorics. By conditioning on fixed routing patterns and union-bounding across them, we derive a sup-norm covering-number bound whose metric entropy scales with the active parameter budget and incurs a MoE-specific routing overhead. Combined with a standard ERM analysis for squared loss, this yields a generalization bound under a d-dimensional manifold data model and Cβ targets, showing that approximation and estimation trade off as in dense networks once active parameters are accounted for appropriately. We further prove a constructive approximation theorem for MoE architectures, showing that, under the approximation construction, error can decrease either by scaling active capacity or by increasing the number of experts, depending on the dominant bottleneck. From these results we derive neural scaling laws for model size, data size, and compute-optimal tradeoffs. Overall, our results provide a transparent statistical reference point for reasoning about MoE scaling, clarifying which behaviors are certified by worst-case theory and which must arise from data-dependent routing structure or optimization dynamics. 
+
+1 Introduction 
+
+Mixture-of-Experts (MoE) Transformers enable conditional computation : for each token, only a small subset of ex-perts is activated, so the number of active parameters per input is much smaller than the total number of parameters in the model. This yields a practical advantage: compute scales primarily with the number of active experts, while the full expert pool still provides substantial capacity for specialization. Despite striking empirical gains, a theory that cleanly separates the benefits of active capacity from the overheads induced by routing has been missing. In particular, existing scaling laws for dense models track error as a function of total parameters, dataset size, and compute, whereas MoE models require a more refined accounting: (i) approximation should scale with the active parameter budget rather than the total parameter count; (ii) generalization should reflect the multiplicity of routing patterns; and (iii) compute-optimal training should couple data and active capacity rather than data and total parameters. In this work, we develop approximation and uniform generalization results for MoE Transformers that make these distinctions explicit. Classical bounds indexed by the ambient dimension D predict unrealistically slow rates for high-dimensional inputs, whereas empirical scaling for Transformers is much faster. A growing body of theory and evidence shows that when data concentrate on a d-dimensional manifold, both approximation and estimation rates and hence the resulting scal-ing exponents are governed by the intrinsic dimension d rather than D. Recent work (Havrilla & Liao, 2024) devel-ops approximation and statistical theories for Transformers on intrinsically low-dimensional data, deriving data- and model-scaling exponents that depend explicitly on d and validating these predictions on language-modeling bench-marks. Motivated by these results, we adopt d as the geometric control parameter throughout: it aligns the theory more closely with practice, explains faster-than-1/D behavior, and yields MoE scaling predictions that are sensitive to data geometry. 
+
+> ∗
+
+Web page: https://mansmayaki.github.io/ 
+
+> arXiv:2604.09175v1 [cs.LG] 10 Apr 2026
+
+Generalization and Scaling Laws for Mixture-of-Experts Transformers Our results should be interpreted as a conservative statistical baseline for MoE models rather than as tight predictions of training dynamics. Where empirical behavior is sharper, it must arise from data-dependent routing stability, spe-cialization, or architectural biases not captured by worst-case analysis. Uniform generalization bounds are especially relevant for emerging architectures such as MoE, where empirical regularities are still evolving: they clarify which scaling behaviors are statistically certified independently of optimization and which require richer, data-dependent explanations. The main theoretical contributions are: • Metric-entropy decomposition for MoE Transformers. We establish a sup-norm covering-number bound in which the complexity of Mixture-of-Experts Transformers decomposes additively into an active-parameter term and a routing combinatorial term, thereby isolating the statistical effect of conditional computation. • Approximation and uniform generalization under intrinsic dimension. Under a d-dimensional manifold model and Cβ targets, we derive approximation and uniform generalization bounds that separate approximation, estimation, and routing contributions, with rates governed by active capacity. • Neural scaling laws for sparse architectures. We recover dense-network scaling exponents in (d, β ) when mea-sured against the active parameter budget, including model, data, and compute-optimal scaling. Routing contributes an additional logarithmic term in the worst-case bound, while specialization can yield stronger empirical gains in practice. 
+
+2 Related Work 
+
+Transformers: expressivity, approximation, and generalization. The Transformer architecture (Vaswani et al., 2017) implements content-addressable computation through multi-head self-attention and positionwise MLPs. For-mal expressivity results show that (suitably parameterized) Transformers are universal approximators for a broad class of sequence-to-sequence maps (Yun et al., 2020), with positional encodings playing a crucial role in breaking permuta-tion symmetries and enabling length-dependent behaviors. Subsequent analyses refine which architectural ingredients control approximation power number of heads, attention bandwidth, depth vs. width trade-offs, and the effect of pre-norm vs. post-norm residual designs often revealing that depth amplifies compositional expressivity while LayerNorm stabilizes Lipschitz constants across layers. From the learning-theoretic perspective, generalization guarantees for deep networks leverage norm-based capacity measures (e.g., spectral-complexity/margin bounds, path norms) (Bartlett et al., 2017; Neyshabur et al., 2015) together with classical complexity tools (Rademacher/Gaussian complexities and covering numbers) (Bartlett & Mendelson, 2002b). Our analysis adopts this toolbox but tailors it to sparse Transform-ers by (i) conditioning on a fixed routing pattern so that the model reduces to a smooth active subnetwork and (ii) union-bounding over routing patterns to account for combinatorial choices. For approximation, we rely on deep ReLU theory that provides near-optimal rates ‖f − N ‖ ∞ ≲ N −β/d for Cβ functions on d-dimensional domains (Yarotsky, 2017; Schmidt-Hieber, 2020; Petersen & Voigtlaender, 2018). We lift these Euclidean results to data on manifolds by working in local charts and gluing approximants with partitions of unity, which pairs naturally with the MoE routers 
+
+k-sparse mixing and underlies our approximation theorem. 
+
+Mixture-of-Experts (MoE): conditional computation and systems. Sparsely-gated MoE layers (Shazeer et al., 2017) activate only a small subset of experts per token, decoupling total parameters from per-example active com-pute. This idea enabled large sparse Transformers such as GShard (Lepikhin et al., 2021), Switch Transformers (Fedus et al., 2022), and GLaM (Du et al., 2022); in vision, V-MoE validated similar benefits for ViTs (Riquelme et al., 2021). Practical deployments introduced load-balancing losses and alternative dispatchers (BASE layers, expert-choice routing) to reduce hotspotting and improve stability, and specialized runtimes (DeepSpeed-MoE, Tutel) to scale training/inference (Lewis et al., 2021; Zhou et al., 2022; Rajbhandari et al., 2022; Hwang et al., 2023). Recent systems emphasize expert specialization and the gap between total and active parameters e.g., Mixtral (8 ×7B, top-2 routing) and DeepSeek-V3 (hundreds of billions total, tens of billions active) (Jiang et al., 2024; DeepSeek-AI, 2024). These trends motivate our theoretical focus on active per-input capacity as the relevant approximation budget and on an ex-plicit routing-combinatorics term that scales like k log( eM/k ) in covering-number bounds. In our framework, hard top-k and softmax gating with temperature/load-balancing behave similarly at the level of uniform bounds as long as the effective sparsity is k.
+
+Intrinsic-dimension theory for Transformers. Our analysis builds on work showing that Transformer scaling is governed by the intrinsic rather than ambient dimension when data concentrate on low-dimensional structure. In particular, Havrilla & Liao (2024) develop an approximation statistical framework for Transformers on intrinsically low-dimensional data, deriving data/model exponents that depend explicitly on the manifold dimension and validating these predictions empirically. We adopt this viewpoint to interpret MoE: active per-token capacity plays the role of the 2Generalization and Scaling Laws for Mixture-of-Experts Transformers effective model-size axis, while routing acts as an additive overhead. Our analysis builds on their dense-Transformer framework and extends it to MoE with routing. Theorem 3.2 mirrors their approximation result but constructs MoE layers with top-k routing and separates active capacity from total parameters. This aligns our MoE scaling laws with intrinsic-dimension theory recovering dense-model exponents measured against active capacity and clarifying when routing can shift constants without changing rates. 
+
+Scaling laws: dense vs. MoE. Dense language models exhibit empirical power-law scaling of loss with model size, data, and compute (Hestness et al., 2017; Kaplan et al., 2020); the Chinchilla study argues for compute-optimal training by scaling model and data jointly under a fixed budget (Hoffmann et al., 2022). For MoE, recent empirical work proposes MoE-specific scaling formulations that disentangle total from active parameters and incorporate routing effects. Fine-grained MoE scaling analyzes expert granularity, token/expert budgets, and the efficiency frontier as expert shards become smaller and more numerous (Krajewski et al., 2024). Upcycling laws study converting dense checkpoints into MoE while retaining predictable scaling behavior (Liew et al., 2025). Joint denseMoE laws integrate active parameters, dataset size, and expert count to explain memory/throughput trade-offs (Ludziejewski et al., 2025), and unified efficient-MoE laws relate expert activation ratios, granularity, and compute (Tian et al., 2025). Large-scale case studies (e.g., extending fine-grained MoE beyond 50B parameters) provide further evidence that MoE can match or exceed dense scaling at comparable or lower active compute (Krajewski et al., 2025). Our theory complements these findings: we recover the dense-network exponents but measure them against the active parameter budget Nact , and we make explicit a routing overhead proportional to k log( eM/k ) that shifts constants and determines finite-sample crossovers (e.g., long sequences or large M  k). This yields computeoptimal prescriptions consistent with practice grow data and active capacity together while clarifying when adding experts primarily changes constants rather than exponents. 
+
+3 MoE Model and Approximation Theory 
+
+We consider i.i.d. samples (xi, y i)ni=1 drawn from an unknown distribution Q over X × Y .
+
+Definition 3.1 (MoE Transformer) . Fix hyperparameters (D, ℓ, d emb , m, L T , M, k ) and FFN dimensions 
+
+(LFFN , W FFN ). For an input H(0) ∈ Rℓ×demb , each block j = 1 , . . . , L T applies the following residual updates: 1. Attention: 
+
+˜H(j−1) = H(j−1) + MHA j
+
+(
+
+H(j−1) )
+
+.
+
+2. MoE: For each token embedding ˜ht ∈ ˜H(j−1) ,
+
+h(j) 
+
+> t
+
+= ˜ht +
+
+> M
+
+∑
+
+> m=1
+
+gj,m (˜ht) Ej,m (˜ht),
+
+where {Ej,m }Mm=1 are MLP experts of depth LFFN and width WFFN .The routing weights satisfy 
+
+gj,m (h) ≥ 0,
+
+> M
+
+∑
+
+> m=1
+
+gj,m (h) = 1 , ∣∣{m : gj,m (h) 6 = 0 }∣∣ ≤ k, 
+
+so that at most k experts are active per token. Definition 3.1 follows standard sparse MoE architectures (Shazeer et al., 2017; Lepikhin et al., 2021; Fedus et al., 2022). While this framework captures expert sparsity, it is too broad for precise statistical analysis. We therefore analyze a restricted MoE Transformer class in which: (i) submodules have fixed depth and width; (ii) routing is deterministic top-k; (iii) all parameters are uniformly bounded; and (iv) the routing family is expressive enough to implement a k-sparse partition of unity. These conditions retain practical relevance while allowing explicit control of active parameter counts and covering numbers. 
+
+3.1 Approximation Bound Under Hölder Smoothness Theorem 3.2. Let M ⊂ RD be a compact d-dimensional C1 submanifold, and let f ∈ Cβ (M) satisfy ‖f ‖Cβ ≤ B,where β > 0. Consider the MoE Transformer class TMoE (Definition 3.1) with LT blocks, sequence length ℓ, and an MoE FFN sublayer per block with M experts, of which at most k are active per token. Assume each expert is a 
+
+3Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+ReLU MLP of depth LFFN , width wFFN , and parameter budget Πexp , and let Πattn denote the number of attention / non-expert parameters per block. Assume further that the router can implement a k-sparse partition of unity and that all weights are bounded by κ.Define the active attention+expert budget 
+
+Nact := LT Πattn + LT kΠexp .
+
+Then, as shown in Appendix F, there exist constants C, c > 0 depending on (B, β, d, M) and polynomially on the architectural quantities (LT , w FFN , L FFN , κ ) such that 
+
+inf  
+
+> T∈T MoE
+
+‖T − f ‖2 
+
+> ∞
+
+≤ C · min 
+
+{
+
+N −2β/d  
+
+> act
+
+, M −2β/d }
+
+. (1) 
+
+Remark 3.3 . The exponent −2β/d is the classical minimax exponent for Cβ approximation on a d-dimensional man-ifold. The constants in Theorem 3.2 depend on (B, β, d, M) and polynomially on the architectural parameters. Stan-dard manifold-approximation arguments imply that this dependence is at most polynomial in d for manifolds with bounded regularity; the only exponential-in-d behavior is the unavoidable covering-number dependence that produces the exponent itself. 
+
+Proof sketch. Appendix F gives a constructive proof of Theorem 3.2. 
+
+3.2 MoE Generalization Bound Theorem 3.4. Let T (ε) be a class of MoE Transformers such that for every f ∈ Cβ (M) there exists T ∈ T (ε) with 
+
+‖T − f ‖L2(Q) ≤ ε. 
+
+Let ˆTn ∈ T (ε) denote an empirical risk minimizer under squared loss based on the i.i.d. sample (xi, y i)ni=1 . Then 
+
+E‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+≤ ε2 + ˜O
+
+( Nact 
+
+n + LT ℓk log( eM/k )
+
+n
+
+)
+
+.
+
+Here ˜O(g) hides polylogarithmic factors: 
+
+˜O(g) = O(g · polylog (n, N act , L T ℓk, M/k, κ, R, M 0
+
+)) .
+
+Corollary 3.5 (Generalization bound with MoE approximation rate) . Under the same router expressivity assumptions as in Theorem 3.2, substituting 
+
+ε2  N −2β/d 
+
+> act
+
+gives 
+
+E‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+≲ N −2β/d  
+
+> act
+
++ Nact 
+
+n + LT ℓk log( eM/k )
+
+n ,
+
+up to polylogarithmic factors. Remark 3.6 (Looseness of the routing union bound) . The factor LT ℓk log( eM/k ) comes from a worst-case union bound over all top-k routing patterns: 
+
+log |Π| ≤ LT ℓk log( eM/k ).
+
+This contribution is conservative and should be interpreted as a worst-case upper bound rather than a tight characteri-zation of practical routing behavior. In practice, router specialization can substantially reduce the effective number of routing patterns, so the bound is expected to be loose but safe. 
+
+Proof sketch. The proof (Appendix E) conditions on fixed routing patterns, reducing the MoE to deterministic active subnetworks. For each pattern, Lipschitz bounds and a covering argument over the active parameter space yield the dense-style rate, while a union bound over patterns adds the routing term LT ℓk log( eM/k ).
+
+Lemma 3.7 (MoE covering number) . Let X ⊂ RD be compact with ‖x‖∞ ≤ M0. Consider the Mixture-of-Experts Transformer class 
+
+TMoE (D, M, k, L T , L FFN , w FFN , d emb , m, κ, R )
+
+defined as in Definition 3.1, except that each feed-forward sublayer is an MoE layer with M experts and the router selects hard top-k experts per token per layer. Assume each learned parameter entry satisfies ‖θ‖∞ ≤ κ and each network output is bounded by ‖T (x)‖∞ ≤ R.
+
+4Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Let Πattn be the number of scalar parameters in the attention / non-expert parts per block, and let Πexp be the number of scalar parameters of a single expert MLP of depth LFFN , width wFFN , and input/output dimension demb . Then for any δ ∈ (0 , 1) , the covering number of TMoE under the sup-norm satisfies 
+
+log N(δ, TMoE , ‖ · ‖ ∞
+
+) ≤ C1
+
+(
+
+Πattn + LT kΠexp 
+
+)
+
+log 
+
+( C2κRM 0
+
+δ
+
+)
+
++ C3LT ℓk log 
+
+( eM k
+
+)
+
+(2) 
+
+for absolute constants C1, C 2, C 3 > 0 depending polynomially on demb , w FFN , m, L T , L FFN , ℓ . Small polylogarith-mic factors may be hidden in the ˜O(·) notation. Proof sketch. The proof (Appendix H) conditions on a fixed top-k routing pattern, reducing the MoE to a deterministic active subnetwork, and then union-bounds over all routing patterns. For a fixed pattern, a parameter-to-function Lips-chitz bound for attention and FFN layers implies that an η-grid of [−κ, κ ]Nact induces a δ-cover of the corresponding function subclass, yielding (2) by standard covering-number arguments (Bartlett & Mendelson, 2002b; Vaswani et al., 2017; Ba et al., 2016). 
+
+Scope and interpretation of the bounds. The theoretical analysis is developed for a structured class of MoE Trans-formers, including bounded parameters, hard top-k routing, and explicit routing partitions. These assumptions are standard in uniform generalization analysis and are introduced to enable tractable covering-number arguments. The resulting guarantees should be interpreted as worst-case statistical bounds . In particular, the routing complexity term reflects a union bound over all possible routing patterns and therefore provides a conservative upper bound rather than a tight characterization of practical MoE behavior. 
+
+4 Neural Scaling Laws 
+
+We derive explicit scaling laws for Mixture-of-Experts transformers that expose the dependence on sample size n, num-ber of experts M , number of active experts per token k, and parameter budgets. Throughout we use the generalization bound from theorem 3.4 in the shorthand form 
+
+E ‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+≲ N −2β/d 
+
+> act
+
+︸ ︷︷ ︸
+
+> approximation
+
++ Nact 
+
+n︸ ︷︷ ︸ 
+
+> estimation
+
++ Rroute 
+
+n︸ ︷︷ ︸ 
+
+> routing
+
+. (3) where Rroute := LT ℓk log 
+
+( eM k
+
+)
+
+.
+
+4.1 Data Scaling 
+
+Let us study how test error decreases with the number of samples n when the architecture is fixed or mildly tuned with n. Ignoring Rroute for the moment (we reintroduce it in §4.4), we balance approximation and estimation by minimizing, over the active budget Nact . Differentiating and setting to 0 gives 
+
+− 2βd N − 2βd −1act + cn = 0 = ⇒ N ⋆ 
+
+> act
+
+
+
+( nc
+
+) d
+
+> 2β+d
+
+⇒ N ⋆ 
+
+> act
+
+ n d
+
+> 2β+d
+
+Substituting N ⋆ 
+
+> act
+
+back we obtain the data scaling law 
+
+E ‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+ n−αD , αD = 2β
+
+2β + d (4) This exponent matches the dense-network exponent under the same intrinsic-dimension assumptions (Havrilla & Liao, 2024); the MoE twist is that Nact is the active budget per input (depending on k), not the total parameter count. 
+
+4.2 Model Scaling 
+
+We quantify how the error scales with the active parameter budget when the sample size n is fixed. 
+
+Proposition 4.1 (Model-scaling law in the approximation-dominated regime) . For a fixed n, let us suppose that Nact 
+
+lies in the regime where the estimation and routing terms are dominated by the approximation term, namely there exist absolute constants c1, c 2 > 0 such that 
+
+Nact 
+
+n ≤ c1N − 2βd 
+
+> act
+
+and Rrt 
+
+n ≤ c2N − 2βd 
+
+> act
+
+(5) 5Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Then we get 
+
+E ‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+ N −αN 
+
+> act
+
+, αN = 2βd (6) 
+
+Proposition 4.2 (Characterization of the approximation-dominated regime) . Since Nact is the active parameter budget, the first condition in (5) is equivalent to 
+
+N 1+2 β/d  
+
+> act
+
+≲ n ⇐⇒ Nact ≲ n d 
+
+> 2β+d
+
+=: N ⋆
+
+> act
+
+(n),
+
+that is, below the estimation crossover N ⋆
+
+> act
+
+(n).The routing condition reads 
+
+Rroute ≲ n N −2β/d  
+
+> act
+
+⇐⇒ Nact ≲
+
+( nLT ℓk log( eM/k )
+
+) d
+
+> 2β
+
+=: N ⋆
+
+> act
+
+(n, M, k, L T , ℓ ).
+
+Therefore, the model-scaling law (6) holds whenever 
+
+Nact ≤ min {N ⋆
+
+> act
+
+(n), N ⋆
+
+> act
+
+(n, M, k, L T , ℓ )}. (7) 
+
+Remark 4.3 (Crossover and beyond) . At the estimation crossover Nact ≈ N ⋆
+
+> act
+
+(n), the approximation and estimation terms balance: 
+
+N −2β/d  
+
+> act
+
+≈ Nact 
+
+n =⇒ Nact  n d 
+
+> 2β+d
+
+, E‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+ n− 2β
+
+> 2β+d
+
+For Nact  N ⋆
+
+> act
+
+(n) (holding n fixed), the bound is dominated by Nact /n (plus routing), so increasing Nact worsens 
+
+the bound. Thus (6) describes the subcritical (approximation-limited) regime, analogous to the dense case (Havrilla & Liao, 2024) but with Nact the active parameter budget. 
+
+Corollary 4.4 (Model-scaling with experts-only approximation) . If attention does not contribute to approximation (so 
+
+Nact = Nexp ), then in the subcritical regime (Eq. (7) )
+
+E ‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+ (LT kΠexp )− 2βd (8) 
+
+4.3 Optimizing the Number of Active Experts k
+
+Let A := LT Πexp and absorb the attention budget into constants. With experts dominate approximation, Nact ∝ k,the bound (3) reduces to the function of k:
+
+E(k) ≲ (Ak )−2β/d 
+
+︸ ︷︷ ︸
+
+> approx
+
++ Ak n︸︷︷︸ 
+
+> estimation
+
++ LT ℓ k log( eM/k )
+
+n︸ ︷︷ ︸
+
+> routing
+
+(9) 
+
+Ignoring the log first. Lets drop log( eM/k ) and treat it as a slowly varying constant near the optimizer. Minimize 
+
+g(k) = ( Ak )−2β/d + ˜Bn k over k > 0. Differentiating gives (up to architecture constants) 
+
+k⋆  n d 
+
+> 2β+d
+
+and E(k⋆)  n− 2β 
+
+> 2β+d
+
+(10) Enforce k⋆ ≤ M ; otherwise the optimum saturates at k = M .
+
+Reintroducing the log. With the routing term present, the derivative of the first-order condition gives 
+
+2βd A−2β/d k−2β/d −1 = 1
+
+n
+
+(
+
+A + LT ℓ log eM k − LT ℓ
+
+)
+
+(11) This matches the stated first-order condition whose closed form involves a Lambert-W factor if solved exactly. Since 
+
+log( eM/k ) varies slowly near the optimizer, the solution is 
+
+k⋆  min 
+
+{
+
+M, 
+
+( nA + LT ℓ log( eM/k ⋆)
+
+) d
+
+> 2β+d
+
+}
+
+(12) Thus, within the worst-case bound, the dependence of k⋆ on M enters only logarithmically. This does not preclude stronger empirical gains from larger expert pools arising through specialization effects outside the scope of the uniform analysis. The full proof of these calculations are provided in appendix G.1. We stress that this conclusion holds at the level of the worst-case bound only; the expanded routing ablations in Section 5 show that, for sufficiently large M/k , empirical performance can improve substantially due to expert spe-cialization effects outside the scope of the present analysis. 6Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+4.4 Routing-dominated vs. Power-law Regime 
+
+Comparing the routing term to the power-law term n−2β/ (2 β+d) yields the threshold 
+
+Rrt 
+
+n ≳ n− 2β 
+
+> 2β+d
+
+⇐⇒ n ≲ nthr := (LT ℓk log eM k
+
+) 2β+dd (13) 
+
+E‖ ˆTn − f ‖2 ≈
+
+{ LT ℓk log( eM/k ) 
+
+> n
+
+n  nthr 
+
+n− 2β 
+
+> 2β+d
+
+n  nthr 
+
+(14) The bound indicates that routing dominance is mitigated when factors such as LT , ℓ, k, and log( eM/k ) are small, a pattern that is consistent with architectural choices observed in prior MoE systems. These strategies align with empirical system-level practices in sparse Transformers: for instance, Switch Transformers (Fedus et al., 2022) and GShard (Lepikhin et al., 2021) emphasized top-1 or top-2 routing for efficiency, while later refinements such as BASE Layers (Lewis et al., 2021) and expert-choice routing (Zhou et al., 2022) reduced routing variance and overhead. Large-scale MoE deployments (Riquelme et al., 2021; Du et al., 2022) also highlight the importance of balancing 
+
+M and k to avoid routing bottlenecks. From the theoretical side, our bound formalizes these intuitions: the routing-dominated regime is suppressed precisely when the effective expert activation ( k) and the combinatorial explosion in 
+
+M are controlled, allowing the system to operate in the favorable power-law regime where sample complexity scales as n−2β/ (2 β+d).While the theory predicts a single smoothness parameter β, empirical estimates obtained from model scaling and data scaling may differ, as these regimes probe different components of the error decomposition (approximation vs estimation and optimization effects). We therefore focus on structural consistency of the scaling exponents rather than exact agreement of inferred β values. 
+
+4.5 Sample Complexity for Target Error ε
+
+In the power-law regime, where routing overhead is negligible relative to the approximation and estimation terms, the classical nonparametric rate applies. Specifically, achieving a target population error ε requires 
+
+n(ε)  ε− 2β+dβ , Nact (ε)  ε− dβ (15) The first relation quantifies the number of samples needed as a function of smoothness β and intrinsic dimension d;the second gives the corresponding effective parameter budget scaling to match the approximation rate. Both coincide with the dense-network theory (Yarotsky, 2017; Schmidt-Hieber, 2020), except that in MoE models Nact is interpreted as the active parameter budget per input rather than the total parameter count. In contrast, in the routing-dominated regime the error floor is determined by the combinatorial overhead of selecting experts. In this case, sample complexity to achieve accuracy ε grows only linearly in 1/ε :
+
+n(ε)  LT ℓk log( eM/k )
+
+ε (16) This expression highlights that the overhead scales with the number of MoE layers ( LT ), sequence length ( ℓ), and active experts per layer ( k), while depending only logarithmically on the total number of experts M . Thus, if M  k,routing dominates and inflates sample complexity significantly, while M = Θ( k) mitigates this effect. In practice, this explains why architectures such as Switch Transformers (Fedus et al., 2022) or GLaM (Du et al., 2022) adopt small k (top-1 or top-2 routing) and balance M against k to remain in the favorable power-law regime. Our theoretical analysis therefore provides a principled characterization of when MoE gains translate into efficient sample usage and when routing combinatorics instead dictate learning dynamics. 
+
+4.6 Compute-optimal Trade-offs 
+
+We derive the optimal allocation of active parameters per input Nact and number of training samples n under a fixed training compute budget C. Throughout we use the bound in (3) and we adopt the standard compute model in which per-token (or per-sample) FLOPs scale linearly with the active parameter budget (Hoffmann et al., 2022; Kaplan et al., 2020), so the total training compute satisfies 
+
+C  n · Nact . (17) 7Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Proposition 4.5 (Compute-optimal allocation of Nact and n). Assume the compute budget (17) . Then the excess error bound is minimized (up to constants) by 
+
+N ⋆
+
+> act
+
+(C)  C d 
+
+> 2β+2 d
+
+and n⋆(C) = CN ⋆
+
+> act
+
+(C)  C 2β+d 
+
+> 2β+2 d
+
+(18) 
+
+The resulting compute error scaling law is 
+
+E ‖ ˆTn⋆ − f ‖2 
+
+> L2(Q)
+
+ C− ββ+d (19) Thus, under a fixed compute budget, both the dataset size and the per-sample active parameters should grow with C
+
+according to the exponents in (18). The error decays as a power law in compute with exponent β/ (β + d), matching nonparametric theory and providing the MoE analogue of compute scaling laws. See appendix G.3 for proof. 
+
+5 Empirical Scaling and Evaluation on LLMs 
+
+Our empirical study is designed to examine the scaling exponents and routing effects suggested by the theoretical analy-sis under controlled yet practically relevant conditions. We evaluate the framework on a family of causal, decoder-only Transformer language models with Mixture-of-Experts (MoE) feed-forward layers. We consider three public text cor-pora with differing levels of complexity and estimated intrinsic dimension: TinyStories , a low-dimensional synthetic dataset of children’s stories (Eldan & Li, 2023); WikiText-103 , a medium-scale corpus of moderately heterogeneous Wikipedia articles (Merity et al., 2016); and OpenWebText , a large and highly heterogeneous corpus reconstructed from Reddit-linked web pages (Gokaslan & Cohen, 2019). Additional details are provided in Appendix A. 
+
+Intrinsic dimension d estimates in practice. We estimate the intrinsic dimension d of the data manifold from hidden representations using standard intrinsic-dimension estimators. Concretely, we pass corpus tokens through a fixed pre-trained GPT-2 model, collect hidden states at a given layer, and apply the Levina–Bickel k-nearest-neighbor maximum-likelihood estimator, which is known to be more robust than TwoNN in high-dimensional settings (Fukunaga & Olsen, 1971; Levina & Bickel, 2004; Facco et al., 2017). Distances are computed using FAISS, and intrinsic dimension is evaluated on a layer-by-layer basis. To reduce variance, we repeat the procedure over multiple random subsamples and report the median intrinsic dimension. Unless stated otherwise, we use the middle Transformer layers as a representative summary of d, following common practice in prior work. The resulting estimates are stable across layers and subsamples. The estimated intrinsic dimensions are lowest for TinyStories and higher for WikiText-103 and OpenWebText, consistent with their relative heterogeneity; exact values are reported in Table 1, with depth-wise trends reported in Figures 2 and 3 in Appendix A. We emphasize that these estimates are representation-dependent and should be viewed as a coarse proxy for data complexity rather than as a definitive characterization of the learned MoE representations. 
+
+Experimental setup. We operate in a small- to medium-scale regime to enable dense sweeps over the capacity grid. Unless noted otherwise, we use sequence lengths ℓ ∈ { 128 , 256 }, m = 4 attention heads, the AdamW optimizer, and a learning rate of 3 × 10 −4. For model scaling, we vary (LT , d ff ) over a broad grid and consider multiple MoE configurations (M, k ). For data scaling, we fix a representative architecture and vary the token budget D over the range 5 × 10 4–8 × 10 5. We examine three empirical regimes corresponding to the theoretical analysis: (i) model scaling , where we estimate the exponent ̂ αN by regressing log L on log Nact ; (ii) data scaling , where we regress 
+
+log L on log D to extract ̂ αD ; and (iii) routing ablations , where we vary (M, k ) to probe the contribution of routing combinatorics and identify the transition from routing-influenced behavior to a power-law-like regime. Empirical estimates of β obtained from model scaling and data scaling do not coincide exactly, which is expected since these regimes probe different components of the error decomposition. We therefore treat β as an effective smoothness parameter and focus on structural consistency of the exponents rather than exact parameter recovery. Additional discussion is provided in Appendix B. 
+
+5.1 Fitting Exponents and Comparison to Theory 
+
+In all scaling experiments, we operated in regimes where routing overhead was either negligible relative to the valida-tion loss or explicitly accounted for. When needed, we introduced a small loss floor c and fit linear models to log( L−c)
+
+as a function of the relevant scaling variable ( log Nact or log D ), yielding empirical exponents (̂ αN ,̂ αD ). We com-pared these exponents to theoretical values (αN , α D ) derived from the intrinsic-dimension framework using an esti-mated dimension d and a range of smoothness parameters β. Across datasets, the empirical and theoretical exponents are of comparable magnitude and approximately satisfy the compute-optimal consistency relation αD ≈ αN /(1+ αN ).8Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Figure 1: Routing ablation across expert pool size M and active experts k. (a) In the moderate regime ( M/k ≤ 8), validation loss increases with the routing complexity term k log( eM/k ), consistent with its interpretation as a worst-case routing overhead. (b) Over the full range, performance improves again for sufficiently large M/k , suggesting gains from expert specialization not captured by the worst-case analysis. These observations suggest that the intrinsic-dimension-based theory provides a coherent statistical reference for ob-served model and data-scaling behavior, without implying tight quantitative agreement. Additional sensitivity analyses over β are reported in Appendix A.6. 
+
+5.2 Routing ablation. 
+
+Figure 1 shows routing ablations over (M, k ) under fixed compute, revealing two consistent regimes across scales. In the moderate regime ( M/k ≤ 8), validation loss increases approximately monotonically with the routing term 
+
+k log( eM/k ), consistent with the theoretical prediction that routing contributes a statistical overhead. For larger values of M/k , we observe a reversal: increasing the expert pool improves performance despite higher routing complexity. For example, at fixed k = 4 , increasing M from 16 to 64 reduces validation loss from 2.73 to 
+
+2.37 . This specialization-dominated regime is not captured by the worst-case analysis and suggests that practical MoE models benefit from structured routing and expert specialization beyond what uniform bounds predict. Importantly, this two-regime behavior is consistent across different compute budgets, reinforcing the interpretation of the routing term as a conservative upper bound rather than a tight characterization of practical performance. 
+
+6 Discussion and Limitations 
+
+Our results indicate that active per-token capacity plays a central role in MoE performance, while routing contributes an additional overhead whose effect depends on the regime. When routing complexity remains modest, MoE models admit dense-style scaling behavior when measured against active parameters rather than total model size. Across TinyStories, WikiText-103, and OpenWebText, the observed model- and data-scaling exponents are of comparable magnitude to those suggested by intrinsic-dimension analysis. The expanded routing ablations further reveal two regimes: a moderate regime in which performance degrades with the routing term k log( eM/k ), consistent with the worst-case theory, and a specialization-dominated regime for larger M/k in which increasing the expert pool improves performance. The constants in our bounds are conservative, and the regimes studied remain far from asymptotic. From a practical standpoint, three architectural factors appear central to MoE behavior: activation sparsity, expert granularity, and routing diversity. Within worst-case statistical guarantees, expert pools that grow much larger than the number of activated experts are not certified to improve rates beyond a logarithmic term; however, our routing ablations show that larger expert pools can yield substantial empirical gains through specialization when M/k is sufficiently large. Routing entropy and load balance therefore remain useful diagnostics during training. For long sequences, smaller values of k can help limit routing overhead and delay the onset of routing-dominated regimes, although data-dependent effects may substantially alter these trade-offs in practice. 9Generalization and Scaling Laws for Mixture-of-Experts Transformers Our analysis focuses on statistical complexity rather than optimization dynamics. In practical MoE systems, mech-anisms such as expert specialization, load balancing, and routing regularization can significantly influence behavior, potentially reducing the effective routing complexity and improving performance beyond worst-case predictions. 
+
+Limitations and future directions. Our analysis relies on several simplifying assumptions, including bounded pa-rameters, hard top-k routing, and squared loss. While these assumptions are standard in uniform convergence analysis, they do not fully capture practical MoE training settings. In particular, the derived bounds are likely conservative. The linear dependence on sequence length ℓ and the number of active experts k arises from worst-case covering arguments and may overestimate the effective complexity of practical models. Moreover, the analysis does not capture approximation gains from expert specialization, which we now observe em-pirically in regimes where M/k is large. Developing tighter data-dependent analyses, as well as corresponding lower bounds, remains an important direction for future work. 
+
+7 Conclusion 
+
+We developed a statistical framework for Mixture-of-Experts (MoE) Transformers that separates active per-token capacity from routing combinatorics. Under standard regularity assumptions, we derive approximation and uniform generalization bounds in which excess risk decomposes into approximation, estimation, and routing terms. When expressed in terms of active parameters, these bounds imply scaling exponents that mirror dense-model behavior, while isolating routing as the distinct MoE-specific statistical overhead. Within this framework, we characterize the scaling of the optimal activation level up to architectural and logarithmic factors, and show that, under worst-case guarantees, increasing the total number of experts affects the bound only logarithmically through routing complexity. At the same time, our expanded routing ablations reveal a richer empirical picture: in a moderate regime, performance degrades with the routing term k log( eM/k ) as predicted by the theory, whereas for sufficiently large M/k , larger expert pools improve performance through specialization effects that are not captured by the worst-case analysis. Overall, our work provides a conservative statistical reference point for reasoning about sparse Transformer scaling. It clarifies when MoE models should behave like dense models measured in active capacity, and when additional data-dependent structure in routing and expert specialization can lead to behavior beyond uniform guarantees. 10 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Impact Statement 
+
+This paper presents theoretical and empirical work aimed at improving the scientific understanding of Mixture-of-Experts Transformers and sparse model scaling. Its primary contribution is methodological rather than directly de-ployable. A possible positive impact is improved compute efficiency in large-scale machine learning through better understanding of active capacity and routing. As with other work on scaling advanced models, these insights could also indirectly support the development of more capable systems, with downstream risks similar to those already as-sociated with large language models, including misuse, bias propagation, and unequal access. We do not believe this paper raises ethical concerns beyond those already well established for research on large-scale machine learning. 
+
+References 
+
+Anthony, M. and Bartlett, P. L. Neural Network Learning: Theoretical Foundations . Cambridge University Press, 1999. Ba, J. L., Kiros, J. R., and Hinton, G. E. Layer normalization. arXiv preprint arXiv:1607.06450 , 2016. URL 
+
+https://arxiv.org/abs/1607.06450 .Bartlett, P. L. and Mendelson, S. Rademacher and gaussian complexities: Risk bounds and structural results. JMLR ,3:463–482, 2002a. Bartlett, P. L. and Mendelson, S. Rademacher and gaussian complexities: Risk bounds and structural results. Journal of Machine Learning Research , 3:463–482, 2002b. Bartlett, P. L., Foster, D. J., and Telgarsky, M. Spectrally-normalized margin bounds for neural networks. In Advances in Neural Information Processing Systems (NeurIPS) , volume 30, 2017. Chen, M., Jiang, H., Liao, W., and Zhao, T. Nonparametric regression on low-dimensional manifolds using deep relu networks: function approximation and statistical recovery. Information and Inference: A Journal of the IMA , 11(4): 1203–1253, 03 2022. ISSN 2049-8772. doi:10.1093/imaiai/iaac001. URL https://doi.org/10.1093/imaiai/ iaac001 .DeepSeek-AI. Deepseek-v3 technical report. 2024. URL https://arxiv.org/abs/2412.19437 .Du, N., Huang, Y., Dai, A. M., Tong, S., Lepikhin, D., Xu, Y., Krikun, M., Zhou, Y., Yu, A. W., Firat, O., Chen, Z., Le, Q. V., Wu, Y., and Chen, Z. Efficient scaling of language models with mixture-of-experts. In International Conference on Machine Learning (ICML) , volume 162 of Proceedings of Machine Learning Research , pp. 5547– 5569. PMLR, 2022. URL https://arxiv.org/abs/2112.06905 . GLaM. Eldan, R. and Li, Y. Tinystories: How small can language models be and still speak coherent english?, 2023. URL 
+
+https://arxiv.org/abs/2305.07759 .Facco, E., dErrico, M., Rodriguez, A., and Laio, A. Estimating the intrinsic dimension of datasets by a minimal neighborhood information. Scientific Reports , 7, 2017. URL https://api.semanticscholar.org/CorpusID: 3991422 .Fedus, W., Zoph, B., and Shazeer, N. Switch transformers: scaling to trillion parameter models with simple and efficient sparsity. Journal of Machine Learning Research , 23(1), January 2022. ISSN 1532-4435. Fukunaga, K. and Olsen, D. An algorithm for finding intrinsic dimensionality of data. IEEE Transactions on Comput-ers , C-20(2):176–183, 1971. doi:10.1109/T-C.1971.223208. Gokaslan, A. and Cohen, V. Openwebtext corpus. http://Skylion007.github.io/OpenWebTextCorpus , 2019. Golowich, N., Rakhlin, A., and Shamir, O. Size-independent sample complexity of neural networks. In COLT , 2018. Havrilla, A. and Liao, W. Understanding scaling laws with statistical and approximation theory for transformer neural networks on intrinsically low-dimensional data. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. URL https://openreview.net/forum?id=N2wYPMpifA .Hestness, J., Narang, S., Ardalani, N., Diamos, G., Jun, H., Kianinejad, H., Patwary, M. M. A., Yang, Y., and Zhou, Y. Deep learning scaling is predictable, empirically, 2017. URL https://arxiv.org/abs/1712.00409 .Hoffmann, J., Borgeaud, S., Mensch, A., Buchatskaya, E., Cai, T., Rutherford, E., de Las Casas, D., Hendricks, L. A., Welbl, J., Clark, A., Hennigan, T., Noland, E., Millican, K., van den Driessche, G., Damoc, B., Guy, A., Osindero, S., Simonyan, K., Elsen, E., Vinyals, O., Rae, J. W., and Sifre, L. Training compute-optimal large language models. In Proceedings of the 36th International Conference on Neural Information Processing Systems , NIPS ’22, Red Hook, NY, USA, 2022. Curran Associates Inc. ISBN 9781713871088. 11 Generalization and Scaling Laws for Mixture-of-Experts Transformers Hwang, C., Cui, W., Xiong, Y., Yang, Z., Liu, Z., Hu, H., Wang, Z., Salas, R., Jose, J., Ram, P., Chau, J., Cheng, P., Yang, F., Yang, M., and Xiong, Y. Tutel: Adaptive mixture-of-experts at scale, 2023. URL https://arxiv.org/ abs/2206.03382 .Jiang, A. Q., Sablayrolles, A., Roux, A., Mensch, A., Savary, B., Bamford, C., Chaplot, D. S., de las Casas, D., Hanna, E. B., Bressand, F., Lengyel, G., Bour, G., Lample, G., Lavaud, L. R., Saulnier, L., Lachaux, M.-A., Stock, P., Subramanian, S., Yang, S., Antoniak, S., Scao, T. L., Gervet, T., Lavril, T., Wang, T., Lacroix, T., and Sayed, W. E. Mixtral of experts, 2024. URL https://arxiv.org/abs/2401.04088 .Kaplan, J., McCandlish, S., Henighan, T., Brown, T. B., Chess, B., Child, R., Gray, S., Radford, A., Wu, J., and Amodei, D. Scaling laws for neural language models, 2020. URL https://arxiv.org/abs/2001.08361 .Krajewski, J., Ludziejewski, J., Adamczewski, K., Píóro, M., Krutul, M., Antoniak, S., Ciebiera, K., Król, K., Odrzygó´ zd´ z, T., Sankowski, P., Cygan, M., and Jaszczur, S. Scaling laws for fine-grained mixture of experts. 2024. doi:10.48550/arXiv.2402.07871. URL https://arxiv.org/abs/2402.07871 .Krajewski, J., Chochowski, M., and Korzekwa, D. Scaling fine-grained moe beyond 50b parameters: Empirical evaluation and practical insights. 2025. URL https://arxiv.org/abs/2506.02890 .Lepikhin, D., Lee, H., Xu, Y., Chen, D., Firat, O., Huang, Y., Krikun, M., Shazeer, N., and Chen, Z. {GS}hard: Scal-ing giant models with conditional computation and automatic sharding. In International Conference on Learning Representations , 2021. URL https://openreview.net/forum?id=qrwe7XHTmYb .Levina, E. and Bickel, P. Maximum likelihood estimation of intrinsic dimension. In Saul, L., Weiss, Y., and Bottou, L. (eds.), Advances in Neural Information Processing Systems , volume 17. MIT Press, 2004. URL https://proceedings.neurips.cc/paper_files/paper/2004/file/ 74934548253bcab8490ebd74afed7031-Paper.pdf .Lewis, M., Bhosale, S., Dettmers, T., Goyal, N., and Zettlemoyer, L. Base layers: Simplifying training of large, sparse models. In International Conference on Machine Learning (ICML) , volume 139 of Proceedings of Machine Learning Research , pp. 6265–6274. PMLR, 2021. URL https://arxiv.org/abs/2103.16716 .Liew, S. P., Kato, T., and Takase, S. Scaling laws for upcycling mixture-of-experts language models. 2025. doi:10.48550/arXiv.2502.03009. URL https://arxiv.org/abs/2502.03009 . ICML 2025. Ludziejewski, J., Pióro, M., Krajewski, J., Stefaniak, M., Krutul, M., Mała´ snicki, J., Cygan, M., Sankowski, P., Adamczewski, K., Miło´ s, P., and Jaszczur, S. Joint moe scaling laws: Mixture of experts can be memory efficient. In Forty-second International Conference on Machine Learning , 2025. URL https://openreview.net/forum? id=70DGIxEHiB .Merity, S., Xiong, C., Bradbury, J., and Socher, R. Pointer sentinel mixture models, 2016. Neyshabur, B., Tomioka, R., and Srebro, N. Norm-based capacity control in neural networks. In Conference on Learning Theory (COLT) , volume 40 of Proceedings of Machine Learning Research , pp. 1376–1401. PMLR, 2015. Petersen, P. and Voigtlaender, F. Optimal approximation of piecewise smooth functions using deep relu neural net-works. Neural Networks , 108:296–330, 2018. ISSN 0893-6080. doi:https://doi.org/10.1016/j.neunet.2018.08.019. URL https://www.sciencedirect.com/science/article/pii/S0893608018302454 .Rajbhandari, S., Li, C., Yao, Z., Zhang, M., Aminabadi, R. Y., Awan, A. A., Rasley, J., and He, Y. Deepspeed-moe: Advancing mixture-of-experts inference and training to power next-generation ai scale. arXiv preprint arXiv:2201.05596 , 2022. URL https://arxiv.org/abs/2201.05596 .Riquelme, C., Puigcerver, J., Mustafa, B., Neumann, M., Jenatton, R., Pinto, A. S., Keysers, D., and Houlsby, N. Scaling vision with sparse mixture of experts. In Advances in Neural Information Processing Systems (NeurIPS) ,volume 34, pp. 8583–8595, 2021. URL https://arxiv.org/abs/2106.05974 .Schmidt-Hieber, J. Nonparametric regression using deep neural networks with relu activation function. The Annals of Statistics , 48(4), August 2020. ISSN 0090-5364. doi:10.1214/19-aos1875. URL http://dx.doi.org/10.1214/ 19-AOS1875 .Shalev-Shwartz, S. and Ben-David, S. Understanding Machine Learning: From Theory to Algorithms . Cambridge University Press, 2014. Shazeer, N., Mirhoseini, A., Maziarz, K., Davis, A., Le, Q., Hinton, G., and Dean, J. Outrageously large neural networks: The sparsely-gated mixture-of-experts layer. In International Conference on Learning Representations ,2017. URL https://openreview.net/forum?id=B1ckMDqlg .Tian, C., Chen, K., Liu, J., Liu, Z., Zhang, Z., and Zhou, J. Towards greater leverage: Scaling laws for efficient mixture-of-experts language models. 2025. doi:10.48550/arXiv.2507.17702. URL https://arxiv.org/abs/ 2507.17702 .12 Generalization and Scaling Laws for Mixture-of-Experts Transformers Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., and Polosukhin, I. Attention is all you need. In Guyon, I., von Luxburg, U., Bengio, S., Wallach, H. M., Fergus, R., Vishwanathan, S. V. N., and Garnett, R. (eds.), Advances in Neural Information Processing Systems 30: Annual Conference on Neural Informa-tion Processing Systems 2017, December 4-9, 2017, Long Beach, CA, USA , pp. 5998–6008, 2017. URL https: //proceedings.neurips.cc/paper/2017/hash/3f5ee243547dee91fbd053c1c4a845aa-Abstract.html .Vershynin, R. High-Dimensional Probability . Cambridge University Press, 2018. Yarotsky, D. Error bounds for approximations with deep relu networks, 2017. URL https://arxiv.org/abs/1610. 01145 .Yun, C., Bhojanapalli, S., Rawat, A. S., Reddi, S. J., and Kumar, S. Are transformers universal approximators of sequence-to-sequence functions? In International Conference on Learning Representations (ICLR) , 2020. arXiv:1912.10077. Zhou, Y., Lei, T., Liu, H., Du, N., Huang, Y., Zhao, V., Dai, A., Chen, Z., Le, Q., and Laudon, J. Mixture-of-experts with expert choice routing. In Advances in Neural Information Processing Systems (NeurIPS) , volume 35, pp. 25478–25492, 2022. URL https://arxiv.org/abs/2202.09368 .13 Generalization and Scaling Laws for Mixture-of-Experts Transformers Table 1: Intrinsic Dimension (ID) Summary across Models and Datasets. The ID estimates remain remarkably stable across different model sizes for each dataset. For the subsequent scaling analysis (Figure 5 and 4), we chose the median ID values for each dataset. 
+
+Model (number of parameters) Tinystories Wikitext-103 OpenWebText Mean (CI) Median Mean (CI) Median Mean (CI) Median 
+
+gpt2 (117 million) 22 .9 ± 2.9 23 .1 31 .6 ± 2.9 32 .4 46 .7 ± 6.2 49 .8
+
+gpt2-medium (345 million) 21 .4 ± 1.1 21 .9 31 .6 ± 1.7 32 .9 43 .7 ± 2.6 45 .0
+
+gpt2-large (774 million) 22 .1 ± 0.9 22 .4 31 .5 ± 1.6 32 .1 44 .7 ± 2.6 47 .7
+
+gpt2-xl (1558 million) 19 .7 ± 0.6 19 .6 30 .3 ± 1.0 31 .1 43 .0 ± 1.7 43 .9
+
+Values Adopted for Scaling Analysis Chosen d (Median ID) d = 23 d = 32 d = 45 
+
+Best-Fit β β ≈ 1.0 β ≈ 1.0 β ≈ 1.0 − 1.5
+
+A Empirical Validation on MoE Transformer LLMs 
+
+This section provides a detailed description of the architectures, hyperparameter grids, and scaling protocols used to ensure the empirical results are consistent with our theoretical predictions. Our goal is to cleanly isolate the roles of (i) effective model capacity, (ii) dataset size, and (iii) routing combinatorics in MoE Transformers. 
+
+A.1 Datasets. 
+
+We consider three publicly available text corpora with varying complexity and intrinsic dimension: Stories / TinySto-ries is a corpus of short, synthetically generated childrens stories, following (Eldan & Li, 2023). This dataset is known to lie on an intrinsically low-dimensional manifold, and has been used in prior work on theoretical scaling laws for Transformers. WikiText-103 is a curated subset of English Wikipedia articles (Merity et al., 2016), commonly used for language modeling. It provides a medium-scale, moderately heterogeneous domain. OpenWebText is an open recreation of the WebText corpus (Gokaslan & Cohen, 2019), constructed from outgoing Reddit links. It is substan-tially larger and more heterogeneous than WikiText-103, with higher intrinsic dimension. For each corpus we extract a plain-text training stream (one document per line). For scaling experiments we sub-sample the stream to match the desired token budgets. 
+
+A.2 Intrinsic Dimension Estimation (Extended Description) 
+
+The intrinsic dimension (ID) of a representation manifold quantifies the effective degrees of freedom of the learned features. To estimate the ID of transformer representations, we employ the Levina–Bickel Maximum Likelihood Estimator (MLE) (Levina & Bickel, 2004), which models the local likelihood of k-nearest-neighbor distances on a smooth manifold. Compared to the TwoNN estimator, which relies only on the ratio of the first two nearest neighbors, the MLE approach uses the full local neighborhood and exhibits substantially lower variance in high-dimensional settings an essential property when studying large language models. We extract hidden states from each block of a pretrained GPT-2 model (gpt2-medium) by sampling tokens from a large text corpus. For each layer ℓ, we compute all pairwise distances to its k nearest neighbors using FAISS in 32-bit precision, and apply the MLE estimator to the resulting distance matrix Dℓ. The estimation pipeline is repeated for multiple random subsamples to mitigate sampling noise; we report the median MLE estimate for each layer, along with the median absolute deviation (MAD) as a robust measure of uncertainty. Following established practice in intrinsic-dimension analyses of deep networks, we summarize the model-level intrin-sic dimension using the middle layers 40–60% depth). Shallow layers typically show inflated dimensionality due to local embedding variation, whereas deeper layers tend to collapse. This procedure yields stable and reproducible ID estimates that are consistent with theoretical predictions from neural scaling laws, allowing us to define a characteris-tic ID ( d) for each corpus that captures its inherent complexity, as summarized in the depth curves (Figure 2) and the scaling law fits (Figure 3). 
+
+A.3 Model family: MoE decoder-only Transformers 
+
+All experiments use a causal decoder-only Transformer with Mixture-of-Experts (MoE) feed-forward layers. Each model consists of token and positional embeddings, followed by LT Transformer blocks. Each block contains: 14 Generalization and Scaling Laws for Mixture-of-Experts Transformers Table 2: Theoretical Exponents derived from the Chosen d and β.
+
+Dataset Chosen d Best-Fit β Theoretical Exponents Empirical Exponents 
+
+αN = 2βd αD = 2β
+
+2β+d Consistency αN
+
+1+ αN̂ αN̂ αD
+
+WikiText-103 32 1.0 0.063 0.059 0.059 0.060 0.058 
+
+OpenWebText 45 1.0 0.044 0.043 0.042 0.045 0.043 
+
+OpenWebText 45 1.5 0.067 0.062 0.063 0.068 0.062 
+
+TinyStories 23 1.0 0.087 0.080 0.080 0.085 0.081 0 0 0 0 0-' $, &)             
+
+> 
+> 
+> 
+> 
+> $)'!$(! !#$(!%$  d
+> $)'!$(! !#$(!%$  +( -' &)  &$  ,)
+> %" !.
+> &)   &'#(   +   
+> &)#!*#   &'#(  +   
+> &)"'   &'#(  +   
+> &),"   &'#(  +   
+
+(a) OpenWebText (OWT) Dataset 0 0 0 0 0*$ !) #&                   
+
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+>  !&$!%   !%"!  d
+> !&$!%  !%"!  (% *$ #&  !*&"$%
+> " +
+> #&   #$ %  (  
+> #& '    #$ %  (   
+> #&$   #$ %  (  
+> #&)   #$ %  (   
+
+(b) TinyStories Dataset 0 0 0 0 0,& #+ %(               
+
+> 0
+> 
+> 0
+> 0#(&#' "#'$#  d
+> #(&#' "#'$#  *' ,& %(   +(0
+> $! -
+> %(   %&"'   *    
+> %(")"   %&"'  *    
+> %(!&   %&"'  *    
+> %(+!   %&"'  *    
+
+(c) WikiText-103 (WT-103) Dataset 
+
+Figure 2: Intrinsic Dimension (ID) Evolution Across Model Depth. The plots show the Maximum Likelihood Esti-mation (MLE) of the Intrinsic Dimension, d, calculated for the representations at each layer of the four GPT-2 models (varying size). The ID remains stable across different model sizes for a given dataset but varies significantly across data corpora. (a) OpenWebText (OWT): Shows the highest intrinsic dimension, reflecting its diverse and complex nature. (b) TinyStories: Exhibits the lowest intrinsic dimension, consistent with its synthetic, simple structure. (c) 
+
+WikiText-103 (WT-103): Has an intermediate intrinsic dimension. • Self-attention: multi-head attention with m heads, model dimension dmodel , causal masking, and standard projec-tion matrices. • MoE feed-forward network: a routing network selecting the top-k experts. Each expert is an MLP with hidden width dff and a GELU nonlinearity. Outputs of the selected experts are combined via a softmax over routing logits. The active parameter budget per input, 
+
+Neff = LT
+
+(Πattn + k Πexp 
+
+),
+
+counts only the parameters that contribute to computation for a given token. This is the quantity that appears in our approximation and covering-number bounds, and serves as the scaling variable in model-capacity experiments. 
+
+A.4 Hyperparameters and Capacity Grids 
+
+We operate in the small-to-medium compute regime to allow dense parameter sweeps and low-noise log–log regres-sions. Unless otherwise stated, we use: • sequence length ℓ ∈ { 128 , 256 },• m = 4 attention heads, • AdamW with learning rate 3 × 10 −4 and weight decay 0.1.
+
+Model-scaling grid. To vary the active capacity over 12 orders of magnitude, we sweep 
+
+(LT , d ff ) ∈ { 2, 3, 4, 5, 6, 8} × { 256 , 384 , 512 , 640 , 768 , 896 , 1024 , 1280 , 1536 },
+
+combined with MoE configurations M ∈ { 4, 8, 16 } and k ∈ { 1, 2}. We avoid extremely large M or k to remain within GPU memory while still covering a wide range of effective capacities. 
+
+A.5 Scaling Protocols 
+
+We run three classes of experiments that map directly onto the theoretical decomposition of the generalization bound. 15 Generalization and Scaling Laws for Mixture-of-Experts Transformers 0 0 0 0 0    0)!$- +%  - )$/$-. $     
+
+> 
+> 
+> 01$- &$ */-'*.'" ')$*.'+*
+>     
+> */-'*.'" ')$*.'+* " ('*&  2   +& +& ,$* $! $3/
+> $ *  ,$- +#$(
+> $#' *  ,$- +#$(
+
+(a) OpenWebText (OWT) Dataset 0 0 0 0 0    -&!* (" *&!,!*+ !      
+
+> 
+> 00
+> 0
+> 0
+> 
+> 0
+> 
+> 0 .!*#! ',*$'+$ $&!'+$('
+>     
+> ',*$'+$ $&!'+$(' %$'# /   (# (#  $'0,(*$!+
+> !'  )!* ( !%
+> ! $'  )!* ( !%
+
+(b) TinyStories Dataset 0 0 0 0 0    /(", *# ,(".",- "     
+
+> 0
+> 0
+> 
+> 0
+> 
+> 0 0",$" ).,%)-%   %(")-%*)
+>     
+> ).,%)-%  %(")-%*)  '%)$ 1   *$ *$  %&% "2.
+> ")  +", *!"'
+> "!%)  +", *!"'
+
+(c) WikiText-103 (WT-103) Dataset 
+
+Figure 3: Intrinsic Dimension Scaling Law: ¯d versus Number of Parameters ( N ). The plots show the relationship between the Average Intrinsic Dimension ( ¯d) (log-log scale) and the Number of Parameters ( N ) across the four GPT-2 model sizes for each dataset. This relationship is modeled as a power law, ¯d ∼ N β , where the slope of the linear fit determines the ID Scaling Exponent β. The results suggest that ¯d exhibits weak or negligible scaling with model size across all three corpora. 
+
+(1) Model scaling. For a fixed dataset, we train all models in the sweeping grid under a common token budget Dfixed .After convergence, we record the validation loss L and fit a linear regression of log L versus log Neff over the region where routing is negligible. The slope yields the empirical model exponent ̂ αN .
+
+(2) Data scaling. We choose a representative “base” architecture (e.g., LT = 4 , dmodel = 128 , dff = 512 , M = 8 ,
+
+k = 2 ) and vary the number of training tokens 
+
+D ∈ { 5 × 10 4, 10 5, 2 × 10 5, 4 × 10 5, 8 × 10 5}.
+
+For each value of D we adjust the number of optimization steps to keep the total token budget fixed. A regression of 
+
+log L on log D yields the empirical data exponent ̂ αD .
+
+(3) Routing ablations. To isolate the influence of routing combinatorics, we fix both the base architecture and the token budget, and vary the expert configuration according to 
+
+k ∈ { 1, 2}, M ∈ { 2k, 4k, 8k}.
+
+For each (M, k ) pair we train a model, record its validation loss, and compute the theoretical routing term 
+
+LT ℓk log( eM/k ). Plotting loss against this term reveals the routing-dominated regime and the predicted crossover into the power-law region governed by (Neff , D ). The models considered in this part are listed in Tables 3 and 4. 
+
+A.6 Full Data Scaling and ModelScaling sensitivity 
+
+B Extended Results: Empirical Comparison to Prior MoE Scaling Laws 
+
+We align our theoretical exponents model scaling with the empirical laws reported in EL (Tian et al., 2025) and Joint MoE Scaling Laws (JMSL) (Ludziejewski et al., 2025). In the power-law (routing-negligible) regime, our theory implies two parameter-free identities that can be checked directly: 
+
+αtheory D = αtheory N
+
+1 + αtheory N
+
+, αtheory C = αtheory N
+
+2 + αtheory N
+
+(20) Accordingly, we test our theory by comparing empirical exponents to these identities, without estimating the intrinsic dimensionality. We align our theoretical exponents model scaling αN , data scaling αD , and compute scaling αC with the empirical laws reported in Joint MoE Scaling Laws (JMSL) (Ludziejewski et al., 2025). They supposed that, for a fixed number of experts E, the validation loss follows a Chinchilla-style surface 
+
+L(Nact , D | E) = m(E) N μ(E)act + n(E) D ν(E) + c, (21) and then introduces an expert-dependent joint law by making both the prefactors and exponents functions of E (ulti-mately via a smoothed ˆE). Concretely, 
+
+L(Nact , D, ˆE) = a ˆEδ N α+γ ln ˆE
+
+act + b ˆEω D β+ζ ln ˆE + c, (22) 16 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+LT df f Nact dmodel nheads M k
+
+2 256 3,148,800 512 4 8 22 384 3,673,600 512 4 8 22 512 4,198,400 512 4 8 22 768 5,248,000 512 4 8 22 1024 6,297,600 512 4 8 24 256 6,297,600 512 4 8 24 384 7,347,200 512 4 8 24 512 8,396,800 512 4 8 24 768 10,496,000 512 4 8 24 1024 12,595,200 512 4 8 24 1536 16,793,600 512 4 8 26 768 15,744,000 512 4 8 26 1024 18,892,800 512 4 8 28 1024 25,190,400 512 4 8 2
+
+Table 3: Model configurations used in the scaling experiments for each data set . Each row corresponds to a distinct Transformer-MoE model used in the model-scaling sweep. The effective active parameter count Nact varies with the number of layers and FFN width, while dmodel = 512 , nheads = 4 , M = 8 , k = 2 , and sequence length ℓ = 256 are held fixed. 
+
+LT dff Nact dmodel nheads M k D
+
+4 512 8,396,800 512 4 8 2 5 × 10 4
+
+4 512 8,396,800 512 4 8 2 1 × 10 5
+
+4 512 8,396,800 512 4 8 2 2 × 10 5
+
+4 512 8,396,800 512 4 8 2 4 × 10 5
+
+4 512 8,396,800 512 4 8 2 8 × 10 5
+
+Table 4: Model configuration used in the data-scaling experiments. The architecture is held fixed while the train-ing token budget D is varied. Unless stated otherwise, the configuration corresponds to a representative mid-scale Transformer–MoE model with fixed active parameter budget Nact .which reduces to (21) when E is held fixed, with μ(E) = α + γ ln ˆE and ν(E) = β + ζ ln ˆE. (Ludziejewski et al., 2025) provides fitted coefficients, per-E reduced exponents, and a compute-optimal analysis under the training-FLOPs proxy F = 6 Nact D. We adopt Their counting conventions for active parameters and FLOPs when fitting/reading off exponents. From their per-expert reduction (their Eq. (5) and Table 4), we read exponents μ(E) and ν(E) and map 
+
+ˆαN (E) := − μ(E), ˆαD (E) := − ν(E).
+
+JMSL reports that as E increases the magnitude of ν(E) increases (improved data efficiency) while |μ(E)| slightly 
+
+decreases . The resulting values and the induced compute exponent are summarized in Table 5. 
+
+Compute-optimal frontier and induced αC . On compute-optimal slices with the constraint F = 6 Nact D, the separable form (21) implies closed-form optima (JMSL Eq. (9)): 
+
+N opt act (F, E ) = G(E)
+
+( F
+
+> 6
+
+) ν(E)
+
+> μ(E)+ ν(E)
+
+, Dopt (F, E ) = G(E)−1 ( F
+
+> 6
+
+) μ(E)
+
+> μ(E)+ ν(E)
+
+,
+
+for a known G(E) depending on m(E), n (E), μ (E), ν (E). Along this frontier, the compute scaling exponent is 
+
+ˆαC (E) = ˆαN (E) ˆ αD (E)ˆαN (E) + ˆ αD (E) . (23) We use JMSL’s F -proxy and the per-E (μ, ν ) to report ˆαC (E) and to compare the token-to-parameter ratio drift with 
+
+E (JMSL’s Finding 1). 
+
+Consistency of β across scaling regimes. Our theoretical framework introduces a smoothness exponent β that appears in both model scaling, through αN = 2 β/d , and data scaling, through αD = 2 β/ (2 β +d). When estimating β
+
+from empirically fitted scaling slopes ̂ αN and ̂ αD , we find that the resulting values βmodel and βdata do not necessarily 17 Generalization and Scaling Laws for Mixture-of-Experts Transformers 1  1  1  1  1  1  1  1  1   
+
+> !$ D
+> ($ #'
+> 
+
+ 
+
+ 
+
+ 
+
+ 
+
+1 
+
+1 
+
+11 
+
+11   
+
+> !$*!!$''
+> ( !#&-# ,  $+(
+> &$)#(&)(
+> "%&!(̂ 
+
+D      
+
+>   
+
+D     
+
+>  
+
+D      
+
+>   
+
+D   
+
+(a) OpenWebText (OWT) 1  1  1  1  1  1  1  1  1   
+
+> !$ D
+> ($ #'
+> 
+
+ 
+
+ 
+
+ 
+
+ 
+
+1    
+
+> !$*!!$''
+> ( !#&,# +  (#,'($&'
+> &$)#(&)(
+> "%&!(̂ 
+
+D      
+
+>   
+
+D     
+
+>  
+
+D      
+
+>   
+
+D   (b) TinyStories 1  1  1  1  1  1  1  1  1   
+
+> !$ D
+> ($ #'
+> 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+1 
+
+1    
+
+> !$*!!$''
+> ( !#&-# ,  +( 
+> &$)#(&)(
+> "%&!(̂ 
+
+D      
+
+>   
+
+D     
+
+>  
+
+D      
+
+>   
+
+D   (c) WikiText-103 (WT-103) 
+
+Figure 4: Data-scaling results (fixed d, varying β). Empirical estimates of the data-scaling law (loss versus data size 
+
+D) across datasets, compared with theoretical lines obtained by fixing the dataset-specific intrinsic dimension d and varying β. The empirical fits are most consistent with β = 1 .5 for OpenWebText and β = 1 .0 for TinyStories and WikiText-103. 1  1  1  1  1  
+
+> ! N
+> %
+> 
+
+1 
+
+11 
+
+11 
+
+11 
+
+11 
+
+11 
+
+1 
+
+1      
+
+> !'!$$
+> ! #*  ) !(%
+> #!& %#&%
+> "#%̂  
+
+N      
+
+>    
+
+N     
+
+> 1  
+
+N      
+
+> 1   
+
+N   
+
+(a) OpenWebText (OWT) 1  1  1  1  1  
+
+> # N
+> '
+> 
+
+ 
+
+ 
+
+ 
+
+ 
+
+1 
+
+1       
+
+> #)   #&&
+> #  "%+" * '"+&'#%&
+> %#("'%('
+> !$% '̂  
+
+N      
+
+>    
+
+N     
+
+>   
+
+N      
+
+>    
+
+N    (b) TinyStories 1  1  1  1  1  
+
+> " N
+> &
+> 
+
+ 
+
+ 
+
+1 
+
+1 
+
+1 
+
+1 
+
+11 
+
+11 
+
+11     
+
+> "("%%
+> "!$+! * )&1 
+> $"'!&$'&
+> #$&̂  
+
+N      
+
+>    
+
+N   1  
+
+> 1  
+
+N      
+
+> 1   
+
+N   (c) WikiText-103 (WT-103) 
+
+Figure 5: Model-scaling results (fixed d, varying β). Empirical estimates of the model-scaling law (loss versus active parameter count Nact ) across datasets. For each plot, the dataset-specific intrinsic dimension d is fixed and theoretical lines are shown for varying β, with theoretical exponent αN = 2 β/d . The empirical fits are most consistent with 
+
+β = 0 .5 across all three datasets. coincide exactly (see Figures 4 and 5). Such discrepancies are expected. Model-scaling curves are typically cleaner and more directly dominated by approximation error, whereas data-scaling curves are more sensitive to optimization noise, finite-sample effects, and, in the MoE setting, routing overhead terms of the form k log( eM/k ). Similar differences between model- and data-derived exponents have been reported in prior empirical studies of both dense and MoE language models (Kaplan et al., 2020; Hoffmann et al., 2022; Krajewski et al., 2024; Ludziejewski et al., 2025). While the two estimates of β need not match exactly, they remain broadly consistent in magnitude across datasets and scaling regimes. This qualitative agreement suggests that the smoothness-based exponents used in our analysis provide a reasonable statistical reference point for interpreting the observed scaling behavior. 
+
+B.1 Our Theory ⇒ Empirical Mapping and Consistency Checks Theoretical exponents. In the power-law (routing-negligible) regime, our theory characterizes 
+
+αtheory N = 2βd , αtheory D = 2β
+
+2β + d , αtheory C = ββ + d .
+
+This implies two parameter-free identities that can be checked directly against JMSL: 
+
+αtheory D = αtheory N
+
+1 + αtheory N
+
+, αtheory C = αtheory N
+
+2 + αtheory N
+
+= αtheory N αtheory D
+
+αtheory N + αtheory D
+
+(24) 18 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+(a) Data-to-model scaling ratio (b) Amplification factor κ(E)
+
+Figure 6: Empirical amplification patterns across experts. Thus, for each expert count E, a simple test is whether the empirical pair (ˆαN (E), ˆαD (E)) approximately satisfies 
+
+ˆαD ≈ ˆαN /(1 + ˆ αN ), and whether ˆαC (E) computed from (23) aligns with the right-hand identity in (20). Deviations quantify where practice departs from the smooth-manifold asymptotics (finite-sample regime, tokenization/entropy floors c, training schedules, or mild routing side-effects). 
+
+B.2 Per-E identity checks 
+
+For each expert count E, we compare the empirical pair (ˆαN (E), ˆαD (E)) against the parameter-free identities 
+
+αpred  
+
+> D
+
+(E) = ˆαN (E)1 + ˆ αN (E) , αpred  
+
+> C
+
+(E) = ˆαN (E)2 + ˆ αN (E) = ˆαN (E) αpred  
+
+> D
+
+(E)ˆαN (E) + αpred  
+
+> D
+
+(E) .
+
+Defining residuals 
+
+rD (E) = ˆ αD (E) − αpred  
+
+> D
+
+(E), rC (E) = ˆ αC (E) − αpred  
+
+> C
+
+(E),
+
+E μ(E) ν(E) αN αD αC αpred  
+
+> D
+
+αpred  
+
+> C
+
+rD rC rel _err D rel _err C
+
+1 -0.1817 -0.1965 0.1817 0.1965 0.0944 0.1537 0.0832 0.0427 0.0111 0.2779 0.1335 2 -0.1780 -0.2065 0.1780 0.2065 0.0955 0.1511 0.0817 0.0553 0.0138 0.3666 0.1697 4 -0.1731 -0.2192 0.1731 0.2192 0.0967 0.1475 0.0796 0.0716 0.0170 0.4855 0.2142 8 -0.1676 -0.2338 0.1676 0.2338 0.0976 0.1435 0.0773 0.0902 0.0203 0.6287 0.2625 16 -0.1617 -0.2494 0.1617 0.2494 0.0980 0.1391 0.0748 0.1102 0.0232 0.7917 0.3114 32 -0.1557 -0.2652 0.1557 0.2652 0.0981 0.1347 0.0722 0.1304 0.0258 0.9684 0.3582 
+
+Table 5: Per-E identity checks.We set αN (E) = −μ(E) and αD (E) = −ν(E). The compute-optimal exponent is 
+
+αC (E) = αN (E)αD (E)   
+
+> αN(E)+ αD(E)
+
+. Predicted exponents use αpred  
+
+> D
+
+= αN /(1 + αN ) and αpred  
+
+> C
+
+= αN /(2 + αN ). Residuals are 
+
+rD = αD − αpred  
+
+> D
+
+and rC = αC − αpred  
+
+> C
+
+; relative errors are r/ pred. we observe systematic, monotone-positive deviations across (see Table 5). Quantitatively, the mean absolute error is 
+
+MAE[ rD ] = 0 .083 and MAE[ rC ] = 0 .0186 , with MAPE[ rD ] = 58 .7% and MAPE[ rC ] = 24 .2% . Both gaps grow with E: (rD , r C ) ≈ (0 .043 , 0.011) at E=1 → (0 .130 , 0.026) at E=32 . Equivalently, Figure 6a show that the ratio ˆαD /ˆαN increases with E (from ∼ 1.08 at E=1 to ∼ 1.70 at E=32 ), indicating stronger-than-idealized data-side gains. A parsimonious correction that captures the trend is an E-dependent amplification of the identity, 
+
+ˆαD (E) ≈ κ(E) ˆαN (E)1 + ˆ αN (E) , κ(E) > 1,
+
+with empirical multipliers κ(1) ≈ 1.28 , κ (2) ≈ 1.37 , κ (4) ≈ 1.47 , κ (8) ≈ 1.62 , κ (16) ≈ 1.79 , κ (32) ≈ 1.97 . A log-linear form κ(E) = A + B ln E provides a simple, testable fit (see 6b). 19 Generalization and Scaling Laws for Mixture-of-Experts Transformers       
+
+> (a) Per-Ecross-budget fits: D∗vs. N∗(b) Tokens-to-parameters drift across E (per budget)
+
+Figure 7: Cross-budget compute-optimal allocations. (a) Cross-budget slopes for each E. (b) Tokens-to-parameters drift across experts (per budget). 
+
+Compute-optimal allocation vs. experts. JMSL reports compute-optimal allocations (N ∗
+
+> act
+
+(F, E ), D ∗(F, E )) , al-lowing us to test our predicted tokens-to-parameters drift. Our theory (via (20)) imposes a fixed relationship between the model and data exponents, and along the compute frontier ( F = 6 Nact D) it implies the losscompute exponent (23). Empirically, JMSL finds that, at fixed compute F , increasing the number of experts E raises D∗ and lowers N ∗
+
+> act
+
+(Table 1 and isoFLOPs plots), consistent with a larger effective data exponent at higher E. This pattern appears di-rectly in Fig. 7b: the ratio D∗/N ∗ increases monotonically with E for every budget C, meaning the compute-optimal allocation shifts toward more tokens per active parameter as expertization grows. Moreover, the slope of D∗/N ∗
+
+versus E becomes shallower at larger budgets (e.g., the gain from E=1 → 16 is roughly ×4.5 at 10 20 but only ×3.0
+
+at 10 21 ), suggesting diminishing marginal amplification with C.
+
+Theory vs. EL (Tian et al., 2025). Empirically, Tian et al. (2025) corroborate these predictions: their Efficiency Leverage metric (EL) grows as a power law in compute and (inverse) activation ratio while expert granularity mod-ulates EL via a log-polynomial term with a stable optimum; their compute-optimal allocations favor more data and smaller active models than dense baselines, and the Ling-mini-beta case study (0.85B active, 17.5B total) matches a 6.1B dense model at > 7× lower compute consistent with our view that active capacity drives gains and routing is a secondary, mostly constant-factor overhead (Tian et al., 2025). 
+
+Theory vs. JMSL (Ludziejewski et al., 2025). JMSL found that, for a fixed number of experts E, validation loss follows a Chinchilla-style surface and then introduces an expert-dependent joint law by letting both prefactors and exponents be functions of E (via a smoothed ˆE). For each E, our theory suggests two simple checks: whether the empirical pair (ˆ αN (E), ˆαD (E)) approximately satisfies ˆαD ≈ ˆαN /(1 + ˆ αN ), and whether ˆαC (E) computed from (23) aligns with the identity in (20). In the JMSL data we observe systematic, monotone-positive deviations: the ratio ˆαD /ˆαN increases with E (Table 5, Fig. 6a in appendix B), indicating stronger-than-idealized data-side gains, plausibly due to finite-sample effects, tokenization/entropy floors c, training schedules, or mild routing side-effects. Consistent with our compute-frontier geometry, JMSLs compute-optimal allocations (N ∗
+
+> act
+
+, D ∗) show that D∗/N ∗
+
+increases monotonically with E for every budget C (Fig. 7b in appendix B), i.e., more tokens per active parameter as expertization grows, with a shallower slope at larger budgets, suggesting diminishing marginal amplification with compute. 
+
+Practical implication. At a fixed training budget C, increasing E should allocate relatively fewer active parameters and more tokens (higher D⋆/N ⋆), improving data efficiency. 
+
+C Additional Preliminaries 
+
+C.1 Notation and basic definitions Sets, measures, and expectations. For a measurable space (X , B) and probability measure Q on (X , B), we write 
+
+X ∼ Q for a random variable taking values in X , and E[·] for expectation with respect to Q. The symbol P refers to probability. 20 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Covering numbers and metric entropy. Let (F, ρ ) be a metric space. An δ-cover of F is a finite subset 
+
+{f1, . . . , f N } ⊂ F such that for every f ∈ F there exists j ∈ [N ] with ρ(f, f j ) ≤ δ. The covering number Ver-shynin (2018) is 
+
+N(δ, F, ρ ) := min { N ∈ N : ∃ δ-cover of F with N elements }
+
+The (log) metric entropy is log N(δ, F, ρ ). We often use ρ(f, g ) = ‖f − g‖∞.
+
+Vectors, matrices, tensors. We use bold uppercase (e.g., H) for matrices and bold lowercase (e.g., h) for vectors when convenient. For a vector v ∈ Rd, define the entrywise ℓ∞ norm 
+
+‖v‖∞ := max  
+
+> 1≤i≤d
+
+|vi|
+
+For a matrix A ∈ Rdout ×din , we use two norms: ‖A‖∞ := max i,j |Aij |
+
+For an embedding matrix H ∈ Rℓ×demb (sequence length ℓ, embedding size demb ), we adopt 
+
+‖H‖∞ := max  
+
+> t∈[ℓ], j ∈[demb ]
+
+|Ht,j |
+
+Asymptotic notation. For nonnegative quantities a, b , a ≲ b means a ≤ C b for an absolute constant C; a ' b
+
+means a ≲ b and b ≲ a. We write ˜O(·) to hide polylogarithmic factors in problem parameters. 
+
+C.2 Loss and learning rule Squared regression error. Given a predictor T : X → R, the population (squared) risk under Q is 
+
+L(T ) := E[(T (X) − f (X)) 2] = ‖T − f ‖2
+
+> L2(Q)
+
+Empirically, for samples {xi}ni=1 , the empirical risk is 
+
+Ln(T ) := 1
+
+n
+
+> n
+
+∑
+
+> i=1
+
+(T (xi) − f (xi))2
+
+Empirical risk minimization (ERM). An empirical risk minimizer (ERM) over T is any measurable selection 
+
+ˆTn ∈ T satisfying 
+
+ˆTn ∈ arg min   
+
+> T∈T
+
+Ln(T )
+
+C.3 Input-Lipschitz bound 
+
+There exists L(dense) in ≥ 1, depending polynomially on (ℓ, m, d emb , w FFN , L FFN ) and on κ, such that for all H, H ′ ∈
+
+Rℓ×demb ,
+
+‖Bdense (θ, H ) − Bdense (θ, H ′)‖∞ ≤ L(dense) in ‖H − H′‖∞, (25) with the schematic scaling (hiding absolute constants and activation Lipschitz factors) 
+
+L(dense) in ≲ 1 + CLN κ
+
+(
+
+ℓ m d 2emb 
+
+︸ ︷︷ ︸
+
+> MHA sensitivity
+
++ demb wLFFN 
+
+> FFN
+
+︸ ︷︷ ︸
+
+> FFN sensitivity
+
+)
+
+.
+
+C.4 Softmax Lipschitz 
+
+We work with the temperature-τ softmax στ : Rm → ∆m−1,
+
+στ (u)i = eui/τ 
+
+∑mj=1 euj /τ , τ > 0.
+
+Its Jacobian is 
+
+Jτ (u) = 1
+
+τ
+
+(
+
+Diag( στ (u)) − στ (u)στ (u)⊤)
+
+.
+
+Lemma C.1 (Softmax is (2 τ )−1-Lipschitz in ‖ · ‖ ∞). For any u, v ∈ Rm,
+
+‖στ (u) − στ (v)‖∞ ≤ 12τ ‖u − v‖∞.
+
+21 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Proof. By the mean value theorem, στ (u) − στ (v) = ∫ 10 Jτ
+
+(v + t(u − v))(u − v) dt . Thus 
+
+‖στ (u) − στ (v)‖∞ ≤ sup 
+
+> w∈[u,v ]
+
+‖Jτ (w)‖∞→∞ ‖u − v‖∞.
+
+Row i of Jτ (w) has entries 1 
+
+> τ
+
+σi(δij − σj ). Summing absolute values in row i:
+
+> m
+
+∑
+
+> j=1
+
+1
+
+τ σi|δij − σj | = 1
+
+τ
+
+(
+
+σi(1 − σi) + ∑ 
+
+> j̸=i
+
+σiσj
+
+)
+
+= 2
+
+τ σi(1 − σi) ≤ 12τ ,
+
+since x(1 − x) ≤ 1/4. Hence ‖Jτ (w)‖∞→∞ ≤ 1/(2 τ ) uniformly, proving the claim. 
+
+Corollary C.2 (Row-wise softmax on matrices) . Let S, S ′ ∈ Rℓ×ℓ and apply softmax τ row-wise to obtain A =softmax τ (S) and A′ = softmax τ (S′). Then 
+
+‖A − A′‖∞ ≤ 12τ ‖S − S′‖∞.
+
+In scaled attention, τ = √dh, hence ‖A − A′‖∞ ≤ 12√dh
+
+‖S − S′‖∞.Remark C.3 (Row-stochastic contraction) . If A is row-stochastic (each row in ∆ℓ−1), then ‖A‖∞→∞ = 1 and 
+
+‖AV ‖∞ ≤ ‖ V ‖∞ for any V under operator norm. When using entrywise ‖ · ‖ ∞, we will also invoke the safe bound ‖AV ‖∞ ≤ ℓ‖A‖∞‖V ‖∞ (cf. C.4). 
+
+C.5 Matrix norm identities and product bounds Lemma C.4 (Basic matrix inequalities) . Let A ∈ Rp×q , B ∈ Rq×r , u ∈ Rq , H ∈ Rℓ×q .(a) Operator submultiplicativity: ‖AB ‖∞→∞ ≤ ‖ A‖∞→∞ ‖B‖∞→∞ .(b) Entrywise-to-operator: ‖A‖∞→∞ ≤ q ‖A‖∞ and ‖Au ‖∞ ≤ q ‖A‖∞‖u‖∞.(c) Products in entrywise norm: ‖AB ‖∞ ≤ q ‖A‖∞ ‖B‖∞ and ‖HB ‖∞ ≤ q ‖H‖∞ ‖B‖∞.(d) Row-stochastic contraction: If each row of A sums to 1 and is nonnegative, then ‖A‖∞→∞ = 1 and 
+
+‖AB ‖∞→∞ ≤ ‖ B‖∞→∞ .(e) Hadamard product: ‖A B‖∞ ≤ ‖ A‖∞‖B‖∞.Proof. Parts (a) and (d) follow from definitions; (b)–(c) use ‖A‖∞→∞ = max i
+
+∑ 
+
+> j
+
+|Aij | ≤ q‖A‖∞ and standard norm inequalities; (e) is immediate from entrywise multiplication. 
+
+Lemma C.5 (Scaled dot-product attention ingredients) . Let H ∈ Rℓ×demb , and WQ, W K , W V satisfy ‖W•‖∞ ≤ κ.Set Q = HW Q, K = HW K , V = HW V , scores S = QK ⊤/√dh and A = softmax √dh (S) (row-wise). Then 
+
+‖Q‖∞, ‖K‖∞, ‖V ‖∞ ≤ demb κ ‖H‖∞,
+
+‖S‖∞ ≤ √dh d2emb κ2 ‖H‖2
+
+> ∞
+
+,
+
+‖A − A′‖∞ ≤ 12√dh
+
+‖S − S′‖∞ (row-wise softmax; C.2 ),
+
+‖AV ‖∞ ≤ ℓ ‖A‖∞ ‖V ‖∞ (entrywise bound; cf. C.3) .
+
+C.6 Taylor remainder on manifolds 
+
+Let M ⊂ RD be a compact C1 submanifold of intrinsic dimension d. Fix a coordinate chart ϕ : U → V ⊂ Rd that is bi-Lipschitz with constants L, L ′ > 0: L−1‖x − y‖ ≤ ‖ ϕ(x) − ϕ(y)‖ ≤ L‖x − y‖ for x, y ∈ U and similarly for ϕ−1
+
+on V .
+
+Lemma C.6 (Local Taylor remainder for Cβ functions on M). Let f ∈ Cβ (M) with β > 0, s = bβc, and α =
+
+β − s ∈ [0 , 1) . Fix a chart (U, ϕ ) and a point x0 ∈ U . Let P be the degree-s Taylor polynomial of f ◦ ϕ−1 at 
+
+z0 = ϕ(x0) in local coordinates, mapped back to M by PM := P ◦ ϕ. Then for every x ∈ U ,
+
+|f (x) − PM(x)| ≤ C(β, d, L, L ′) ‖f ‖Cβ (U ) ‖ϕ(x) − ϕ(x0)‖β ≤ C′ ‖f ‖Cβ (U ) ‖x − x0‖β .
+
+In particular, on any chart of diameter at most r, sup x∈U |f (x) − PM(x)| ≤ C r β .
+
+22 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Proof. Apply the standard Taylor remainder in Rd to f ◦ ϕ−1 ∈ Cβ (V ) and use bi-Lipschitz distortion to convert local distance in V to ambient distance in M; constants depend polynomially on L, L ′ and on bounds of chart derivatives. 
+
+C.7 Partitions of unity with bounded overlap Lemma C.7 (Partition of unity subordinate to a bounded-overlap cover) . Let M ⊂ RD be a compact C1 manifold and fix r ∈ (0 , 1) . There exists a finite cover of M by open sets {Uν }Nν=1 such that: (i) diam( Uν ) ≤ r, (ii) each 
+
+x ∈ M belongs to at most s0(d) sets (bounded overlap), and (iii) a C∞ partition of unity {φν }Nν=1 subordinate to 
+
+{Uν } with 0 ≤ φν ≤ 1, ∑ 
+
+> ν
+
+φν (x) = 1 for all x, and the Lipschitz bound 
+
+‖∇ φν (x)‖ ≤ C(d)
+
+r for all x ∈ M and all ν.Consequently, at every x at most s0(d) of the φν (x) are nonzero. Proof. Step 1: A bounded-overlap cover by small balls. Work with the metric induced on M by the ambient Euclidean norm on RD . Since M is compact and C1, there exists a finite atlas {(Vj , φ j )}Jj=1 such that: • each φj : Vj → Rd is a bi-Lipschitz chart onto its image, and • on each Vj the volume of metric balls is comparable to that of Euclidean d-balls in Rd (with constants depending only on d and the chart regularity). Fix a small radius ρ > 0 proportional to r (we will specify it below), and choose a maximal ρ/ 2-separated set 
+
+{xν }Nν=1 ⊂ M , i.e., 
+
+‖xν − xμ‖ ≥ ρ
+
+2 for all ν 6 = μ, 
+
+and the union of balls B(xν , ρ ) (intersection with M ) covers M . Such a set exists by a standard greedy argument: repeatedly add points that are at distance at least ρ/ 2 from all previously chosen ones until no further point can be added. Define 
+
+Uν := B(xν , ρ ) ∩ M
+
+By construction, {Uν }Nν=1 is an open cover of M . Choosing ρ ≤ r/ 2 ensures diam( Uν ) ≤ r.We now show that the overlap multiplicity is bounded. Fix any x ∈ M and consider the index set 
+
+I(x) := {ν : x ∈ Uν } = {ν : ‖x − xν ‖ < ρ }
+
+For each ν ∈ I(x), the balls B(xν , ρ/ 4) are pairwise disjoint (by ρ/ 2-separation) and all lie inside B(x, 2ρ):
+
+B(xν , ρ/ 4) ⊂ B(x, ρ + ρ/ 4) ⊂ B(x, 2ρ)
+
+Using the chart bi-Lipschitz property and volume comparability on M , there exist constants c1, c 2 > 0 depending only on d and the atlas such that for any ball BM (y, t ) in M (with respect to the induced metric), 
+
+c1td ≤ Vol M
+
+(BM (y, t )) ≤ c2td
+
+Hence, the volumes of the disjoint balls {B(xν , ρ/ 4) }ν∈I(x) satisfy 
+
+|I(x)| · c1(ρ/ 4) d ≤ ∑
+
+> ν∈I(x)
+
+Vol M
+
+(B(xν , ρ/ 4) ) ≤ Vol M
+
+(B(x, 2ρ)) ≤ c2(2 ρ)d
+
+Therefore 
+
+|I(x)| ≤ c2(2 ρ)d
+
+c1(ρ/ 4) d = C(d) for some constant C(d),
+
+depending only on d and the chart regularity. Setting s0(d) := C(d) yields the bounded-overlap property: each x ∈ M
+
+belongs to at most s0(d) of the sets Uν .
+
+Step 2: Smooth bump functions subordinate to the cover. Let η : RD → [0 , 1] be a fixed C∞ bump function such that: 
+
+η(z) = 1 if ‖z‖ ≤ 1/2, η(z) = 0 if ‖z‖ ≥ 1, ‖∇ η(z)‖ ≤ C0(d)
+
+23 Generalization and Scaling Laws for Mixture-of-Experts Transformers For each ν, define 
+
+ψν (x) := η
+
+( x − xν
+
+ρ
+
+)
+
+, x ∈ M
+
+Then ψν ∈ C∞(M ), ψν (x) ∈ [0 , 1] , and 
+
+ψν (x) = 1 if ‖x − xν ‖ ≤ ρ
+
+2 , ψν (x) = 0 if ‖x − xν ‖ ≥ ρ
+
+Hence supp( ψν ) ⊂ Uν , i.e., each ψν is subordinate to Uν . Moreover, 
+
+‖∇ ψν (x)‖ = 1
+
+ρ
+
+∥∥∥∇η
+
+( x − xν
+
+ρ
+
+) ∥∥∥ ≤ C0(d)
+
+ρ
+
+Because the balls B(xν , ρ/ 2) cover M , for every x ∈ M there exists at least one index ν with ‖x − xν ‖ ≤ ρ/ 2, hence 
+
+ψν (x) = 1 . Therefore 
+
+S(x) := 
+
+> N
+
+∑
+
+> μ=1
+
+ψμ(x) ≥ 1 for all x ∈ M. 
+
+On the other hand, for each fixed x, at most s0(d) of the ψμ(x) are nonzero (because ψμ vanish outside Uμ and the 
+
+Uμ have overlap at most s0(d)), and each ψμ(x) ≤ 1, so 
+
+1 ≤ S(x) ≤ s0(d) for all x ∈ M. 
+
+Step 3: Normalize to obtain a partition of unity and bound gradients. Define 
+
+ϕν (x) := ψν (x)
+
+S(x) , x ∈ M
+
+Then each ϕν ∈ C∞(M ), 0 ≤ ϕν ≤ 1, and 
+
+> N
+
+∑
+
+> ν=1
+
+ϕν (x) = 1
+
+S(x)
+
+> N
+
+∑
+
+> ν=1
+
+ψν (x) = 1 for all x ∈ M. 
+
+Moreover, supp( ϕν ) ⊂ supp( ψν ) ⊂ Uν , so {ϕν } is subordinate to the cover {Uν }.We now bound the gradient. Using the quotient rule, 
+
+∇ϕν (x) = ∇ψν (x)S(x) − ψν (x)∇S(x)
+
+S(x)2 , ∇S(x) = 
+
+> N
+
+∑
+
+> μ=1
+
+∇ψμ(x).
+
+Thus 
+
+‖∇ ϕν (x)‖ ≤ ‖∇ ψν (x)‖ S(x) + |ψν (x)| ‖∇ S(x)‖
+
+S(x)2
+
+≤ ‖∇ ψν (x)‖
+
+S(x) + ‖∇ S(x)‖
+
+S(x)2
+
+We already know 1 ≤ S(x) ≤ s0(d); hence 1/S (x), 1/S (x)2 ≤ 1. Also, for each x, at most s0(d) functions ψμ are nonzero, so 
+
+‖∇ S(x)‖ =
+
+∥∥∥ ∑
+
+> μ
+
+∇ψμ(x)
+
+∥∥∥ ≤ ∑ 
+
+> μ:ψμ(x)̸=0
+
+‖∇ ψμ(x)‖ ≤ s0(d) · C0(d)
+
+ρ
+
+Combining these bounds gives 
+
+‖∇ ϕν (x)‖ ≤ C0(d)
+
+ρ + s0(d)C0(d)
+
+ρ ≤ C(d)
+
+ρ
+
+for some constant C(d) depending only on d and the atlas. Choosing ρ proportional to r (e.g., ρ = r/ 2 as above) yields 
+
+‖∇ ϕν (x)‖ ≤ C(d)
+
+r
+
+Finally, since at most s0(d) of the ψν (x) are nonzero at any x, the same holds for the ϕν (x), and the consequently statement follows. 
+
+Remark C.8 (From partition of unity to k-sparse mixing) . Since at most s0(d) functions are nonzero at any x, choosing 
+
+k ≥ s0(d) allows a router to implement a k-sparse mixture ∑ 
+
+> ν∈S(x)
+
+wν (x)Eν (x) with weights wν = φν (or an approximation thereof), as used in the approximation construction. 24 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+C.8 Useful norm conversions for attention chains 
+
+For attention chains H 7 → Q 7 → K 7 → S 7 → A 7 → O = AV , combining Lemmas C.4,C.5 and C.2 yields the schematic bounds used in the main text: 
+
+‖Q − Q′‖∞, ‖K − K′‖∞, ‖V − V ′‖∞ ≤ demb κ ‖H − H′‖∞ + demb ‖W• − W ′•‖∞ ‖H′‖∞,
+
+‖S − S′‖∞ ≲ √dh d2emb κ
+
+(
+
+‖Q − Q′‖∞ + ‖K − K′‖∞
+
+)
+
+,
+
+‖A − A′‖∞ ≤ 12√dh
+
+‖S − S′‖∞,
+
+‖AV − A′V ′‖∞ ≤ ‖ A − A′‖∞→∞ ‖V ‖∞
+
+︸ ︷︷ ︸
+
+> attention change
+
++ ‖A′‖∞→∞ ‖V − V ′‖∞
+
+︸ ︷︷ ︸
+
+> value change
+
+≲ ‖A − A′‖∞ ‖V ‖∞ + ‖V − V ′‖∞,
+
+using ‖A′‖∞→∞ = 1 . These estimates justify the polynomial dependence on (ℓ, m, d emb , κ ) that appears in the MHA stability bound. 
+
+D Full Model Specification 
+
+Definition D.1 (Dense Transformer Block) . We define the dense residual block based on the canonical Transformer structure Vaswani et al. (2017). Let the input to block j be H ∈ Rℓ×demb with tokenwise ℓ∞-bound ‖H‖∞ ≤ M0.The block maps H 7 → Hout via the sequential steps: 
+
+˜H = H + MHA ψ
+
+(H), (26) 
+
+Hout = ˜H + FFN χ
+
+( ˜H), (27) where θ = {ψ, χ } collects all block parameters. 
+
+Layer Normalization (LN) Ba et al. (2016). For each token t ∈ [ℓ],
+
+LN γ,β (H)t = γ Ht − μ(Ht)1
+
+√σ2(Ht) + ϵ + β, γ, β ∈ Rdemb 
+
+with learned scale/shift (γ, β ) and small ϵ > 0. We will use the uniform magnitude bounds 
+
+‖γ‖∞ ≤ κ, ‖β‖∞ ≤ κ (28) 
+
+Multi-Head Self-Attention (MHA). Let the number of heads be m, and the per-head key/query/value dimension be 
+
+dh (so dk = dv = dh) such that m d h = demb . The input to MHA is H. For head h ∈ [m] we have projections 
+
+Q(h) = HW (h) 
+
+> Q
+
+, K(h) = HW (h) 
+
+> K
+
+, V (h) = HW (h) 
+
+> V
+
+, W (h) 
+
+> Q
+
+, W (h) 
+
+> K
+
+, W (h) 
+
+> V
+
+∈ Rdemb ×dh ,
+
+scores S(h) = 1√dh
+
+Q(h)(K(h))⊤ ∈ Rℓ×ℓ, row-wise A(h) = softmax( S(h)), head output O(h) = A(h)V (h) ∈ Rℓ×dh ,and 
+
+MHA ψ (H) = [Concat mh=1 O(h)] WO , WO ∈ R(md h)×demb 
+
+We assume the uniform parameter bounds 
+
+‖W (h) 
+
+> Q
+
+‖∞, ‖W (h) 
+
+> K
+
+‖∞, ‖W (h) 
+
+> V
+
+‖∞, ‖WO ‖∞ ≤ κ (29) 
+
+Positionwise Feed-Forward Network (FFN). We use an LFFN -layer MLP applied tokenwise. Let widths be at most WFFN . For ℓ = 1 , . . . , L FFN and token t,
+
+z(0)  
+
+> t
+
+= ( ˜H)t, z(ℓ) 
+
+> t
+
+= σ(W (ℓ)z(ℓ−1)  
+
+> t
+
++ b(ℓ))
+
+with activations σ (ReLU/GELU), W (1) ∈ RWFFN ×demb , W (ℓ) ∈ RWFFN ×WFFN for 2 ≤ ℓ ≤ LFFN − 1, and 
+
+W (LFFN ) ∈ Rdemb ×WFFN ; biases b(ℓ) are conformal. The FFN output is FFN χ( ˜H)t = z(LFFN ) 
+
+> t
+
+, and we assume 
+
+‖W (ℓ)‖∞ ≤ κ, ‖b(ℓ)‖∞ ≤ κ, ℓ = 1 , . . . , L FFN (30) 25 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Output bound and architectural polynomial. We assume the block output is uniformly bounded by 
+
+‖Bdense (θ, H )‖∞ ≤ R for all admissible θ and ‖H‖∞ ≤ M0 Havrilla & Liao (2024); Chen et al. (2022). Con-stants in our bounds will be expressed via a fixed architecture polynomial 
+
+P (dense) arch = poly (ℓ, m, d emb , w FFN , L FFN 
+
+)
+
+Hypothesis classes. We consider a hypothesis class T of predictors. In this paper, T is either the dense Transformer class (D.1) or the MoE class TMoE (D.1). We always assume sup T ∈T ‖T ‖∞ ≤ R.
+
+D.1 MoE Transformer Experts and router. Using Definition 3.1, each block j has M experts {Ej,i }Mi=1 , each a tokenwise MLP Ej,i :
+
+Rd 
+
+> emb
+
+→ Rd 
+
+> emb
+
+of depth LFFN and width wFFN sharing the same architecture. For a token t ∈ [ℓ], let Z(j) 
+
+> t
+
+=
+
+H(j−1)  
+
+> t
+
+∈ Rd 
+
+> emb
+
+be the MoE input. The router in block j computes logits gj,i (Z(j) 
+
+> t
+
+) for i ∈ [M ] (by a bounded parametric map) and selects the hard top-k index set 
+
+Sj,t (H(j−1) ) ⊂ [M ], |Sj,t (H(j−1) )| = k
+
+consisting of the k largest logits. The MoE output at token t is then the k-sparse mixture 
+
+MoE (j)(Z(j)) 
+
+> t
+
+= ∑
+
+> i∈Sj,t (H(j−1) )
+
+wj,i (Z(j) 
+
+> t
+
+) Ej,i (Z(j) 
+
+> t
+
+), wj,i (Z(j) 
+
+> t
+
+) ≥ 0, ∑
+
+> i∈Sj,t
+
+wj,i (Z(j) 
+
+> t
+
+) = 1 (31) with router weights wj,i restricted to the selected indices. 
+
+Readout and parameter set. A fixed linear readout R : Rℓ×demb → R produces the scalar prediction 
+
+Tθ (x) = R(H(LT )).
+
+We define the MoE Transformer network class as the set of all functions 
+
+TMoE (D, M, k, L T , L FFN , w FFN , d emb , m, κ, R ) := 
+
+{
+
+Tθ : X → R
+
+∣∣∣ ‖θ‖∞ ≤ κ, ‖Tθ ‖∞ ≤ R
+
+}
+
+(32) 
+
+D.2 Per-block parameter counts (dense baseline). 
+
+Ignoring biases for clarity and taking the standard choice dh = demb /m :
+
+Π(dense)  
+
+> attn
+
+= 3 demb dh m
+
+︸ ︷︷ ︸ 
+
+> WQ,W K,W V
+
++ ( md h)demb 
+
+︸ ︷︷ ︸
+
+> WO
+
+= 4 d2emb ,
+
+Π(dense)  
+
+> FFN
+
+= demb wFFN + ( LFFN − 2) w2FFN + wFFN demb = 2 demb wFFN + ( LFFN − 2) w2FFN ,
+
+. With biases, add 3 md h + demb (attention) and wFFN (LFFN − 1) + demb (FFN). 
+
+Parameter-Lipschitz (baseline). For two parameter sets θ, θ ′ with ‖θ − θ′‖∞ ≤ η and fixed input H,
+
+‖Bdense (θ, H ) − Bdense (θ′, H )‖∞ ≤ C(dense) block 
+
+(
+
+ℓ m d 2emb + demb wLFFN 
+
+> FFN
+
+)
+
+κ η (33) obtained by summing the MHA and FFN parameter-perturbation bounds (each applied after LN) and absorbing LN perturbations into constants. These two baseline inequalities (33)-(25) are the dense counterparts of the MoE block bounds where the FFN sensitivity term gains an additional factor k from the k active experts. 
+
+D.3 Routing patterns. 
+
+For each block j ∈ [LT ] and token t ∈ [ℓ], the router chooses a k-subset Sj,t ⊂ [M ]. A routing pattern is the collection 
+
+π = { Sj,t ⊂ [M ] : |Sj,t | = k, j = 1 , . . . , L T , t = 1 , . . . , ℓ }
+
+Let Π denote the set of all such patterns. Its cardinality is bounded by 
+
+|Π| ≤ 
+
+((Mk
+
+))LT ℓ
+
+=⇒ log |Π| ≤ LT ℓ k log 
+
+( e M k
+
+)
+
+(34) using (Mk
+
+) ≤ (e M/k )k. For a fixed π ∈ Π, denote by Tπ ⊂ T MoE the subclass with deterministic routing equal to π.Then 
+
+TMoE = ⋃
+
+> π∈Π
+
+Tπ
+
+26 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+E Proof of theorem 3.4 
+
+Assume sup T ∈T MoE ‖T ‖∞ ≤ R and ‖f ‖∞ ≤ R. Let ˆTn ∈ arg min T ∈T MoE Ln(T ) be an ERM for squared loss 
+
+L(T ) = E[( T (X) − f (X)) 2]. Then for any cover scale δ ∈ (0 , 1) , via the standard biasvariance decomposition described in lemma E.1, we have the following inequality 
+
+E[‖ ˆTn − f ‖2
+
+> L2(Q)
+
+] ≤ 3 inf  
+
+> T∈T MoE
+
+‖T − f ‖2 
+
+> ∞
+
++ C R 2
+
+(√
+
+log N(δ, TMoE , ‖ · ‖ ∞
+
+)
+
+n + δ
+
+)
+
+(35) for an absolute constant C > 0. Equivalently, 
+
+E[‖ ˆTn − f ‖2
+
+> L2(Q)
+
+] ≲ inf  
+
+> T∈T MoE
+
+‖T − f ‖2 
+
+> ∞
+
++ log N(δ, TMoE , ‖ · ‖ ∞
+
+)
+
+n + δ (36) where ≲ hides universal constants and a factor R2.Now it remains to bound the two terms of 36. The first is bounded in theorem 3.2 as: 
+
+inf  
+
+> T∈T MoE
+
+‖T − f ‖2 
+
+> ∞
+
+≤ ϵ2 (37) The second terms is bounded using the cover number from lemma 3.7 as follows 
+
+log N(δ, TMoE , ‖ · ‖ ∞
+
+) ≤ C1
+
+(
+
+Πattn + LT kΠexp 
+
+)
+
+log 
+
+( C2κRM 0
+
+δ
+
+)
+
++ C3LT ℓk log 
+
+( eM k
+
+)
+
+(38) Combining (37) and (55) yields to the desired inequality 
+
+E[‖ ˆTn − f ‖2
+
+> L2(Q)
+
+] ≤ ˜O
+
+(
+
+N −2β/d + N + LT ℓk log( eM/k )
+
+n
+
+)
+
+(39) 
+
+□
+
+Lemma E.1 (ERM bound via symmetrization and covering numbers) . Write 
+
+L(T ) = ‖T − f ‖2 
+
+> L2(Q)
+
+and Ln(T ) = 1
+
+n
+
+> n
+
+∑
+
+> i=1
+
+(T (xi) − f (xi)) 2.
+
+Fix δ ∈ (0 , 1) and let G be a minimal δ-net of TMoE in ‖ · ‖ ∞, so |G| = N (δ, TMoE , ‖ · ‖ ∞) and for all T there exists 
+
+G ∈ G with ‖T − G‖∞ ≤ δ.
+
+(i) Lipschitz transfer from predictors to losses. For any a, b, c ∈ [−R, R ],
+
+|(a − c)2 − (b − c)2| = |(a − b)( a + b − 2c)| ≤ 4R |a − b|
+
+Hence for all T, G ,
+
+|L(T ) − L(G)| ≤ 4R ‖T − G‖∞, |Ln(T ) − Ln(G)| ≤ 4R ‖T − G‖∞ (40) (ii) ERM reduction to the finite cover. Let T ⋆ ∈ arg min T ∈T MoE L(T ) and choose G⋆ ∈ G with ‖G⋆ − T ⋆‖∞ ≤ δ. By ERM optimality, Ln( ˆTn) ≤ Ln(G⋆). Adding and subtracting L and using (40) ,
+
+L( ˆTn) ≤ Ln(G⋆) + sup 
+
+> G∈G
+
+|L(G) − Ln(G)| ≤ L(G⋆) + sup 
+
+> G∈G
+
+|L(G) − Ln(G)| + 4 R δ 
+
+Also L(G⋆) ≤ L(T ⋆) + 4 R δ . Thus 
+
+L( ˆTn) ≤ inf  
+
+> T∈T MoE
+
+L(T ) + 8 R δ + sup 
+
+> G∈G
+
+|L(G) − Ln(G)| (41) (iii) Symmetrization over the finite cover. Define the bounded loss class F = {x 7 → (G(x) − f (x)) 2 : G ∈ G} with range in [0 , (2 R)2]. By symmetrization, 
+
+E
+
+[
+
+sup 
+
+> G∈G
+
+|L(G) − Ln(G)|
+
+]
+
+≤ 2
+
+n E
+
+[
+
+sup 
+
+> G∈G
+
+∣∣∣
+
+> n
+
+∑
+
+> i=1
+
+εi(G(xi) − f (xi)) 2
+
+∣∣∣]
+
+27 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+where (εi)ni=1 are i.i.d. Rademacher variables independent of the sample. By Massarts finite-class lemma (range bounded by 4R2), 
+
+E
+
+[
+
+sup 
+
+> G∈G
+
+|L(G) − Ln(G)|
+
+]
+
+≤ C R 2
+
+√ log |G| 
+
+n = C R 2
+
+√ log N (δ, TMoE , ‖ · ‖ ∞)
+
+n
+
+(iv) Combine and relate L to ‖ · ‖ 2
+
+> ∞
+
+. Taking expectations in (41) and using L(T ) = ‖T − f ‖2 
+
+> L2(Q)
+
+≤ ‖ T − f ‖2 
+
+> ∞
+
+yields 
+
+E‖ ˆTn − f ‖2 
+
+> L2(Q)
+
+≤ inf  
+
+> T∈T MoE
+
+‖T − f ‖2 
+
+> ∞
+
++ C R 2
+
+√ log N (δ, TMoE , ‖ · ‖ ∞)
+
+n + C R δ 
+
+Absorbing constants and (optionally) replacing R δ by R2 δ (since δ ≤ 1) gives (35) . Finally, the elementary inequality √u ≤ u + 14 for u ≥ 0 (or Youngs ab ≤ a2/(2 λ) + λb 2/2) converts the square-root term into a linear (log N )/n term up to constants, yielding (36) .
+
+F Proof of theorem 3.2 
+
+Definition F.1 (k-sparse partition-of-unity router) . A router realizes a k-sparse partition of unity (under the idealized router expressivity assumption of Section 3) if there exist nonnegative weights {wν (x)}Nν=1 with ∑ 
+
+> ν
+
+wν (x) = 1 for all x ∈ M , such that for each x at most k weights are nonzero, and each wν is supported on a chart Uν of a bounded-overlap cover {Uν }Nν=1 of M (cf. Lemma C.7 in App. C). Moreover, the router outputs the top-k indices with weights restricted to these indices. 
+
+Proof. We give two constructive approximations and then take the minimum rate. 
+
+Geometric setup (charts and PoU). Fix a resolution r ∈ (0 , 1) . By Lemma C.7 (App. C), there exists a cover 
+
+{Uν }Nν=1 of M with diam( Uν ) ≤ r, bounded overlap s0 = s0(d), and a C∞ partition of unity {φν }Nν=1 subordinate to the cover, such that ∑ 
+
+> ν
+
+φν (x) = 1 , 0 ≤ φν ≤ 1, and for each x at most s0 terms are nonzero. Standard volume-comparison yields N ≤ CMr−d.By Lemma C.6 (App. C), for each ν there is a degree s = bβc polynomial Pν (expressed in local coordinates and mapped back to M) such that 
+
+sup 
+
+> x∈Uν
+
+|f (x) − Pν (x)| ≤ C1 B r β . (42) 
+
+Router realization of a k-sparse PoU. Since at most s0(d) functions φν are nonzero at any x, take k ≥ s0(d). By assumption (Def. F.1), the router computes nonnegative weights wν (x) supported on the same Uν and with k-sparsity, satisfying ∑ 
+
+> ν
+
+wν (x) = 1 . We further assume (without loss) a uniform approximation ‖wν − φν ‖∞ ≤ C2rβ can be achieved by attention-based similarity to chart anchors and a softmax/top-k selection; this is standard with a fixed number of heads and bounded magnitudes (the resulting constants are absorbed into C). We now present two constructions. 
+
+Construction A (expert-count limited; M regime). Assign one expert Eν to each chart Uν (total experts N ≤ Cr −d). Within Uν , let expert Eν approximate Pν exactly (ReLU networks implement polynomials with constant depth/width depending on s, d ; the parameters stay bounded and independent of r), or to accuracy C3rβ with a constant per-expert parameter budget Πexp .2 Define the MoE output 
+
+T (x) := 
+
+> N
+
+∑
+
+> ν=1
+
+wν (x) Eν (x), (at most k nonzero summands at each x). We bound the sup error at any x ∈ M as 
+
+|T (x) − f (x)| ≤ ∑
+
+> ν
+
+wν (x) |Eν (x) − Pν (x)| + ∑
+
+> ν
+
+wν (x) |Pν (x) − f (x)|≤ max  
+
+> ν
+
+sup 
+
+> Uν
+
+|Eν − Pν |
+
+︸ ︷︷ ︸
+
+> ≤C3rβ
+
++ ∑
+
+> ν
+
+wν (x)
+
+︸ ︷︷ ︸
+
+> =1
+
+max  
+
+> ν
+
+sup 
+
+> Uν
+
+|Pν − f |
+
+︸ ︷︷ ︸
+
+> ≤C1Br β
+
+≤ C4rβ . (43)     
+
+> 2Exact or O(rβ)-accurate polynomial representation by ReLU MLPs with poly( s, d )parameters is classical; see, e.g., Yarotsky (2017), Schmidt-Hieber (2020).
+
+28 Generalization and Scaling Laws for Mixture-of-Experts Transformers To realize this construction we need M ≥ N , i.e. M ≳ r−d, hence choose r  M −1/d , which yields 
+
+‖T − f ‖∞ ≤ C M −β/d =⇒ ‖T − f ‖2 
+
+> ∞
+
+≤ C M −2β/d .
+
+Since the router uses at most k experts per input, this obeys the MoE constraint. 
+
+Construction B (active-parameter limited; Nact regime). Here we use few experts (e.g. k = 1 active expert per block) but allocate the entire active budget Nact to the expert(s) and non-expert parts to approximate f globally. By standard ReLU approximation on d-dimensional domains (e.g., Yarotsky (2017); Schmidt-Hieber (2020)), there exists a ReLU network N with N parameters such that 
+
+sup 
+
+> x∈M
+
+|N (x) − f (x)| ≤ C5 B N −β/d . (44) Choose the MoE so that its active subnetwork implements N with N  Nact = LT Πattn + LT kΠexp (e.g. k = 1 ,one expert playing the role of the global MLP; attention acts as an identity/featurizer). This is legitimate because the MoE with fixed routing reduces to a standard feed-forward subnetwork on the active path. Thus we can realize 
+
+T (x) = N (x) with N  Nact and 
+
+‖T − f ‖∞ ≤ C6 N −β/d  
+
+> act
+
+=⇒ ‖T − f ‖2 
+
+> ∞
+
+≤ C N −2β/d 
+
+> act
+
+Taking the minimum. Constructions A and B are both valid members of TMoE under the parameter bound ‖θ‖∞ ≤
+
+κ (after routine rescalings absorbed by LayerNorm and architectural constants). Therefore, 
+
+inf  
+
+> T∈T MoE
+
+‖T − f ‖∞ ≤ C min {N −β/d  
+
+> act
+
+, M −β/d }
+
+and squaring gives (1). If M is sufficiently large to support the cover at the r achieving the Nact -optimal precision, the M constraint is inactive and (45) follows. 
+
+inf  
+
+> T∈T MoE
+
+‖T − f ‖2 
+
+> ∞
+
+≤ C N −2β/d  
+
+> act
+
+(45) Both regimes yield the rates claimed in (1); taking the better gives the minimum. 
+
+G Proof of neural scaling laws 
+
+G.1 Proof of optimal number of experts 
+
+Recall the kdependent objective (experts dominate approximation; constants absorbed) 
+
+E(k) = ( Ak )−2β/d 
+
+︸ ︷︷ ︸
+
+> approx
+
++ An k
+
+︸︷︷︸ 
+
+> estimation
+
++ LT ℓn k log eM k︸ ︷︷ ︸
+
+> routing
+
+, A := LT Πexp , 1 ≤ k ≤ M. (46) Differentiate and set the derivative to zero: 
+
+E′(k) = − 2βd A−2β/d k−2β/d −1 + An + LT ℓn
+
+(
+
+log eM k − 1
+
+)
+
+= 0 .
+
+Equivalently, 
+
+2βd A−2β/d k−2β/d −1 = 1
+
+n
+
+(
+
+A + LT ℓ log eM k − LT ℓ
+
+)
+
+. (47) This matches the stated first-order condition. It has a closed form in terms of the Lambert-W function after algebraic manipulation (since k appears both polynomially and inside log k), but the Lambert-W form is not particularly illu-minating. Instead we give (i) a principled fixed-point approximation and (ii) clean sandwich bounds showing that M
+
+enters only logarithmically .
+
+Fixed-point approximation. Rewrite (47) as 
+
+k 2β/d +1 = 2βd A−2β/d nA + LT ℓ [log( eM/k ) − 1] . (48) 29 Generalization and Scaling Laws for Mixture-of-Experts Transformers Treat the slowly varying factor log( eM/k ) as (locally) constant to obtain the iterate 
+
+k(t+1) := 
+
+[
+
+2βd A−2β/d nA + LT ℓ [log( eM/k (t)) − 1] 
+
+] d
+
+> 2β+d
+
+. (49) Initializing with the no-routing optimum k(0)  ( nA
+
+) d 
+
+> 2β+d
+
+and taking one step already yields the advertised fixed-point form 
+
+k⋆ ≈
+
+[
+
+nA + LT ℓ log eM k⋆
+
+] d
+
+> 2β+d
+
+(up to constants), (50) with the cap k⋆ ≤ M . Because log( eM/k ) varies only between 1 and 1 + log M for k ∈ [1 , M ], a couple of iterations of (49) suffice in practice, and the exponent in n is unchanged. 
+
+Sandwich bounds (log enters only through constants). Note that for 1 ≤ k ≤ M , log( eM/k ) ∈ [1 , 1 + log M ].Hence the right-hand side of (47) lies in 
+
+1
+
+n
+
+(
+
+A
+
+)
+
+≤ RHS ≤ 1
+
+n
+
+(
+
+A + LT ℓ log M
+
+)
+
+.
+
+Solving the equality 2βd A−2β/d k−2β/d −1 = Cn for k gives k  (n/C ) d 
+
+> 2β+d
+
+A− d 
+
+> 2β+d
+
+. Applying this with C = A +
+
+LT ℓ log M (upper RHS) and C = A (lower RHS) yields the sandwich: 
+
+c1
+
+( nA + LT ℓ log M
+
+) d
+
+> 2β+d
+
+≤ k⋆ ≤ c2
+
+( nA
+
+) d
+
+> 2β+d
+
+, with k⋆ ≤ M, (51) for absolute constants c1, c 2 > 0. Thus M affects k⋆ only through the logarithm , and the rate in n remains nd/ (2 β+d).Combining (50) and (51), 
+
+k⋆  min 
+
+{
+
+M, 
+
+( nA + LT ℓ log( eM/k ⋆)
+
+) d
+
+> 2β+d
+
+}
+
+,
+
+and the nexponent remains d 
+
+> 2β+d
+
+; M only enters through a logarithm. 
+
+G.2 Effect of the total experts M
+
+For fixed k, increasing M influences the bound in (3) only through log( eM/k ) in Rroute . Therefore, absent special-ization effects that improve constants, 
+
+∂∂M E(k, M ) ≳ kn · 1
+
+M ⇒ larger M with fixed k only raises the bound (logarithmically). A design heuristic is to choose M commensurate with k (e.g., M = O(k)) if one wishes to avoid a large routing over-head; having M  k does not help rates in this bound. The details of these calculations are provided in appendix G.2. 
+
+Proposition G.1 (Monotone (logarithmic) M effect at fixed k). Fix n, k, L T , ℓ, Πattn , Πexp . Define 
+
+E(k, M ) := N −2β/d  
+
+> act
+
++ Nact 
+
+n + LT ℓk n log 
+
+( eM k
+
+)
+
+, 1 ≤ k ≤ M. 
+
+Then, for any fixed k, E(k, M ) is strictly increasing in M , with 
+
+∂∂M E(k, M ) = LT ℓk n · 1
+
+M . (52) 
+
+Consequently, absent additional specialization gains (i.e., changes in the approximation constant that are not captured in (3) ), the bound is minimized at the smallest admissible M , namely M = k, and grows only logarithmically with M
+
+for fixed k.Proof. The first two terms do not depend on M when k is fixed. The routing term is LT ℓk n log( eM/k ), whose derivative in M is LT ℓk n · 1 
+
+> M
+
+, yielding (52). Monotonicity follows since M 7 → log( eM/k ) is strictly increasing for M ≥ k.
+
+Corollary G.2 (Quantitative overhead from enlarging M at fixed k). For any M2 ≥ M1 ≥ k,
+
+E(k, M 2) − E (k, M 1) = LT ℓk n log 
+
+( M2
+
+M1
+
+)
+
+.
+
+In particular, setting M = ρ k with ρ ≥ 1 gives a routing penalty LT ℓk n log( eρ ) = LT ℓk n (1 + log ρ).
+
+30 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Design heuristic. To keep the routing overhead small, choose M commensurate with k, e.g. M = Θ( k), so that 
+
+log( eM/k ) = Θ(1) . Having M  k increases the bound only through log( eM/k ) and does not improve the rate in 
+
+n or Nact .
+
+When is routing negligible? Routing is negligible relative to the estimation term if 
+
+LT ℓk n log 
+
+( eM k
+
+)
+
+ Nact 
+
+n ⇐⇒ log 
+
+( eM k
+
+)
+
+ Nact 
+
+LT ℓk . (53) Since Nact = LT Πattn + LT kΠexp , a sufficient condition is log( eM/k )  Πattn /(ℓk ) + Π exp /ℓ ; in particular, if 
+
+M = ρk with moderate ρ and ℓ is not enormous, the routing term is dominated by the estimation term. 
+
+G.3 Proof of proposition 4.5 
+
+Under C  nN act , we eliminate n = C/N act and reduce the bound to a single-variable objective 
+
+Φ( Nact ; C) := A N −2β/d  
+
+> act
+
++ B N 2act 
+
+C (54) with positive constants A, B absorbing fixed architectural and loss factors. Differentiating w.r.t. Nact > 0,
+
+Φ′(Nact ) = − 2βd A N −2β/d −1act + 2 B Nact 
+
+C
+
+The first-order condition Φ′(N ⋆
+
+> act
+
+) = 0 gives 
+
+2BC (N ⋆
+
+> act
+
+)2+2 β/d = 2βd A =⇒ (N ⋆
+
+> act
+
+) 2(1+ β/d ) = βdAB C
+
+Hence 
+
+N ⋆
+
+> act
+
+(C) = 
+
+( βdAB
+
+) d
+
+> 2β+2 d
+
+C d 
+
+> 2β+2 d
+
+ C d
+
+> 2β+2 d
+
+which is the first equality in Eq. (18). Using n⋆ = C/N ⋆ 
+
+> act
+
+we obtain the second equality in Eq.(18). Substituting 
+
+N ⋆ 
+
+> act
+
+into (54) (the two terms balance at optimum) gives 
+
+Φ( N ⋆
+
+> act
+
+; C)  (N ⋆
+
+> act
+
+)−2β/d  C− 2βd · d 
+
+> 2β+2 d
+
+= C− ββ+d
+
+which is (19). 
+
+H Proof of lemma 55 (MoE Covering Number) 
+
+Let X ⊂ RD be compact with ‖x‖∞ ≤ M0. Consider the Mixture-of-Experts transformer class 
+
+TMoE (D, M, k, L T , L FFN , w FFN , d emb , m, κ, R ) defined as in Definition 3.1, except that each feed-forward sublayer is an MoE layer with M experts and the router selects (hard) top-k experts per token per layer. Assume each learned parameter entry satisfies ‖θ‖∞ ≤ κ and each network output is bounded by ‖T (x)‖∞ ≤ R.Let Πattn be the number of scalar parameters in the attention / non-expert parts per block and let Πexp be the number of scalar parameters of a single expert MLP (depth LFFN , width wFFN , input/output dimension demb ). Then for any 
+
+δ ∈ (0 , 1) the covering number of TMoE under the sup-norm satisfies 
+
+log N(δ, TMoE , ‖ · ‖ ∞
+
+) ≤ C1
+
+(
+
+Πattn + LT kΠexp 
+
+)
+
+log 
+
+( C2κRM 0
+
+δ
+
+)
+
++ C3LT ℓk log 
+
+( eM k
+
+)
+
+(55) for absolute constants C1, C 2, C 3 > 0 depending polynomially on demb , w FFN , m, L T , L FFN , ℓ (and we may hide small poly-log factors in the ˜O(·) version). 
+
+Proof. The proof follows the structure of the dense-transformer covering-number proof (Lemma 2 in Havrilla & Liao (2024)) with two MoE-specific modifications. We divide the proof into four steps: (1) enumerate routing patterns and apply a union bound; (2) bound the sup-norm difference between two networks in terms of the sup-norm difference of their parameters; (3) count active parameters for a fixed pattern and derive a parameter-grid covering bound; (4) combine items to obtain (55). 31 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+H.1 decomposition into routing patterns (union bound). 
+
+For each MoE layer ℓ and each token position t ∈ { 1, . . . , ℓ }, the router chooses a subset Sℓ,t ⊂ [M ] of size |Sℓ,t | = k.A routing pattern π is the collection of these choices for all layers and token positions: 
+
+π = {Sℓ,t : ℓ = 1 , . . . , L T , t = 1 , . . . , ℓ }.
+
+The number of possible patterns is bounded by 
+
+|Π| ≤ 
+
+((Mk
+
+))LT ℓ
+
+Using the standard combinatorial bound (Mk
+
+) ≤ (eM/k )k we obtain 
+
+log |Π| ≤ LT ℓ · k log 
+
+( eM k
+
+)
+
+(56) For a fixed routing pattern π denote by Tπ the subclass of MoE transformers whose router outputs follow π deter-ministically (i.e., the same fixed subset of experts is used in each MoE layer and position for all inputs). Since 
+
+TMoE = ⋃ 
+
+> π∈Π
+
+Tπ , the subadditivity of covering numbers under unions gives 
+
+N (δ, TMoE , ‖ · ‖ ∞) ≤ ∑
+
+> π∈Π
+
+N (δ, Tπ , ‖ · ‖ ∞) (57) 
+
+Log-summax inequality. For nonnegative {aπ }π∈Π one has 
+
+log 
+
+( ∑ 
+
+> π∈Π
+
+aπ
+
+)
+
+≤ log |Π| + max  
+
+> π∈Π
+
+log aπ
+
+since ∑ 
+
+> π
+
+aπ ≤ | Π| · max π aπ . Applying this to aπ = N (δ, Tπ , ‖ · ‖ ∞) in (57) gives 
+
+log N (δ, TMoE , ‖ · ‖ ∞) ≤ log |Π| + max  
+
+> π∈Π
+
+log N (δ, Tπ , ‖ · ‖ ∞) (58) Thus it remains to upper-bound log N (δ, Tπ , ‖ · ‖ ∞) uniformly over π.
+
+H.2 sensitivity of the network output to parameter perturbations (Lipschitz in parameter space). 
+
+Fix a routing pattern π. Under π the architecture becomes a deterministic (dense) composition of modules where each MoE layer is replaced by the (sparse) subnetwork that contains only the k selected experts for the corresponding tokens/layer. Denote by θ the vector of all scalar parameters that are active under this pattern (embedding + attention + non-expert weights + the selected experts’ weights). Let θ′ be another parameter vector of the same shape and satisfying ‖θ − θ′‖∞ < η for some η > 0. We will bound 
+
+sup 
+
+> x∈X
+
+|Tθ (x) − Tθ′ (x)|
+
+by a constant times η, with that constant depending polynomially on the architecture hyperparameters. The network is a composition of LT transformer blocks. Let Bj (θj , ·) denote block j (viewed as a map on embedding tensors) parameterized by the block parameters θj . We write the forward pass as 
+
+H(0) = PE + E(x), H(j) = Bj (θj , H (j−1) ), j = 1 , . . . , L T ,
+
+and the scalar output Tθ (x) is a fixed linear readout of H(LT ).Define the sup-norm on embedding matrices by ‖H‖∞ = max i,t |Hi,t | (matching the earlier notation). As in the dense case, each module is: (i) Lipschitz in its input (constant Lin polynomial in (demb , m, w FFN , L FFN )) and (ii) Lipschitz in its parameters (constant Cparam polynomial in the same quantities and in ℓ) (Anthony & Bartlett, 1999; Vershynin, 2018; Shalev-Shwartz & Ben-David, 2014). 32 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+(A) Multi-head attention sensitivity. Consider a single multi-head attention (MHA) block with m heads, each head parameterized by query/key/value matrices and interaction kernels. Let the MHA parameter vector be ψ. For two MHA parameter sets ψ, ψ ′ with ‖ψ − ψ′‖∞ ≤ η, and any input embedding H satisfying ‖H‖∞ ≤ M , the goal is to bound the following expression via Lemma H.1 
+
+‖MHA ψ (H) − MHA ψ′ (H)‖∞
+
+Lemma H.1 (MHA parameter stability) . For ‖ψ − ψ′‖∞ ≤ η and ‖H‖∞ ≤ CM 0,
+
+‖MHA ψ (H) − MHA ψ′ (H)‖∞ ≤ CMHA ℓ m d 2emb κ η. 
+
+for some architecture-dependent constant CMHA . The dependence ∝ ℓmd 2emb arises because each head sums over 
+
+ℓ tokens and involves inner-products of demb -dimensional projected vectors; the factor κ comes from the bound on parameter magnitudes. 
+
+(B) FFN (non-expert) sensitivity. For the non-expert FFN parts (the small projection matrices that are outside MoE experts see Definition 3.1) with depth LFFN and width wFFN , the parameter perturbation bound from the dense proof is given by the following Lemma 
+
+Lemma H.2 (FFN parameter stability) . For a (non-expert) FFN of depth LFFN and width wFFN ,
+
+‖FFN χ(h) − FFN χ′ (h)‖∞ ≤ CFFN demb wLFFN  
+
+> FFN
+
+κ η. 
+
+uniformly over ‖h‖∞ ≤ CM 0 (cf. (Bartlett & Mendelson, 2002a; Golowich et al., 2018)). For each token input h (and hence on the embedding matrix by taking sup over tokens); the polynomial dependence on wFFN and LFFN reflects repeated matrix multiplications. 
+
+(C) Expert-FFN sensitivity under fixed pattern (key MoE change). Under a fixed routing pattern π, only k experts per token per layer are active, so the FFN stage of the block is effectively a concatenation / parallel application of exactly those k expert MLPs. For a single expert with parameter vector ϕ and sup-norm perturbation ‖ϕ − ϕ′‖∞ ≤ η,the per-token difference is bounded as in (B) by the following lemma 
+
+Lemma H.3 (Expert stability) . For a single expert MLP Eϕ,
+
+‖Eϕ(h) − Eϕ′ (h)‖∞ ≤ Cexp demb wLFFN  
+
+> FFN
+
+κ η. 
+
+Since only k experts are active, the total perturbation coming from expert blocks per token scales linearly in k:
+
+∥∥∥∑
+
+> i∈S
+
+Eϕi (h) − ∑
+
+> i∈S
+
+Eϕ′ 
+
+> i
+
+(h)
+
+∥∥∥∞
+
+≤ k C exp demb wLFFN  
+
+> FFN
+
+κ η. 
+
+(D) Block-level perturbation bound. Combining (A),(B),(C) and the residual connection structure of the trans-former block (additive skip-connections and tokenwise FFNs), a single block Bj satisfies, for parameter perturbation 
+
+≤ η inside the block and any input H with ‖H‖∞ ≤ M yields to Lemma H.4. 
+
+Lemma H.4 (Block-level stability) . With k active experts per block under a fixed routing pattern, 
+
+∥∥Bj (θj , H ) − Bj (θ′ 
+
+> j
+
+, H )∥∥∞ ≤ Cblock 
+
+(ℓmd 2emb + demb wLFFN  
+
+> FFN
+
++ kd emb wLFFN 
+
+> FFN
+
+)κη. 
+
+hence we may write (absorbing polynomial factors into a single constant) 
+
+‖Bj (θj , H ) − Bj (θ′ 
+
+> j
+
+, H )‖∞ ≤ Cb Parch (ℓ, m, d emb , w FFN , L FFN ) κ η, 
+
+where Parch (·) is a polynomial capturing the block-dependence and includes the linear factor k in the expert term. 
+
+(E) Induction across blocks. Let H(j) and H′(j) denote the block outputs when using θ and θ′ respectively. We can write 
+
+‖H(j) − H′(j)‖∞ = ‖Bj (θj , H (j−1) ) − Bj (θ′ 
+
+> j
+
+, H ′(j−1) )‖∞
+
+≤ ‖ Bj (θj , H (j−1) ) − Bj (θj , H ′(j−1) )‖∞
+
+︸ ︷︷ ︸
+
+> input-Lipschitz term
+
++ ‖Bj (θj , H ′(j−1) ) − Bj (θ′ 
+
+> j
+
+, H ′(j−1) )‖∞
+
+︸ ︷︷ ︸
+
+> param-perturbation term
+
+.
+
+33 Generalization and Scaling Laws for Mixture-of-Experts Transformers The input-Lipschitz term is bounded by Lin ‖H(j−1) − H′(j−1) ‖∞ where Lin is the Lipschitz constant of the block as a function of its input (this constant depends polynomially on demb , m, w FFN , L FFN but not on M ). The param-perturbation term is bounded by the block-level bound in the previous paragraph. Thus 
+
+‖H(j) − H′(j)‖∞ ≤ Lin ‖H(j−1) − H′(j−1) ‖∞ + Cb Parch (·) κ η. 
+
+Iterating this inequality from j = 1 to j = LT and noting that H(0) = H′(0) (same positional encodings and same input) we obtain 
+
+‖H(LT ) − H′(LT )‖∞ ≤
+
+( LT −1∑
+
+> t=0
+
+Lt
+
+> in
+
+)
+
+Cb Parch (·) κ η ≤ LLT
+
+> in
+
+Lin − 1 Cb Parch (·) κ η. 
+
+The previous inequality is proved in details in lemma I.1. Since the decoder/readout is a fixed linear projection, the final scalar output difference is bounded by the same order. Thus there exists an overall Lipschitz constant 
+
+Lparam = C′ LLT 
+
+> in
+
+Parch (ℓ, m, d emb , w FFN , L FFN ) κ
+
+such that 
+
+sup 
+
+> x∈X
+
+|Tθ (x) − Tθ′ (x)| ≤ Lparam η. 
+
+Crucially: Parch (·) contains a factor linear in the number of active experts per layer( k) and Lparam does not depend on the total number of experts M for a fixed routing pattern (it depends on M only through how the pattern is chosen which we handle with the union bound). 
+
+H.3 parameter counting and parameter-space covering (full details). 
+
+Fix a routing pattern π. Let θact denote the vector formed by all scalar parameters that are active under π (token embedding/positional terms, attention and non-expert FFN parameters for each block, and the experts that appear in 
+
+π). Write p := |θact | for the active parameter dimension. 
+
+(a) Parameter domain and norm. By the magnitude constraint ‖θ‖∞ ≤ κ (Assumption in Lemma 3.7), the admissible parameter set is included in the ℓ∞ball of radius κ:
+
+B∞(κ)p = {u ∈ Rp : ‖u‖∞ ≤ κ} = [ −κ, κ ]p.
+
+(For ℓ∞, the ball is the axis-aligned cube.) 
+
+(b) Constructing an ηgrid in parameter space. For a mesh width η > 0, define the coordinatewise grid on [−κ, κ ] by 
+
+Gη = { − κ + rη : r ∈ Z, −κ ≤ − κ + rη ≤ κ}.
+
+Along each coordinate, the number of grid points is at most 
+
+N1 ≤
+
+⌈ 2κη
+
+⌉
+
++ 1 ≤ 2κη + 2 ≤ 3κη (for η ≤ κ; else enlarge the constant) .
+
+Therefore the full pdimensional grid Gpη has cardinality bounded by 
+
+∣∣Gpη
+
+∣∣ ≤
+
+( 2κη + 1 
+
+)p
+
+≤
+
+( 3κη
+
+)p
+
+. (59) Moreover, for every u ∈ [−κ, κ ]p, rounding each coordinate of u to its nearest grid value produces ˜u ∈ G pη with 
+
+‖u − ˜u‖∞ ≤ η (or η/ 2 if we choose midpoints). Hence Gpη is an ηnet for the parameter cube in the ℓ∞ norm. 
+
+(c) Parameter-to-function Lipschitz map. From Step 2, we have the uniform parameter-stability (Lipschitz) inequality 
+
+sup 
+
+> x∈X
+
+∣∣Tθ (x) − Tθ′ (x)∣∣ ≤ Lparam ‖θ − θ′‖∞,
+
+with 
+
+Lparam = C′ LLT 
+
+> in
+
+Parch (ℓ, m, d emb , w FFN , L FFN , k ) κ, 
+
+independent of M for fixed routing pattern π (the dependence on k enters via Parch ). 34 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+(d) From parameter cover to function cover. Given δ ∈ (0 , 1) , choose 
+
+η = δLparam 
+
+.
+
+Then any two parameter vectors within ℓ∞distance η induce network outputs within sup-norm distance at most δ
+
+(uniformly over x ∈ X ). Therefore, taking the grid Gpη as in (59) and evaluating the network at each grid parameter gives a δcover of the function class Tπ under ‖ · ‖ ∞:
+
+N (δ, Tπ , ‖ · ‖ ∞) ≤ ∣∣Gpη
+
+∣∣ ≤
+
+( 3κη
+
+)p
+
+=
+
+( 3κL param 
+
+δ
+
+)p
+
+.
+
+Taking logarithms gives 
+
+log N (δ, Tπ , ‖ · ‖ ∞) ≤ p · log 
+
+( 3κL param 
+
+δ
+
+)
+
+= |θact | · log 
+
+( 3κL param 
+
+δ
+
+)
+
+. (60) 
+
+(e) Bounding the active parameter count p = |θact |. Decompose 
+
+|θact | = |θembed | + |θdec | + LT
+
+(|θattn | + |θffn ,nonexp | + |θexp ,act |).
+
+Under a fixed routing pattern, expert parameter tensors are shared across tokens within a layer, so the active expert count per layer satisfies |θexp ,act | ≤ k Πexp . Absorbing the (input/output) embedding and decoder constants into C0
+
+and writing Πattn for attention/non-expert parameters per block, we obtain the coarse bound 
+
+|θact | ≤ C0 + LT
+
+(Πattn + k Πexp 
+
+) ≲ Πattn + LT kΠexp .
+
+Substituting this and the expression of Lparam into (60), and renaming constants, gives 
+
+log N (δ, Tπ , ‖ · ‖ ∞) ≤ C1
+
+(Πattn + LT kΠexp 
+
+) log 
+
+( C2κRM 0
+
+δ
+
+)
+
+,
+
+which is the fixed-pattern covering bound used in Step 4. □
+
+H.4 combine with the routing-pattern union bound. 
+
+Plugging the routing count (56) into (58) gives 
+
+log N (δ, TMoE , ‖ · ‖ ∞) ≤ LT ℓ k log 
+
+( eM k
+
+)
+
++ C1
+
+(
+
+Πattn + LT kΠexp 
+
+)
+
+log 
+
+( C2κRM 0
+
+δ
+
+)
+
+≤ C1
+
+(
+
+Πattn + LT kΠexp 
+
+)
+
+log 
+
+( C2κRM 0
+
+δ
+
+)
+
++ C3LT ℓk log 
+
+( eM k
+
+)
+
+,
+
+for some constants C1, C 2, C 3 > 0. This proves the lemma. 
+
+I Proofs of Stability Lemmas 
+
+I.1 Proof of H.1 
+
+Fix a sequence embedding H ∈ Rℓ×demb with ‖H‖∞ ≤ M and consider one MHA layer with m heads and parameters 
+
+ψ = {W (h) 
+
+> Q
+
+, W (h) 
+
+> K
+
+, W (h) 
+
+> V
+
+, W O }mh=1 , ‖ψ‖∞ ≤ κ. 
+
+Let ψ′ be another parameter set with ‖ψ − ψ′‖∞ ≤ η. For head h, define 
+
+Q(h) = HW (h) 
+
+> Q
+
+, K(h) = HW (h) 
+
+> K
+
+, V (h) = HW (h) 
+
+> V
+
+,
+
+and the (row-wise) attention map 
+
+A(h) = softmax 
+
+( 1√dk
+
+Q(h)(K(h))⊤)
+
+∈ Rℓ×ℓ.
+
+The head output is O(h) = A(h)V (h) ∈ Rℓ×dv and the MHA output is 
+
+MHA ψ (H) = [Concat mh=1 O(h)] WO ∈ Rℓ×demb .
+
+We show 
+
+‖MHA ψ (H) − MHA ψ′ (H)‖∞ ≤ CMHA ℓ m d 2emb κ η, (61) for a universal constant CMHA > 0 depending at most polynomially on (demb , d k, d v ) and on the bound M .35 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Step 1: linear projections ( Q, K, V ). For any matrices X and W , ‖XW ‖∞ ≤ din ‖X‖∞‖W ‖∞ (since each entry is a sum of din products). Hence, with ‖H‖∞ ≤ M , ‖W (h) 
+
+> •
+
+‖∞ ≤ κ, and ‖W (h) 
+
+> •
+
+− W (h)′• ‖∞ ≤ η,
+
+‖Q(h)‖∞ ≤ demb M κ, ‖K(h)‖∞ ≤ demb M κ, ‖V (h)‖∞ ≤ demb M κ, 
+
+and 
+
+‖Q(h) − Q(h)′‖∞ ≤ demb M η, ‖K(h) − K(h)′‖∞ ≤ demb M η, ‖V (h) − V (h)′‖∞ ≤ demb M η. 
+
+Step 2: score matrices and softmax. Let S(h) = 1√dk
+
+Q(h)(K(h))⊤ ∈ Rℓ×ℓ and similarly S(h)′. By the product rule and the matrix ℓ∞ bound ‖XY ⊤‖∞ ≤ ℓ‖X‖∞‖Y ‖∞,
+
+‖S(h) − S(h)′‖∞ ≤ 1
+
+√dk
+
+(
+
+‖Q(h) − Q(h)′‖∞‖K(h)‖∞ + ‖Q(h)′‖∞‖K(h) − K(h)′‖∞
+
+)
+
+ℓ ≤ CS ℓ d 2emb M 2 κ η, 
+
+with CS := 2 /√dk. The row-wise softmax σ : Rℓ → Rℓ has Jacobian J(z) = diag( σ(z)) − σ(z)σ(z)⊤, whose operator norm (for ℓ∞) is bounded by a universal constant (e.g., ‖J(z)‖∞→∞ ≤ 1; tighter bounds give 1/2 or 1/4 but are unnecessary here). Applying the mean value theorem row-wise, 
+
+‖A(h) − A(h)′‖∞ ≤ Csm ‖S(h) − S(h)′‖∞ ≤ Csm CS ℓ d 2emb M 2 κ η, 
+
+for a universal Csm ∈ [1 /4, 1] .
+
+Step 3: head outputs ( O(h) = A(h)V (h)). Decompose 
+
+O(h) − O(h)′ = ( A(h) − A(h)′)V (h) + A(h)′(V (h) − V (h)′).
+
+Using ‖XY ‖∞ ≤ ℓ‖X‖∞‖Y ‖∞ for ℓ×ℓ times ℓ×dv , together with Step 1 bounds on ‖V (h)‖∞ and ‖V (h) −V (h)′‖∞,
+
+‖O(h) − O(h)′‖∞ ≤ ℓ ‖A(h) − A(h)′‖∞‖V (h)‖∞ + ℓ ‖A(h)′‖∞‖V (h) − V (h)′‖∞.
+
+Since rows of A(h)′ are probability vectors, ‖A(h)′‖∞ ≤ 1. Hence, 
+
+‖O(h) − O(h)′‖∞ ≤ ℓ (Csm CS ℓ d 2emb M 2 κ η ) (demb M κ ) + ℓ (demb M η ) ≤ CO ℓ d 3emb M 3 κ2 η + ℓ d emb M η, 
+
+where CO := Csm CS . We keep the dominant (polynomial) term and absorb the lower-order term into constants. 
+
+Step 4: concatenate heads and output projection. Let O = Concat mh=1 O(h) ∈ Rℓ×(md v ). Then 
+
+‖O − O′‖∞ ≤ max  
+
+> h∈[m]
+
+‖O(h) − O(h)′‖∞ ≤ CO ℓ d 3emb M 3 κ2 η. 
+
+Finally, apply the output projection WO with ‖WO ‖∞ ≤ κ and ‖WO − W ′ 
+
+> O
+
+‖∞ ≤ η:
+
+‖MHA ψ (H) − MHA ψ′ (H)‖∞ = ‖OW O − O′W ′ 
+
+> O
+
+‖∞
+
+≤ ‖ (O − O′)WO ‖∞ + ‖O′(WO − W ′ 
+
+> O
+
+)‖∞
+
+≤ (md v ) ‖O − O′‖∞‖WO ‖∞ + ( md v ) ‖O′‖∞η
+
+≤ Cout (md v ) ℓ d 3emb M 3 κ3 η + ( md v ) ‖O′‖∞η, 
+
+and we bound ‖O′‖∞ by the same polynomial in (ℓ, d emb , M, κ ) as above. Absorbing dv and all input/weight bounds into the constant, and noting that the paper tracks only polynomial dependence on dimensions and sequence length (hiding fixed architecture factors into CMHA ), we obtain 
+
+‖MHA ψ (H) − MHA ψ′ (H)‖∞ ≤ CMHA ℓ m d 2emb κ η, 
+
+which is (61). □
+
+I.2 Proof of H.2 
+
+Let FFN ψ : Rdemb → Rdemb be a depth-LFFN MLP applied tokenwise, with hidden widths at most wFFN , coor-dinatewise activation σ (e.g., ReLU/GELU), and parameters ψ = {(W ℓ, b ℓ)}LFFN  
+
+> ℓ=1
+
+. Assume the uniform bounds 
+
+‖W ℓ‖∞ ≤ κ, ‖bℓ‖∞ ≤ κ for all ℓ. Let ψ′ be another parameter set with ‖W ℓ − W ℓ′‖∞ ≤ η and ‖bℓ − bℓ′‖∞ ≤ η.Fix an input token h ∈ Rdemb , and denote the layerwise states 
+
+z0 = h, zℓ = σ(W ℓzℓ−1 + bℓ), z′ 0 = h, z′ ℓ = σ(W ℓ′z′ ℓ−1 + bℓ′).
+
+We prove 
+
+‖FFN ψ (h) − FFN ψ′ (h)‖∞ = ‖zLFFN − z′ LFFN ‖∞ ≤ CFFN demb wLFFN  
+
+> FFN
+
+κ η, (62) for a constant CFFN > 0 depending only polynomially on architectural constants and on a uniform bound on ‖h‖∞
+
+(absorbed into CFFN ), exactly as done in the paper. 36 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Auxiliary facts. We use (i) ‖Xu ‖∞ ≤ din ‖X‖∞‖u‖∞ for X ∈ Rdout ×din , (ii) ‖σ(u) − σ(v)‖∞ ≤ Lσ ‖u − v‖∞
+
+with Lσ ≤ 1 for ReLU and Lσ = O(1) for GELU, and (iii) ‖σ(u)‖∞ ≤ ‖ u‖∞ for ReLU (and similarly for GELU up to a constant). 
+
+Step 1: bound the forward activations. Let d0 = demb and dℓ ≤ wFFN for 1 ≤ ℓ ≤ LFFN − 1, and dLFFN ≤ demb .Inductively, 
+
+‖zℓ‖∞ ≤ Lσ
+
+(‖W ℓzℓ−1‖∞ + ‖bℓ‖∞
+
+) ≤ Lσ
+
+(dℓ−1κ ‖zℓ−1‖∞ + κ).
+
+Solving this recursion gives 
+
+‖zℓ‖∞, ‖z′ ℓ‖∞ ≤ C0 (dmax κ)ℓ, dmax := max {demb , w FFN }, (63) where C0 absorbs Lσ and ‖h‖∞. (Exactly the same bound holds for the primed sequence, since ψ′ obeys the same magnitude constraints.) 
+
+Step 2: one-layer perturbation inequality. Fix ℓ ∈ { 1, . . . , L FFN } and set uℓ = W ℓzℓ−1 + bℓ, u′ ℓ = W ℓ′z′ ℓ−1 +
+
+bℓ′. Then 
+
+‖zℓ − z′ ℓ‖∞ ≤ Lσ ‖uℓ − u′ ℓ‖∞ ≤ Lσ
+
+(
+
+‖W ℓ(zℓ−1 − z′ ℓ−1)‖∞ + ‖(W ℓ − W ℓ′)z′ ℓ−1‖∞ + ‖bℓ − bℓ′‖∞
+
+)
+
+.
+
+Using the auxiliary facts and (63), 
+
+‖zℓ − z′ ℓ‖∞ ≤ Lσ
+
+(
+
+dℓ−1κ ‖zℓ−1 − z′ ℓ−1‖∞ + dℓ−1η ‖z′ ℓ−1‖∞ + η
+
+)
+
+≤ αℓ ‖zℓ−1 − z′ ℓ−1‖∞ + βℓ η, (64) where 
+
+αℓ := Lσ dℓ−1κ, βℓ := Lσ
+
+(dℓ−1C0(dmax κ)ℓ−1 + 1 ).
+
+Step 3: iterate the perturbation recursion. Starting with ‖z0 − z′ 0‖∞ = 0 and applying (64) layer by layer, 
+
+‖zLFFN − z′ LFFN ‖∞ ≤ η
+
+> LFFN
+
+∑
+
+> ℓ=1
+
+(
+
+βℓLFFN ∏
+
+> t=ℓ+1
+
+αt
+
+)
+
+.
+
+Since αt ≤ Lσ dmax κ and βℓ ≤ C1dmax (dmax κ)ℓ−1 + C1 for a constant C1,
+
+‖zLFFN − z′ LFFN ‖∞ ≤ η · C2
+
+> LFFN
+
+∑
+
+> ℓ=1
+
+(
+
+dmax (dmax κ)ℓ−1)
+
+(dmax κ)LFFN −ℓ ≤ η · C3 dmax (dmax κ)LFFN −1.
+
+Finally, dmax ≤ max {demb , w FFN } ≤ demb + wFFN ≤ 2wFFN (for the hidden layers to be useful we take wFFN ≥
+
+demb /2; otherwise replace wLFFN  
+
+> FFN
+
+by (dmax )LFFN ). Absorbing all fixed constants and powers of κ into CFFN , we obtain the clean architectural polynomial 
+
+‖zLFFN − z′ LFFN ‖∞ ≤ CFFN demb wLFFN  
+
+> FFN
+
+κ η, 
+
+which is (62). □
+
+I.3 Proof of H.3 
+
+Let Eϕ : Rdemb → Rdemb be a tokenwise MLP (the expert ) of depth LFFN with hidden widths at most wFFN ,coordinatewise activation σ (ReLU/GELU), and parameters ϕ = {(W ℓ, b ℓ)}LFFN  
+
+> ℓ=1
+
+. Assume uniform magnitude bounds 
+
+‖W ℓ‖∞ ≤ κ, ‖bℓ‖∞ ≤ κ for all ℓ. Let ϕ′ be another parameter set with ‖W ℓ − W ℓ′‖∞ ≤ η and ‖bℓ − bℓ′‖∞ ≤ η.For a token h ∈ Rdemb define the layerwise states 
+
+z0 = h, zℓ = σ(W ℓzℓ−1 + bℓ), z′ 0 = h, z′ ℓ = σ(W ℓ′z′ ℓ−1 + bℓ′),
+
+so that Eϕ(h) = zLFFN and Eϕ′ (h) = z′ LFFN .
+
+Goal. Show 
+
+‖Eϕ(h) − Eϕ′ (h)‖∞ ≤ Cexp demb wLFFN  
+
+> FFN
+
+κ η, (65) with Cexp > 0 depending at most polynomially on (LFFN , ‖σ‖Lip , ‖h‖∞) and on fixed architectural constants, in the same sense as the paper. 37 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Auxiliary inequalities. For X ∈ Rdout ×din and u ∈ Rdin ,
+
+‖Xu ‖∞ ≤ din ‖X‖∞‖u‖∞, (66) 
+
+‖σ(u) − σ(v)‖∞ ≤ Lσ ‖u − v‖∞, ‖σ(u)‖∞ ≤ Cσ ‖u‖∞, (67) with Lσ ≤ 1 for ReLU and Lσ = O(1) for GELU (similarly for Cσ ). 
+
+Step 1: forward activation bound. Let d0 = demb and dℓ ≤ wFFN for 1 ≤ ℓ ≤ LFFN − 1, and dLFFN ≤ demb .Using (66)(67), 
+
+‖zℓ‖∞ ≤ Cσ
+
+(‖W ℓzℓ−1‖∞ + ‖bℓ‖∞
+
+) ≤ Cσ
+
+(dℓ−1κ‖zℓ−1‖∞ + κ).
+
+Unrolling the recursion yields 
+
+‖zℓ‖∞, ‖z′ ℓ‖∞ ≤ C0 (dmax κ)ℓ, dmax := max {demb , w FFN }, (68) for some constant C0 absorbing Cσ , L σ and ‖h‖∞.
+
+Step 2: one-layer perturbation. Set uℓ = W ℓzℓ−1 + bℓ and u′ ℓ = W ℓ′z′ ℓ−1 + bℓ′. Then 
+
+‖zℓ − z′ ℓ‖∞ ≤ Lσ ‖uℓ − u′ ℓ‖∞ ≤ Lσ
+
+(
+
+‖W ℓ(zℓ−1 − z′ ℓ−1)‖∞
+
+︸ ︷︷ ︸  
+
+> ≤dℓ−1κ∥zℓ−1−z′ℓ−1∥∞
+
++ ‖(W ℓ − W ℓ′)z′ ℓ−1‖∞
+
+︸ ︷︷ ︸  
+
+> ≤dℓ−1η∥z′ℓ−1∥∞
+
++‖bℓ − bℓ′‖∞
+
+)
+
+.
+
+Using (68), 
+
+‖zℓ − z′ ℓ‖∞ ≤ αℓ ‖zℓ−1 − z′ ℓ−1‖∞ + βℓ η, αℓ := Lσ dℓ−1κ, β ℓ := Lσ
+
+(dℓ−1C0(dmax κ)ℓ−1 + 1 ). (69) 
+
+Step 3: iterate the recursion. Starting from ‖z0 − z′ 0‖∞ = 0 and applying (69) layerwise, 
+
+‖zLFFN − z′ LFFN ‖∞ ≤ η
+
+> LFFN
+
+∑
+
+> ℓ=1
+
+(
+
+βℓLFFN ∏
+
+> t=ℓ+1
+
+αt
+
+)
+
+.
+
+Since αt ≤ Lσ dmax κ and βℓ ≤ C1
+
+(dmax (dmax κ)ℓ−1 + 1 ),
+
+‖zLFFN − z′ LFFN ‖∞ ≤ η C 2
+
+> LFFN
+
+∑
+
+> ℓ=1
+
+dmax (dmax κ)LFFN −1 ≤ η C 3 dmax (dmax κ)LFFN −1.
+
+Finally, dmax ≤ max {demb , w FFN } ≤ c0 wFFN for a numerical c0 (or replace by dmax if preferred). Absorbing fixed powers of κ and numerical constants into Cexp , and noting that the input and output layers contribute at most linear factors in demb , we obtain the architectural polynomial 
+
+‖Eϕ(h) − Eϕ′ (h)‖∞ = ‖zLFFN − z′ LFFN ‖∞ ≤ Cexp demb wLFFN  
+
+> FFN
+
+κ η, 
+
+which is the claimed bound (65). □
+
+I.4 Network stability & parameter Lipschitzness Lemma I.1 (Network stability & parameter Lipschitzness) . Let Lin ≥ 1 be the block input-Lipschitz constant. Then for j = 1 , . . . , L T , ∥∥∥H(j) − H′(j)
+
+∥∥∥∞ ≤ Lin 
+
+∥∥∥H(j−1) − H′(j−1) 
+
+∥∥∥∞ + CbParch κη, 
+
+hence 
+
+sup 
+
+> x∈X
+
+|Tθ (x) − Tθ′ (x)| ≤ Lparam η, Lparam = C′ LLT 
+
+> in
+
+Parch (ℓ, m, d emb , w FFN , L FFN , k ) κ. 
+
+Let a (pre-norm) transformer block be 
+
+Bj (θj , H ) = H + MHA ψ
+
+(LN γ1,β 1 (H)) + FFN nonexp 
+
+> χ
+
+(LN γ2,β 2 (H)) + ∑
+
+> i∈Sj
+
+Eϕi
+
+(LN γ2,β 2 (H)),
+
+where Sj is the set of k active experts of the MoE sublayer in block j under the fixed routing pattern, and θj =
+
+{ψ, χ, {ϕi}i∈Sj , γ 1, β 1, γ 2, β 2}. Let θ′ 
+
+> j
+
+be another parameter vector with ‖θj − θ′ 
+
+> j
+
+‖∞ ≤ η, and fix the input H ∈
+
+Rℓ×demb with ‖H‖∞ ≤ CM 0.38 Generalization and Scaling Laws for Mixture-of-Experts Transformers 
+
+Step 1: decompose by residual additivity. Since H is added as a residual with the same value in both blocks, 
+
+‖Bj (θj , H ) − Bj (θ′ 
+
+> j
+
+, H )‖∞ ≤ ∥∥MHA ψ (LN γ1,β 1 (H)) − MHA ψ′ (LN γ′ 
+
+> 1,β ′
+> 1
+
+(H)) ∥∥∞
+
++ ∥∥FFN nonexp  
+
+> χ
+
+(LN γ2,β 2 (H)) − FFN nonexp  
+
+> χ′
+
+(LN γ′ 
+
+> 2,β ′
+> 2
+
+(H)) ∥∥∞
+
++ ∑
+
+> i∈Sj
+
+∥∥Eϕi (LN γ2,β 2 (H)) − Eϕ′ 
+
+> i
+
+(LN γ′ 
+
+> 2,β ′
+> 2
+
+(H)) ∥∥∞.
+
+(B.1) 
+
+Step 2: control the LayerNorm parameter perturbations. For fixed H, the (per-token) layer normalization 
+
+LN γ,β (H) = γ ˆH + β depends linearly on (γ, β ) when H is fixed (the centering/scaling of H is the same for both parameter sets). Hence 
+
+‖LN γ,β (H) − LN γ′,β ′ (H)‖∞ ≤ CLN demb ‖H‖∞ ‖(γ, β ) − (γ′, β ′)‖∞ ≤ C′ 
+
+> LN
+
+demb κ η. (B.2) Both MHA and FFN sublayers are Lipschitz in their inputs (with constants depending polynomially on 
+
+(ℓ, m, d emb , w FFN , L FFN )); thus the contribution of the LayerNorm parameter change to each sublayers output is bounded by a constant times C′
+
+> LN
+
+demb κη , which we absorb into the module constants below. 
+
+Step 3: apply per-module parameter Lipschitz bounds. From the previously established lemmas: (MHA) ∥∥MHA ψ (Z) − MHA ψ′ (Z)∥∥∞ ≤ CMHA ℓ m d 2emb κ η, ∀Z, 
+
+(non-expert FFN) ∥∥FFN nonexp  
+
+> χ
+
+(z) − FFN nonexp  
+
+> χ′
+
+(z)∥∥∞ ≤ CFFN demb wLFFN  
+
+> FFN
+
+κ η, ∀z, 
+
+(single expert) ∥∥Eϕ(z) − Eϕ′ (z)∥∥∞ ≤ Cexp demb wLFFN  
+
+> FFN
+
+κ η, ∀z. 
+
+Under a fixed routing pattern, exactly k experts are active in block j, so the MoE contribution is 
+
+∑
+
+> i∈Sj
+
+∥∥Eϕi (z) − Eϕ′ 
+
+> i
+
+(z)∥∥∞ ≤ k C exp demb wLFFN  
+
+> FFN
+
+κ η. (B.3) 
+
+Step 4: combine everything. Apply the bounds from Step 3 to (B.1) with Z = LN γ1,β 1 (H) and z = LN γ2,β 2 (H); add the (absorbed) LayerNorm terms from (B.2): 
+
+‖Bj (θj , H )−Bj (θ′ 
+
+> j
+
+, H )‖∞ ≤ CMHA ℓ m d 2emb κ η +CFFN demb wLFFN  
+
+> FFN
+
+κ η +k C exp demb wLFFN  
+
+> FFN
+
+κ η +C′′  
+
+> LN
+
+demb κ η. 
+
+Since wFFN ≥ 1 and k, m ≥ 1, the last term is dominated and can be absorbed into the FFN/expert constants. Renaming Cblock to absorb all fixed numerical/polylog factors, 
+
+‖Bj (θj , H ) − Bj (θ′ 
+
+> j
+
+, H )‖∞ ≤ Cblock 
+
+(ℓ m d 2emb + demb wLFFN  
+
+> FFN
+
++ k d emb wLFFN 
+
+> FFN
+
+) κ η. 
+
+This is the claimed block-level perturbation bound. □
+
+I.5 Proof of I.1 
+
+Recall the block-level stability (for fixed input H and parameters differing by at most η in ℓ∞)
+
+‖Bj (θj , H ) − Bj (θ′ 
+
+> j
+
+, H )‖∞ ≤ Cb Parch (ℓ, m, d emb , w FFN , L FFN , k ) κ η, (70) and the input-Lipschitz property of a transformer block 
+
+‖Bj (θj , U ) − Bj (θj , V )‖∞ ≤ Lin ‖U − V ‖∞, (71) where Parch (·) is a fixed architecture polynomial and Lin ≥ 1 is independent of j. Let 
+
+∆j := ‖H(j) − H′(j)‖∞, H(j) = Bj (θj , H (j−1) ), H′(j) = Bj (θ′ 
+
+> j
+
+, H ′(j−1) ).
+
+Add and subtract Bj (θj , H ′(j−1) ) and use the triangle inequality, (71), and (70): 
+
+∆j = ‖Bj (θj , H (j−1) ) − Bj (θ′ 
+
+> j
+
+, H ′(j−1) )‖∞
+
+≤ ‖ Bj (θj , H (j−1) ) − Bj (θj , H ′(j−1) )‖∞
+
+︸ ︷︷ ︸
+
+> ≤Lin ∆j−1
+
++ ‖Bj (θj , H ′(j−1) ) − Bj (θ′ 
+
+> j
+
+, H ′(j−1) )‖∞
+
+︸ ︷︷ ︸
+
+> ≤CbParch κη
+
+≤ Lin ∆j−1 + Cb Parch (·) κ η. (72) 39 Generalization and Scaling Laws for Mixture-of-Experts Transformers This is a linear inhomogeneous recurrence with ∆0 = 0 (since H(0) = H′(0) share the same input and positional encoding). 
+
+Solving the recurrence. By induction on j (or by the discrete Grönwall inequality), 
+
+∆j ≤ Cb Parch (·) κ η 
+
+> j−1
+
+∑
+
+> t=0
+
+L t
+
+> in
+
+. (73) Indeed, the base j = 1 gives ∆1 ≤ CbParch κη . Assuming (73) for j − 1, plug into (72): 
+
+∆j ≤ Lin · CbParch κη 
+
+> j−2
+
+∑
+
+> t=0
+
+L t 
+
+> in
+
++ CbParch κη = CbParch κη 
+
+> j−1
+
+∑
+
+> t=0
+
+L t
+
+> in
+
+.
+
+Geometric series bound. For j = LT ,
+
+∆LT = ‖H(LT ) − H′(LT )‖∞ ≤
+
+( LT −1∑
+
+> t=0
+
+L t
+
+> in
+
+)
+
+Cb Parch (·) κ η. 
+
+If Lin 6 = 1 , the sum is LLT  
+
+> in −1
+> Lin −1
+
+, so 
+
+‖H(LT ) − H′(LT )‖∞ ≤ LLT 
+
+> in
+
+− 1
+
+Lin − 1 Cb Parch (·) κ η. 
+
+If 0 ≤ Lin ≤ 1, then ∑LT −1 
+
+> t=0
+
+L t 
+
+> in
+
+≤ LT and LLT 
+
+> in
+
+≤ 1, so the bound still holds after increasing the prefactor by at most a constant depending on LT . In both cases we may write, for a numerical constant C′ (absorbing 1 
+
+> |Lin −1|
+
+or LT ), 
+
+‖H(LT ) − H′(LT )‖∞ ≤ C′ LLT 
+
+> in
+
+Parch (ℓ, m, d emb , w FFN , L FFN , k ) κ η. (74) 
+
+From hidden states to the scalar output. Let the final readout be Tθ (x) = Rω (H(LT )), where Rω is a fixed linear map (e.g., token pooling followed by a linear form) with ‖ω‖∞ ≤ κ. Then 
+
+|Tθ (x)−Tθ′ (x)| = ∣∣Rω (H(LT ))−Rω′ (H′(LT ))∣∣ ≤ ‖ Rω ‖∞→∞ ‖H(LT ) − H′(LT )‖∞
+
+︸ ︷︷ ︸
+
+> via (74)
+
++ ‖Rω − Rω′ ‖∞→∞ ‖H′(LT )‖∞
+
+︸ ︷︷ ︸  
+
+> ≤C′′ κ η
+
+.
+
+Using (74) and the uniform forward bound on ‖H′(LT )‖∞ (polynomial in the architecture; absorbed into C′′ ), we obtain 
+
+sup 
+
+> x∈X
+
+|Tθ (x) − Tθ′ (x)| ≤ C′ LLT 
+
+> in
+
+Parch (ℓ, m, d emb , w FFN , L FFN , k ) κ η + C′′ κ η ≤ Lparam η, 
+
+with 
+
+Lparam := C⋆ LLT 
+
+> in
+
+Parch (ℓ, m, d emb , w FFN , L FFN , k ) κ, 
+
+for a constant C⋆ absorbing C′, C ′′ and fixed readout norms. This is the claimed parameter-stability inequality. 40
