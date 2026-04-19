@@ -1,0 +1,6447 @@
+Title: Shuffling the Data, Stretching the Step-size: Sharper Bias in constant step-size SGD
+
+URL Source: https://arxiv.org/pdf/2604.10373v1
+
+Published Time: Tue, 14 Apr 2026 00:55:39 GMT
+
+Number of Pages: 48
+
+Markdown Content:
+Published as a conference paper at ICLR 2026 
+
+# SHUFFLING THE DATA , S TRETCHING THE STEP -S IZE :SHARPER BIAS IN CONSTANT STEP -S IZE SGD 
+
+Konstantinos Emmanouilidis ∗, Emmanouil-Vasileios Vlatakis-Gkaragkounis #, Ren´ e Vidal ∗
+
+Department of Computer Science 
+
+> ∗
+
+University of Pennsylvania, #University of Wisconsin-Madison, Archimedes Research Unit 
+
+## ABSTRACT 
+
+From adversarial robustness to multi-agent learning, many machine learning tasks can be cast as finite-sum min–max optimization or, more generally, as variational inequality problems (VIPs). Owing to their simplicity and scalability, stochastic gradient methods with constant step size are widely used, despite the fact that they converge only up to a constant term. Among the many heuristics adopted in practice, two classical techniques have recently attracted attention to mitigate this issue: Random Reshuffling of data and Richardson–Romberg extrapolation across iterates. Random Reshuffling sharpens the mean-squared error (MSE) of the estimated solution, while Richardson-Romberg extrapolation acts orthogonally, providing a second order reduction in its bias. In this work, we show that their composition is strictly better than both, not only maintaining the enhanced MSE guarantees but also yielding an even greater cubic refinement in the bias. To the best of our knowledge, our work provides the first theoretical guarantees for such a synergy in structured non-monotone VIPs. Our analysis proceeds in two steps: (i) we smooth the discrete noise induced by reshuffling and leverage tools from continuous-state Markov chain theory to establish a novel law of large numbers and a central limit theorem for its iterates; and (ii) we employ spectral tensor techniques to prove that extrapolation debiases and sharpens the asymptotic behavior even under the biased gradient oracle induced by reshuffling. Finally, extensive experiments validate our theory, consistently demonstrating substantial speedups in practice. 
+
+## 1 INTRODUCTION 
+
+Variational inequality problems (VIPs) (Stampacchia, 1964) are a unifying framework that extends beyond classical loss minimization to encompass min–max optimization, complementarity problems (Dantzig & Cottle, 1968; Facchinei & Pang, 2003), equilibrium computation in games, and general fixed-point formulations (Bauschke & Combettes, 2017). In recent years, VIPs have gained significant traction in ML and data science, especially due to their broad potential applicability in domains where minimizing a single empirical loss is insufficient. Notable examples include generative adversarial networks (Goodfellow et al., 2014; Arjovsky et al., 2017), multi-agent and robust reinforcement learning (Namkoong & Duchi, 2016; Wang et al., 2021; Giannou et al., 2022), and auction theory (Syrgkanis et al., 2015). In practice, many of these tasks reduce to finite-sum formulations, where the objective depends on a large collection of data samples or agents. In such settings, stochastic gradient methods have become the workhorse of large-scale learning (Bottou et al., 2018). By exploiting the finite-sum structure, stochastic gradient descent (SGD) and its variants replace expensive full-gradient computations with inexpensive updates on a few components, enabling scalability to massive datasets. While the theoretical underpinnings of SGD date back to the seminal work of Robbins & Monro (1951) and Kiefer & Wolfowitz (1952), the initial results involved an asymptotic analysis under a vanishing step size. Consequent works (Ljung, 1978; Bena ¨ım, 2006; Rakhlin et al., 2011; Raginsky et al., 2017; Azizian et al., 2024; Malick & Mertikopoulos, 2024) have extended the guarantees of SGD under different design choices, since much of its practical success can be traced to a handful of seemingly “low-level” heuristics (Bottou, 2012b): step-size schedules (constant vs. decaying), data ordering (with vs. without resampling), and iterate selection (average vs. last iterate). To facilitate analysis, the community has typically adopted a ceteris paribus perspective—isolating one design choice at a time while holding the rest fixed—an approach that clarifies individual effects but obscures their interaction. 1
+
+> arXiv:2604.10373v1 [math.OC] 11 Apr 2026
+
+Published as a conference paper at ICLR 2026 A particularly important case is the use of a constant step size γ, which is popular in practice since it simplifies tuning, quickly erases the dependence on initialization, and yields fast early progress (Yu et al., 2021). However, its fundamental drawback is that convergence halts at a non-vanishing error. Even in strongly convex problems with unique solution x∗, the last iterate of SGD typically satisfies: MSE (SGD ) = lim sup 
+
+> k→∞
+
+E[∥xk − x∗∥2] = O(γ) and bias (SGD ) = lim sup 
+
+> k→∞
+
+∥ E[xk] − x∗∥ = O(γ).That is, the iterates stabilize at a distance from the optimum on the order of the step size. 
+
+▶ To mitigate this limitation, practitioners often turn to debiasing heuristics. A prominent example is random reshuffling (RR 1), or without-replacement sampling, where each data point is visited exactly once per epoch. Unlike classical with-replacement SGD, which may resample or skip points, RR 1 enforces a random full pass that closely mirrors large-scale training in practice (Bottou et al., 2018). Despite the dependence it induces across samples, recent work has established faster convergence guarantees for RR 1 in both minimization (Ahn et al., 2020; G ¨urb ¨uzbalaban et al., 2021; Cai et al., 2023) and VIPs (Mishchenko et al., 2020b; Emmanouilidis et al., 2024), along with sharper 
+
+MSE bounds from O(γ) to O(γ2). However, the question of whether the bias term improves has remained open. Indeed, recall that for any estimator ˆx, the mean squared error decomposes as 
+
+MSE(ˆ x) = E[∥ˆx − x∗∥2] = ∥ E[ˆ x] − x∗∥2 + Var(ˆ x),
+
+so that bias(ˆ x) ≤ pMSE(ˆ x). Under this trivial bound, SGD– RR 1 guarantees improved MSE compared to vanilla SGD, but does not necessarily yield smaller bias. 
+
+▶ Orthogonal to reshuffling, another classical idea from numerical analysis has recently re-emerged in stochastic optimization: Richardson–Romberg (RR 2) extrapolation . Its principle is simple yet powerful: Run the algorithm of your choice with two different step sizes and combine their outputs so that the leading bias term cancels. Concretely, whenever the bias admits an expansion of the form bias (γ) = ∆ γ + O(γκ) with κ > 1, running the stochastic approximation at two step sizes gives: 
+
+xγ 
+
+> ∞
+
+− x∗ = ∆ γ + O(γκ) and x2γ 
+
+> ∞
+
+− x∗ = 2∆ γ + O(γκ).Extrapolating these iterates then yields: 
+
+xextr − x∗ = 2 xγ 
+
+> ∞
+
+− x2γ 
+
+> ∞
+
+− x∗ = 2∆ γ − 2∆ γ + O(γκ) = O(γκ).
+
+Originally introduced for accelerating discretization schemes in stochastic differential equations (Hildebrand, 1987; Talay & Tubaro, 1990; Bally & Talay, 1996), RR 2 has since been applied to optimization, improving constant-step methods from SGD (Durmus et al., 2016; Dieuleveut et al., 2020; Mangold et al., 2024; Sheshukova et al., 2024) to Q-learning and two-timescale stochastic approximation methods (Huo et al., 2023; Kwon et al., 2024; Zhang & Xie, 2024; Allmeier & Gast, 2024). However, despite its conceptual simplicity and empirical success, the theoretical foundations of RR 2 for stochastic VIPs remain nascent (Vlatakis-Gkaragkounis et al., 2024). In summary, the known bias rates of the heuristics remain limited when they are applied in isolation: For uncon-strained strongly monotone VIPs, RR 1 is known to sharpen MSE bounds (from O(γ) to O(γ2)) but does not, in general, guarantee an improved bias order; on the other hand RR 2 alone attains O(γ3/2) bias (Vlatakis-Gkaragkounis et al., 2024) 1. However, it remains unclear whether one can combine effectively the aforementioned heuristics in a unified method that outperforms both, ideally reaching O(γ3) bias. This raises the natural question: 
+
+What new phenomena arise when these heuristics — constant step sizes, random reshuffling, and Richardson extrapolation —interact simultaneously? 
+
+(⋆)Addressing this question is delicate, because reshuffling introduces a biased stochastic oracle whose dis-crete, permutation-driven noise structure is not covered by existing analyses of extrapolation, which predominantly assume unbiased or continuously distributed perturbations (Dieuleveut et al., 2020; Sheshukova et al., 2024; Vlatakis-Gkaragkounis et al., 2024).   
+
+> 1The O(γ2)rate in Vlatakis-Gkaragkounis et al. (2024, Sec. 5, Thm. 6) is obtained via a reduction to Dieuleveut et al. (2020, Sec. 3, Thm. 4), which requires additional noise assumptions not met in our setting.
+
+2Published as a conference paper at ICLR 2026                                                           
+
+> SGD-RR 1inner loop (step γ)
+> Epoch k−1
+> nsteps, step γ
+> Epoch knsteps, step γ
+> Epoch k+1
+> nsteps, step γ
+> x[γ]
+> kx[γ]
+> k+1
+> xi+1
+> k←xik−ηF ωk[i](xik)
+> i=0, . . . , n −1
+> Shared ωk
+> across both runs
+> SGD-RR 1inner loop (step 2γ)
+> Epoch k−1
+> nsteps, step 2γ
+> Epoch knsteps, step 2γ
+> Epoch k+1
+> nsteps, step 2γ
+> x[2 γ]
+> kx[2 γ]
+> k+1
+> RR 2Extrapolation
+> ˆxk+2 = 2 x[γ]
+> k+2 −x[2 γ]
+> k+2
+> Cancels O(γ)bias term Bias: O(γ)→ O (γ3)
+> x[γ]
+> k+2
+> x[2 γ]
+> k+2
+> Output ˆxK
+> Bias O(γ3)
+> return
+> Method SGD SGD-RR 1SGD-RR 2SGD-RR 2⊕RR 1
+> Bias O(γ)O(γ)O(γ3/2)O(γ3)
+> MSE O(γ)O(γ2)O(γ)O(γ2)
+
+Figure 1: Overview of SGD-RR 2⊕RR 1 (Algorithm 1). Two synchronized runs— Run A (blue, step γ) and Run B 
+
+(orange, step 2γ)—share the same random permutation ωk at each epoch, producing epoch-end iterates x[γ] 
+
+> k
+
+and 
+
+x[2 γ] 
+
+> k
+
+. The RR 2 outer loop combines them as ˆxk = 2 x[γ] 
+
+> k
+
+− x[2 γ] 
+
+> k
+
+, canceling the leading O(γ) bias term. The resulting asymptotic bias is O(γ3), a strict cubic improvement over either heuristic alone. 
+
+Our contributions. In this work, we unify the RR 1 and RR 2 heuristics into a principled algorithmic framework, showing that their composition yields a level of bias reduction unattainable by either heuristic alone. 
+
+Main Result (Informal — see Theorem 4.6.) Let F be a quasi-strongly monotone smooth finite-sum operator. Run SGD-RR 2⊕RR 1 (Algorithm 1) with two parallel step sizes γ and 2γ, and combine their epoch-level outputs via Richardson–Romberg extrapolation. Then ∃ c, c ′ < ∞, ρ, ρ ′ ∈ (0 , 1) such that: 
+
+E[xk] − x∗
+
+| {z }
+
+bias 
+
+≤ c (1 − ρ)k + O(γ3), E∥xk − x∗∥2| {z }
+
+MSE 
+
+≤ c′(1 − ρ′)k + O(γ2).
+
+The O(γ) and O(γ2) bias terms cancel exactly via extrapolation, yielding a strictly cubic improvement over 
+
+RR 1 alone (O(γ)) and RR 2 alone (O(γ3/2)) , while preserving the O(γ2) MSE of RR 1.
+
+Our contributions are as follows: 
+
+⋆ Convergence of SGD-RR 1 under perturbations. We analyze the RR 1 component, proving exponential convergence with an O(γ2) bias under quasi-strong monotonicity, robust to preprocessing perturbations. 
+
+⋆ Epoch-level Markov chain analysis of SGD-RR 1. We prove that the dynamics of RR 1 admit a unique invariant stationary distribution and establish a Law of Large Numbers (LLN) and a Central Limit Theorem (CLT) for the per-epoch iterates. 
+
+⋆ Cubic bias refinement via RR 2⊕RR 1 synergy. Through a spectral analysis of the reshuffling-induced biased oracle and higher-moment bounds, we prove the first O(γ3) asymptotic bias guarantee for the combined algorithm in quasi-strongly monotone VIPs. 3Published as a conference paper at ICLR 2026 
+
+## 2 PROBLEM SETUP AND ASSUMPTIONS 
+
+Variational inequalities. Let’s recall first the basic framework of finite-sum variational inequalities (VIs), which will underlie our analysis. Let X ⊆ Rd be a nonempty closed convex set and F : Rd → Rd a single-valued operator. The variational inequality problem VI( X, F ) asks for a point x⋆ ∈ X such that 
+
+⟨F (x∗), x − x∗⟩ ≥ 0, ∀x ∈ X (VIP) In our setting, we focus on the unconstrained finite-sum case, i.e. X = Rd and F (x) = 1
+
+> n
+
+Pn−1 
+
+> i=0
+
+Fi(x), respectively, where each Fi : Rd → Rd typically represents the gradient of a loss function for a data point in some dataset D. To build intuition, we illustrate the framework through a few canonical examples below: 
+
+Example 2.1: Solving Non-linear equations. A solution x∗ to the (VIP) corresponds to a root of the equation 
+
+F (x) = 0. Therefore, we can cast any non-linear equation as a specific instantiation of the Variational Inequality framework. Well-known examples include the Navier-Stokes equations in computational dynamics (Hao, 2021). 
+
+Example 2.2: Empirical Risk Minimization. For any C1−smooth loss function ℓ : Rd → R, a solution x∗ to the (VIP) with F (x) = ∇ℓ(x) is a critical point (KKT solution) to the associated empirical risk minimization problem, consisting the cornerstone of machine learning objectives. 
+
+Example 2.3: Nash Equilibria & Saddle-point Problems. Consider N players, each having an action set in Rd
+
+and a convex cost function ci : Rd → R. A Nash Equilibrium (NE) is a joint-action profile x∗ = ( x∗ 
+
+> i
+
+)Ni=1 that satisfies 
+
+ci(x∗) ≤ ci(xi; x∗−i), ∀i, x i ∈ Rd. (NE) For convex cost functions ci : Rd → R, a (NE) coincides with the solution of a (VIP) with operator F (x) = (∇xi ci(x)) Ni=1 . In the particular case of two players and a (quasi) convex-concave objective L : Rd × Rd → R, the solution x∗ = ( x∗
+
+> 1
+
+, x ∗
+
+> 2
+
+) to the (VIP) with F (x) = ( ∇L (x), −∇L (x)) is a saddle point of L satisfying 
+
+L(x∗
+
+> 1
+
+, x 2) ≤ L (x∗
+
+> 1
+
+, x ∗
+
+> 2
+
+) ≤ L (x1, x ∗
+
+> 2
+
+), ∀x1, x 2 ∈ Rd.
+
+Saddle-point problems and applications of (NE) are ubiquitous, from training Generative Adversarial Networks (GANs) to multi-agent reinforcement learning and auction/bandit problems (Daskalakis et al., 2017; Zhang et al., 2021; Pfau & Vinyals, 2016). 
+
+Blanket assumptions. We now state the standing assumptions for our analysis, beginning with the existence of a solution x⋆ to (VIP). 
+
+Assumption 2.1. The solution set X ∗ of (VIP) is nonempty and there exists x∗ ∈ X ∗, R ∈ R such that 
+
+∥x∗∥2 ≤ R.The next assumption introduces the class of operators F of the associated (VIP) for which our stochastic gradient algorithms will be analyzed. 
+
+Assumption 2.2 (λ-weak μ-quasi strong monotonicity) .
+
+The operator F is λ-weak μ-quasi strongly monotone, i.e. there exist λ ≥ 0, μ > 0 such that for some x∗ ∈ X ∗ it holds that 
+
+⟨F (x), x − x∗⟩ ≥ μ∥x − x∗∥2 − λ, ∀x ∈ Rd. (1) Assumption 2.2 for λ = 0 coincides with the well-known no-tions of quasi-strong monotonicity (Loizou et al., 2020), strong stability condition (Mertikopoulos & Zhou, 2019), and strongly coherent VIPs (Song et al., 2020) in the optimization literature. It can be seen as a relaxation of the classical notion of strong mono-tonicity/convexity, which requires ⟨F (x) − F (x′), x − x′⟩ ≥ 
+
+μ∥x − x′∥2 for all x, x ′ ∈ Rd. For λ > 0, Assumption 2.2 rep-resents a further relaxation, motivated by dissipative dynamical systems and weakly convex optimization (Raginsky et al., 2017; Erdogdu et al., 2018), and it encompasses non-monotone games as well as a variety of problems in statistical learning theory (Tan & Vershynin, 2023). Figure 2: A simple example satisfying As-sumption 2.2: f (x, y ) = ( x2 +7 sin x)+ xy −
+
+(y2 − 7 cos y), with (μ, λ ) = (1 , 25) .4Published as a conference paper at ICLR 2026 A common assumption in the literature of smooth optimization that we will utilize is that the operators in the finite-sum structure of the (VIP) are Lipschitz continuous. 
+
+Assumption 2.3 (Lipschitz continuity) . Each Fi is Li-Lipschitz: 
+
+∥Fi(x1) − Fi(x2)∥ ≤ Li∥x1 − x2∥, ∀x1, x 2 ∈ Rd, i ∈ [n],
+
+with Lmax = max i∈[n] Li.Unlike standard analyses assuming unbiased oracles with bounded variance, e.g., (Loizou et al., 2021; Hsieh et al., 2019; Lin et al., 2020; Mishchenko et al., 2020b), random reshuffling induces bias via inter-step dependence. Such conditions may fail even for simple quadratics. Instead, we work directly with Lipschitz continuity and impose only a mild moment bound: 
+
+Assumption 2.4 (Bounded moments at the solution) . At some x∗ ∈ X ∗, the oracle values have finite second and fourth moments: 
+
+σ2 
+
+> ∗
+
+:= 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x∗)∥2 < ∞, σ4 
+
+> ∗
+
+:= 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x∗)∥4 < ∞.
+
+Assumption 2.4 is mild: it does not require global boundedness of gradients, but only that the oracle values 
+
+Fi(x∗) admit finite second and fourth moments at the solution. Building on this, we extend the variance bound of Emmanouilidis et al. (2024, Prop. A.2, p. 16) to higher-order moments. 
+
+Proposition 2.5. Let Assumptions 2.1–2.3 hold. Then, for any x ∈ Rd it holds that (i) 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x) − F (x)∥2 ≤ 2
+
+n
+
+> n
+
+X
+
+> i=1
+
+L2 
+
+> i
+
+∥x − x∗∥2 + 2 σ2 
+
+> ∗
+
+,
+
+(ii) 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x) − F (x)∥4 ≤ 128 
+
+n
+
+> n
+
+X
+
+> i=1
+
+L4 
+
+> i
+
+∥x − x∗∥4 + 128 σ4 
+
+> ∗
+
+.
+
+Having introduced the necessary assumptions, we, next, provide the proposed algorithm that will achieve the higher order bias refinement in our results. 
+
+## 3 THE ALGORITHMIC FRAMEWORK 
+
+While there are many conceivable ways to interleave RR 2 and RR 1, both intra- and inter-epoch, we adopt the most natural and practically motivated design. In modern pipelines, RR 1 is the workhorse at the low-level training stage, while RR 2 is often employed as a black-box refinement at a higher level, allowing parallelization and modular integration. Accordingly, we study stochastic gradient algorithms that sample via random reshuffling to generate stochastic oracles of gradients/operators. At the start of each epoch k > 0, a random permutation ωk of [n] is drawn, prescribing the order in which data points are processed. The algorithm then performs the classical SGD update:          
+
+> xi+1
+> k=xik−γPreProcess StochOracle( xik;ωik),(SGD-RR 2⊕RR 1(inner-loop))
+
+where StochOracle( xik; ωik) denotes either the stochastic gradient (in minimization problems) or the operator value Fωik (xik) (in the general VI case), indexed by the ωik data point and PreProcess[ ·] is a preprocessing routine implementing calibrated Gaussian smoothing to the input. Then, the final iterate of each epoch becomes the starting point of the next, and the procedure repeats. 
+
+On the necessity of smoothing. A key challenge with reshuffling is that, after one epoch, the cumulative gradient estimator is biased, unlike sampling with replacement, which is unbiased and analytically simpler. The induced noise is also discrete, tied to permutations. To handle this, we introduce a calibrated Gaussian perturbation that smooths the discrete reshuffling noise into a well-behaved proxy while preserving variance, moments, and bias order. In practice, the perturbation has negligible effect across datasets; clarifying its precise dependence on dataset size is an interesting direction for future work. For completeness, the supplement also includes a brief sketch showing how 5Published as a conference paper at ICLR 2026 
+
+Algorithm 1 SGD– RR 2⊕RR 1
+
+Require: Initial point x0 ∈ Rd; step size γ > 0; epochs I; dataset size n;STOCH ORACLE (x; i) returns Fi(x) (minimization) or operator value (VI); PRE PROCESS (g; i) adds calibrated Gaussian smoothing on g (e.g., Uk ∼ N (0 , γ 2nσ 2 
+
+> ∗
+
+I)). 1: for k = 0 , 1, . . . , I − 1 do ▷ epoch k
+
+2: for η = γ, 2γ do ▷ Parallel iterations with two step-sizes 3: Draw a random permutation ωk of [n]
+
+4: for i = 0 , 1, . . . , n − 1 do ▷ inner loop (reshuffled pass) 5: xi+1  
+
+> k, [η]
+
+← xik, [η] − η PRE PROCESS (STOCH ORACLE (xik, [η], ω k [i])) 
+
+6: end for 
+
+7: x0 
+
+> k+1 ,[η]
+
+← xnk, [η] ▷ baseline next-start (used for analysis) 8: end for 
+
+9: ˆxk+1 ← 2 xnk, [γ] − xnk, [2 γ] ▷ outer loop ( extrapolation at epoch end) OR 10: ˆxk+1 ← (2 P 
+
+> m∈[k]
+
+xnk, [γ] − xnm, [2 γ])/k ▷ Alternative: ( extrapolation at epoch’s averages) 11: end for 
+
+12: return ˆxI ▷ (optionally average {ˆxk } across epochs) 
+
+our results extend even without this step. Finally, at the end of each epoch we apply RR 2, yielding the extrapolated update: 
+
+ˆxNI+1 = 2 xNI, [γ] − xNI, [2 γ] . (SGD-RR 2⊕RR 1(outer-loop)) In Section 4, we prove that this combination achieves a provable O(γ3) bias— to the best of our knowledge, the first such result. 
+
+## 4 THEORETICAL GUARANTEES 
+
+We present the theoretical guarantees for the synergy of both heuristics in our algorithm, establishing a cubic refinement in the bias attained. We start by analyzing the RR 1 component (inner loop of Algorithm 1), which serves as the basis for performing RR 2 (outer loop of Algorithm 1) on the produced iterates and describe the interplay of both heuristics in the bias of Algorithm 1. 4.1 CONVERGENCE GUARANTEES FOR RR 1
+
+Our first result concerns the convergence of the RR 1 component for λ-weak μ-quasi strongly monotone VIPs. More specifically, in order to effectively utilize Markov Chain tools we study the RR 1 variant under preprocessing perturbations 2 (inner loop of Algorithm 1), attributing for simplicity of exposition of our results the name Perturbed SGD– RR 1.
+
+Theorem 4.1. Let Assumptions 2.1-2.3 hold. If γ ≤ γmax , then the iterates of Perturbed SGD– RR 1 satisfy 
+
+E ∥x0 
+
+> k+1
+
+− x∗∥2 ≤
+
+
+
+1 − γnμ 
+
+2
+
+k+1 
+
+∥x00 − x∗∥2 + 8nγ 2L2
+
+> max
+
+μ2 σ2 
+
+> ∗
+
++ 8λμ
+
+where σ2 
+
+> ∗
+
+= 1
+
+> n
+
+Pn−1 
+
+> i=0
+
+∥Fi(x∗)∥2 and γmax = min 
+
+ß 13nL max ,
+
+√1+6 μ2L2
+
+> max −112 nL 2
+> max
+
+™
+
+.
+
+Remark 1. Theorem 4.1 establishes exponential convergence up to a bias of O(γ2σ2 
+
+> ∗
+
++ λμ ), where the 8λμ term is inherent (Yu et al., 2021). For fair comparison we focus on the quasi-strongly monotone case ( λ = 0 ), which already generalizes strong convexity. Our rate recovers known results for strongly monotone operators (Das et al., 2022; Emmanouilidis et al., 2024) and extends them to weak monotonicity. In this regime, reshuffling attains a much smaller bias than the O(γσ 2 
+
+> ∗
+
+) of with-replacement SGD (Loizou et al., 2020; Gower et al., 2019), converging to a tighter neighborhood. This sharper bias also yields faster accuracy rates: with γ = 1 /(nK ), with-replacement SGD reaches O(1 /(nK )) accuracy (Das et al., 2022; Mishchenko et al., 2020a), while reshuffling accelerates to 
+
+O(1 /(nK 2)) , a further support for its empirical success. 
+
+> 2
+
+Empirically, for sufficiently large datasets the effect of discrete noise in smooth problems is negligible, making the preprocessing step unnecessary. A detailed study of this effect lies beyond the scope of this paper, whose focus is instead the first systematic treatment of the interaction between Random reshuffling and Richardson extrapolation. 
+
+6Published as a conference paper at ICLR 2026                              
+
+> Aspect Emmanouilidis et al. (2024) Our work
+> Baseline Algorithm SEG SGDA
+> Model Assumptions (Smoothness) Fi–LiLipschitz Fi–LiLipschitz Model Assumptions (Drift) F μ –strongly monotone Fquasi –strongly monotone Main heuristic RR 1only RR 1⊕RR 2
+> Asymptotic Bias order O(γ+γ3)O(γ3)
+> Asymptotic MSE order O(γ2)O(γ2)
+> Condition number Worse than vanilla-SEG Same as vanilla-SGDA
+> Mechanism EG-structure + RR 1Bias cancellation ( RR 1⊕RR 2)
+
+Table 1: Summary of key differences between Emmanouilidis et al. (2024) and our results. In the sequel, we view the algorithmic trajectory through the prism of Markov chain theory. This perspective enables a finer dissection of the reshuffling bias and, mutatis mutandis, equips us with the machinery to construct consistent estimators for performance statistics. The Markovian framework arises naturally, as the method progresses from xk to xk+1 in a state-dependent fashion. The connection between stochastic approximation and Markov processes—traced back to early works such as Robbins & Monro (1951); Pflug (1986)—has fueled a rich literature for algorithms with unbiased oracles. Random reshuffling, however, generates systematically biased oracles, necessitating a genuine departure from this canonical line of analysis. For readers accustomed only to classical finite-state Markov chains, the transition mechanism is usually represented by a directed graph with fixed transition probabilities. In our setting, the analogue is the transition kernel P (x, A ) = Pr xnext ∈ A | xnow = x, A ∈ B (Rd), where B(Rd) denotes the Borel sets of Rd. As in the finite-state case, it is highly desirable that this kernel remain invariant over time—this is the property of time-homogeneity. 3
+
+At the step level, reshuffling destroys homogeneity: the transition kernel varies with the permutation index, making the process non-stationary. Fortunately, this irregularity vanishes at the epoch scale: 
+
+“After one reshuffled pass, the law of the next iterate depends only on the epoch’s starting point and the drawn permutation, but not its position within the permutation.” 
+
+Thus, the sequence of epoch-level iterates (x[0]  
+
+> k
+
+)k≥0 forms a bona fide time-homogeneous Markov chain, forming the basis for the asymptotic analysis of the RR 2 extrapolation component 4
+
+Lemma 4.2 (Epoch-level homogeneity and kernel) . Fix γ > 0 and n ∈ N. Then the Perturbed SGD-RR 1 can be described at each epoch k as: Draw ωk uniformly from Sn and set 
+
+xk+1 = H(xk, ω k) + Uk, Uk ∼ N (0 , Σ) ,
+
+where H(x, ω ) denotes the endpoint of one reshuffled pass started at x with permutation ω (i.e., the map induced by n inner updates with step size γ). Then (xk)k≥0 is a time-homogeneous Markov chain on Rd with transition kernel 
+
+P (x, A ) = 1
+
+n!
+
+X
+
+> ω∈Sn
+
+Z
+
+> A
+
+ϕ y; H(x, ω ), Σ dy, A ∈ B (Rd),
+
+where ϕ(·; m, Σ) is the d-variate Gaussian density with mean m and covariance Σ.By verifying irreducibility, aperiodicity, and positive Harris recurrence (Meyn & Tweedie, 2012), we establish a unique invariant distribution πγ , geometric convergence in total variation to it, and concentration of scalar observables (admissible test functions) around x∗.
+
+> 3
+
+If time-homogeneity fails, a process can be still Markovian in the sense that the future depends only on the present, but its statistical regularity vary with time, complicating both analysis and long-run guarantees. 
+
+> 4
+
+On the augmented space Rd × Sn, the chain (( xk , ω k )) k≥0 is also time-homogeneous with kernel K (x, ω ), A × B =
+
+R 
+
+> A
+
+ϕ y; H(x, ω ), ΣId
+
+ dy · |B| 
+
+> n!
+
+. The above formulation is convenient for verifying Lyapunov–Foster and minorization criteria, since the coupling with uniform perturbation remains independent. 
+
+7Published as a conference paper at ICLR 2026 
+
+Theorem 4.3. Under Assumptions 2.1–2.3, run Perturbed SGD-RR 1with γ ≤ γmax . Then (xk)k≥0 admits a unique stationary distribution πγ ∈ P 2(Rd), and additionally: (i) | E[ℓ(xk)] − Ex∼πγ [ℓ(x)] | ≤ c(1 − ρ)k ∀ℓ : |ℓ(x)| ≤ Lℓ(1 + ∥x∥),
+
+(ii) | Ex∼πγ [ℓ(x)] − ℓ(x∗)| ≤ Lℓ
+
+√C ∀ℓ : Lℓ − Lipschitz functions ,
+
+for some c < ∞, ρ ∈ (0 , 1) , C = Θ(MSE( SGD − RR 1)) and γmax defined in Theorem 4.1 
+
+Remark 2. Item (i) of Theorem 4.3 shows that Perturbed SGD-RR 1converges geometrically in total variation to 
+
+πγ . Item (ii) bounds the gap between the expectation of a measurement under πγ and its value at the solution x∗.Intuitively, if the method converged exactly to x∗, these expectations would coincide. 
+
+The result of Theorem 4.3 follows from a Foster–Lyapunov drift condition combined with a minorization argument, showing that the induced Markov chain satisfies the standard ergodicity criteria in the spirit of Yu et al. (2021); Vlatakis-Gkaragkounis et al. (2024). Beyond geometric ergodicity, one may also ask whether the chain admits asymptotic statistical estimation of functionals of its trajectory. By invoking the Birkhoff–Khinchin ergodic theorem for continuous-state Markov chains, we establish both a Law of Large Numbers (LLN) and a Central Limit Theorem (CLT) for empirical averages of test functions evaluated along the epoch iterates. 
+
+Theorem 4.4 (LLN and CLT for Perturbed SGD– RR 1). Suppose Assumptions 2.1–2.3 hold and run Perturbed SGD– RR 1 with γ ≤ γmax , (cf. Theorem 4.1). Let ℓ : Rd → R be any test function such that |ℓ(x)| ≤ 
+
+Lℓ(1 + ∥x∥2) and Ex∼πγ [ℓ(x)] < ∞. Then for the epoch-level iterates it holds that: 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+ℓ(xt) a.s. 
+
+−−→ Ex∼πγ [ℓ(x)] 
+
+| {z }
+
+> (LLN)
+
+T −1/2 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+ℓ(xt) − Ex∼πγ [ℓ(x)] 
+
+ d
+
+−→ N (0 , σ 2 
+
+> πγ
+
+(ℓ)) 
+
+| {z }
+
+> (CLT)
+
+,
+
+where σ2 
+
+> πγ
+
+(ℓ) = lim T →∞ 1 
+
+> T
+
+Eπγ [S2 
+
+> T
+
+] and S2 
+
+> T
+
+= PT −1
+
+> t=0
+
+ ℓ(xt) − Ex∼πγ [ℓ(x)] 2.4.2 CONVERGENCE GUARANTEES FOR RR 2⊕RR 1
+
+Having established the role of RR 1 within stochastic algorithms, we now examine its interplay with RR 2 and the effect of combining these heuristics on the bias term. The previous results hold for the full class of weakly quasi-strongly monotone problems with λ > 0. To sharpen our understanding, we focus on the quasi-strongly monotone case ( λ = 0 in Assumption 2.2), which already covers a broad range of non-monotone regimes (Loizou et al., 2020). A key step in our analysis is to bound higher-order moments of the deviation between RR 1 iterates and the solution of (VIP) , thereby showing that the bias of Perturbed SGD– RR 1 is linear in the step size with quadratic corrections. Technically, our analysis relies on two delicate ingredients that go beyond straightforward generalizations. (i) A spectral study of the full-pass operator (Lemma F.2), which approximates the underlying map F of the VIP. This connection between RR 1 and the multi-step extragradient literature may be of independent interest, but its proof requires a nontrivial handling of spectral properties across reshuffled passes. (ii) A combinatorial lemma 
+
+(Lemma E.2) that bounds fourth order moments of finite-sum subsets of vectors. While reminiscent of Mishchenko et al. (2020b, Lemma 1, Sec. 7), our result demands substantially more intricate manipulations to accommodate the dependencies introduced by sampling without replacement. 
+
+Lemma 4.5. Let λ = 0 and Assumptions 2.1–2.4 hold. If γ ≤ γmax (cf. Lemma E.4), then 
+
+bias( Perturbed SGD-RR 1) = lim sup 
+
+> k→∞
+
+∥ E[xk] − x∗∥ = C(x∗)γ + O(γ3).
+
+Remark 3. For classical SGD , the bias takes the form bias( SGD ) = C(x∗)γ + O(γ1.5) (Dieuleveut et al., 2020). Hence, while RR 1 retains the same first-order term, it improves the higher-order contribution and simultaneously yields sharper mean-squared error guarantees. 
+
+8Published as a conference paper at ICLR 2026 Building on this fact, we construct a refined trajectory via the debiasing scheme RR 2. Our final result shows that the combined scheme attains exponentially fast a provable asymptotic O(γ3) bias: 
+
+Theorem 4.6. Under the assumptions of Lemma 4.5, Algorithm 1 output satisfies Last-iterate version (line 9): ∥ E[xk] − x∗∥ ≤ c(1 − ρ)k + O(γ3),
+
+Averaged-iterate version (line 10): E
+
+"
+
+> 1
+> kk
+
+X
+
+> m=1
+
+xm
+
+#
+
+− x∗ ≤ c/ρ k + O(γ3).
+
+and the attained MSE is bounded by 
+
+E ∥xk − x∗∥2 ≤ c′(1 − ρ′)k + O  γ2
+
+where ρ, ρ ′ ∈ (0 , 1) , c, c ′ < ∞.
+
+Remark 4. Although the last-iterate estimator is often preferred in theory, in practice a trade-off emerges vs 
+
+ergodic-average : full-epoch or tailed averaging (the Polyak–Ruppert scheme (Polyak & Juditsky, 1992)) achieves improved variance properties, asymptotically captured by Theorem 4.4. 
+
+## 5 EXPERIMENTS 
+
+In this section, we conduct a series of experiments demonstrating the benefits from the synergy of the two heuristics empirically. More specifically, we focus in the strongly monotone setting and compare the relative error and bias attained by 4 variants: the classical SGD(A) algorithm using uniform with-replacement sampling (denoted as SGDA 
+
+in the plots), the one equipped with RR 1, the one equipped with RR 2 and the method utilizing both heuristics. For each experiment, we report the average of 5 trials/runs and plot the relative error log 
+
+ ∥xk −x∗∥2
+
+> ∥x0−x∗∥2
+
+
+
+with respect to the iterations of the algorithm. 
+
+Two-player Zero-Sum Games. In the strongly monotone case, we consider the two-player zero-sum game from Emmanouilidis et al. (2024) and Loizou et al. (2021), consisting a strongly convex - strongly concave quadratic of the form 
+
+min 
+
+> x1∈Rd
+
+max 
+
+> x2∈Rd
+
+f (x1, x 2) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+12 xT 
+
+> 1
+
+Aix1 + xT 
+
+> 1
+
+Bix2 − 12 xT 
+
+> 2
+
+Cix2 + αTi x1 − cTi x2.
+
+For the interested reader, additional details on the experimental setup and the procedure used to sample the matrices 
+
+Ai, B i, C i are provided in Appendix G. 
+
+On the Rate of Convergence. In the first set of experiments, we aim to validate empirically the result of Theorem 4.1 by running SGDA with RR 1 and using the step sizes described by theory. We conduct experiments for multiple conditions κ = Lμ with value κ = {1, 5, 10 } and μ = 1 . In Figure 3, we observe that the algorithm with RR 1
+
+converges linearly to a neighbourhood around the solution x∗ and the neighbourhood depends on the step size used, 0 2 4 6 8 10                                  
+
+> Epochs (x10 2)
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 1)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+> Epochs (x10 2)
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 5)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+> Epochs (x10 3)
+> 10 8
+> 10 7
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 10)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1)
+
+Figure 3: Comparison of different heuristics. The combination of RR 2⊕RR 1 converges linearly to neighborhood of the solution, validating the established theoretical results (Theorem 4.1). Even when we are using the last iterates, the combination of RR 2⊕RR 1 converges to a smaller relative error in comparison to the other variants (classical SGDA, RR 1, RR 2). This validates that the bias of Algorithm 1 is improved even when RR 1-last iterates are used. 9Published as a conference paper at ICLR 2026 100 75 50 25 0 25 50 75 100  
+
+> 1
+> TTt= 1
+> ft
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+> 0.030
+> 0.035
+> 0.040
+> Density
+
+Concentration Around the Game Value        
+
+> True Value (0)
+> T = 100
+> T = 500
+> T = 1000 300 200 100 0100 200 300
+> 1
+> TTt= 1
+> ft
+> 0.000
+> 0.002
+> 0.004
+> 0.006
+> 0.008
+> 0.010
+> Density
+
+Effect of Stepsize on CLT 
+
+> True Value (0)
+> = 0.1 (T=500)
+> = 0.001 (T=500)
+
+Figure 4: Validation of concentration around the mean and effect of the number of iterations and step sized selected. The average of the game values tend to concentrate more around the mean for larger number of iterations and smaller step sizes. The right plot indicates the effect of two different step sizes γ ∈ { 0.1, 0.001 }, showing that for smaller step sizes the corresponding distribution attains higher concentration around the mean of the values. validating in this way the results of Theorem 4.1. We have run experiments also for stepsizes that are larger than the ones predicted in theory, observing similar behaviour of the optimization algorithm. Additionally, we have performed an ablation study in Wasserstein GANs (Emmanouilidis et al., 2024; Daskalakis et al., 2017), showing that the performance benefit of the proposed heuristic is universal in many other common optimization algorithms used in VIs (Appendix G). 
+
+Efficient Statistics & Empirical Concentration. This set of experiments examines the central limit theorem (CLT) and aims to validate empirically the theoretical results established in Theorem 4.4. The value of the game, which is zero, is used as the test value for which we observe the averaged evaluations after T = {100 , 500 , 1000 } iterations respectively. In particular, we run the algorithm with the step size suggested by Theorem 4.4 and maintain for the total number of iterations the sum of the evaluations, normalized with √T . We run the experiment for T = 2000 
+
+trials/runs and plot the corresponding histograms. In Figure 4, we observe that the histograms tend to concentrate to the value of the game as the number of iterations increase. Additionally, we examine the effect of the step size to concentration of the observed distributions. 
+
+## 6 CONCLUSION 
+
+In summary, our work establishes that the synergy of random reshuffling and extrapolation yields a principled reduction of bias, culminating in accelerated convergence guarantees for structured non-monotone VIPs. By combining Markov chain techniques, spectral analysis, and higher-moment bounds, we provide the first rigorous evidence that these heuristics can be synergistically integrated rather than studied in isolation. This perspective bridges a long-standing gap between practice and theory, offering a systematic framework that extends naturally to a broad class of constant step-size stochastic methods. We view this as a foundation for a new generation of analyses where practical heuristics are not only empirically verified but also theoretically grounded to deliver provable performance improvements in complex stochastic optimization landscapes. ACKNOWLEDGMENTS 
+
+Konstantinos Emmanouilidis and Ren ´e Vidal acknowledge support from the NSF-Simons grant 2031985 “Research Collaborations on the Mathematical and Scientific Foundations of Deep Learning” and Simons Foundation 81420 (Theorinet). Emmanouil-Vasileios Vlatakis-Gkaragkounis acknowledges support from the startup funding at Wisconsin Madison university under the grant (233-AAN5596 - GF000020971). 10 Published as a conference paper at ICLR 2026 
+
+## REFERENCES 
+
+Rafik Aguech, Eric Moulines, and Pierre Priouret. On a perturbation approach for the analysis of stochastic tracking algorithms. SIAM Journal on Control and Optimization , 39(3):872–899, 2000. Kwangjun Ahn, Chulhee Yun, and Suvrit Sra. Sgd with shuffling: optimal rates without component convexity and large epoch requirements. In NeurIPS , 2020. Sebastian Allmeier and Nicolas Gast. Computing the bias of constant-step stochastic approximation with markovian noise. Advances in Neural Information Processing Systems , 37:137873–137902, 2024. Kimon Antonakopoulos, Panayotis Mertikopoulos, Georgios Piliouras, and Xiao Wang. Adagrad avoids saddle points. In International Conference on Machine Learning , pp. 731–771. PMLR, 2022. Martin Arjovsky, Soumith Chintala, and L ´eon Bottou. Wasserstein generative adversarial networks. In ICML , 2017. Wa ¨ıss Azizian, Franck Iutzeler, J ´er ˆome Malick, and Panayotis Mertikopoulos. What is the long-run distribution of stochastic gradient descent? a large deviations analysis. arXiv preprint arXiv:2406.09241 , 2024. Vlad Bally and Denis Talay. The law of the euler scheme for stochastic differential equations: I. convergence rate of the distribution function. Probability theory and related fields , 104(1):43–60, 1996. HH Bauschke and PL Combettes. Convex analysis and monotone operator theory in hilbert spaces, 2011 springer. 
+
+New York , 2017. Michel Benaim. A dynamical system approach to stochastic approximations. SIAM Journal on Control and Optimization , 34(2):437–472, 1996. Michel Bena ¨ım. Dynamics of stochastic approximation algorithms. In Seminaire de probabilites XXXIII , pp. 1–68. Springer, 2006. Michel Bena ¨ım and Morris W Hirsch. Dynamics of morse-smale urn processes. Ergodic Theory and Dynamical Systems , 15(6):1005–1030, 1995. Yoshua Bengio. Practical Recommendations for Gradient-Based Training of Deep Architectures. Neural Networks: Tricks of the Trade , pp. 437–478, 2012. ISSN 1611-3349. doi: 10.1007/978-3-642-35289-8 26. Dimitri P. Bertsekas. Incremental Gradient, Subgradient, and Proximal Methods for Convex Optimization: A Survey. In Suvrit Sra, Sebastan Nowozin, and Stephen J. Wright (eds.), Optimization for Machine Learning ,chapter 4. The MIT Press, 2011. ISBN 9780262298773. Dimitri P. Bertsekas and John N. Tsitsiklis. Gradient Convergence in Gradient methods with Errors. SIAM Journal on Optimization , 10(3):627–642, January 2000a. doi: 10.1137/s1052623497331063. Dimitri P Bertsekas and John N Tsitsiklis. Gradient convergence in gradient methods with errors. SIAM Journal on Optimization , 10(3):627–642, 2000b. L ´eon Bottou. Curiously fast convergence of some stochastic gradient descent algorithms. Unpublished open problem offered to the attendance of the SLDS 2009 conference, 2009. URL http://leon.bottou.org/ papers/bottou-slds-open-problem-2009 .L´ eon Bottou. Stochastic gradient descent tricks. In Neural Networks , 2012a. L ´eon Bottou. Stochastic gradient descent tricks. In Neural networks: tricks of the trade: second edition , pp. 421–436. Springer, 2012b. L ´eon Bottou, Frank E Curtis, and Jorge Nocedal. Optimization methods for large-scale machine learning. SIAM review , 60(2):223–311, 2018. Odile Brandi `ere and Marie Duflo. Les algorithmes stochastiques contournent-ils les pieges? In Annales de l’IHP Probabilit´ es et statistiques , volume 32, pp. 395–427, 1996. Nicolas Brosse, Alain Durmus, ´Eric Moulines, and Marcelo Pereyra. Sampling from a log-concave distribution with compact support with proximal langevin monte carlo. In Conference on learning theory , pp. 319–342. PMLR, 2017. 11 Published as a conference paper at ICLR 2026 S ´ebastien Bubeck, Ronen Eldan, and Joseph Lehec. Sampling from a log-concave distribution with projected langevin monte carlo. Discrete & Computational Geometry , 59(4):757–783, 2018. Alexander Bukharin et al. Robust multi-agent reinforcement learning via adversarial regularization: Theoretical foundation and stable algorithms. In Advances in Neural Information Processing Systems (NeurIPS) , volume 36, pp. 68121–68133, 2023. Xufeng Cai, Cheuk Yin Lin, and Jelena Diakonikolas. Empirical risk minimization with shuffled sgd: A primal-dual perspective and improved bounds. arXiv:2306.12498 , 2023. Jerry Chee and Panos Toulis. Convergence diagnostics for stochastic gradient descent with constant learning rate. In International Conference on Artificial Intelligence and Statistics , pp. 1476–1485. PMLR, 2018. George HG Chen and R Tyrrell Rockafellar. Convergence rates in forward–backward splitting. SIAM Journal on Optimization , 7(2):421–444, 1997. Xiang Cheng, Niladri S Chatterji, Yasin Abbasi-Yadkori, Peter L Bartlett, and Michael I Jordan. Sharp convergence rates for langevin dynamics in the nonconvex setting. arXiv preprint arXiv:1805.01648 , 2018a. Xiang Cheng, Niladri S Chatterji, Peter L Bartlett, and Michael I Jordan. Underdamped langevin mcmc: A non-asymptotic analysis. In Conference on learning theory , pp. 300–323. PMLR, 2018b. Hanseul Cho and Chulhee Yun. SGDA with shuffling: faster convergence for nonconvex-pł minimax optimization. In ICLR , 2023. Sayantan Choudhury, Eduard Gorbunov, and Nicolas Loizou. Single-call stochastic extragradient methods for structured non-monotone variational inequalities: Improved analysis under weaker conditions. In NeurIPS , 2023. Kai Lai Chung. On a stochastic approximation method. The Annals of Mathematical Statistics , pp. 463–483, 1954. Arnak S Dalalyan. Theoretical guarantees for approximate sampling from smooth and log-concave densities. 
+
+Journal of the Royal Statistical Society Series B: Statistical Methodology , 79(3):651–676, 2017. Arnak S Dalalyan and Avetik Karagulyan. User-friendly guarantees for the langevin monte carlo with inaccurate gradient. Stochastic Processes and their Applications , 129(12):5278–5311, 2019. Arnak S Dalalyan and Lionel Riou-Durand. On sampling from a log-concave density using kinetic langevin diffusions. 2020. George B Dantzig and RW Cottle. Complementary pivot theory of. mathematical programming. Mathematics of the decision sciences, part , 1:115–136, 1968. Aniket Das, Bernhard Sch ¨olkopf, and Michael Muehlebach. Sampling without replacement leads to faster rates in finite-sum minimax optimization. In NeurIPS , 2022. Constantinos Daskalakis, Andrew Ilyas, Vasilis Syrgkanis, and Haoyang Zeng. Training gans with optimism. arXiv preprint arXiv:1711.00141 , 2017. Constantinos Daskalakis, Stratis Skoulakis, and Manolis Zampetakis. The complexity of constrained min-max optimization. In Proceedings of the 53rd Annual ACM SIGACT Symposium on Theory of Computing , pp. 1466–1478, 2021. Aymeric Dieuleveut, Alain Durmus, and Francis Bach. Bridging the gap between constant step size stochastic gradient descent and markov chains. 2020. Yoel Drori and Ohad Shamir. The Complexity of Finding Stationary Points with Stochastic Gradient Descent. arXiv preprint arXiv:1910.01845 , 2019. Simon Du, Jason Lee, Haochuan Li, Liwei Wang, and Xiyu Zhai. Gradient descent finds global minima of deep neural networks. In International conference on machine learning , pp. 1675–1685. PMLR, 2019. Alain Durmus and Eric Moulines. Nonasymptotic convergence analysis for the unadjusted langevin algorithm. 2017. 12 Published as a conference paper at ICLR 2026 Alain Durmus, Umut Simsekli, Eric Moulines, Roland Badeau, and Ga ¨el Richard. Stochastic gradient richardson-romberg markov chain monte carlo. Advances in neural information processing systems , 29, 2016. Raaz Dwivedi, Yuansi Chen, Martin J Wainwright, and Bin Yu. Log-concave sampling: Metropolis-hastings algorithms are fast. Journal of Machine Learning Research , 20(183):1–42, 2019. Konstantinos Emmanouilidis, Ren ´e Vidal, and Nicolas Loizou. Stochastic extragradient with random reshuffling: Improved convergence for variational inequalities. In International Conference on Artificial Intelligence and Statistics , pp. 3682–3690. PMLR, 2024. Murat A Erdogdu and Rasa Hosseinzadeh. On the convergence of langevin monte carlo: The interplay between tail growth and smoothness. In Conference on Learning Theory , pp. 1776–1822. PMLR, 2021. Murat A Erdogdu, Lester Mackey, and Ohad Shamir. Global non-convex optimization with discretized diffusions. 
+
+Advances in Neural Information Processing Systems , 31, 2018. Vaclav Fabian. On asymptotic normality in stochastic approximation. The Annals of Mathematical Statistics , pp. 1327–1332, 1968. Francisco Facchinei and Jong-Shi Pang. Finite-dimensional variational inequalities and complementarity problems .Springer, 2003. Yixin Fang, Jinfeng Xu, and Lei Yang. Online bootstrap confidence intervals for the stochastic gradient descent estimator. Journal of Machine Learning Research , 19(78):1–21, 2018. Jean-Claude Fort and Gilles Pages. Asymptotic behavior of a markovian stochastic algorithm with constant step. 
+
+SIAM journal on control and optimization , 37(5):1456–1482, 1999. Angeliki Giannou, Kyriakos Lotidis, Panayotis Mertikopoulos, and Emmanouil-Vasileios Vlatakis-Gkaragkounis. On the convergence of policy gradient methods to nash equilibria in general stochastic games. Advances in Neural Information Processing Systems , 35:7128–7141, 2022. Paul W Goldberg and Matthew Katzman. Ppad-complete pure approximate nash equilibria in lipschitz games. In 
+
+International Symposium on Algorithmic Game Theory , pp. 169–186. Springer, 2022. I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio. Generative adversarial nets. In NeurIPS , 2014. Eduard Gorbunov, Nicolas Loizou, and Gauthier Gidel. Extragradient method: O (1/k) last-iterate convergence for monotone variational inequalities and connections with cocoercivity. In AISTATS , 2022a. Eduard Gorbunov, Adrien Taylor, and Gauthier Gidel. Last-iterate convergence of optimistic gradient method for monotone variational inequalities. In NeurIPS , 2022b. Robert Mansel Gower, Nicolas Loizou, Xun Qian, Alibek Sailanbayev, Egor Shulgin, and Peter Richtarik. Sgd: General analysis and improved rates. In AISTATS , 2019. Luigi Grippo. A class of unconstrained minimization methods for neural network training. Optimization Methods and Software , 4(2):135–150, January 1994. doi: 10.1080/10556789408805583. Mert G ¨urb ¨uzbalaban, Asuman ¨Ozda ˘glar, and Pablo A. Parrilo. Why random reshuffling beats stochastic gradient descent. Mathematical Programming , Oct 2019. ISSN 1436-4646. doi: 10.1007/s10107-019-01440-w. Mert G ¨urb ¨uzbalaban, Asu Ozdaglar, and Pablo A Parrilo. Why random reshuffling beats stochastic gradient descent. 
+
+Mathematical Programming , 186:49–84, 2021. Andi Han et al. Nonconvex-nonconcave min-max optimization on riemannian manifolds. Transactions on Machine Learning Research , 2023. Wenrui Hao. A gradient descent method for solving a system of nonlinear equations. Applied Mathematics Letters ,112:106739, 2021. Jeff Haochen and Suvrit Sra. Random Shuffling Beats SGD after Finite Epochs. In Kamalika Chaudhuri and Ruslan Salakhutdinov (eds.), Proceedings of the 36th International Conference on Machine Learning , volume 97 of 
+
+Proceedings of Machine Learning Research , pp. 2624–2633, Long Beach, California, USA, 09–15 Jun 2019. PMLR. 13 Published as a conference paper at ICLR 2026 Francis Begnaud Hildebrand. Introduction to numerical analysis . Courier Corporation, 1987. Ya-Ping Hsieh, Panayotis Mertikopoulos, and Volkan Cevher. The limits of min-max optimization algorithms: Convergence to spurious non-critical sets. In International Conference on Machine Learning , pp. 4337–4348. PMLR, 2021. Ya-Ping Hsieh, Mohammad Reza Karimi Jaghargh, Andreas Krause, and Panayotis Mertikopoulos. Riemannian stochastic optimization methods avoid strict saddle points. Advances in Neural Information Processing Systems ,36:29580–29601, 2023. Yu-Guan Hsieh, Franck Iutzeler, J ´er ˆome Malick, and Panayotis Mertikopoulos. On the convergence of single-call stochastic extra-gradient methods. In NeurIPS , 2019. Dongyan Huo, Yudong Chen, and Qiaomin Xie. Bias and extrapolation in markovian linear stochastic approximation with constant stepsizes. In Abstract Proceedings of the 2023 ACM SIGMETRICS International Conference on Measurement and Modeling of Computer Systems , pp. 81–82, 2023. UC IEOR. The linear complementarity problem, lemke algorithm, perturbation, and the complexity class ppad. 2011. Chi Jin, Praneeth Netrapalli, and Michael I. Jordan. What is local optimality in nonconvex-nonconcave minimax optimization? In Proceedings of the 37th International Conference on Machine Learning (ICML) , PMLR, 2020. Richard Jordan, David Kinderlehrer, and Felix Otto. The variational formulation of the fokker–planck equation. 
+
+SIAM journal on mathematical analysis , 29(1):1–17, 1998. Jack Kiefer and Jacob Wolfowitz. Stochastic estimation of the maximum of a regression function. The Annals of Mathematical Statistics , pp. 462–466, 1952. Yuri Kifer. Random perturbations of dynamical systems. Nonlinear Problems in Future Particle Accelerators , 189, 1988. Beomsu Kim and Junghoon Seo. Semi-implicit hybrid gradient methods with application to adversarial robustness. In Proceedings of the International Conference on Artificial Intelligence and Statistics (AISTATS) , PMLR, 2022. Galina M Korpelevich. The extragradient method for finding saddle points and other problems. Matecon , 12: 747–756, 1976. Jeongyeol Kwon, Luke Dotson, Yudong Chen, and Qiaomin Xie. Two-timescale linear stochastic approximation: Constant stepsizes go a long way. arXiv preprint arXiv:2410.13067 , 2024. Zehua Lai and Lek-Heng Lim. Recht-R ´e Noncommutative Arithmetic-Geometric Mean Conjecture is False. arXiv preprint arXiv:2006.01510 , 2020. Xuechen Li, Yi Wu, Lester Mackey, and Murat A Erdogdu. Stochastic runge-kutta accelerates langevin monte carlo and beyond. Advances in neural information processing systems , 32, 2019. Tianyi Lin, Zhengyuan Zhou, Panayotis Mertikopoulos, and Michael Jordan. Finite-time last-iterate convergence for multi-agent learning in games. In ICML , 2020. Chaoyue Liu, Dmitriy Drusvyatskiy, Misha Belkin, Damek Davis, and Yian Ma. Aiming towards the minimizers: fast convergence of sgd for overparametrized problems. Advances in neural information processing systems , 36: 60748–60767, 2023. Lennart Ljung. Strong convergence of a stochastic approximation algorithm. The Annals of Statistics , 6(3):680–696, 1978. Lennart Ljung. Analysis of recursive stochastic algorithms. IEEE transactions on automatic control , 22(4):551–575, 2003. Nicolas Loizou, Hugo Berard, Alexia Jolicoeur-Martineau, Pascal Vincent, Simon Lacoste-Julien, and Ioannis Mitliagkas. Stochastic hamiltonian gradient methods for smooth games. In ICML , 2020. 14 Published as a conference paper at ICLR 2026 Nicolas Loizou, Hugo Berard, Gauthier Gidel, Ioannis Mitliagkas, and Simon Lacoste-Julien. Stochastic gradient descent-ascent and consensus optimization for smooth games: Convergence analysis under expected co-coercivity. In NeurIPS , 2021. Zhi-Quan Luo. On the Convergence of the LMS Algorithm with Adaptive Learning Rate for Linear Feedforward Networks. Neural Computation , 3(2):226–245, June 1991. doi: 10.1162/neco.1991.3.2.226. Siyuan Ma, Raef Bassily, and Mikhail Belkin. The power of interpolation: Understanding the effectiveness of sgd in modern over-parametrized learning. In International Conference on Machine Learning , pp. 3325–3334. PMLR, 2018. J ´er ˆome Malick and Panayotis Mertikopoulos. The global convergence time of stochastic gradient descent in non-convex landscapes: Sharp estimates via large deviations. arXiv preprint: 2503.16398 , 2024. Olvi L. Mangasarian and Mikhail V. Solodov. Serial and parallel backpropagation convergence via nonmono-tone perturbed minimization. Optimization Methods and Software , 4(2):103–116, 1994. doi: 10.1080/ 10556789408805581. Paul Mangold, Alain Durmus, Aymeric Dieuleveut, Sergey Samsonov, and Eric Moulines. Refined analysis of federated averaging’s bias and federated richardson-romberg extrapolation. arXiv preprint arXiv:2412.01389 ,2024. Panayotis Mertikopoulos and Zhengyuan Zhou. Learning in games with continuous action sets and unknown payoff functions. Mathematical Programming , 173(1):465–507, 2019. Panayotis Mertikopoulos, Nadav Hallak, Ali Kavis, and Volkan Cevher. On the almost sure convergence of stochastic gradient descent in non-convex problems. Advances in Neural Information Processing Systems , 33:1117–1128, 2020. Panayotis Mertikopoulos, Ya-Ping Hsieh, and Volkan Cevher. A unified stochastic approximation framework for learning in games. Mathematical Programming , 203(1):559–609, 2024. Lars Mescheder, Sebastian Nowozin, and Andreas Geiger. The numerics of gans. In NeurIPS , 2017. Sean P Meyn and Richard L Tweedie. Markov chains and stochastic stability . Springer Science & Business Media, 2012. Konstantin Mishchenko, Ahmed Khaled, and Peter Richt ´arik. Random reshuffling: Simple analysis with vast improvements. In NeurIPS , 2020a. Konstantin Mishchenko, Dmitry Kovalev, Egor Shulgin, Peter Richt ´arik, and Yura Malitsky. Revisiting stochastic extragradient. In AISTATS , 2020b. Dheeraj Nagaraj, Prateek Jain, and Praneeth Netrapalli. SGD without Replacement: Sharper Rates for General Smooth Convex Functions. In Kamalika Chaudhuri and Ruslan Salakhutdinov (eds.), Proceedings of the 36th International Conference on Machine Learning , volume 97 of Proceedings of Machine Learning Research , pp. 4703–4711, Long Beach, California, USA, 09–15 Jun 2019. PMLR. Hongseok Namkoong and John C Duchi. Stochastic gradient methods for distributionally robust optimization with f-divergences. In NeurIPS , 2016. Angelia Nedi ´c and Dimitri P. Bertsekas. Incremental Subgradient Methods for Nondifferentiable Optimization. 
+
+SIAM Journal on Optimization , 12(1):109–138, January 2001. doi: 10.1137/s1052623499362111. Deanna Needell, Rachel Ward, and Nati Srebro. Stochastic Gradient Descent, Weighted Sampling, and the Randomized Kaczmarz algorithm. In Z. Ghahramani, M. Welling, C. Cortes, N. D. Lawrence, and K. Q. Weinberger (eds.), Advances in Neural Information Processing Systems 27 , pp. 1017–1025. Curran Associates, Inc., 2014. Phuong Ha Nguyen, Lam Nguyen, and Marten van Dijk. Tight Dimension Independent Lower Bound on the Expected Convergence Rate for Diminishing Step Sizes in SGD. In H. Wallach, H. Larochelle, A. Beygelzimer, F. d’ Alch ´e-Buc, E. Fox, and R. Garnett (eds.), Advances in Neural Information Processing Systems 32 , pp. 3660–3669. Curran Associates, Inc., 2019. 15 Published as a conference paper at ICLR 2026 Quynh N Nguyen and Marco Mondelli. Global convergence of deep networks with one wide layer followed by pyramidal topology. Advances in Neural Information Processing Systems , 33:11961–11972, 2020. Christos H Papadimitriou, Emmanouil-Vasileios Vlatakis-Gkaragkounis, and Manolis Zampetakis. The computa-tional complexity of multi-player concave games and kakutani fixed points. arXiv preprint arXiv:2207.07557 ,2022. Robin Pemantle. Nonconvergence to unstable points in urn models and stochastic approximations. The Annals of Probability , pp. 698–712, 1990. David Pfau and Oriol Vinyals. Connecting generative adversarial networks and actor-critic methods. arXiv preprint arXiv:1610.01945 , 2016. Georg Ch Pflug. Stochastic minimization with constant step-size: asymptotic laws. SIAM Journal on Control and Optimization , 24(4):655–666, 1986. Boris T Polyak and Anatoli B Juditsky. Acceleration of stochastic approximation by averaging. SIAM journal on control and optimization , 30(4):838–855, 1992. P Priouret and A Yu Veretenikov. A remark on the stability of the lms tracking algorithm. Stochastic analysis and applications , 16(1):119–129, 1998. Maxim Raginsky, Alexander Rakhlin, and Matus Telgarsky. Non-convex learning via stochastic gradient langevin dynamics: a nonasymptotic analysis. In Conference on Learning Theory , pp. 1674–1703. PMLR, 2017. Shashank Rajput, Anant Gupta, and Dimitris Papailiopoulos. Closing the convergence gap of SGD without replacement. arXiv preprint arXiv:2002.10400 , 2020. Alexander Rakhlin, Ohad Shamir, and Karthik Sridharan. Making gradient descent optimal for strongly convex stochastic optimization. arXiv preprint arXiv:1109.5647 , 2011. Alexander Rakhlin, Ohad Shamir, and Karthik Sridharan. Making Gradient Descent Optimal for Strongly Convex Stochastic Optimization. In Proceedings of the 29th International Coference on International Conference on Machine Learning , ICML’12, pp. 1571–1578, Madison, WI, USA, 2012. Omnipress. ISBN 9781450312851. Benjamin Recht and Christopher R ´e. Toward a noncommutative arithmetic-geometric mean inequality: Conjectures, case-studies, and consequences. In S. Mannor, N. Srebro, and R. C. Williamson (eds.), Proceedings of the 25th Annual Conference on Learning Theory , volume 23, pp. 11.1–11.24, 2012. Edinburgh, Scotland. Benjamin Recht and Christopher R ´e. Parallel Stochastic Gradient Algorithms for Large-Scale Matrix Completion. 
+
+Mathematical Programming Computation , 5(2):201–226, April 2013. doi: 10.1007/s12532-013-0053-8. Lewis Fry Richardson. Ix. the approximate arithmetical solution by finite differences of physical problems involving differential equations, with an application to the stresses in a masonry dam. Philosophical Transactions of the Royal Society of London. Series A, containing papers of a mathematical or physical character , 210(459-470): 307–357, 1911. Herbert Robbins and Sutton Monro. A stochastic approximation method. The annals of mathematical statistics , pp. 400–407, 1951. Werner Romberg. Vereinfachte numerische integration. Norske Vid. Selsk. Forh. , 28:30–36, 1955. David Ruppert. Efficient estimations from a slowly convergent robbins-monro process. Technical report, Cornell University Operations Research and Industrial Engineering, 1988. Jerome Sacks. Asymptotic distribution of stochastic approximation procedures. The Annals of Mathematical Statistics , 29(2):373–405, 1958. Itay Safran and Ohad Shamir. How good is sgd with random shuffling? In COLT , 2020. Mark Schmidt and Nicolas Le Roux. Fast convergence of stochastic gradient descent under a strong growth condition. arXiv preprint arXiv:1308.6370 , 2013. Alexander Shapiro. Asymptotic properties of statistical estimators in stochastic programming. The Annals of Statistics , pp. 841–858, 1989. 16 Published as a conference paper at ICLR 2026 Ruoqi Shen and Yin Tat Lee. The randomized midpoint method for log-concave sampling. Advances in Neural Information Processing Systems , 32, 2019. Marina Sheshukova, Denis Belomestny, Alain Durmus, Eric Moulines, Alexey Naumov, and Sergey Samsonov. Nonasymptotic analysis of stochastic gradient descent with the richardson-romberg extrapolation. arXiv preprint arXiv:2410.05106 , 2024. Chaobing Song, Zhengyuan Zhou, Yichao Zhou, Yong Jiang, and Yi Ma. Optimistic dual extrapolation for coherent non-monotone variational inequalities. Advances in Neural Information Processing Systems , 33:14303–14314, 2020. Matthew Staib, Sashank Reddi, Satyen Kale, Sanjiv Kumar, and Suvrit Sra. Escaping saddle points with adaptive gradient methods. In International Conference on Machine Learning , pp. 5956–5965. PMLR, 2019. Guido Stampacchia. Formes bilineaires coercitives sur les ensembles convexes. Comptes Rendus Hebdomadaires Des Seances De L Academie Des Sciences , 258(18):4413, 1964. Weijie Su and Yuancheng Zhu. Statistical inference for online learning and stochastic approximation via hierarchical incremental gradient descent. arXiv preprint arXiv:1802.04876 , pp. 3, 2018. Ruo-Yu Sun. Optimization for Deep Learning: An Overview. Journal of the Operations Research Society of China ,8(2):249–294, Jun 2020. ISSN 2194-6698. doi: 10.1007/s40305-020-00309-6. Vasilis Syrgkanis, Alekh Agarwal, Haipeng Luo, and Robert E Schapire. Fast convergence of regularized learning in games. Advances in Neural Information Processing Systems , 28, 2015. Denis Talay and Luciano Tubaro. Expansion of the global error for numerical schemes solving stochastic differential equations. Stochastic analysis and applications , 8(4):483–509, 1990. Yan Shuo Tan and Roman Vershynin. Online stochastic gradient descent with arbitrary initialization solves non-smooth, non-convex phase retrieval. Journal of Machine Learning Research , 24(58):1–47, 2023. Panos Toulis and Edoardo M Airoldi. Asymptotic and finite-sample properties of estimators based on stochastic gradients. 2017. Nilesh Tripuraneni, Nicolas Flammarion, Francis Bach, and Michael I Jordan. Averaging stochastic gradient descent on riemannian manifolds. In Conference On Learning Theory , pp. 650–687. PMLR, 2018. Sharan Vaswani, Francis Bach, and Mark Schmidt. Fast and faster convergence of sgd for over-parameterized models and an accelerated perceptron. In The 22nd international conference on artificial intelligence and statistics , pp. 1195–1204. PMLR, 2019. Emmanouil Vasileios Vlatakis-Gkaragkounis, Angeliki Giannou, Yudong Chen, and Qiaomin Xie. Stochastic methods in variational inequalities: Ergodicity, bias and refinements. In International Conference on Artificial Intelligence and Statistics , pp. 4123–4131. PMLR, 2024. Jingkang Wang, Tianyun Zhang, Sijia Liu, Pin-Yu Chen, Jiacen Xu, Makan Fardad, and Bo Li. Adversarial attack generation empowered by min-max optimization. In A. Beygelzimer, Y. Dauphin, P. Liang, and J. Wortman Vaughan (eds.), NeurIPS , 2021. Wikipedia. Wasserstein metric – wikipedia, the free encyclopedia, 2023. URL https://en.wikipedia.org/wiki/Wasserstein metric, Accessed: 2025-08-28. Lu Yu, Krishnakumar Balasubramanian, Stanislav Volgushev, and Murat A Erdogdu. An analysis of constant step size sgd in the non-convex regime: Asymptotic normality and bias. Advances in Neural Information Processing Systems , 34:4234–4248, 2021. Kaiqing Zhang, Zhuoran Yang, and Tamer Ba s¸ ar. Multi-agent reinforcement learning: A selective overview of theories and algorithms. Handbook of reinforcement learning and control , pp. 321–384, 2021. Yixuan Zhang and Qiaomin Xie. Constant stepsize q-learning: Distributional convergence, bias and extrapolation. 
+
+arXiv preprint arXiv:2401.13884 , 2024. Difan Zou, Yuan Cao, Dongruo Zhou, and Quanquan Gu. Gradient descent optimizes over-parameterized deep relu networks. Machine learning , 109(3):467–492, 2020. 17 Published as a conference paper at ICLR 2026 
+
+# SUPPLEMENTAL MATERIAL 
+
+## CONTENTS 
+
+Appendix 18 A Additional Related Literature 19 B Proof Roadmap 22 
+
+B.1 Warm-Up:Useful Inequalities . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22 
+
+C Proof of Convergence Rate (MSE) of Perturbed SGD– RR 1
+
+(Theorem 4.1) 23 
+
+C.1 Preparatory Lemmas & Propositions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 C.2 Assembling the Lemmas: Proof of Theorem 4.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . 25 
+
+D Proof of Ergodic Properties and Limit Theorems (Theorem 4.3) & (Theorem 4.4) 27 
+
+D.1 Proof of Continuous State Time Homogenious Markov Chain (Lemma 4.2) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27 D.2 Proof of Foster-Lyuapunov inequality . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28 D.3 Proof of Minorization Property . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30 D.4 Proof of Irreducibility, Aperiodicity and Harris and Positive Recurrence . . . . . . . . . . . . . . 30 D.5 Proof of Existence of Unique Invariant Distribution at Epoch-level (Theorem 4.3) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31 D.6 Proof of Limit theorems of Epoch-level iterates (Theorem 4.3) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33 
+
+E Bounding 4th-order Moments of Error Distance 34 
+
+E.1 Higher order version of Proposition A.2 (Emmanouilidis et al., 2024) - Bound of Kyrtosis for Lipschtiz Operators . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34 E.2 A Combinatorial Tool for Higher-Order Moments In Sampling without Replacement . . . . . . . 35 
+
+F Proof of Bias for RR 1 and RR 1⊕RR 2 Methods (Lemma 4.5) and (Theorem 4.6) 41 
+
+F.1 Jacobian bound for one-pass map . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41 F.2 Higher-Order Terms of RR 1 bias (Lemma 4.5) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43 F.3 Proof of Bias Refinements of RR 1⊕RR 2
+
+(Theorem 4.6) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44 
+
+G On Experiments 46 
+
+18 Published as a conference paper at ICLR 2026 
+
+## A ADDITIONAL RELATED LITERATURE 
+
+Owing to its central role in optimization and machine learning, stochastic gradient descent (SGD) and its numerous variants have generated an extensive body of literature that spans several decades. A complete survey is well beyond the scope of this paper, so we restrict ourselves to highlighting the most relevant threads and pointers. The only aspects we emphasize at this point are the phenomena most pertinent to our analysis: 1. classical stochastic approximation and asymptotic normality results; 2. constant step-size schemes viewed through the lens of Markov chains and diffusion approximations; 3. the widespread use of random reshuffling and its still-developing theoretical guarantees; and 4. challenges that arise in min–max and variational inequality settings. These themes form the backbone of our extended discussion in the appendix, where we provide a more comprehen-sive account of prior work. 
+
+From classical stochastic approximation to modern SGD. The study of stochastic approximation predates machine learning by decades, beginning with the foundational work of Robbins & Monro (1951) and Kiefer & Wolfowitz (1952). Early analyses focused on vanishing step-sizes obeying the classic L2–L1 summability rules, and developed the ODE method to describe limiting dynamics; see, e.g., Ljung (1978; 2003); Bena ¨ım (2006); Bertsekas & Tsitsiklis (2000b). In parallel, a rich line of results examined the almost-sure behavior of stochastic approximation, including avoidance of saddle points and convergence to locally stable equilibria (Pemantle, 1990; Brandi `ere & Duflo, 1996; Bena ¨ım & Hirsch, 1995; Hsieh et al., 2021; 2023; Jordan et al., 1998; Mertikopoulos et al., 2020; 2024; Staib et al., 2019; Antonakopoulos et al., 2022). 
+
+Asymptotic normality and statistical inference. A complementary thread established central limit theorems for stochastic approximation: classical milestones include Chung (1954); Sacks (1958); Fabian (1968); Ruppert (1988); Shapiro (1989), culminating in the Polyak–Juditsky averaging principle (Polyak & Juditsky, 1992). Under suitable decaying step-sizes, the averaged SGD iterate is asymptotically normal and attains the Cram ´er–Rao optimal variance. This statistical perspective has been leveraged to construct confidence intervals and inference procedures for SGD-based estimators (Tripuraneni et al., 2018; Su & Zhu, 2018; Toulis & Airoldi, 2017; Fang et al., 2018). 
+
+Constant step sizes: bias, speed, and Markovian viewpoints. Constant step-size policies, now standard in large-scale learning, trade a nonvanishing asymptotic error for fast initial progress and robust practical performance. Their benefits in over-parameterized regimes are well documented (Schmidt & Roux, 2013; Needell et al., 2014; Ma et al., 2018; Vaswani et al., 2019). The Markov chain viewpoint provides a unifying language for analyzing such constant-step schemes: early developments used dynamical-systems and Markov-process techniques to establish stability and ergodic properties (Kifer, 1988; Benaim, 1996; Priouret & Veretenikov, 1998; Fort & Pages, 1999; Aguech et al., 2000), with recent refinements quantifying convergence behavior and variance (Dieuleveut et al., 2020; Chee & Toulis, 2018; Tan & Vershynin, 2023). In parallel, diffusion-based analyses and Langevin-type discretizations connect SGD to MCMC methodology, yielding non-asymptotic guarantees and sharp mixing rates in log-concave and beyond-log-concave settings (Dalalyan, 2017; Durmus & Moulines, 2017; Cheng et al., 2018b; Dalalyan & Karagulyan, 2019; Brosse et al., 2017; Cheng et al., 2018a; Bubeck et al., 2018; Dwivedi et al., 2019; Dalalyan & Riou-Durand, 2020; Li et al., 2019; Shen & Lee, 2019; Erdogdu & Hosseinzadeh, 2021). 
+
+Random reshuffling vs. with-replacement sampling. Among finite-sum methods, random reshuffling (RR) occupies a special place: each epoch processes every component exactly once in a random order, in contrast to classical with-replacement SGD. RR is ubiquitous in practice—it improves cache locality (Bengio, 2012), often converges faster than with-replacement sampling (Bottou, 2009; Recht & R ´e, 2013), and is the default in deep learning pipelines (Sun, 2020). The success of RR contrasts with the mature theory for with-replacement SGD, which enjoys tight upper/lower bounds in many regimes (Rakhlin et al., 2012; Drori & Shamir, 2019; Nguyen et al., 2019). A key analytical hurdle is bias: within an epoch, conditional expectations are no longer unbiased gradients, so classical SGD proofs do not transfer verbatim. Early attempts leveraging the noncommutative arithmetic–geometric mean conjecture (Recht & R ´e, 2012) were later undermined when the conjecture was disproved (Lai & Lim, 2020). More recent works establish rates for twice-smooth and smooth objectives and highlight gaps between theory and prevalent heuristics (G ¨urb ¨uzbalaban et al., 2019; Haochen & Sra, 2019; Nagaraj et al., 2019; Safran & Shamir, 2020; Rajput et al., 2020). 19 Published as a conference paper at ICLR 2026 
+
+Incremental/ordered passes and sensitivity to permutations. Before RR became the default, incremental gradient (IG) methods with fixed orderings were widely used in neural network training (Luo, 1991; Grippo, 1994), with asymptotic convergence known since early work (Mangasarian & Solodov, 1994; Bertsekas & Tsitsiklis, 2000a). However, their performance can depend strongly on the chosen ordering (Nedi ´c & Bertsekas, 2001; Bertsekas, 2011). By randomizing the order every epoch, RR mitigates this sensitivity and—under smoothness—can outperform both with-replacement SGD and deterministic IG (G ¨urb ¨uzbalaban et al., 2019; Haochen & Sra, 2019), with refined lower/upper bounds developed in follow-up studies (Nagaraj et al., 2019; Safran & Shamir, 2020; Rajput et al., 2020). 
+
+Min–max problems and variational inequalities. In large-scale saddle-point and VIP settings, most theoretical analyses assume with-replacement sampling for convenience, whereas implementations overwhelmingly adopt without-replacement sampling (Bottou, 2012a). A growing literature is closing this gap: for minimization problems, several works show (sometimes provably faster) RR rates in finite-sum regimes (Mishchenko et al., 2020a; Ahn et al., 2020; G ¨urb ¨uzbalaban et al., 2021; Cai et al., 2023). For min–max and VIPs, guarantees remain comparatively sparse: Chen & Rockafellar (1997) and Korpelevich (1976) initiated the study of stochastic and extragradient-type methods, with modern analyses for SEG and optimistic variants (Gorbunov et al., 2022a;b; Hsieh et al., 2019; Choudhury et al., 2023). For RR specifically, Das et al. (2022) derive guarantees for SGDA and PPM under strong structural conditions, and Cho & Yun (2023) extend to certain non-monotone settings. Nevertheless, classical SGDA can diverge even in simple monotone bilinear games, while proximal methods are implicit and less practical; filling this theoretical–practical gap remains an active direction. 
+
+Overparameterization and global convergence phenomena. Finally, SGD training dynamics in overparameter-ized neural networks reveal regimes where global convergence can emerge from structural properties such as width, depth, and initialization (Du et al., 2019; Zou et al., 2020; Nguyen & Mondelli, 2020; Liu et al., 2023). These results are powerful but specialized: they rely on problem-specific structure (e.g., width scaling or tailored initializations). Our focus is orthogonal—we seek guarantees for general non-convex or non-monotone landscapes under stochastic approximation, independent of architectural assumptions. For completeness, we refer the reviewer for the related work of the aforementioned work for further surveys about these SGD & overparameterization results in more detail. 
+
+Comparison to Prior Work and Overview of Our Contributions. Before introducing the intuition behind our algorithmic design, we briefly contrast our results with those of Emmanouilidis et al. (2024), who study RR 1-based improvements for the Stochastic Extragradient (SEG) method. Our analysis uncovers a fundamentally different phenomenon: the joint use of RR 1 ⊕ RR 2 produces a bias cancellation mechanism that eliminates the leading O(γ)
+
+term while preserving the condition number and asymptotic behavior of SGDA. The key distinctions are summarized in Table 1. Achieving the best of both worlds—optimal bias order together with a tight condition number, as SEG without reshuffling enjoys—remains an interesting direction for future work. 
+
+Summary. To summarize, there is a mature theory for with-replacement SGD (both asymptotic and non-asymptotic), well-developed statistical limits via averaging, and powerful diffusion/Markov perspectives for constant-step schemes. RR, despite being the practical default, poses distinctive analytical challenges due to its within-epoch bias, especially in min–max and VIP settings. Recent advances begin to bridge this gap, but a comprehensive understand-ing of how classical heuristics (constant steps, reshuffling, extrapolation) interact remains incomplete—precisely the juncture where our work contributes. 
+
+## OUR MODEL ’S ASSUMPTIONS .
+
+While variational inequalities provide a unifying language for optimization, learning, and game dynamics, no single structural assumption can capture the full complexity of all modern nonconvex–nonconcave problems . From a computational standpoint, even smooth VIs are intractable in full generality—being tightly connected to Nash equilibria (Papadimitriou et al., 2022; Goldberg & Katzman, 2022), linear complementarity (IEOR, 2011), and constrained saddle-point problems (Daskalakis et al., 2021). Consequently, much of the theoretical literature adopts 
+
+structured assumptions (strong convexity, quasi-strong monotonicity, quasar or weak convexity, PL/KL conditions, Minty conditions, error bounds, etc.), each expressive in specific regimes but not universal. Our work is based on quasi-strong monotonicity which falls squarely within this class: it captures stabilizing behav-iors of many smooth systems, while remaining far more permissive than strong convexity or global monotonicity. At the same time, it is helpful to clarify that this assumption is not meant as a universal model for all adversarial or fully nonconvex–nonconcave settings. Certain modern ML applications— including GANs, adversarial robustness, and multi-agent RL—can exhibit fundamentally unstable or rotational dynamics (Jin et al., 2020; Han et al., 2023; 20 Published as a conference paper at ICLR 2026 Kim & Seo, 2022; Bukharin et al., 2023), where even local monotonicity surrogates fail. As such, our theoretical guarantees should be viewed as pertaining to regimes where a minimum amount of local structure is present, rather than to the most adversarial or unstructured cases. 5
+
+## LIMITATIONS 
+
+Limitations of the structural assumption. A central structural assumption in our analysis is that the operator 
+
+F satisfies λ-weak μ-quasi-strong monotonicity. This condition is broad enough to include several meaningful non-monotone problem classes—such as dissipative dynamical systems, weakly convex optimization, and locally contractive variational inequalities—and is standard in modern analyses of stochastic fixed-point and operator-splitting methods (e.g., Hsieh et al., 2019; Mertikopoulos and Zhou, 2019; Chavdarova et al., 2021). However, it is important to emphasize the following limitations. 1. Not applicable to general nonconvex–nonconcave min–max problems. The assumption does not 
+
+hold for arbitrary adversarial problems such as deep GANs, multi-agent RL environments, or smooth non-monotone games with persistent rotational dynamics. These settings may lack even local stability (e.g., Daskalakis et al. 2018; Fiez et al. 2020). Accordingly, our theoretical guarantees should not be interpreted as applying to fully adversarial or worst-case min–max formulations. 2. Local nature of the assumption. Quasi-strong monotonicity is inherently a local regularity condition: smooth operators that are monotone in a neighborhood of a solution satisfy it on that region (Lemma A.4, Hsieh et al. 2019). This requires smoothness and regularity that may not hold in problems involving discontinuities, clipping, piecewise-linear losses, or hard constraints. In such cases, the assumption may fail even locally. 3. Not capturing highly oscillatory or anti-monotone operators. Allowing λ > 0 permits controlled violation of monotonicity, but the assumption still does not model strongly anti-monotone or highly oscillatory operators. Extending our analysis to Minty variational inequalities, hypomonotone operators, or other generalized monotonicity classes remains an interesting direction for future work. Despite these limitations, we believe the assumption remains meaningful for a broad set of structured, smooth VIPs where local stability is present. We hope that this explicit discussion helps avoid any misunderstanding about the scope of applicability of our results.       
+
+> 5A complementary and key fact for our setting, established in (Hsieh et al., 2019, Lemma A.4), is that any smooth VI operator is locally quasi-strongly monotone in a neighborhood of a regular solution .Combined with our Markov-chain recurrence result—which ensures that the iterates remain in such neighborhoods with probability 1—this provides a natural and widely adopted stability regime in which the RR 1and RR 2debiasing mechanisms are both theoretically justified and practically meaningful.
+
+21 Published as a conference paper at ICLR 2026 
+
+## B PROOF ROADMAP 
+
+Our main theorem relies on several technical components, developed across different parts of the appendix. In Appendix C, we establish the mean-squared convergence rate of Perturbed SGD– RR 1. While this result is of independent interest—as it extends prior analyses to a noisy setting—it primarily serves to construct the Lyapunov function that underpins our Markov chain treatment of the algorithm. Armed with this Lyapunov function, the properties of the perturbation, and the epoch-level viewpoint, Appendix D shows that SGD– RR 1forms a geometrically ergodic Markov chain with all standard consequences: existence of an invariant measure, a law of large numbers, and a central limit theorem. Appendix E develops higher-moment control. In particular, part E.2 introduces a new combinatorial lemma on fourth moments of finite-sum subsets of vectors—a technically challenging step, motivated by the fact that most extrapolation analyses (e.g., Dieuleveut et al. (2020)) require bounded fourth moments of the reshuffling estimator. With this tool in hand, Appendix F shows that no change in the step-size order is required to accommodate the extrapolation trick: we are able to control the higher moments of the Jacobian of the reshuffled biased gradient estimator. To the best of our knowledge, this is the first such result. The last parts of Appendix F then contain the full proofs of our main theorem. Finally, Appendix G presents additional experiments demonstrating the practical gains of our method, which originally motivated this study. Appendix C   
+
+> Perturbed SGD–RR
+> MSE rate & Lyapunov
+> Appendix D
+> Epoch-level Markov chain
+> Minorization
+> Foster–Lyapunov
+> Appendix D
+> Invariant measure, LLN, CLT
+> Appendix E.2
+> 4th-moment control
+> combinatorial lemma
+> Appendix F
+> Spectral analysis
+> full-pass operator
+> Appendix F
+> Bias analysis
+> Pert. SGD–RR
+> Appendix F
+> Synergy RRresh + Extrap.
+> Bias O(γ3)
+> Appendix G Experiments
+
+Figure 5: Dependency graph of Appendix results. Solid lines: main logical flow. Dashed lines: auxiliary inputs. B.1 WARM -U P:U SEFUL INEQUALITIES 
+
+We start our technical appendix by providing inequalities that will be useful in our proofs 
+
+> n
+
+X
+
+> i=1
+
+xi
+
+> 2
+
+≤ n
+
+> n
+
+X
+
+> i=1
+
+∥xi∥2 (2) 
+
+> n
+
+X
+
+> i=1
+
+xi
+
+> 4
+
+≤ n3
+
+> n
+
+X
+
+> i=1
+
+∥xi∥4 (3) 
+
+∥a − b∥2 ≥ 12 ∥a∥2 − ∥ b∥2 (4) 
+
+⟨a, b ⟩ = 12
+
+î∥a∥2 + ∥b∥2 − ∥ a − b∥2ó (5) 
+
+e−x ≥ 1 − x, ∀x ≥ 0 (6) 
+
+∥a + b∥2 ≤ 1
+
+t ∥a∥2 + 11 − t ∥b∥2, ∀t ∈ (0 , 1) (7) 22 Published as a conference paper at ICLR 2026 
+
+## C PROOF OF CONVERGENCE RATE (MSE) OF PERTURBED SGD– RR 1
+
+## (T HEOREM 4.1) 
+
+Our first result concerns the Perturbed SGD– RR 1 variant for λ-weak μ-quasi strongly monotone VIPs. 
+
+Theorem C.1 (Restatement of Theorem 4.1) . Let Assumptions 2.1-2.3 hold. Then the iterates of Perturbed SGD– RR 1 satisfy for γ ≤ γmax ,
+
+E ∥x0 
+
+> k+1
+
+− x∗∥2 ≤
+
+
+
+1 − γnμ 
+
+2
+
+k+1 
+
+∥x00 − x∗∥2 + 8nγ 2L2
+
+> max
+
+μ2 σ2 
+
+> ∗
+
++ 8λμ
+
+where σ2 
+
+> ∗
+
+= 1
+
+> n
+
+Pn−1 
+
+> i=0
+
+∥Fi(x∗)∥2 and γmax = min 
+
+ß 13nL max ,
+
+√1+6 μ2L2
+
+> max −112 nL 2
+> max
+
+™
+
+.
+
+We first provide some notation that will be necessary for establishing the proof of Theorem 4.1. Consider the epoch-wise update rule of Perturbed SGD– RR 1
+
+x0 
+
+> k+1
+
+= xnk = x0 
+
+> k
+
+− γ
+
+> n−1
+
+X
+
+> i=0
+
+Fωik (xik) − γU k
+
+= x0 
+
+> k
+
+− γG ωk (x0
+
+> k
+
+) − γU k (8) where Gωk (x0
+
+> k
+
+) := n−1P
+
+> i=0
+
+Fωik (xik) denotes the epoch-wise operator used to update the epoch-level iterates (xk)k≥0.C.1 PREPARATORY LEMMAS & P ROPOSITIONS 
+
+With this notation at hand, we proceed in proving two Lemmas that are necessary for deriving the rate of convergence of the Theorem 4.1. In the first lemma, following the high-level intuition that one epoch of random reshuffling with step size γ progresses the underlying dynamics approximately equal to one step of the deterministic GD with step size γ′ = nγ , in the first lemma we bound the “progress” that the deterministic algorithm makes in one step. 
+
+Lemma C.2. Let Assumptions 2.1-2.3 hold. For any x∗ ∈ X ∗, the iterates of Perturbed SGD– RR 1 satisfy that 
+
+E
+
+h
+
+∥xk+1 − x∗ − γnF (xk)∥2 | F k
+
+i
+
+≤ (1 − γnμ )2 + γ2n2L2
+
+> max
+
+ ∥xk − x∗∥2 + 2 γnλ 
+
+Proof. For any fixed x∗ ∈ X ∗, it holds that 
+
+∥xk+1 − x∗ − γnF (xk)∥2 = ∥xk − x∗∥2 − 2γn ⟨xk − x∗, F (xk)⟩ + γ2n2∥F (xk)∥2
+
+≤ ∥xk − x∗∥2 − 2γnμ ∥xk − x∗∥2 + 2 γnλ + γ2n2∥F (xk)∥2
+
+≤ (1 − 2γnμ )∥x0 
+
+> k
+
+− x∗∥2 + 2 γnλ + γ2n2∥F (xk)∥2 
+
+> Assumption 2.3
+
+≤ (1 − 2γnμ + γ2n2L2
+
+> max
+
+)∥xk − x∗∥2 + 2 γnλ (9) Taking expectation condition on the filtration Fk, gives 
+
+E
+
+h
+
+∥xk+1 − x∗ − γnF (xk)∥2 | F k
+
+i
+
+≤ (1 − 2γnμ + γ2n2L2
+
+> max
+
+)∥xk − x∗∥2 + 2 γnλ 
+
+≤ (1 − γnμ )2 + γ2n2L2
+
+> max
+
+ ∥xk − x∗∥2 + 2 γnλ 
+
+Having an expression for the progress made by the deterministic counterpart of Perturbed SGD– RR 1, we next aim to bound how large the deviation of the two algorithms becomes inside an epoch. To do so, we bound the sum of the distances of the iterates obtain by Perturbed SGD– RR 1 from the start of the epoch, which corresponds to the fictitious iterate of our comparator deterministic counterpart. The following lemma provides an upper bound dependent on the distance of the current epoch-level iterate from the solution and the variance at the optimum. 23 Published as a conference paper at ICLR 2026 
+
+Lemma C.3. Let Assumptions 2.1, 2.3 hold. If Perturbed SGD– RR 1 is run with step size γ ≤ 1√3n(n−1) Lmax 
+
+,then it holds that 
+
+E
+
+hn−1X
+
+> i=1
+
+xik − x0 
+
+> k
+> 2
+
+| F k
+
+i
+
+≤ 6n3γ2L2 
+
+> max
+
+x0 
+
+> k
+
+− x∗ 2 + 2 n2γ2σ2
+
+> ∗
+
+Proof. From the epoch-level update (8), it holds 
+
+∥xik − x0
+
+> k
+
+∥2 = γ2i2 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(xjk)
+
+> 2
+> (2)
+
+≤ 3γ2i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(xjk) − Fωjk
+
+(x0
+
+> k
+
+) 2
+
++ 3 γ2i2 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 2
+
++3 γ2i2 F (x0
+
+> k
+
+) 2 
+
+> Assumption 2.3
+
+≤ 3γ2L2
+
+> max
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+xjk − x0
+
+> k
+> 2
+
++ 3 γ2i2 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 2
+
++3 γ2i2 F (x0
+
+> k
+
+) 2
+
+where at the last step we have used the Lipschitz property of the operators Fi, ∀i ∈ [n]. Taking expectation condition on the filtration Fk, we get 
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+i
+
+≤ 3γ2L2
+
+> max
+
+i E
+
+
+
+> i−1
+
+X
+
+> j=0
+
+xjk − x0
+
+> k
+> 2
+
+Fk
+
+
+
++3 γ2i2 E
+
+ 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 2
+
+Fk
+
+ + 3 γ2i2 F (x0
+
+> k
+
+) 2 (10) From Lemma A.3 in (Emmanouilidis et al., 2024), it holds for A = 2
+
+> n
+
+Pn−1 
+
+> i=0
+
+L2 
+
+> i
+
+, σ2 
+
+> ∗
+
+= 1
+
+> n
+
+Pn−1 
+
+> i=0
+
+∥Fi(x∗)∥2 and 
+
+∀i ∈ [n] that 
+
+i2 E
+
+ 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 2
+
+Fk
+
+ ≤ i(n − i)
+
+n − 1
+
+ A∥x0 
+
+> k
+
+− x∗∥2 + 2 σ2
+
+> ∗
+
+ (11) From inequality (11) and (10), thus, we obtain 
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+i
+
+≤ 3γ2L2
+
+> max
+
+i E
+
+
+
+> i−1
+
+X
+
+> j=0
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+ + 3 γ2 i(n − i)
+
+n − 1 A x0 
+
+> k
+
+− x∗ 2
+
++6 γ2 i(n − i)
+
+n − 1 σ2 
+
+> ∗
+
++ 3 γ2i2 F (x0
+
+> k
+
+) 2 (12) By summing over 0 ≤ i ≤ n − 1 we have that 
+
+> n−1
+
+X
+
+> i=0
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+i
+
+≤ 3γ2L2
+
+> max
+
+n(n − 1) 2
+
+> n−1
+
+X
+
+> i=0
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+i
+
++ γ2A n(n + 1) 2 x0 
+
+> k
+
+− x∗ 2
+
++γ2n(n + 1) σ2 
+
+> ∗
+
++ γ2n(n − 1)(2 n − 1) 2 F (x0
+
+> k
+
+) 2, (13) where we used the facts 
+
+> n−1
+
+X
+
+> i=0
+
+i = n(n − 1) 2 ,
+
+> n−1
+
+X
+
+> i=0
+
+i2 = n(n − 1)(2 n − 1) 6 ,
+
+> n−1
+
+X
+
+> i=0
+
+i(n − i)
+
+n − 1 = n(n + 1) 6 .
+
+24 Published as a conference paper at ICLR 2026 For γ ≤ 1√3n(n−1) Lmax 
+
+, rearranging the terms in (13) we obtain 
+
+> n−1
+
+X
+
+> i=0
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+i
+
+≤ γ2n(n + 1) A x0 
+
+> k
+
+− x∗ 2 + 2 n(n + 1) γ2σ2
+
+> ∗
+
++n(n − 1)(2 n − 1) γ2 F (x0
+
+> k
+
+) 2 
+
+> Assumption 2.3
+
+≤ 2γ2n2(A + nL 2) x0 
+
+> k
+
+− x∗ 2 + 2 n2γ2σ2
+
+> ∗
+> A≤2L2
+> max
+
+≤ 6n3γ2L2 
+
+> max
+
+x0 
+
+> k
+
+− x∗ 2 + 2 n2γ2σ2
+
+> ∗
+
+In the preceding subsection, we established a series of preparatory lemmas. We now combine these ingredients into a unified elementwise argument to prove Theorem 4.1. C.2 ASSEMBLING THE LEMMAS : P ROOF OF THEOREM 4.1 In this section, we provide the proof of Theorem 4.1, establishing linear convergence of Perturbed SGD– RR 1 to a neighbourhood of the solution. The proof technique leverages the interpretation that one epoch of Perturbed SGD– RR 1 with sufficiently small step size γ > 0 is equivalent to one step of the gradient descent with step size γ′ = nγ , as the iterates of Perturbed SGD– RR 1 inside the epoch do not change drastically. To account for the deviation of the iterates from the initial state x0 
+
+> k
+
+inside the epoch, we have upper bounded the sum of the corresponding distances in Lemma C.3. Thus, using the combining the bound on the progress made by gradient descent from Lemma C.2 with the potential “deviation” between the two algorithms we establish the rate of convergence of the method. 
+
+Proof. Using the update rule of Perturbed SGD– RR 1, we have that: 
+
+x0 
+
+> k+1
+
+= xn−1 
+
+> k
+
+− γF ωkn−1 (xn−1 
+
+> k
+
+) − γUk
+
+= x0 
+
+> k
+
+− γ
+
+> n−1
+
+X
+
+> i=0
+
+Fωik (xik) − γUk
+
+= x0 
+
+> k
+
+− γnF (x0
+
+> k
+
+) − γ
+
+> n−1
+
+X
+
+> i=0
+
+ÄFωik (xik) − Fωik (xk)ä − γUk (14) where the last step we used the fact that γnF (x0
+
+> k
+
+) = γ n−1P
+
+> i=0
+
+Fωki−1 (x0
+
+> k
+
+) and the finite-sum structure of the operator 
+
+F . It holds, thus, that 
+
+∥x0 
+
+> k+1
+
+− x∗∥2 = x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) − γ
+
+> n−1
+
+X
+
+> i=0
+
+(Fωik (xik) − F kωik
+
+(x0
+
+> k
+
+)) − γUk
+
+> 2
+
+(15) From Young’s inequality, the right-hand side (RHS) of (15) can be bounded as follows 
+
+∥x0 
+
+> k+1
+
+− x∗∥2 ≤ x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) 2
+
+1 − γnμ + γnμ 
+
+> n−1
+
+X
+
+> i=0
+
+(Fωik (xik) − F kωik
+
+(x0
+
+> k
+
+)) + Uk
+
+> 2
+> (2)
+
+≤ x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) 2
+
+1 − γnμ + 2γnμ 
+
+> n−1
+
+X
+
+> i=0
+
+Fωik (xik) − Fωik (x0
+
+> k
+
+)
+
+> 2
+
++ 2γnμ ∥Uk∥2
+
+> (2)
+
+≤ x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) 2
+
+1 − γnμ + 2γμ
+
+> n−1
+
+X
+
+> i=0
+
+Fωik (xik) − Fωik (x0
+
+> k
+
+) 2
+
++ 2γnμ ∥Uk∥2
+
+Applying the Lipschitz property of the operators, we obtain 
+
+∥x0 
+
+> k+1
+
+− x∗∥2 ≤ x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) 2
+
+1 − γnμ + 2γL 2
+
+> max
+
+μ
+
+> n−1
+
+X
+
+> i=1
+
+xik − x0 
+
+> k
+> 2
+
++ 2γnμ ∥Uk∥2 (16) 25 Published as a conference paper at ICLR 2026 Taking expectation condition on the filtration Fk (history of x0
+
+> k
+
+) and using the fact that the noise Uk ∼N  0, γ 2n2σ2 
+
+> ∗
+
+I, we get 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥2 | F k
+
+i
+
+≤
+
+E
+
+h
+
+x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) 2 | F k
+
+i
+
+1 − γnμ + 2γL 2
+
+> max
+
+μ E
+
+hn−1X
+
+> i=1
+
+xik − x0 
+
+> k
+> 2
+
+| F k
+
+i
+
++ 2nγ 3σ2
+
+> ∗
+
+μ (17) To complete the proof, it suffices to bound each term on the right-hand side of (17) . From Lemmas C.2, C.3, it holds for γ ≤ 1√3n(n−1) Lmax 
+
+that 
+
+E
+
+h
+
+x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) 2 | F k
+
+i
+
+≤ (1 − γnμ )2 + γ2n2L2
+
+> max
+
+ ∥xk − x∗∥2 + 2 γnλ (18) 
+
+E
+
+hn−1X
+
+> i=1
+
+xik − x0 
+
+> k
+> 2
+
+| F k
+
+i
+
+≤ 4γ2n3L2 x0 
+
+> k
+
+− x∗ 2 (19) Substituting (18) and (19) into (17), we obtain 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥2 Fk
+
+i
+
+≤
+
+Å
+
+1 − γnμ + γ2n2L2
+
+> max
+
+1 − γnμ + 8n3γ3L2L2
+
+> max
+
+μ
+
+ã
+
+∥x0 
+
+> k
+
+− x∗∥2
+
++ 4n2γ3L2
+
+> max
+
+μ σ2 
+
+> ∗
+
++ 2nγλ 
+
+1 − γnμ (20) Selecting the stepsize γ ≤ min 
+
+ß 12nμ ,
+
+√1+6 L2
+
+> max μ2−112 nL 2
+> max
+
+™
+
+, we have that 
+
+11 − γnμ ≤ 2
+
+and 
+
+Å
+
+1 − γnμ + γ2n2L2
+
+> max
+
+1 − γnμ + 12 n3γ3L4
+
+> max
+
+μ
+
+ã
+
+≤
+
+
+
+1 − γnμ 
+
+2
+
+
+
+and thus substituting in (20) we get 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥2 Fk
+
+i
+
+≤
+
+
+
+1 − γnμ 
+
+2
+
+
+
+∥x0 
+
+> k
+
+− x∗∥2 + 4n2γ3L2
+
+> max
+
+μ σ2 
+
+> ∗
+
++ 4 nγλ (21) Taking expectation on both sides and using the tower property of expectations, we have that: 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥2
+
+i
+
+≤
+
+
+
+1 − γnμ 
+
+2
+
+
+
+∥x0 
+
+> k
+
+− x∗∥2 + 4n2γ3L2
+
+> max
+
+μ σ2 
+
+> ∗
+
++ 8 nγλ 
+
+≤
+
+
+
+1 − γnμ 
+
+2
+
+k+1 
+
+∥x0 
+
+> k
+
+− x∗∥2 +
+
+> k
+
+X
+
+> i=1
+
+(1 − γnμ )i
+
+Å 4n2γ3L2
+
+> max
+
+μ σ2 
+
+> ∗
+
++ 8 nγλ 
+
+ã
+
+≤
+
+
+
+1 − γnμ 
+
+2
+
+k+1 
+
+∥x00 − x∗∥2 + 8nγ 2L2
+
+> max
+
+μ2 σ2 
+
+> ∗
+
++ 8λμ
+
+26 Published as a conference paper at ICLR 2026 
+
+## D PROOF OF ERGODIC PROPERTIES AND LIMIT THEOREMS 
+
+## (T HEOREM 4.3) & (T HEOREM 4.4) 
+
+We start by proving a series of properties that the induced Markov Chain satisfies, that will be necessary for proving the Theorem 4.3. 
+
+Proposition D.1 (Proposition 5.5.3 (Meyn & Tweedie, 2012)) . If a set C ∈ B (Rd) is νm-small, then it is 
+
+νδm -petite for some δm > 0.
+
+Intuition. The notions of small and petite sets are technical tools in Markov chain theory that help verify stability properties. A set C is called small if, starting from C, the chain has a uniform positive chance of reaching any region of the state space within a fixed number of steps. A petite set is a weaker concept: instead of requiring such uniformity in a single time step, it allows the chance of hitting any region to be distributed over a random number of steps (via a probability distribution over times). Thus, every small set is automatically petite, but the reverse is not true. Intuitively, small sets guarantee “uniform mixing after a fixed horizon,” while petite sets guarantee the same effect “on average over time.” D.1 PROOF OF CONTINUOUS STATE TIME HOMOGENIOUS MARKOV CHAIN 
+
+(L EMMA 4.2) 
+
+Lemma D.2 (Epoch-level homogeneity and kernel) . Fix γ > 0 and n ∈ N. Then Perturbed-SGD can be described at each epoch k as: Draw ωk uniformly from Sn and set 
+
+xk+1 = H(xk, ω k) + Uk, Uk ∼ N (0 , Σ) ,
+
+where H(x, ω ) denotes the endpoint of one reshuffled pass started at x with permutation ω (i.e., the map induced by n inner updates with step size γ). Then (xk)k≥0 is a time-homogeneous Markov chain on Rd with transition kernel 
+
+P (x, A ) = 1
+
+n!
+
+X
+
+> ω∈Sn
+
+Z
+
+> A
+
+ϕ y; H(x, ω ), Σ dy, A ∈ B (Rd),
+
+where ϕ(·; m, Σ) is the d-variate Gaussian density with mean m and covariance Σ.
+
+Proof. Fix γ > 0 and n ∈ N. For any x ∈ Rd and ω ∈ Sn, define the inner-epoch recursion 
+
+x[0] (x, ω ) = x, x[j+1] (x, ω ) = x[j](x, ω ) − γ F ω[j]
+
+ x[j](x, ω ), j = 0 , . . . , n − 1,
+
+and the (measurable) epoch map 
+
+H(x, ω ) := x − γ
+
+> n−1
+
+X
+
+> j=0
+
+Fω[j]
+
+ x[j](x, ω ).
+
+By construction, at epoch k the algorithm updates as 
+
+xk+1 = H(xk, ω k) + Uk,
+
+where (ωk)k≥0 are i.i.d. uniform on Sn and (Uk)k≥0 are i.i.d. with law N (0 , ΣId), independent of (ωk)k≥0 and of 
+
+xk given the present state. 
+
+Markov property. Let A ∈ B (Rd). Using the tower property and the independence of ωk, U k from the past given xk,
+
+Pr( xk+1 ∈ A | x0, . . . , x k) = E
+
+h
+
+Pr( H(xk, ω k) + Uk ∈ A | xk, ω k) xk
+
+i
+
+= E[Pr( H(xk, ω ) + U ∈ A)] ,
+
+where the outer expectation is over ω ∼ Unif( Sn) and U ∼ N (0 , ΣId), independent. Thus 
+
+Pr( xk+1 ∈ A | x0, . . . , x k) = Pr( xk+1 ∈ A | xk) =: P (xk, A ),
+
+so (xk)k≥0 is a Markov chain. 
+
+Time-homogeneity and kernel. Since the joint law of (ωk, U k) does not depend on k, the transition kernel P is time-invariant. By conditioning on ω and integrating over the Gaussian U ,
+
+P (x, A ) = 1
+
+n!
+
+X
+
+> ω∈Sn
+
+Pr( H(x, ω ) + U ∈ A) = 1
+
+n!
+
+X
+
+> ω∈Sn
+
+Z
+
+> A
+
+ϕ(y; H(x, ω ), ΣId) dy, 
+
+27 Published as a conference paper at ICLR 2026 where ϕ(·; m, ΣId) denotes the d-variate Gaussian density with mean m and covariance ΣId. This yields the stated expression for P and establishes time-homogeneity on Rd.
+
+Augmented formulation (for reference). On the product space Rd × Sn, define the next permutation ω′ ∼ Unif( Sn)
+
+independently of (x, ω ) and U . Then the augmented chain (( xk, ω k)) k≥0 satisfies 
+
+(x′, ω ′) =  H(x, ω ) + U, ω ′,
+
+and the associated kernel is 
+
+K (x, ω ), A × B =
+
+Z
+
+> A
+
+ϕ(y; H(x, ω ), ΣId) dy · |B|
+
+n! ,
+
+which is manifestly time-homogeneous. We, next, show that there exists an energy function that describes the iterates of the Markov chain. D.2 PROOF OF FOSTER -L YUAPUNOV INEQUALITY 
+
+A central tool for proving stability and ergodicity of Markov chains is the Foster–Lyapunov inequality . The idea is to construct an “energy” or “Lyapunov” function E(x, x ∗) that tracks the distance of the chain’s state from equilibrium. If this function decreases on average outside a bounded region, it ensures that the process cannot drift to infinity and will instead return frequently to a compact set. This property, when combined with the minorization condition, implies positive Harris recurrence and geometric ergodicity (Meyn & Tweedie, 2012). In our case, a natural candidate for such an energy is the squared distance to a solution x∗, up to an additive constant. The following corollary verifies that this choice indeed satisfies a Foster–Lyapunov inequality for Perturbed SGD– RR 1, showing that the expected energy after one epoch contracts linearly up to a fixed additive term. 
+
+Corollary D.3. Let Assumptions 2.1-2.3 hold. The function E(xk 
+
+> 0
+
+, x ∗) = ∥xk 
+
+> 0
+
+− x∗∥22 + 1 satisfies for any 
+
+x∗ ∈ X ∗ the inequality 
+
+E
+
+h
+
+E(xk+1 0 , x ∗) | F k
+
+i
+
+≤ c1E(xk 
+
+> 0
+
+, x ∗) + c2,
+
+where c1 = 1 − γnμ  
+
+> 2
+
+and c2 = γnμ  
+
+> 2
+
++ 8nγ 2L2 
+
+> max
+> μ2
+
+σ2 
+
+> ∗
+
++ 8λμ .
+
+Proof. From inequality (21) of Theorem 4.1, we have that 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥2 | F k
+
+i
+
+≤
+
+
+
+1 − γnμ 
+
+2
+
+k+1 
+
+∥x00 − x∗∥2 + 8nγ 2L2
+
+> max
+
+μ2 σ2 
+
+> ∗
+
++ 8λμ
+
+Adding in both sides one and using the definition of E(xk 
+
+> 0
+
+, x ∗), we obtain 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥2 + 1 | F k
+
+i
+
+≤
+
+
+
+1 − γnμ 
+
+2
+
+  ∥xk − x∗∥2 + 1  + γnμ 
+
+2 + 8nγ 2L2
+
+> max
+
+μ2 σ2 
+
+> ∗
+
++ 8λμ
+
+⇐⇒ E
+
+h
+
+E(xk+1 0 , x ∗) | F k
+
+i
+
+≤ c1E(xk 
+
+> 0
+
+, x ∗) + c2 (22) where at the last step we have let c1 = 1 − γnμ  
+
+> 2
+
+and c2 = γnμ  
+
+> 2
+
++ 8nγ 2L2 
+
+> max
+> μ2
+
+σ2 
+
+> ∗
+
++ 8λμ .
+
+Lemma D.4. Let Assumptions 2.1-2.3 hold. If γ ≤ γmax , then for any fixed x∗ ∈ X ∗ the functions 
+
+E1(x, x ∗) = E(x, x ∗), E2(x, x ∗) = pE(x, x ∗) satisfy the geometric drift property for the iterates of Perturbed SGD– RR 1, i.e., ∀i ∈ { 1, 2} there exist measurable set Ci, constants αi > 0, ˜αi < ∞ such that ∀x ∈ Rd
+
+∆Ei(x, x ∗) = −αEi(x, x ∗) + 1C ˜α, (23) 28 Published as a conference paper at ICLR 2026 where ∆Ei(x, x ∗) = R 
+
+> x′∈Rd
+
+P (z, dx ′)Ei(x′) − Ei(x) and the constant γmax =min 
+
+ß 13nL max ,
+
+√1+6 μ2L2
+
+> max −112 nL 2
+> max
+
+™
+
+.
+
+Proof. In order to prove that the geometric drift property is satisfied, we need to show that there exist function 
+
+Ei : Rd → [1 , +∞], measurable set Ci and constants αi > 0, ˜αi < ∞ such that (23) holds. From Corollary D.3, we have that the function E1 : Rd → [1 , +∞] with E1(x, x ∗) = ∥x − x∗∥2 + 1 satisfies along the iterates of Perturbed SGD– RR 1 that 
+
+E
+
+h
+
+E1(xk+1 , x ∗) | F k : {xk = x}
+
+i
+
+≤ c1E1(x, x ∗) + c2, (24) where c1 = 1 − γnμ  
+
+> 2
+
+and c2 = γnμ  
+
+> 2
+
++ 8nγ 2L2 
+
+> max
+> μ2
+
+σ2 
+
+> ∗
+
++ 8λμ . Additionally, for the epoch-level iterates xk of Perturbed SGD– RR 1 the definition of ∆E is 
+
+∆E1(x, x ∗) =
+
+Z
+
+> x′∈Rd
+
+P (x, dx′)E1(x′, x ∗) − E 1(x, x ∗)= E
+
+h
+
+E1(xk+1 , x ∗) − E 1(xk, x ∗) | F k : {xk = x}
+
+i
+
+. (25) From (24) and (25), we have that 
+
+E
+
+h
+
+E1(xk+1 , x ∗) | F k : {xk = x}
+
+i
+
+≤ c1E1(x) + c2
+
+⇒ E
+
+h
+
+E1(xk+1 , x ∗) − E 1(xk, x ∗) | F k : {xk = x}
+
+i
+
+≤ − (1 − c1)E1(x, x ∗) + c2
+
+⇒ ∆E1(x, x ∗) ≤ − (1 − c1)E1(x, x ∗) + c2 (26) Let C1 = ¶x ∈ Rd : E1(x, x ∗) ≤ 2c2
+
+> (1 −c1)
+
+©. We have that 
+
+∆E1(x, x ∗) ≤ −(1 − c1)E1(x, x ∗) + 1C (x)c2 + 1Cc (x) 1 − c1
+
+2 E1(x, x ∗)
+
+≤ − 1 − c1
+
+2 E1(x, x ∗) + 1C1(x) c2 (27) where at the last step we used the fact that 1Cc 
+
+> 1
+
+(x) < 1 and c1 ∈ (0 , 1) . From (27) we conclude that E1(x, x ∗)
+
+satisfies the geometric drift property for the set C1 = ¶x ∈ Rd : E1(x) ≤ 2c2
+
+> (1 −c1)
+
+© and with constants α = 1−c1 
+
+> 2
+
+, a =
+
+c2.For the E2(x, x ∗) = pE(x, x ∗), by Jensen’s inequality it holds that 
+
+E
+
+h»
+
+E(xk+1 , x ∗) | F k : {xk = x}
+
+i
+
+≤
+
+…
+
+E
+
+h
+
+E(xk+1 , x ∗) | F k : {xk = x}
+
+i
+
+≤
+
+»
+
+c1E(x, x ∗) + c2
+
+≤ √c1
+
+»
+
+E(x, x ∗) + √c2
+
+Thus, there exist constants d1 = √c1, d 2 = √c2 such that it holds 
+
+E
+
+h
+
+E2(xk+1 , x ∗) | F k : {xk = x}
+
+i
+
+≤ d1E2(x, x ∗) + d2, (28) Since it holds that 
+
+∆E2(x, x ∗) = 
+
+Z
+
+> x′∈Rd
+
+P (x, dx′)E2(x′, x ∗) − E 2(x, x ∗) = E
+
+h
+
+E2(xk+1 , x ∗) − E 2(xk, x ∗) | F k : {xk = x}
+
+i
+
+, (29) we have that 
+
+E
+
+h
+
+E2(xk+1 , x ∗) − E 2(xk, x ∗) | F k : {xk = x}
+
+i
+
+≤ − (1 − d1)E2(x, x ∗) + d2
+
+⇒ ∆E2(x, x ∗) ≤ − (1 − d1)E2(x, x ∗) + d2 (30) 29 Published as a conference paper at ICLR 2026 Let C2 = ¶x ∈ Rd : E2(x, x ∗) ≤ 2d2
+
+> (1 −d1)
+
+©. We have that 
+
+∆E2(x, x ∗) ≤ −(1 − d1)E2(x, x ∗) + 1C2(x) d2 + 1Cc 
+
+> 2
+
+(x) 1 − d1
+
+2 E2(x, x ∗)
+
+≤ − 1 − d1
+
+2 E2(x, x ∗) + 1C2(x) d2
+
+where at the last step we used the fact that 1Cc 
+
+> 2
+
+(x) < 1 and d1 ∈ (0 , 1) . Hence, we conclude that E2(x, x ∗) satisfies the geometric drift property for the set C2 = ¶x ∈ Rd : E2(x) ≤ 2d2
+
+> (1 −d1)
+
+© and with constants α2 = 1−d1 
+
+> 2
+
+, ˜α =
+
+d2.D.3 PROOF OF MINORIZATION PROPERTY 
+
+The next step in establishing ergodicity is to verify a minorization condition . Intuitively, this property guarantees that whenever the chain is in a certain “small set” C, its one-step transition kernel dominates a fixed nontrivial distribution ν, uniformly with probability δ > 0. In other words, starting from any x ∈ C, the algorithm has a baseline chance of moving into any region of the state space according to ν. This is the key ingredient that, together with a Lyapunov–Foster drift condition, yields geometric ergodicity of the Markov chain. The following lemma formalizes this property for the iterates of Perturbed SGD– RR 1.
+
+Lemma D.5 (Minorization property) . Let Assumptions 2.1–2.3 hold. If γ ≤ γmax , then the iterates of 
+
+Perturbed SGD--RR 1 satisfy the minorization condition: there exist a constant δ > 0, a probability measure ν on (Rd, B(Rd)) , and a set C ⊆ Rd such that ν(C) = 1 , ν(C∁) = 0 , and 
+
+P (x, A ) ≥ δ 1C (x) ν(A), ∀x ∈ Rd, A ∈ B (Rd), (31) where P (x, A ) = Pr( xk+1 ∈ A | xk = x) and γmax = min 
+
+ß 13nL max ,
+
+√1+6 μ2L2
+
+> max −112 nL 2
+> max
+
+™
+
+.
+
+Proof. Consider the Lyapunov candidate E(x) = ∥x − x∗∥2 + 1 for some x∗ ∈ X ∗. Its sublevel sets 
+
+C(r) := {x ∈ Rd : E(x) ≤ r} = B(x∗, √r − 1) , r > 1,
+
+are bounded, hence suitable for applying small/petite set arguments. At each epoch, the update of Perturbed SGD-RR 1 can be described by 
+
+xk+1 = H(xk, ω k) + Uk,
+
+where ωk is uniform on Sn and Uk ∼ N (0 , ΣId), independent of ωk and xk. Thus, for any A ∈ B (Rd),
+
+P (x, A ) = 1
+
+n!
+
+X
+
+> ω∈Sn
+
+Z
+
+> A
+
+ϕ y; H(x, ω ), Σ dy, 
+
+Since ϕ(y; m, ΣId) > 0 for all y ∈ Rd, the kernel has strictly positive support everywhere. Now fix r0 > 1 and restrict to C(r0). Define the reference measures for any A ∈ B (Rd)
+
+ν(A) := Leb( A ∩ C(r0)) Leb( C(r0)) and Leb( A) = 
+
+Z
+
+> A
+
+inf 
+
+> x∈C(r0)
+
+1
+
+n!
+
+X
+
+> ω∈Sn
+
+ϕ y; H(x, ω ), Σ dy. 
+
+i.e., the uniform probability distribution over C(r0). Clearly ν(C(r0)) = 1 and ν(C(r0)∁) = 0 .Finally, by continuity of ϕ and compactness of C(r0), there exists δ ≥ Leb( C(r0)) > 0 such that 
+
+P (x, A ) ≥ δ ν (A), ∀x ∈ C(r0), A ⊆ C(r0).
+
+If x / ∈ C(r0) or A̸ ⊆ C(r0), the right-hand side of (31) is zero and the inequality is trivially satisfied. Hence the minorization condition (31) holds. D.4 PROOF OF IRREDUCIBILITY , A PERIODICITY AND HARRIS AND POSITIVE RECURRENCE 
+
+30 Published as a conference paper at ICLR 2026 
+
+Lemma D.6. The Markov chain (xk)k≥0 of Perturbed SGD– RR 1 is 1. ψ−irreducible for some non-zero σ-finite measure ψ on Rd over the Borel σ-algebra of Rd.2. strongly aperiodic. 3. Harris and positive recurrent with an invariant measure. 
+
+Proof. We prove each of the three properties in turn. 
+
+Irreducibility. From Lemma D.5, the Markov kernel of Perturbed SGD--RR 1 is 
+
+P (x, A ) = 1
+
+n!
+
+X
+
+> ω∈Sn
+
+Z
+
+> A
+
+ϕ(y; H(x, ω ), ΣId) dy, A ∈ B (Rd),
+
+where ϕ(·; m, ΣId) is a Gaussian density with strictly positive support. Hence, for any measurable set A of positive Lebesgue measure, P (x, A ) > 0. Taking ψ to be the Lebesgue measure, we conclude that the chain is ψ-irreducible. 
+
+Strong Aperiodicity. By Lemma D.5, there exist δ > 0, a probability measure ν, and a set C ⊆ Rd such that 
+
+P (x, A ) ≥ δ 1C (x)ν(A), ∀x ∈ Rd, A ∈ B (Rd).
+
+Since C has positive Lebesgue measure and ν(C) = 1 , ν(C◦) = 0 and given that the sets C(r) in the proof of the Lemma D.5 are small and of positive measure, we get that the Markov chain is strongly aperiodic. 
+
+Harris and Positive Recurrence. By Proposition D.1, the small set C of Lemma D.5 is also petite. Combined with the Foster–Lyapunov drift condition of Lemma D.4, the Geometric Ergodic Theorem (Theorem 15.0.1 in (Meyn & Tweedie, 2012)) guarantees that the chain is positive recurrent and admits an invariant probability measure. Finally, from Theorem 9.1.8 of (Meyn & Tweedie, 2012), the existence of a Lyapunov function unbounded off petite sets, satisfying ∆E ≤ 0 together with ψ-irreducibility, implies Harris recurrence. D.5 PROOF OF EXISTENCE OF UNIQUE INVARIANT DISTRIBUTION AT EPOCH -LEVEL 
+
+(T HEOREM 4.3) By verifying irreducibility, aperiodicity, and positive Harris recurrence (Meyn & Tweedie, 2012), we establish a unique invariant distribution πγ , geometric convergence in total variation to it, and concentration of scalar observables (admissible test functions) around x∗.
+
+Theorem D.7 (Restatement of Theorem 4.3) . Under Assumptions 2.1–2.3, run Perturbed SGD-RR 1 with 
+
+γ ≤ γmax . Then (xk)k≥0 admits a unique stationary distribution πγ ∈ P 2(Rd), and additionally: (i) | E[ℓ(xk)] − Ex∼πγ [ℓ(x)] | ≤ c(1 − ρ)k ∀ℓ : |ℓ(x)| ≤ Lℓ(1 + ∥x∥),
+
+(ii) | Ex∼πγ [ℓ(x)] − ℓ(x∗)| ≤ Lℓ
+
+√C ∀ℓ : Lℓ − Lipschitz functions ,
+
+for some c < ∞, ρ ∈ (0 , 1) , C = Θ(MSE( SGD − RR 1)) and γmax defined in Theorem 4.1 
+
+Proof. From Lemma D.6, we have that the underlying Markov Chain has an invariant probability measure. Since from Lemma D.4 the induced Markov Chain satisfies the geometric drift property, according to the Strong Ergodic Theorem (Meyn & Tweedie, 2012) we conclude that the measure is finite and unique. From the invariant property of πγ , we have that for x0 ∼ πγ the iterates satisfy also that (xk)k> 0 ∼ πγ . From Corollary D.3, we have that for an arbitrary fixed x∗ the iterates of Perturbed SGD– RR 1 with step size γ ≤ satisfy for c1 ∈ (0 , 1) , c 2 > 0 that 
+
+E
+
+h
+
+∥xk+1 − x∗∥22 + 1 | F k
+
+i
+
+≤ c1
+
+ ∥xk − x∗∥22 + 1  + c2.
+
+Taking expectation with respect to the invariant measure πγ and using the tower law of expectation, we get 
+
+Ex∼πγ
+
+∥x − x∗∥22
+
+ ≤ c1 + c2 − 11 − c1
+
+= O
+
+Å max( γ, λ )
+
+μ
+
+ã
+
+< +∞. (32) 31 Published as a conference paper at ICLR 2026 Combining the above inequality with the fact that ∥x∗∥ ≤ R by Assumption 2.1, we conclude that the invariant measure πγ ∈ P 2(Rd), where P2(Rd) is the set of distributions supported in Rd with finite second moment. We, next, proceed with proving the second statement of the Theorem. By assumption, we have that the test function satisfies ∀x ∈ Rd 
+
+> ≥0
+
+that 
+
+|ℓ(x)| ≤ Lℓ(1 + ∥x∥)
+
+≤ Lℓ(1 + ∥x∗∥ + ∥x − x∗∥)
+
+≤ Lℓ(1 + R + ∥x − x∗∥)
+
+≤ (1 + R)Lℓ(1 + ∥x − x∗∥) (33) where we have used the triangle inequality and the fact that ∥x∗∥ ≤ R. Applying Cauchy-Schwarz inequality, we can further upper bound ∥ℓ(x)∥|ℓ(x)| ≤ √2(1 + R)Lℓ
+
+»
+
+1 + ∥x − x∗∥≤ max Ä1, √2(1 + R)Lℓ
+
+ä » 
+
+E(x, x ∗) (34) Letting c = max Ä1, √2(1 + R)Lℓ
+
+ä and ˜E(x, x ∗) = cpE(x, x ∗), we have that 
+
+|ℓ(x)| ≤ ˜E(x, x ∗)
+
+From Lemma D.4 we have that E1(x, x ∗), E2(x, x ∗) satisfy the geometric drift property and since c ≥ 1 we have that ˜E(x, x ∗) = cE2(x, x ∗) satisfies also the geometric drift property. According to Theorem 16.0.1 in (Meyn & Tweedie, 2012) Perturbed SGD– RR 1 is ˜E-uniformly ergodic and there exists ρ ∈ (0 , 1) and R ∈ (0 , +∞) such that 
+
+P kℓ(x0) − Ex∼πγ [ℓ(x)] ≤ R(1 − ρ)k ˜E(x0, x ∗) (35) Letting c = R ˜E(x0, x ∗) , we have proven the inequality in the statement of the theorem. In order to show that the epoch-level iterates converge under the total variation distance it suffices to consider only functions ℓ : Rd → R that are bounded by 1. In this case, there are constants ˜ρ ∈ (0 , 1) and ˜R ∈ (0 , +∞) independent of ℓ such that it holds 
+
+sup 
+
+> |ℓ|≤ 1
+
+P kℓ(x0) − Ex∼πγ [ℓ(x)] ≤ ˜R(1 − ˜ρ)k ˜E(x0, x ∗)
+
+implying according to the dual representation of Radon metric for bounded initial conditions (Wikipedia, Accessed: 2025-08-28) the geometric convergence under the total variation distance. In order to prove the third statement of the theorem, we apply linearity of expectation and the Lipschitz property of the test function ℓ and obtain 
+
+Ex∼πγ [ℓ(x)] − ℓ(x∗) ≤ Ex∼πγ [|ℓ(x) − ℓ(x∗)|]
+
+≤ Ex∼πγ [Lℓ ∥x − x∗∥]
+
+Applying Cauchy-Schwarz inequality and using inequality (32), we obtain that 
+
+Ex∼πγ [ℓ(x)] − ℓ(x∗) ≤ Lℓ
+
+»
+
+Ex∼πγ [∥x − x∗∥] ≤ Lℓ
+
+√D
+
+where D ∝ max( γ,λ ) 
+
+> μ
+
+according to (32). 32 Published as a conference paper at ICLR 2026 We conclude with the establishment of a Law of Large Numbers (LLN) and the corresponding Centra limit Theorem (CLT) that describe the epoch-level iterates of Perturbed SGD– RR 1.D.6 PROOF OF LIMIT THEOREMS OF EPOCH -LEVEL ITERATES 
+
+(T HEOREM 4.3) 
+
+Theorem D.8 (Restatement of Theorem 4.4) . Suppose Assumptions 2.1–2.3 hold and run Perturbed SGD– RR 1with γ ≤ γmax , (cf. Theorem 4.1). Let ℓ : Rd → R be any test function such that |ℓ(x)| ≤ Lℓ(1 + ∥x∥2) and Ex∼πγ [ℓ(x)] < ∞.Then for the epoch-level iterates, it holds that: 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+ℓ(xt) a.s. 
+
+−−→ Ex∼πγ [ℓ(x)] 
+
+| {z }
+
+> (LLN)
+
+T −1/2 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+ℓ(xt) − Ex∼πγ [ℓ(x)] 
+
+ d
+
+−→ N (0 , σ 2 
+
+> πγ
+
+(ℓ)) 
+
+| {z }
+
+> (CLT)
+
+,
+
+where σ2 
+
+> πγ
+
+(ℓ) = lim T →∞ 1 
+
+> T
+
+Eπγ [S2 
+
+> T
+
+] and S2 
+
+> T
+
+= PT −1
+
+> t=0
+
+ ℓ(xt) − Ex∼πγ [ℓ(x)] 2.
+
+Proof. We show that the Markov Chain induced by the epoch-level iterates of Perturbed SGD– RR 1 is Harris positive recurrent, it has an invariant measure and satisfies E-uniform ergodicity, and hence by Theorem 17.0.1 in (Meyn & Tweedie, 2012) the stated Law of Large Numbers and Central Limit Theorem hold. From Lemma D.6, we have that the Markov Chain is Harris positive recurrent with an invariant measure. It suffices, thus, to show that the chain is E-uniform ergodic by proving that there exists a potential function E(·)
+
+such that the chain satisfies the geometric drift property of Meyn & Tweedie (2012) and ∥ℓ(x)∥2 ≤ E (x). Let 
+
+E(x, x ∗) = E
+
+h
+
+E(xk+1 0 , x ∗) | F k
+
+i
+
+for any fixed x∗ ∈ X ∗. According to Lemma D.4, E(x, x ∗) satisfies the geometric drift property. Additionally, since ℓ has a linear growth it holds that 
+
+|ℓ(x)|2 ≤ L2 
+
+> ℓ
+
+(1 + ∥x∥2)2
+
+≤ L2 
+
+> ℓ
+
+(1 + ∥x∗∥ + ∥x − x∗∥)2
+
+≤ L2 
+
+> ℓ
+
+(1 + R + ∥x − x∗∥)2
+
+≤ L2 
+
+> ℓ
+
+(1 + R)2(1 + ∥x − x∗∥)2 (36) From Cauchy-Schwarz inequality, it holds that 
+
+1 + ∥x − x∗∥ ≤ √2
+
+»
+
+1 + ∥x − x∗∥2
+
+⇒ (1 + ∥x − x∗∥)2 ≤ 2(1 + ∥x − x∗∥2)
+
+⇒ (1 + ∥x − x∗∥)2 ≤ 2E(x, x ∗) (37) Thus, combining (37) and (36), we obtain 
+
+|ℓ(x)|2 ≤ 2L2 
+
+> ℓ
+
+(1 + R)2E(x, x ∗) (38) Thus, E(x, x ∗) satisfies the geometric drift property and it holds that |ℓ(x)|2 ≤ E (x, x ∗) and hence the chain is 
+
+E-uniform ergodic, completing the proof. 33 Published as a conference paper at ICLR 2026 
+
+## E BOUNDING 4TH -ORDER MOMENTS OF ERROR DISTANCE 
+
+E.1 HIGHER ORDER VERSION OF PROPOSITION A.2 (E MMANOUILIDIS ET AL ., 2024) - B OUND OF 
+
+KYRTOSIS FOR LIPSCHTIZ OPERATORS 
+
+Proposition E.1. Let Assumption 2.3 hold. For any x ∈ Rd and any reference point x∗ ∈ Rd, it holds that 
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x) − F (x)∥4 ≤ 128 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+L4
+
+> i
+
+!
+
+∥x − x∗∥4 + 128 σ4 
+
+> ∗
+
+,
+
+where σ4 
+
+> ∗
+
+:= 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x∗)∥4.
+
+Proof. Define 
+
+∆i := Fi(x) − Fi(x∗), ∆ := 1
+
+n
+
+> n
+
+X
+
+> j=1
+
+∆j = F (x) − F (x∗), ξi := Fi(x∗) − F (x∗).
+
+Then Fi(x) − F (x) = (∆ i − ∆) + ξi. Using (a + b)4 ≤ 8( a4 + b4), we have that 
+
+∥Fi(x) − F (x)∥4 ≤ 8∥∆i − ∆∥4 + 8 ∥ξi∥4.
+
+Applying the same inequality once more to ∆i − ∆, we obtain 
+
+∥∆i − ∆∥4 ≤ 8 ∥∆i∥4 + ∥∆∥4.
+
+Averaging over i and using Jensen’s inequality for the convex map u 7 → ∥ u∥4,
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x) − F (x)∥4 ≤ 128 
+
+ 1
+
+> nn
+
+X
+
+> i=1
+
+∥∆i∥4
+
++ 8 
+
+ 1
+
+> nn
+
+X
+
+> i=1
+
+∥ξi∥4
+
+.
+
+Moreover, ∥ξi∥ = ∥Fi(x∗) − F (x∗)∥ ≤ ∥ Fi(x∗)∥ + ∥F (x∗)∥, hence by (a + b)4 ≤ 8( a4 + b4) and Jensen, 
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥ξi∥4 ≤ 16 
+
+ 1
+
+> nn
+
+X
+
+> i=1
+
+∥Fi(x∗)∥4
+
+= 16 σ4 
+
+> ∗
+
+.
+
+By Lipschitz continuity, we have 
+
+∥∆i∥ = ∥Fi(x) − Fi(x∗)∥ ≤ Li∥x − x∗∥ ⇒ 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥∆i∥4 ≤
+
+ 1
+
+> nn
+
+X
+
+> i=1
+
+L4
+
+> i
+
+
+
+∥x − x∗∥4.
+
+Combine the last two inequalities to obtain 
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+∥Fi(x) − F (x)∥4 ≤ 128 
+
+ 1
+
+> nn
+
+X
+
+> i=1
+
+L4
+
+> i
+
+
+
+∥x − x∗∥4 + 128 σ4
+
+> ∗
+
+34 Published as a conference paper at ICLR 2026 E.2 A C OMBINATORIAL TOOL FOR HIGHER -O RDER MOMENTS IN SAMPLING WITHOUT REPLACEMENT 
+
+As part of our analysis, we require bounds on the fourth moment of empirical averages when the underlying data are sampled without replacement . While this result is of independent combinatorial interest—appearing naturally in the study of randomization effects and variance reduction—it also plays a technical role in controlling higher-order error terms in our proofs. The following lemma provides a clean upper bound in terms of simple population statistics such as ˆΣ and S4.
+
+Lemma E.2 (Fourth moment of a sample mean; upper bound) . Let X1, . . . , X n ∈ Rd be fixed vectors, let 
+
+¯X := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+Xi, ri := Xi − ¯X, ˆΣ := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+rir⊤ 
+
+> i
+
+,
+
+and define the population sums 
+
+S4 := 
+
+> n
+
+X
+
+> i=1
+
+∥ri∥4, U2 := X
+
+> i̸=j
+
+∥ri∥2∥rj ∥2, T2 := X 
+
+> i̸=j
+
+(r⊤ 
+
+> i
+
+rj )2.
+
+Draw a size-k simple random sample without replacement, with indices (ω1, . . . , ω n) uniformly chosen among all k-subsets, and set ¯Xω = 1
+
+> k
+
+Pkt=1 Xωt . Then 
+
+E ∥ ¯Xω − ¯X∥4 ≤ 1
+
+k4
+
+ï kn S4 + 9k(k − 1) 
+
+n(n − 1) 
+
+
+
+n2(tr ˆΣ) 2 − S4
+
+ò
+
+. (39) 
+
+Proof. Write S := Pkt=1 rωt so that ¯Xω − ¯X = 1 
+
+> k
+
+S and ∥ ¯Xω − ¯X∥4 = 1 
+
+> k4
+
+∥S∥4. Using the Frobenius inner product ⟨A, B ⟩F = tr( A⊤B),
+
+∥S∥2 =
+
+> k
+
+X
+
+> t=1
+
+rωt
+
+> 2
+
+=
+
+> k
+
+X
+
+> t,u =1
+
+r⊤ 
+
+> ωt
+
+rωu =
+
+D kX
+
+> t=1
+
+rωt r⊤ 
+
+> ωt
+
+,
+
+> k
+
+X
+
+> u=1
+
+rωu r⊤
+
+> ωu
+
+E
+
+> F
+
+,
+
+and hence 
+
+∥S∥4 =
+
+ kX
+
+> t,u =1
+
+r⊤ 
+
+> ωt
+
+rωu
+
+2
+
+=
+
+> k
+
+X
+
+> t,u,s,v =1
+
+(r⊤ 
+
+> ωt
+
+rωu )( r⊤ 
+
+> ωs
+
+rωv ).
+
+Taking expectation and using the inclusion probabilities for simple random sampling without replacement, 
+
+P(ωa = i) = 1
+
+n , P(ωa = i, ω b = j) = 1
+
+n(n − 1) (i̸ = j),
+
+we may group terms by the equality pattern among the positions (t, u, s, v ) (Hoeffding/U-statistics enumeration). Only three patterns survive: 
+
+(P1) Diagonal–diagonal: (t = u) and (s = v). This contributes 
+
+kn S4 + k(k − 1) 
+
+n(n − 1) U2.
+
+(P2) Diagonal–off-diagonal (or vice versa): exactly one of the pairs (t, u ) or (s, v ) is diagonal and the other is off-diagonal. Counting gives a coefficient 4 k
+
+> 1
+
+  k−12
+
+, leading to the contribution 
+
+4 k
+
+> 1
+
+  k−12
+
+ n
+
+> 1
+
+  n−12
+
+ T2 = 6k(k − 1) 
+
+n(n − 1) T2.
+
+(P3) Off-diagonal–off-diagonal: both pairs are off-diagonal but correspond to the same unordered pair of distinct sampled units. This yields 
+
+2 k
+
+> 2
+
+ n
+
+> 2
+
+ U2 = 2 · k(k−1) 2
+
+> n(n−1) 2
+
+U2 = 2k(k − 1) 
+
+n(n − 1) U2.
+
+35 Published as a conference paper at ICLR 2026 Summing the three contributions we obtain the exact identity 
+
+E ∥ ¯Xω − ¯X∥4 = 1
+
+k4
+
+ï kn S4 + 3k(k − 1) 
+
+n(n − 1) U2 + 6k(k − 1) 
+
+n(n − 1) T2
+
+ò
+
+. (40) Next, by Cauchy–Schwarz, 
+
+(r⊤ 
+
+> i
+
+rj )2 ≤ ∥ ri∥2 ∥rj ∥2 for all i̸ = j, 
+
+hence T2 ≤ U2. Plugging this into (40) gives 
+
+E ∥ ¯Xω − ¯X∥4 ≤ 1
+
+k4
+
+ï kn S4 + (3 + 6) k(k − 1) 
+
+n(n − 1) U2
+
+ò
+
+= 1
+
+k4
+
+ï kn S4 + 9k(k − 1) 
+
+n(n − 1) U2
+
+ò
+
+.
+
+Finally, observe the exact identity 
+
+U2 = X
+
+> i̸=j
+
+∥ri∥2∥rj ∥2 =
+
+ nX
+
+> i=1
+
+∥ri∥2
+
+2
+
+−
+
+> n
+
+X
+
+> i=1
+
+∥ri∥4 = n2  tr ˆΣ2 − S4,
+
+because P 
+
+> i
+
+∥ri∥2 = n tr ˆΣ. Substituting this into the previous display yields the claimed bound (39). 
+
+Lemma E.3. Let Assumptions 2.1, 2.3 hold. If Perturbed SGD– RR 1 is run with step size γ ≤ 13nL max , then it holds that 
+
+E
+
+hn−1X
+
+> i=1
+
+xik − x0 
+
+> k
+> 4
+
+| F k
+
+i
+
+≤ 54 γ4C∥xk − x∗∥4 + 3456 γ4(n − 1) σ4 
+
+> ∗
+
++ 972 γ4 n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+where C = 64 nL 2 
+
+> max
+
++ 3 n2(n + 1) L2 
+
+> max
+
++ n2(n+1) 2(2 n+1) L4 
+
+> 10
+
+.
+
+Proof. From the epoch-level update (8), it holds 
+
+∥xik − x0
+
+> k
+
+∥4 = γ4i4 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(xjk)
+
+> 4
+> (3)
+
+≤ 27 γ4i3
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(xjk) − Fωjk
+
+(x0
+
+> k
+
+) 4
+
++ 27 γ4i4 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 4
+
++27 γ4i4 F (x0
+
+> k
+
+) 4 
+
+> Assumption 2.3
+
+≤ 27 γ4i3L4
+
+> max i−1
+
+X
+
+> j=0
+
+xjk − x0
+
+> k
+> 2
+
++ 27 γ4i4 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 4
+
++27 γ4i4 F (x0
+
+> k
+
+) 4
+
+where at the last step we have used the Lipschitz property of the operators Fi, ∀i ∈ [n]. Taking expectation condition on the filtration Fk, we get 
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 4
+
+Fk
+
+i
+
+≤ 27 γ4i3L4 
+
+> max
+
+E
+
+
+
+> i−1
+
+X
+
+> j=0
+
+xjk − x0
+
+> k
+> 4
+
+Fk
+
+
+
++27 γ4i4 E
+
+ 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 4
+
+Fk
+
+ + 27 γ4i4 F (x0
+
+> k
+
+) 4 (41) 36 Published as a conference paper at ICLR 2026 Substituting in Lemma E.2 Xωt := Fωjk
+
+(x0
+
+> k
+
+) and k = n, we get that 
+
+E
+
+ 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 4
+
+Fk
+
+ ≤ 1
+
+i4
+
+ï in S4 + 9i(i − 1) 
+
+n(n − 1) 
+
+
+
+n2(tr ˆΣ) 2 − S4
+
+ò
+
+≤ 1
+
+i4
+
+ï in S4 + 9in (i − 1) 
+
+n − 1 (tr ˆΣ) 2
+
+ò
+
+(42) where S4 = Pi−1 
+
+> j=0
+
+∥Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)∥4 ≥ 0 and tr ˆΣ = 1
+
+> n
+
+Pn−1 
+
+> i=0
+
+∥Fi(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)∥2. We, next, upper bound the terms S4 and tr ˆΣ. From Lemma E.2, we have that 
+
+S4 ≤ 128 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+L4
+
+> i
+
+!
+
+∥xk − x∗∥4 + 128 σ4 
+
+> ∗
+
+. (43) Using Proposition A.2 (Emmanouilidis et al., 2024), we have that 
+
+tr ˆΣ = 1
+
+n
+
+> n−1
+
+X
+
+> i=0
+
+∥Fi(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)∥2 ≤ A∥xk − x∗∥2 + 2 σ2 
+
+> ∗
+
+, (44) since each Fi is Lipschitz. Substituting (43), (44) into (41), we obtain that 
+
+i4 E
+
+ 1
+
+i
+
+> i−1
+
+X
+
+> j=0
+
+Fωjk
+
+(x0
+
+> k
+
+) − F (x0
+
+> k
+
+)
+
+> 4
+
+Fk
+
+ ≤ 128 in2
+
+> n
+
+X
+
+> i=1
+
+L4 
+
+> i
+
+∥xk − x∗∥4 + 128 in σ4
+
+> ∗
+
++ 9i(i − 1) 
+
+n − 1 (A∥xk − x∗∥2 + 2 σ2 
+
+> ∗
+
+)2
+
+> (2)
+
+≤ 128 in2 A4∥xk − x∗∥4 + 128 in σ4
+
+> ∗
+
++ 18 i(i − 1) 
+
+n − 1 A∥xk − x∗∥4 + 36 i(i − 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2 (45) where we have let A4 := Pni=1 L4 
+
+> i
+
+for brevity. From inequality (45) and (41), thus, we obtain 
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 4
+
+Fk
+
+i
+
+≤ 27 γ4i3L4 
+
+> max
+
+E
+
+
+
+> i−1
+
+X
+
+> j=0
+
+xik − x0 
+
+> k
+> 4
+
+Fk
+
+
+
++27 γ4
+
+h 128 in2 A4∥xk − x∗∥4 + 128 in σ4 
+
+> ∗
+
++ 18 i(i − 1) 
+
+n − 1 A∥xk − x∗∥4 + 36 i(i − 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+i
+
++27 γ4i4 F (x0
+
+> k
+
+) 4
+
+≤ 27 γ4i3L4 
+
+> max
+
+E
+
+
+
+> i−1
+
+X
+
+> j=0
+
+xik − x0 
+
+> k
+> 4
+
+Fk
+
+
+
++27 γ4
+
+h Å 128 in2 A4 + 18 i(i − 1) 
+
+n − 1 A
+
+ã
+
+∥xk − x∗∥4 + 128 in σ4 
+
+> ∗
+
++ 36 i(i − 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+i
+
++27 γ4i4 F (x0
+
+> k
+
+) 4 (46) By summing over 0 ≤ i ≤ n − 1, we have that 
+
+> n−1
+
+X
+
+> i=0
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+i
+
+≤ 27 γ4L4
+
+> max
+
+n2(n − 1) 2
+
+4
+
+> n−1
+
+X
+
+> i=0
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 2
+
+Fk
+
+i
+
++27 γ4
+
+Å 64( n − 1) 
+
+n A4 + 18 n(n + 1) A
+
+ã
+
+∥xk − x∗∥4 + 1728 γ4(n − 1) σ4
+
+> ∗
+
++γ4 972 n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2 + 27 γ4 n(n + 1)(2 n + 1)(3 n2 + 3 n − 1) 30 F (x0
+
+> k
+
+) 4, (47) 37 Published as a conference paper at ICLR 2026 where we used the facts 
+
+> n−1
+
+X
+
+> i=0
+
+i = n(n − 1) 2 ,
+
+> n−1
+
+X
+
+> i=0
+
+i(i − 1) = n(n + 1)( n − 1) ,
+
+> n−1
+
+X
+
+> i=0
+
+i(n − i)
+
+n − 1 = n(n + 1) 6 ,
+
+> n−1
+
+X
+
+> i=0
+
+i3 =
+
+Å n(n − 1) 2
+
+ã2
+
+,
+
+> n−1
+
+X
+
+> i=0
+
+i4 = n(n + 1)(2 n + 1)(3 n2 + 3 n − 1) 30 .
+
+We, thus, have that by rearranging the terms in (47) it holds that 
+
+ï
+
+1 − 27 γ4L4
+
+> max
+
+n2(n − 1) 2
+
+4
+
+ò n−1X
+
+> i=0
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 4
+
+Fk
+
+i
+
+≤ 27 γ4
+
+Å 64( n − 1) 
+
+n A4 + 18 n(n + 1) A
+
+ã
+
+∥xk − x∗∥4 + 1728 γ4(n − 1) σ4
+
+> ∗
+
++γ4 972 n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2 + 27 γ4 n(n + 1)(2 n + 1)(3 n2 + 3 n − 1) 30 F (x0
+
+> k
+
+) 4
+
+For γ ≤ 13nL max we have that (1 − 27 γ4L4 
+
+> max n2(n−1) 2
+> 4
+
+) ≥ 12 , and thus we obtain 
+
+> n−1
+
+X
+
+> i=0
+
+E
+
+h
+
+xik − x0 
+
+> k
+> 4
+
+Fk
+
+i
+
+≤ 54 γ4
+
+Å 64( n − 1) 
+
+n A4 + 18 n(n + 1) A
+
+ã
+
+∥xk − x∗∥4
+
++3456 γ4(n − 1) σ4 
+
+> ∗
+
++ γ4 972 n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
++54 γ4 n(n + 1)(2 n + 1)(3 n2 + 3 n − 1) 30 F (x0
+
+> k
+
+) 42.3
+
+≤ 54 γ4
+
+Å
+
+64 A4 + 18 n(n + 1) A + n2(n + 1) 2(2 n + 1) L4
+
+10 
+
+ã
+
+∥xk − x∗∥4
+
++3456 γ4(n − 1) σ4 
+
+> ∗
+
++ γ4 972 n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+≤ 54 γ4
+
+Å
+
+64 nL 2 
+
+> max
+
++ 36 n2(n + 1) L2 
+
+> max
+
++ n2(n + 1) 2(2 n + 1) L4
+
+10 
+
+ã
+
+∥xk − x∗∥4
+
++3456 γ4(n − 1) σ4 
+
+> ∗
+
++ γ4 972 n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+where at the last step we used the fact that A4 = Pn−1 
+
+> i=0
+
+L4 
+
+> i
+
+≤ nL 4 
+
+> max
+
+and A = 2 Pn−1 
+
+> i=0
+
+L2 
+
+> i
+
+≤ 2nL 2
+
+> max
+
+.To establish Theorem 4.6, we will first prove upper bounds on the higher moments of the distance of the epoch-level iterates from the optimum, as well as the connection of the Lipschitz property of the per-step operators Fi, i ∈ [n],
+
+and the Lipschitz constant of the epoch-level operator Gωk . We start by providing the bound on the higher moments in the following Lemma. 
+
+Lemma E.4. Let Assumption 2.1-2.3 hold and λ = 0 . Then, the iterates of Perturbed SGD– RR 1 with stepsize 
+
+γ ≤ γmax satisfy 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥3
+
+i
+
+= O Än 32 γ3ä
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥4
+
+i
+
+= O  γ4
+
+where γmax = min 
+
+ß μ
+
+> 3nL 2
+> max
+
+,
+
+√1+6 μ2L2
+
+> max −112 nL 2
+> max
+
+, μ3/5
+
+> 8nL 3/5
+> max
+
+™
+
+.
+
+Proof. We, first, provide the bound on the third moment. From Holder’s inequality, we have that 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥3
+
+i
+
+≤
+
+
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥2 Fk
+
+i 32
+
+38 Published as a conference paper at ICLR 2026 From Theorem 4.1, it holds that 
+
+E
+
+h
+
+∥xk 
+
+> 0
+
+− x∗∥2
+
+i
+
+= O  nγ 2 ,
+
+and thus substituting we obtain 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥3
+
+i
+
+≤ O Än 32 γ3ä ,
+
+where we have used the fact that the fourth moment of the stochastic oracles is bounded from Assumption 2.4. Taking the limit of the Markov chain we obtain the bound on the third moment 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥3
+
+i
+
+≤ O Än 32 γ3ä
+
+We, next, bound the fourth moment E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥4
+
+i
+
+. We have that 
+
+∥xk+1 0 − x∗∥4 = Ä∥xk+1 0 − x∗∥2ä2
+
+> (16)
+
+≤ x0 
+
+> k
+
+− x∗ − γnF (x0
+
+> k
+
+) 2
+
+1 − γnμ + 2γL 2
+
+> max
+
+μ
+
+> n−1
+
+X
+
+> i=1
+
+xik − x0 
+
+> k
+> 2
+
++ 2γnμ ∥Uk∥2
+
+!2
+
+Letting T1 = xk − x∗ − γnF (x0
+
+> k
+
+) 2 , T 2 = Pn−1 
+
+> i=1
+
+xik − x0 
+
+> k
+> 2
+
+and T3 = ∥Uk∥2 for brevity, we have 
+
+∥xk+1 0 − x∗∥4 ≤
+
+Å T1
+
+1 − γnμ + 2γμ T2 + 2γμ T3
+
+ã2
+
+(48) From (9) in Lemma C.2, we can bound the term T1 by 
+
+T1 ≤ (1 − γnμ )2 + γ2n2L2
+
+> max
+
+ ∥xk − x∗∥2 + 2 γnλ 
+
+Substituting the bound of T1 into (48), we get 
+
+∥xk+1 0 − x∗∥4 ≤
+
+Å (1 − γnμ )2 + γ2n2L2
+
+> max
+
+1 − γnμ ∥xk − x∗∥2 + 2γL 2
+
+> max
+
+μ T2 + 2γnμ T3
+
+ã2
+
+Letting c1 = (1 −γnμ )2+γ2n2L2 
+
+> max
+> 1−γnμ
+
+for brevity and performing Young’s inequality (7) with t = c1, we obtain that 
+
+∥xk+1 0 − x∗∥4 ≤ 1
+
+c1
+
+Å
+
+c1∥xk − x∗∥2 + 2γnμ T3
+
+ã2
+
++ 4γ2L4
+
+> max
+
+c1μ2 T 22
+
+≤ c1∥xk 
+
+> 0
+
+− x∗∥4 + 4γ2
+
+μ2n2c1
+
+T 23 + 4c1γnμ T3∥xk − x∗∥2 + 2γ2L4
+
+> max
+
+μ2 T 22
+
+Taking expectation with respect to the permutation ωk and condition on the filtration Fk (history of x0
+
+> k
+
+) as well as using the fact that the noise Uk is independent of the stochasticity of ωk, we get 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥4 Fk
+
+i
+
+≤ c1∥xk 
+
+> 0
+
+− x∗∥4 + 4γ2
+
+μ2n2c1
+
+T 23 + 4c1γnμ T3∥xk − x∗∥2 + 2γ2L4
+
+> max
+
+μ2 E
+
+h
+
+T 22 Fk
+
+i
+
+(49) Using Lemma E.3, we can bound the term 
+
+E
+
+h
+
+T 22 Fk
+
+i
+
+≤ 54 γ4C∥xk − x∗∥4 + 3456 γ4(n − 1) σ4 
+
+> ∗
+
++ 972 γ4 n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+where C = 64 nL 2 
+
+> max
+
++ 3 n2(n + 1) L2 
+
+> max
+
++ n2(n+1) 2(2 n+1) L4 
+
+> 10
+
+and thus substituting into (49) we obtain that 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥4 Fk
+
+i
+
+≤
+
+Å
+
+c1 + 108 γ6L4
+
+> max
+
+μ2 C
+
+ã
+
+∥xk 
+
+> 0
+
+− x∗∥4 + 4γ2
+
+μ2n2c1
+
+T 23 + 4c1γnμ T3∥xk − x∗∥2
+
++ 6912 γ6L4
+
+> max
+
+μ2 (n − 1) σ4 
+
+> ∗
+
++ 1944 γ6L4
+
+> max
+
+μ2
+
+n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2. (50) 39 Published as a conference paper at ICLR 2026 The next step involves taking expectation on both sides with respect to the randomness of the Uk and will require a bound on the terms E
+
+h
+
+T3
+
+i
+
+, E
+
+h
+
+T 23
+
+i
+
+. Since Uk ∼ N Ä0, γ2n2 
+
+> d
+
+σ2 
+
+> ∗
+
+Id
+
+ä, we obtain 
+
+E∥Uk∥2 = tr 
+
+Å γ2n2
+
+d σ2 
+
+> ∗
+
+Id
+
+ã
+
+= γ2n2σ2 
+
+> ∗
+
+.
+
+and 
+
+E∥Uk∥4 = d(d + 2) 
+
+Å γ2n2
+
+d σ2
+
+> ∗
+
+ã2
+
+≤ γ4n4(σ2 
+
+> ∗
+
+)2,
+
+as ∥Uk∥2/ Ä γ2n2 
+
+> d
+
+σ2
+
+> ∗
+
+ä2
+
+∼ χ2 
+
+> d
+
+and E(χ2
+
+> d
+
+)2 = d2 + 2 d.Thus, taking expectation on both sides of (50) and substituting the bounds on E
+
+h
+
+T3
+
+i
+
+, E
+
+h
+
+T 23
+
+i
+
+, we have that 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥4
+
+i
+
+≤
+
+Å
+
+c1 + 108 γ6L4
+
+> max
+
+μ2 C
+
+ã
+
+∥xk 
+
+> 0
+
+− x∗∥4 + 4γ2
+
+μ2n2c1
+
+E
+
+h
+
+T 23
+
+i
+
++ 4c1γnμ E
+
+h
+
+T3
+
+i
+
+∥xk − x∗∥2
+
++ 6912 γ6L4
+
+> max
+
+μ2 (n − 1) σ4 
+
+> ∗
+
++ 1944 γ6L4
+
+> max
+
+μ2
+
+n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+≤
+
+Å
+
+c1 + 108 γ6L4
+
+> max
+
+μ2 C
+
+ã
+
+∥xk 
+
+> 0
+
+− x∗∥4 + 4γ6n2
+
+μ2c1
+
+(σ2 
+
+> ∗
+
+)2 + 4c1γ3nμ σ2 
+
+> ∗
+
+∥xk − x∗∥2
+
++ 6912 γ6L4
+
+> max
+
+μ2 (n − 1) σ4 
+
+> ∗
+
++ 1944 γ6L4
+
+> max
+
+μ2
+
+n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+Taking expectation on both sides, using the tower law of expectation and the fact that from Theorem 4.1 E
+
+h
+
+∥xk 
+
+> 0
+
+−
+
+x∗∥2
+
+i
+
+= O  nγ 2 σ2 
+
+> ∗
+
+, we obtain 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥4
+
+i
+
+≤
+
+Å
+
+c1 + 108 γ6L4
+
+> max
+
+μ2 C
+
+ã
+
+E
+
+h
+
+∥xk 
+
+> 0
+
+− x∗∥4
+
+i
+
++ 4γ6n2
+
+μ2c1
+
+(σ2 
+
+> ∗
+
+)2
+
++ 1944 γ6L4
+
+> max
+
+μ2 (σ2 
+
+> ∗
+
+)2 + 4c1γ3nμ σ2 
+
+> ∗
+
+E
+
+h
+
+∥xk − x∗∥2
+
+i
+
++ 6912 γ6L4
+
+> max
+
+μ2 (n − 1) σ4 
+
+> ∗
+
++ 1944 γ6L4
+
+> max
+
+μ2
+
+n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+≤
+
+Å
+
+c1 + 108 γ6L4
+
+> max
+
+μ2 C
+
+ã
+
+E
+
+h
+
+∥xk 
+
+> 0
+
+− x∗∥4
+
+i
+
++ 4γ6n2
+
+μ2c1
+
+(σ2 
+
+> ∗
+
+)2
+
++ 1944 γ6L4
+
+> max
+
+μ2 (σ2 
+
+> ∗
+
+)2 + 4c1γ3nμ O  nγ 2 (σ2 
+
+> ∗
+
+)2
+
++ 6912 γ6L4
+
+> max
+
+μ2 (n − 1) σ4 
+
+> ∗
+
++ 1944 γ6L4
+
+> max
+
+μ2
+
+n(n + 1) 
+
+n − 1 (σ2 
+
+> ∗
+
+)2
+
+≤
+
+Å
+
+c1 + 108 γ6L4
+
+> max
+
+μ2 C
+
+ã
+
+E
+
+h
+
+∥xk 
+
+> 0
+
+− x∗∥4
+
+i
+
++ O
+
+Å γ6n2
+
+c1
+
++ c1nγ 5
+
+μ + γ6n
+
+ã
+
+(σ2 
+
+> ∗
+
+)2
+
++ 6912 γ6L4
+
+> max
+
+μ2 (n − 1) σ4 
+
+> ∗
+
+(51) Selecting the stepsize γ ≤ min 
+
+n 13nL max , μ
+
+> 3nL 2
+> max
+
+, μ3/5
+
+> 8nL 3/5
+> max
+
+o
+
+, we have that 
+
+c1 = 1 − γnμ + γ2n2L2
+
+> max
+
+1 − γnμ ≤ 1 − γnμ 
+
+2
+
+and 
+
+c1 + 108 γ6L4
+
+> max
+
+μ2 C ≤ 1 − γnμ 
+
+2 + 108 γ6L4
+
+> max
+
+μ2 C
+
+> C≤64 n5L4
+> max
+
+≤ 1 − γnμ 
+
+2 + 108 γ6L4
+
+> max
+
+μ2 64 n5L4
+
+> max
+
+≤ 1 − γnμ 
+
+4 (52) 40 Published as a conference paper at ICLR 2026 Thus, substituting (52) in (51) 
+
+E
+
+h
+
+∥x0 
+
+> k+1
+
+− x∗∥4
+
+i
+
+≤
+
+
+
+1 − γnμ 
+
+4
+
+
+
+E
+
+h
+
+∥xk 
+
+> 0
+
+− x∗∥4
+
+i
+
++ O  γ5n (σ2 
+
+> ∗
+
+)2 + 6912 γ6L4
+
+> max
+
+μ2 (n − 1) σ4
+
+> ∗
+
+Taking expectation with respect to the invariant measure πγ and using Assumption 2.4 and the fact that σ2 
+
+> ∗
+
+< +∞,we obtain 
+
+γnμ 
+
+4 Ex∼πγ ∥x − x∗∥4 ≤ O  γ5n
+
+and thus we have 
+
+Ex∼πγ ∥x − x∗∥4 ≤ O  γ4
+
+## F PROOF OF BIAS FOR RR 1 AND RR 1⊕RR 2 METHODS 
+
+## (L EMMA 4.5) AND (T HEOREM 4.6) 
+
+F.1 JACOBIAN BOUND FOR ONE -PASS MAP 
+
+Lemma F.1 (Jacobian bound for one-pass map) . Assume each component Fi : Rd → Rd is C1 near x∗ with 
+
+∥∇ Fi(x∗)∥op ≤ Li and let Lmax = max i Li. For a permutation ω ∈ Sn, define the inner one-step map 
+
+Φω,i (x) := x − γF ωi (x), i = 0 , . . . , n − 1,
+
+its composition over one reshuffled pass 
+
+Φ(n) 
+
+> ω
+
+(x) := Φ ω,n −1 ◦ · · · ◦ Φω, 0(x),
+
+and the epoch map 
+
+H(x, ω ) := x − γ
+
+> n−1
+
+X
+
+> i=0
+
+Fωi
+
+ x[i](x, ω ), x[0] (x, ω ) = x, x[i+1] (x, ω ) = Φ ω,i 
+
+ x[i](x, ω ).
+
+Then, at x∗ it holds that 
+
+∥∇ xG(x∗, ω )∥op ≤ 1 + 
+
+> n
+
+X
+
+> i=1
+
+(γL max )i.
+
+Consequently, the spectral radius of ∇xG(x∗, ω ) is at most 1 + Pni=1 (γL max )i.Our first lemma aims to bound the maximum eigenvalue of the matrix ∇xH(ω, x ∗) with respect to the known Lipschitz constants of the operators Fi, ∀i ∈ [n].
+
+Lemma F.2. The maximum eigenvalue of the operator ∇xG(x∗, ω ) is LGmax = 1 + nP
+
+> i=1
+
+(γL max )i.
+
+Proof. Let ϕωi (x, z ) = x − γF ωi (z). Define, also, the k−step operator ϕ(k) 
+
+> ω
+
+(x, z ) =
+
+ϕωk
+
+ x, ϕ ωk−1 (x, ...ϕ ω1 (x, z ) ... ) with ϕ(0)  
+
+> ω
+
+(x, z ) = z and obtain that 
+
+x0 
+
+> k+1
+
+= H(x0
+
+> k
+
+, ω )
+
+∇xG(x0
+
+> k
+
+, ω ) = I − ∇ ϕ(n) 
+
+> ω
+
+(x0
+
+> k
+
+, x 0
+
+> k
+
+)
+
+since G(x0
+
+> k
+
+, ω ) := Pn−1 
+
+> i=0
+
+Fωik
+
+ xik
+
+.The gradient of G(·, ω ) is computed by deriving first the partial derivatives of ϕ(n) 
+
+> ω
+
+(x, z ) with respect to x and z.We prove by induction that 41 Published as a conference paper at ICLR 2026 • ∇z ϕ(n) 
+
+> ω
+
+(x, z ) = ( −γ)n∇Fωn
+
+Äϕ(n−1)  
+
+> ω
+
+(x, z )ä · ∇ Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fω1
+
+Äϕ(0)  
+
+> ω
+
+(x, z )ä
+
+• ∇xϕ(n) 
+
+> ω
+
+(x, z ) = n−1P
+
+> j=0
+
+(−γ)j ∇Fωn−1 (ϕ(n) 
+
+> ω
+
+(x, z )) ∇Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fωn−j+1 
+
+Äϕ(n−j) 
+
+> ω
+
+(x, z )ä
+
+For k = 1 , we have that ϕ(1)  
+
+> ω
+
+(x, z ) = ϕω1 (x, z ) = x − γF ω1 (z) and it holds that 
+
+∇z ϕ(1)  
+
+> ω
+
+(x, z ) = −γ∇Fω0 (z)
+
+∇xϕ(1)  
+
+> ω
+
+(x, z ) = I
+
+thus the inductive hypothesis holds for k = 1 . Assuming that it holds for n − 1, we, next, prove that it holds for n.We have that 
+
+∇z ϕ(n) 
+
+> ω
+
+(x, z ) = ∇z ϕω
+
+Äx, ϕ (n−1)  
+
+> ω
+
+(x, z )ä ∇z ϕ(n−1)  
+
+> ω
+
+(x, z )= (−γ)∇Fωn
+
+Äϕ(n−1)  
+
+> ω
+
+(x, z )ä · (−γ)n−1∇Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fω1
+
+Äϕ(0)  
+
+> ω
+
+(x, z )ä
+
+= (−γ)n∇Fωn
+
+Äϕ(n−1)  
+
+> ω
+
+(x, z )ä · ∇ Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fω1
+
+Äϕ(0)  
+
+> ω
+
+(x, z )ä
+
+We, next, compute the gradient with respect to x and get 
+
+∇xϕnω (x, z ) = ∇xϕω (x, ϕ (n−1)  
+
+> ω
+
+(x, z )) + ∇z ϕω
+
+Äx, ϕ (n−1)  
+
+> ω
+
+(x, z )ä ∇xϕ(n−1)  
+
+> ω
+
+(x, z ) (53) Using the fact that ∇xϕω (x, ϕ (n−1)  
+
+> ω
+
+(x, z )) = I, ∇z ϕω
+
+Äx, ϕ (n−1)  
+
+> ω
+
+(x, z )ä = ∇Fωn (ϕ(n−1)  
+
+> ω
+
+(x, z )) and the inductive hypothesis for ∇xϕ(n−1)  
+
+> ω
+
+(x, z ), we obtain 
+
+∇z ϕ(n) 
+
+> ω
+
+(x, z ) = I − γ∇Fωn (ϕ(n−1)  
+
+> ω
+
+(x, z )) 
+
+> n−2
+
+X
+
+> j=0
+
+(−γ)j ∇Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fωn−j
+
+Äϕ(n−1−j) 
+
+> ω
+
+(x, z )ä
+
+= I +
+
+> n−2
+
+X
+
+> j=0
+
+(−γ)j+1 ∇Fωn−1 (ϕ(n) 
+
+> ω
+
+(x, z )) ∇Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fωn−j
+
+Äϕ(n−1−j) 
+
+> ω
+
+(x, z )ä
+
+= I +
+
+> n−1
+
+X
+
+> j=1
+
+(−γ)j ∇Fωn−1 (ϕ(n) 
+
+> ω
+
+(x, z )) ∇Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fωn−j+1 
+
+Äϕ(n−j) 
+
+> ω
+
+(x, z )ä
+
+=
+
+> n−1
+
+X
+
+> j=0
+
+(−γ)j ∇Fωn−1 (ϕ(n) 
+
+> ω
+
+(x, z )) ∇Fωn−1
+
+Äϕ(n−2)  
+
+> ω
+
+(x, z )ä · ... · ∇ Fωn−j+1 
+
+Äϕ(n−j) 
+
+> ω
+
+(x, z )ä
+
+Thus, in order to compute ∇xG(ω, x ∗) = I − ∇ ϕ(n) 
+
+> ω
+
+(x∗, x ∗), we first compute ∇ϕ(n) 
+
+> ω
+
+(x∗, x ∗). Since x∗ is a stationary point, it is a fixed point of the operator ϕ(j) 
+
+> ω
+
+(x∗, x ∗) = x∗, ∀j ≥ 0. From chain rule, we have that 
+
+∇ϕ(n) 
+
+> ω
+
+(x∗, x ∗) = ∇z ϕ(n) 
+
+> ω
+
+(x∗, x ∗) + ∇xϕ(n) 
+
+> ω
+
+(x∗, x ∗) (54) 
+
+= (−γ)nnY
+
+> j=1
+
+∇Fωj (x∗) + 
+
+> n−1
+
+X
+
+> i=1
+> i
+
+Y
+
+> j=1
+
+(−γ∇Fωn−j (x∗)) (55) 
+
+=
+
+> n
+
+X
+
+> i=1
+> i
+
+Y
+
+> j=1
+
+(−γ∇Fωn−j (x∗)) (56) 42 Published as a conference paper at ICLR 2026 In order to find the maximum eigenvalue of the operator ∇ϕ(n) 
+
+> ω
+
+(x∗, x ∗), we apply the sub-multiplicative property of the operator norm to get 
+
+> n
+
+X
+
+> i=1
+> i
+
+Y
+
+> j=1
+
+(−γ∇Fωn−j (x∗)) 
+
+> op
+
+≤
+
+> n
+
+X
+
+> i=1
+> i
+
+Y
+
+> j=1
+
+(−γ∇Fωn−j (x∗)) 
+
+> op
+
+≤
+
+> n
+
+X
+
+> i=1
+> i
+
+Y
+
+> j=1
+
+∥ − γ∇Fωn−j (x∗)∥op 
+
+≤
+
+> n
+
+X
+
+> i=1
+
+γiiY
+
+> j=1
+
+Ln−j (57) 
+
+≤
+
+> n
+
+X
+
+> i=1
+
+(γL max )i (58) where Li is the maximum eigenvalue of ∇Fi(x∗) and Lmax is the maximum over all eigenvalues of ∇Fi(x∗), ∀i ∈
+
+[n]. Since ∇G(ω, x ∗) = I − ∇ ϕ(n) 
+
+> ω
+
+(x0
+
+> k
+
+, x ∗), using the submultiplicative property of the operator norm we have that ∥∇ G(ω, x ∗)∥op ≤ 1 + ∥∇ ϕ(n) 
+
+> ω
+
+(x0
+
+> k
+
+, x ∗)∥op and thus the maximum eigenvalue of ∇G(ω, x ∗) is LGmax =1 + nP
+
+> i=1
+
+(γL max )i.We, next, provide the theorem establishing that the combination of the two heuristics lead to a refined bias of the order O  γ3.F.2 HIGHER -O RDER TERMS OF RR 1 BIAS 
+
+(L EMMA 4.5) 
+
+Lemma F.3 (Extended version of Lemma 4.5) . Let λ = 0 and Assumptions 2.1–2.4 hold. If Perturbed SGD-RR 1 is run with γ < γ max , it holds that 
+
+bias( Perturbed SGD-RR 1) = lim sup 
+
+> k→∞
+
+∥ E[xk] − x∗∥ = C(x∗)γ + O(γ3).
+
+⇕
+
+Eπγ [x] = x∗ + γA + O  γ3
+
+where A = − 12 ∇xH(ω, x ∗)−1∇2H(ω, x ∗)M R 
+
+> Rd
+
+C(x)πγ (dx ), C = E
+
+h
+
+U⊗2
+
+> ω1k
+
+i
+
+, LGmax = 1 + nP
+
+> i=1
+
+Limax ,
+
+M = ∇xH(ω, x ∗) ⊗ I + I ⊗ ∇ xH(ω, x ∗) − γ∇xH(ω, x ∗) ⊗ ∇ xH(ω, x ∗) and the maximum step size is 
+
+γmax = min 
+
+ß μ
+
+> 3nL 2
+> max
+
+,
+
+√1+6 μ2L2
+
+> max −112 nL 2
+> max
+
+, μ3/5
+
+> 8nL 3/5
+> max
+
+™
+
+.
+
+Proof. From a third order Taylor expansion of G around x∗, we have that 
+
+H(ω, x ) = ∇xH(ω, x ∗)( x − x∗) + 12 ∇2H(ω, x ∗)( x − x∗)⊗2 + R1(x), ∀x ∈ Rd (59) where the reminder R1(x) satisfies sup x∈Rd
+
+¶ R1(x)∥∥x−x∗∥3
+
+© < +∞. Taking expectation with respect to the invariant distribution πγ and using the fact that Eπγ [H(ω, x )] = 0 , we get 
+
+0 = Eπγ
+
+ï
+
+∇xH(ω, x ∗)( x − x∗) + 12 ∇2H(ω, x ∗)( x − x∗)⊗2 + R1(x)
+
+ò
+
+(60) From Lemma E.4 and using Holder inequality and the fact that sup x∈Rd
+
+¶ R1(x)∥∥x−x∗∥3
+
+© < +∞, we obtain 
+
+∇xH(ω, x ∗) Eπγ [x − x∗] + 12 ∇2H(ω, x ∗)
+
+Z
+
+> Rd
+
+(x − x∗)⊗2πγ (dx ) = O  γ3 (61) 43 Published as a conference paper at ICLR 2026 Taking the second order Taylor of G around x∗, we have that 
+
+x10 − x∗ = x00 − x∗ − γ∇xH(ω, x ∗)( x00 − x∗) + γUk 
+
+> 1
+
+(x00) + γR 2(x00) (62) with R2 the second order reminder satisfying sup x∈Rd
+
+¶ R2(x)∥∥x−x∗∥2
+
+© < +∞. From the second order moment of equation (62), the unbiasedness of the noise Uk, ∀i, k ∈ N, and Theorem E.4, we have that 
+
+Z
+
+> Rd
+
+(x − x∗)⊗2πγ (dx ) = [I − γ∇xH(ω, x ∗)] 
+
+Z
+
+> Rd
+
+(x − x∗)⊗2πγ (dx ) [ I − γ∇xH(ω, x ∗)] +γ2
+
+Z
+
+> Rd
+
+C(x)πγ (dx ) + O  γ5
+
+Rearranging the terms, we get 
+
+M
+
+Z
+
+> Rd
+
+(x − x∗)⊗2πγ (dx ) = γ
+
+Z
+
+> Rd
+
+C(x)πγ (dx ) + O  γ3 (63) where M = ∇xH(ω, x ∗) ⊗ I + I ⊗ ∇ xH(ω, x ∗) − γ∇xH(ω, x ∗) ⊗ ∇ xH(ω, x ∗).We, next, show that the operator M is invertible for the selected step size by proving that it is symmetric and positive definite. Let λi, ∀i ∈ [d], be the eigenvalues of ∇xH(ω, x ∗) with {ui}i∈[d] the corresponding eigenvectors. Note that I − γ 
+
+> 2
+
+∇xH(ω, x ∗) has eigenvalues (1 − γ 
+
+> 2
+
+λi) > 0 and thus for γ < 2 
+
+> λmax (∇xH(ω,x ∗))
+
+it is symmetric positive definite on the same basis {ui}i∈[d]. Hence we can factor the operator M as 
+
+M = ∇xH(ω, x ∗) ⊗ I + I ⊗ ∇ xH(ω, x ∗) − γ∇xH(ω, x ∗) ⊗ ∇ xH(ω, x ∗)= ∇xH(ω, x ∗) ⊗ (I − γ
+
+2 ∇xH(ω, x ∗)) + ( I − γ
+
+2 ∇xH(ω, x ∗)) ⊗ ∇ xH(ω, x ∗)
+
+Thus, the vectors ui ⊗ uj , ∀i, j ∈ [d] diagonalize M with eigenvalues μi,j = λi(1 − γλ j ) + λj (1 − γλ i), ∀i, j ∈ [d].From Lemma F.2, we have that the maximum eigenvalue of ∇xH(ω, x ∗) is LGmax = 1 + nP
+
+> i=1
+
+(γL max )i and hence for γ < 1 we have that γL max ≤ 1 and hence LGmax < ˜LGmax =: 1 + n. Selecting the stepsize such that γ < 2 
+
+> n+1
+
+,
+
+it holds that μi,j > 0, ∀i, j ∈ [d], and thus M is positive definite and invertible. Thus, multiplying (63) with M −1
+
+from the left, we get Z
+
+> Rd
+
+(x − x∗)⊗2πγ (dx ) = γM −1
+
+Z
+
+> Rd
+
+C(x)πγ (dx ) + O  γ3 (64) Substituting (64) into (61) and rearranging the terms, we obtain 
+
+∇xH(ω, x ∗) Eπγ [x − x∗] = − γ
+
+2 ∇2H(ω, x ∗)M
+
+Z
+
+> Rd
+
+C(x)πγ (dx ) + O  γ3
+
+⇒ Eπγ [x − x∗] = − γ
+
+2 ∇xH(ω, x ∗)−1∇2H(ω, x ∗)M
+
+Z
+
+> Rd
+
+C(x)πγ (dx ) + O  γ3 (65) Letting A = − 12 ∇xH(ω, x ∗)−1∇2H(ω, x ∗)M R 
+
+> Rd
+
+C(x)πγ (dx ), we obtain 
+
+Eπγ [x] = x∗ + γA + O  γ3 (66) F.3 PROOF OF BIAS REFINEMENTS OF RR 1⊕RR 2
+
+(T HEOREM 4.6) 
+
+Theorem F.4 (Restatement of Theorem 4.6) . Under the assumptions of Lemma 4.5, Algorithm 1 output satisfies Last-iterate version (line 9): ∥ E[xk] − x∗∥ ≤ c(1 − ρ)k + O(γ3),
+
+Averaged-iterate version (line 10): E
+
+"
+
+> 1
+> kk
+
+X
+
+> m=1
+
+xm
+
+#
+
+− x∗ ≤ c/ρ k + O(γ3).
+
+and the attained MSE is bounded by 
+
+E ∥xk − x∗∥2 ≤ c′(1 − ρ′)k + O  γ2
+
+44 Published as a conference paper at ICLR 2026 where ρ, ρ ′ ∈ (0 , 1) , c, c ′ < ∞.
+
+Proof. From Lemma F.3, we have that the iterates xk,γ of Perturbed SGD– RR 1with step size γ satisfy 
+
+Exγ ∼πγ [x] = x∗ + γA + O  γ3 (67) Similarly the iterates (x2γ,k )k of SGD-RR with step size 2γ satisfy 
+
+Ex2γ ∼π2γ [x2γ ] = x∗ + 2 γA + O  γ3 (68) Thus, from (67), (68) we can compute the Richardson Romberg iterates as 
+
+ Exγ ∼πγ [2 x] − Ex2γ ∼π2γ [x2γ ] = O  γ3 (69) Consider the test function ℓ(x) = x. The function satisfies the assumptions in both Theorem D.7, 4.4. Combining (69) with the rate that the iterates of the method tend to the limiting invariant distribution and the corresponding Central Limit Theorem from Theorems D.7, 4.4, we obtain 
+
+∥ E[xk] − x∗∥ ≤ c(1 − ρ)k + O(γ3), (70) 
+
+E
+
+"
+
+> 1
+> kk
+
+X
+
+> m=1
+
+xm
+
+#
+
+− x∗ ≤ c/ρ k + O(γ3). (71) where ρ ∈ (0 , 1) , c ∈ (0 , +∞).For the MSE bounds, we have that 
+
+E ∥xk − x∗∥2 = E ∥2xk,γ − xk, 2γ − x∗∥2
+
+= E ∥2 ( xk,γ − x∗) − (xk, 2γ − x∗) ∥2
+
+> (2)
+
+≤ 8 E ∥xk,γ − x∗∥2 + 2 E ∥xk, 2γ − x∗∥2
+
+Applying Theorem 4.1 twice, we have that 
+
+E ∥xk − x∗∥2 ≤ 8
+
+
+
+1 − γnμ 
+
+2
+
+k
+
+∥x0 − x∗∥2 + O  γ2 + 2 (1 − γnμ )k∥x0 − x∗∥2 + O  γ2 
+
+≤ 10 
+
+
+
+1 − γnμ 
+
+2
+
+k
+
+∥x0 − x∗∥2 + O  γ2
+
+Thus, there exist ρ′ ∈ (0 , 1) , c ′ ∈ (0 , +∞) such that 
+
+E ∥xk − x∗∥2 ≤ c′(1 − ρ′)k + O  γ2
+
+45 Published as a conference paper at ICLR 2026 
+
+## G ON EXPERIMENTS 
+
+In this section, we provide additional details on the experimental setting used for the conducted experiments. We consider the setup of strongly monotone quadratic min-max problems 
+
+min 
+
+x1∈Rd
+
+max 
+
+x2∈Rd
+
+f (x1, x 2) = 1
+
+n
+
+nX
+
+i=1 
+
+12 xT
+
+1 Aix1 + xT
+
+1 Bix2 − 12 xT
+
+2 Cix2 + αTi x1 − cTi x2.
+
+The matrices Ai are sampled by first sampling an orthogonal matrix P and then sampling a diagonal matrix Di
+
+with elements in the diagonal uniformly sampled from the interval [μ, L ]. The selected parameters μ, L correspond to the strong monotonicity parameter in Assumption 2.2 and the Lipschitz parameter of the underlying problem respectively. We acquire the matrices Ai as the product Ai = P D iP T . We sample the matrices Bi, C i similarly to sampling the matrices Ai with the only difference that the elements of the diagonal matrices Di lie in the interval 
+
+[0 , 0.1] and [μ, L ] respectively. The vectors ai, c i are follow the normal distribution N (0, I ). In all experiments, we use n = 100 , d = 100 , while we specify the values of μ, L in each experiment independently as they differ. We provide additional experiments on the effect of each heuristic in the convergence of the algorithm. More specifically, we compare the classical with-replacement SGDA algorithm, the RR 1variant, the RR 2variant and the algorithm utilizing both heuristics. We run the experiment for multiple stepsizes γ = {10 −3, 10 −4, 10 −5} and multiple condition numbers κ = {1, 5, 10 }.0 2 4 6 8 10 
+
+Epochs (x10 2)            
+
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 1)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 2)            
+
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 5)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 2)            
+
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 10)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 3)              
+
+> 10 8
+> 10 7
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 1)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 3)              
+
+> 10 8
+> 10 7
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 5)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 3)              
+
+> 10 8
+> 10 7
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 10)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 3)              
+
+> 10 8
+> 10 7
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 1)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 3)              
+
+> 10 8
+> 10 7
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 5)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1) 0246810
+
+Epochs (x10 3)         
+
+> 10 8
+> 10 7
+> 10 6
+> 10 5
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Relative Error
+> Strongly Monotone Problem ( = 10)
+> SGDA
+> SGDA-RR1
+> SGDA-RR2
+> SGDA-(RR2+RR1)
+
+Figure 6: Relative Error of the different variants of SGDA. Each row corresponds to a strongly monotone problem with condition number κ = {1, 5, 10 } and each row corresponds to a different step size γ = {10 −3, 10 −4, 10 −5}.The combination of both heuristics RR 2⊕RR 1achieves the smallest relative error in comparison to the other methods. In Figure 6, we observe that all variants converge linearly to a neighbourhood of the solution. Demonstrably, the variant leveraging both heuristics outperforms the other variants, reducing faster the relative error and validating the theoretical results established so far. 46 Published as a conference paper at ICLR 2026 We, next, provide an ablation study on the effect of the proposed heuristic in a variety of common algorithms used in VI and machine learning settings. 
+
+Wasserstein GANs. We train a Wasserstein GAN (WGAN) (Arjovsky et al., 2017) for learning the mean of a multivariate Gaussian and consider the effects of each heuristic in the training of the GAN. In a Wasserstein GAN, the optimization objective is a two-player zero-sum game between the generator G(·) and the discriminator D(·),given by 
+
+inf  
+
+> θ
+
+sup 
+
+> w
+
+Ex∼N (v,I ) [⟨w, x ⟩] − Ez∼N (0 ,I ) [⟨w, z + θ⟩] . (72) The discriminator consists a linear classifier D(x; w) = ⟨w, x ⟩ of the input x ∈ Rd, while the generator returns a noisy estimation G(z; θ) = z + θ of the learned parameter θ ∈ Rd, after sampling a noise vector z ∼ N (0 , I ).In our experiments, the aim of the generator is to learn the mean μ of the true Gaussian distribution with mean 
+
+μ = [3 , 4] T and covariance Σ = 110 I.0 2 4 6 8 10                      
+
+> Iterations (x10 5)
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Distance to Optimal Params  SEG
+> SEG-RR1
+> SEG-RR2
+> SEG-RR1+2 012345
+> Iterations (x 2 10 5)
+> 10 2
+> 10 1
+> 10 0
+> Distance to optimum
+> SOMD
+> SOMD-RR1
+> SOMD-RR2
+> SOMD-RR1+2 0246810
+> Iterations (x 10 5)
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> 10 0
+> Distance to optimum  SCO
+> SCO-RR1
+> SCO-RR2
+> SCO-RR1+2
+
+Figure 7: Wasserstein GAN trained with different heuristics on top of a base algorithm. For all base algorithms, the generator trained with the combination of both heuristics RR 2⊕RR 1converges closer to the optimal parameters than the generator trained with any other algorithmic variant. We examine the effect of the heuristics in a variety of different training algorithms and report the distance from the generator’s optimal parameters for each experiment. Similar to Emmanouilidis et al. (2024), we, first, consider the Stochastic Extragradient (SEG) method as the main algorithmic template for training and use each one of the 4 variants (SEG, SEG-RR 1, SEG-RR 2, SEG-RR 2 ⊕ RR 1) to train a GAN. We use the same constant step size for the generator and discriminator as in Emmanouilidis et al. (2024) and double the step size of the variants that implement Richardson-Romberg extrapolation. Figure 7 shows that the generator trained with SEG-RR 2 ⊕ RR 1
+
+is able to converge closer to the optimal parameters than the generator trained with any other variant and thus the synergy of both heuristics ( RR 2 ⊕ RR 1) is beneficial in training. Following Daskalakis et al. (2017), we train a WGAN with the use of Optimistic Mirror Descent (OMD). Aiming to see the effect of each heuristic even for this algorithm, we use the classical OMD method, the RR 1 variant, the random reshuffling ( RR 2) and the combination of both ( RR 2 ⊕ RR 1). We let the step size of the generator and the discriminator be γG = 0 .02 , γ D = 0 .01 respectively. As shown in Figure 7, the RR 2 ⊕ RR 1 outperforms all other variants, indicating that the advantages of this heuristic remain apparent even for the OMD algorithm. Lastly, we test lightweight second order methods common in the literature of VIs (Mescheder et al., 2017; Loizou et al., 2020). More specifically, Stochastic Consensus Optimization (SCO) is an algorithm that can be seen as a combination of the SGDA algorithm and the Stochastic Hamiltonian (SHMD) method (Loizou et al., 2020), where a regularizer λ articulates the contribution of SHMD that is being introduced in the update rule. Given that the SCO method is related to the SGDA but requires Jacobian vector products, thus being a lightweight second order method, we have run experiments to examine whether the RR 2 ⊕ RR 1 provides benefits in higher-order methods. According to Figure 7, the generator trained with the heuristic RR 2 ⊕ RR 1 converges closer to the optimal parameters than the generator trained with plain SCO or any other variant. 
+
+On Single-Run Experiments & Variance of Observed Behaviour. For completeness, we report the variability of our experimental results over single runs, establishing a more refined description of the effect of each heuristic empirically. More specifically, in Figure 8 we plot the mean and standard deviations for each of the 4 variants over 5 runs. As shown in Figure 8, the RR 2 ⊕ RR 1 variant outperforms all other heuristics even in single trials. 
+
+Wall-clock time Comparison of the different heuristics. We, next, compare the wall-clock time of the different heuristics. All 4 variants have the same per iteration cost in terms of gradient evaluations, since the only difference between the classical SGD algorithm and the RR 1 variant is the way that the mini-batch gradients are sampled, while in RR 2 and RR 2⊕RR 1the two chains of the Richardson extrapolation can be run in parallel. 47 Published as a conference paper at ICLR 2026 
+
+Figure 8: Mean and standard deviation of each heuristic over 5 trials. The combination of both heuristics 
+
+RR 2⊕RR 1achieves the smallest relative error in comparison to the other methods. Interestingly, SGDA with random reshuffling typically runs faster in wall-clock time than SGDA with with-replacement sampling. The following factors explain why random reshuffling can be run faster, as observed in our experiments: • RR 1 performs only one random operation per epoch. With with-replacement sampling, each iteration requires a random draw it ∼ U nif orm (1 , . . . , n ).• RR 1 calls the PRNG once per epoch (through randperm(n) or equivalent), after which all iterations are sequential. This eliminates thousands of PRNG calls and reduces interpreter overhead. We have reproduced the same experiment as in Figure ?? and have reported the wall-clock time needed for each method. According to table 2, the RR 2 ⊕ RR 1 heuristic runs in half the time required for the plain SGDA variant and comparable time with respect to random reshuffling. Hence, thanks to parallelization one can obtain the benefits from the synergy of the two heuristics without the need of a higher wall-clock time. Table 2: Wall-clock time comparison of SGDA variants. 
+
+Method Time (sec) 
+
+SGDA 107.59 SGDA-RR 1 50.92 SGDA-RR 2 107.59 SGDA-RR 2 ⊕ RR 1 51.94 48
