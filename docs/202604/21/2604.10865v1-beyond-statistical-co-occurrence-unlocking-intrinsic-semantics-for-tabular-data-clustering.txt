@@ -1,0 +1,390 @@
+Title: Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering
+
+URL Source: https://arxiv.org/pdf/2604.10865v1
+
+Published Time: Tue, 14 Apr 2026 01:32:53 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering 
+
+Mingjie Zhao 1 Yunfan Zhang 1 Yiqun Zhang 2 Yiu-ming Cheung* 1
+
+Abstract 
+
+Deep Clustering (DC) has emerged as a powerful tool for tabular data analysis in real-world do-mains like finance and healthcare. However, most existing methods rely on data-level statistical co-occurrence to infer the latent metric space, of-ten overlooking the intrinsic semantic knowledge encapsulated in feature names and values. As a result, semantically related concepts like ‘Flu’ and ‘Cold’ are often treated as symbolic tokens, causing conceptually related samples to be iso-lated. To bridge the gap between dataset-specific statistics and intrinsic semantic knowledge, this paper proposes Tabular-Augmented Contrastive Clustering (TagCC), a novel framework that an-chors statistical tabular representations to open-world textual concepts. Specifically, TagCC uti-lizes Large Language Models (LLMs) to distill underlying data semantics into textual anchors via semantic-aware transformation. Through Con-trastive Learning (CL), the framework enriches the statistical tabular representations with the open-world semantics encapsulated in these an-chors. This CL framework is jointly optimized with a clustering objective, ensuring that the learned representations are both semantically co-herent and clustering-friendly. Extensive exper-iments on benchmark datasets demonstrate that TagCC significantly outperforms its counterparts. 
+
+1. Introduction 
+
+Deep Clustering (DC) has emerged as a promising technique for knowledge discovery, particularly for tabular datasets widespread in real-world domains like finance and health-care (Li et al., 2025; Hollmann et al., 2025). Unlike tra-ditional shallow models (Zhang & Cheung, 2023; Zhang 
+
+> 1
+
+Department of Computer Science, Hong Kong Baptist Uni-versity, Hong Kong, China, 2Department of Computer Science, Guangdong University of Technology, Guangzhou, China. Corre-spondence to: Yiu-ming Cheung <ymc@comp.hkbu.edu.hk >.
+
+Preprint. April 14, 2026. Input Tabular Data Snippet         
+
+> ID: A
+> ID: B
+> ID: C
+> Condition: Flu
+> Condition: Cold
+> Condition: Fracture
+> …
+> …
+> …
+> C (Fracture) B (Cold)
+> A (Flu) ddd
+> C (Fracture)
+> B (Cold)
+> A (Flu)
+> High Similarity
+> Large
+> Semantic Gap
+> Statistical Encodings
+> (One -Hot/Embeddings)
+> Semantic View
+> (True Distribution)
+
+Figure 1. Comparison between statistical encoding (Left) and semantic relationship (Right). Statistical encoding strategies treat related concepts like ‘Flu’ and ‘Cold’ as orthogonal to ‘Fracture’, i.e., equidistant. In contrast, ideally, the latent space should be aligned with open-world semantics to ensure that conceptually similar samples are partitioned into coherent clusters. 
+
+et al., 2025), DC leverages the powerful non-linear fitting capabilities of neural networks to capture intricate feature in-teractions within raw data, mapping them into a latent repre-sentation where clustering objectives can be optimized (Ren et al., 2024; Zhou et al., 2024; Gorishniy et al., 2021). To effectively learn such representations, existing frameworks commonly rely on two paradigms: ReConstruction-based (RC) methods (Svirsky & Lindenbaum, 2024; Rabbani et al., 2025; Guo et al., 2017), which learn representations by min-imizing data reconstruction error to preserve local structure, and Contrastive Learning-based (CL) methods (Chen et al., 2023; Wang & Isola, 2020), which maximize the agreement between augmented views of the same sample while pushing apart distinct samples to learn robust representations. These approaches have demonstrated significant success in capturing the statistical correlations and data manifolds within tabular data. Nevertheless, they are limited to in-ferring latent dependencies implicitly through data-level co-occurrences, such as statistical associations between fea-tures, treating feature values merely as symbolic tokens or discrete scalars while disregarding the semantic priors encapsulated in tabular schemas, e.g., feature names and context of feature values. In the real world, where samples are often limited and sparse, such reliance is insufficient to 1
+
+> arXiv:2604.10865v1 [cs.AI] 13 Apr 2026 Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering
+
+support valid statistical inference. As illustrated in Figure 1, solely relying on such sparse statistical signals may fail to capture the proximity between conceptually related terms like ‘Flu’ and ‘Cold’, leaving them as orthogonal as unre-lated concepts like ‘Fracture’, thereby limiting the model’s capacity to cluster similar samples. Recently, some studies have attempted to incorporate ex-plicit semantic priors into tabular learning by leveraging Pre-trained Language Models (PLM) (Fang et al., 2024). They typically employ serialization strategies (Hegselmann et al., 2023), e.g., concatenation of feature names and values, to convert table rows into text sequences for representation learning (Wang et al., 2025; Borisov et al., 2022). However, such concatenation-based serialization often overlook the distance structure that is essential for clustering, resulting in verbose textual descriptions that lack discriminative focus for partitioning tabular samples (Wang & Sun, 2022; Iida et al., 2021). To mitigate this deficiency, methods like (Rauf et al., 2025) derive initial embeddings from serialized text and subsequently constrain them using statistical priors, such as Mahalanobis distance. Despite these efforts to in-troduce statistical guidance, the model inevitably inherits the vulnerability to data sparsity. Even in large datasets, tabular data manifest as sparse, discrete points rather than continuous manifolds (Wang et al., 2025; Borisov et al., 2022). Consequently, heavy reliance on statistical priors drives the model to overfit isolated statistical correlations inferred from these discrete points, impeding the learning of generalized semantic representations. As a result, the in-trinsic tabular semantics, weakened by concatenation-based serialization, are further overshadowed during training. This imposes an inevitable performance ceiling, as the clustering objective cannot compensate for the under-utilized semantic priors and unreliable statistical priors. In this paper, we propose Tabular-Augmented Contrastive Clustering (TagCC), a novel framework that anchors statis-tical tabular representations to open-world textual concepts derived from tabular schemas. Specifically, distinct from relying on concatenation-based serialization, we leverage the extensive open-world knowledge of Large Language Models (LLMs) to interpret tabular semantics. To this end, we devise a semantic-aware transformation strategy. This mechanism explicitly guides LLM to distill intrinsic data semantics into structured, context-enriched textual anchors, ensuring the generated descriptions remain discriminative for clustering. By aligning tabular representations with these anchors via CL, TagCC enriches the statistical latent space with open-world semantics while preventing the represen-tations from overfitting to isolated statistical correlations. Simultaneously, we jointly optimized the CL objective with the clustering objective, ensuring that the resulting partitions are both semantically coherent and structurally compact. Our main contributions are summarized as follows: • We propose the TagCC framework that introduces a se-mantic anchoring paradigm to tabular learning. Unlike existing methods that rely on statistical co-occurrence to infer latent metric space, TagCC anchors the tabu-lar representations to stable open-world textual con-cepts, incorporating semantic priors to compensate for data sparsity and effectively preventing the model from overfitting to isolated statistical correlations. • A semantic-aware transformation strategy coupled with a CL mechanism is proposed. These components en-code intrinsic data semantics into context-enriched tex-tual anchors and explicitly align tabular representations with these anchors, ensuring that the learned tabular representations capture open-world semantics and are discriminative for clustering. • Extensive experiments on multiple benchmark datasets demonstrate that TagCC achieves superior clustering performance against state-of-the-art counterparts. This highlights that integrating open-world semantic priors yields semantically coherent partitions, outperforming methods that are constrained to inferring data distribu-tions from closed statistical co-occurrences. 
+
+2. Related Work 
+
+In this section, we provide an overview of representation learning for clustering, categorizing methodologies into RC-based and CL-based paradigms, and recent methods for learning with LLMs for tabular data .
+
+RC-based Methods. Early methods like (Xie et al., 2016) and (Guo et al., 2017) optimize clustering by preserving local structure via autoencoder reconstruction constraints, while variational approaches (Jiang et al., 2017; Yang et al., 2019) extend this to probabilistic frameworks. Recent works such as (Chen et al., 2024) and (Svirsky & Lindenbaum, 2024) have refined these for tabular data by modeling hetero-geneous feature interactions. However, they fundamentally rely on geometric proximity, ignoring intrinsic semantics. Although (Rauf et al., 2025) attempts to incorporate seman-tics via serialized text initialization, it suffers from semantic forgetting. As its optimization is governed by statistical con-straints (e.g., Mahalanobis distance), the initial open-world knowledge is diluted during training, causing the model to revert to local statistical dependencies. 
+
+CL-based Methods. This paradigm extracts discrimina-tive features by maximizing agreement between augmented views. Methods like (Bahri et al., 2022) and (Razmadze et al., 2022) enforce instance-level consistency, while graph-based approaches (Bo et al., 2020; Liu et al., 2022) leverage GCNs to capture topological structures. Despite these de-signs, positive pairs are defined solely by intra-dataset sta-2Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering Transformer 
+
+Encoder 
+
+Linear 
+
+Projection 
+
+Categorical 
+
+Features 
+
+Numerical 
+
+Features 
+
+Dual -Branch Representation Learning 
+
+Schema 
+
+Raw Table 
+
+Protocol 
+
+Synthesizer 
+
+Semantic –Aware Transformation 
+
+Raw 
+
+Row ixixit
+
+Semantic 
+
+Anchors it
+
+Joint Alignment and 
+
+Clustering Optimization tab iztxt iz
+
+MLP proto 1μ2μproto align 
+
+Unit Hypersphere 
+
+Tabular Flow Semantic Flow Semantic Embedding Tabular Embedding Cluster Centroid    
+
+> This is a Patient Clinical
+> Records dataset
+> [Attributes]:
+> -ID: Admin Tag (Ignore)
+> -Condition: Diagnosis
+> (Describes health status &
+> pathology, e.g., 'Flu' is
+> viral)
+> -···
+> Generate a clinical patient
+> summary.
+> Filter Noise: Ignore the
+> administrative 'ID' column.
+> Semantic Expansion:
+> Interpret the 'Condition'
+> column using medical
+> knowledge
+> …
+> A 25 -year -old patient
+> diagnosed with Influenza
+> (Flu), a contagious viral
+> respiratory infection
+> characterized by sudden
+> onset of fever, severe
+> fatigue, and muscle aches.
+> ···align
+
+
+
+Inference 
+
+Executor 
+
+Protocol proto 
+
+Figure 2. Overview of the TagCC framework. To bridge the semantic gap in tabular clustering, the framework augments raw table rows with LLM-synthesized semantic anchors ti. These anchors and raw features xi are then processed by a dual-branch encoder, where the trainable tabular network is optimized to align with the frozen semantic backbone. The optimization is conducted on a unit hypersphere 
+
+Z, where the model jointly minimizes CL loss Lalign for semantic consistency and DC loss Lproto for structural compactness. 
+
+tistical co-occurrence. Treating values as symbolic tokens, these methods overlook the semantic proximity between concepts, resulting in ambiguous cluster boundaries when statistical features are sparse. 
+
+LLMs for Tabular Data . Recent adaptations like (Wang & Sun, 2022) and (Hollmann et al., 2025) utilize transformer architectures to model field interactions from serialized text. However, these frameworks are predominantly designed for supervised tasks, relying on labels to resolve ambigu-ity. Directly applying them to clustering yields suboptimal results, as generic textual representations lack the specific cluster-structure constraints required for partitioning data. 
+
+3. Preliminaries 
+
+In this section, we introduce the notations and formally define the problem of deep tabular clustering. Consider a tabular dataset X = {x1, x2, . . . , xn} with n
+
+data samples. Each data sample can be denoted as an m-dimensional row vector xi = [ xi, 1, x i, 2, . . . , x i,m ]⊤ repre-sented by m features A = {a1, a2, ..., am}. The dataset is structured by a schema S, which comprises comprehensive metadata, e.g., background context of the dataset, feature definitions, and specific interpretations of feature values. The goal of deep tabular clustering is to jointly learn a non-linear mapping fθ : X → Z and a set of trainable centroids 
+
+M = {μj }kj=1 , effectively projecting the raw data into a lower-dimensional latent space Z ∈ Rd organized into k
+
+disjoint clusters C = {C1, . . . , C k}.This paper focuses on aligning the representation learning with semantic structures to facilitate semantically coherent clustering. Therefore, the key lies in how to effectively leverage the static metadata in S to generate discriminative semantic anchors for the tabular data, explicitly guiding the optimization of fθ to yield representations that are both statistically compact and semantically distinctive. 
+
+4. Proposed Method 
+
+We first detail the semantic-aware transformation in Sec-tion 4.1, where LLMs are leveraged to distill intrinsic se-mantics into textual anchors. Then, in Section 4.2, we in-troduce the dual-branch representation learning to explicitly align statistical representations with these semantic priors. Finally, the joint optimization objective is presented in Sec-tion 4.3. The pipeline of TagCC is shown in Figure 2. 
+
+4.1. Semantic-Aware Transformation 
+
+To synthesize semantic anchors that are both semantically enriched and discriminative for clustering, avoiding the in-formation degradation inherent in serialization, a guided semantic inference process is essential. However, directly prompting LLMs to interpret tabular rows often yields overly generic outputs due to the lack of task-specific con-straints. To mitigate this, we employ a self-instruction strat-egy that empowers the LLM to assume dual roles, acting as a protocol synthesizer to derive reasoning standards and an inference executor to perform guided transformation. Consequently, the implementation hinges on addressing two 3Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering 
+
+fundamental tasks: T1: automatically distilling a transforma-tion protocol from the tabular schema; and T2: leveraging this protocol to synthesize discriminative, semantic-aware textual anchors. For T1 , the LLM acting as a protocol synthesizer to ana-lyzes the tabular schema S to synthesize a dataset-specific transformation protocol. We systematically provide the gen-eration process with justifications as follows: 
+
+Definition 4.1 (semantic-aware Meta-Principles Pmeta ).
+
+Let Pmeta = {ψhor , ψ ver } be a tuple of constraints that conditions the instruction generation on a schema-derived analytic perspective, e.g., an economist classifying income: 
+
+1) Horizontal Salience ( ψhor ): The instruction should max-imize information density by filtering out administrative noise irrelevant to the analytic goal; 2) Vertical Distinc-tiveness ( ψver ): The instruction must maximize semantic separability by interpreting symbolic terms into open-world concepts from the domain expert’s perspective. Guided by these principles, the LLM formulates the schema 
+
+S into a dataset-specific transformation protocol Iproto 
+
+Iproto = LLM (S, Pmeta ). (1) This automated instantiation distills the tabular schema into executable inference rules, establishing a unified reasoning logic that governs the subsequent interpretation. For T2 , the transformation is formulated as a protocol-guided inference task (Ouyang et al., 2022). Specifically, the LLM interprets the raw data xi by strictly adhering to the reasoning logic defined in the derived protocol Iproto :
+
+ti ∼ PLLM (t | xi, Iproto ). (2) By adhering to Iproto , this controlled reasoning process generates a semantic-aware representation ti that encodes intrinsic data semantics while preserving structural distinc-tiveness for each sample. These representations {ti}ni=1 
+
+serve as stable semantic anchors and are subsequently lever-aged to guide the tabular representation learning. 
+
+4.2. Dual-Branch Representation Learning 
+
+After obtaining the textual anchors {ti}ni=1 , our goal is to utilize them to explicitly guide the tabular encoder fθ , to compensate for the sparsity of statistical information. To facilitate this, it is essential to align the feature spaces of the tabular data and the textual anchors to enable effective semantic injection. To this end, we propose a dual-branch representation learning framework. Specifically, this archi-tecture deploys a tabular encoder branch and a semantic adapter branch to project these disparate modalities into a unified metric space, enabling explicit semantic alignment. 
+
+Tabular encoder branch. To distill intrinsic statistical pat-terns from the raw sample xi, the fθ is designed to handle the inherent heterogeneity of tabular data. Unlike homoge-neous pixel inputs, tabular data typically comprises mixed continuous features anum and discrete features acat . To map these disparate features into a compatible latent space, a type-specific embedding strategy is employed. Specifi-cally, guided by schema S, the l-th feature of xi is projected into a unified dense vector ei,l :
+
+ei,l =
+
+(
+
+Wlxi,l + bl, if al ∈ anum 
+
+Emb l(xi,l ), if al ∈ acat 
+
+, (3) where l = {1, . . . , m }. Here, Wl, bl and Emb l(·) denote the learnable projection parameters for numerical and cate-gorical features, respectively. Subsequently, to model com-plex high-order feature interactions, these local embeddings are concatenated and fused via a Multi-Layer Perceptron (MLP) Φtab , formally defining the encoder mapping fθ :
+
+fθ (xi) = Φ tab 
+
+h 
+
+e(1) ⊕ e(2) ⊕ · · · ⊕ e(m)i 
+
+, (4) The resulting fθ (xi) serves as a statistically rich represen-tation encoding both feature-specific properties and their non-linear correlations. 
+
+Semantic adapter branch. In parallel, to incorporate open-world knowledge into the clustering framework, the aux-iliary semantic adapter gϕ processes the textual anchor ti
+
+generated in the previous stage. To align general semantic knowledge with the task-specific subspace, the text is first encoded by a frozen PLM backbone Eplm (e.g., Sentence-BERT) and then transformed by a learnable linear projector: 
+
+gϕ(ti) = Wsem Eplm (ti) + bsem , (5) where Wsem and bsem are the projection parameters. 
+
+Remark 4.2 (Semantic Anchoring Strategy) . The frozen semantic backbone Eplm acts as a semantic manifold regu-larizer to prevent representational co-adaptation and mode collapse. By providing a stationary target distribution, this strategy forces the tabular encoder to converge towards the pre-defined semantic structure, avoiding the trivial solutions common in unconstrained joint optimization. 
+
+Unified project head. To bridge the distribution gap be-tween the tabular and texture modalities, the raw represen-tation fθ (xi) and the semantic representation gϕ(ti) are mapped onto a shared unit hypersphere Z. Distinct non-linear projection heads ( Proj θ and Proj ϕ) are applied, fol-lowed by ℓ2 normalization: 
+
+ztab i = Proj θ (fθ (xi)) 
+
+∥Proj θ (fθ (xi)) ∥2
+
+, ztxt i = Proj ϕ(gϕ(ti)) 
+
+∥Proj ϕ(gϕ(ti)) ∥2
+
+.
+
+(6) Here, ztab i , z txt i ∈ Rd denote the final normalized embed-dings. This geometric alignment ensures that the dot product directly reflects semantic similarity, thereby facilitating the subsequent semantic-aware clustering objective. 4Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering 
+
+4.3. Joint Alignment and Clustering Optimization 
+
+After obtaining the unified representations for tabular data and semantic anchors, to achieve semantically coherent clustering and avoid overfitting to isolated statistical corre-lations, semantic consistency and structural compactness are simultaneously enforced within the shared latent space. Accordingly, the optimization is governed by a tripartite ob-jective function, integrating cross-view CL, prototype-based DC, and entropy regularization: 
+
+Ltotal = Lalign + αLproto + βLent , (7) where α and β are balancing coefficients. To align the tabular representation with open-world seman-tics, the generated anchor ztxt i serves as the positive refer-ence for the tabular feature ztab i . A CL loss is employed to maximize the agreement between corresponding representa-tions within the batch of size B:
+
+Lalign = − 1
+
+B
+
+> B
+
+X
+
+> i=1
+
+log exp( ⟨ztab i , z txt i ⟩/τ )
+
+PBj=1 exp( ⟨ztab i , z txt j ⟩/τ ) , (8) where τ is the temperature parameter and ⟨· , ·⟩ denotes the dot product. This alignment establishes a semantically meaningful layout in Z before cluster structures are explic-itly formed. 
+
+Theorem 4.3 (Robustness against hallucination) . The con-trastive alignment objective Lalign acts as a robust regu-larizer against semantic hallucination. It effectively limits the impact of suboptimal anchors on the learning process, ensuring that the model’s error grows much slower than the hallucination magnitude ϵ at a sub-linear rate of O(√ϵ).Proof. See Theorem ?? in Appendix ?? and Appendix ?? 
+
+for the proofs and empirical evidence. To uncover the latent cluster structure within the aligned space, the framework employs a set of learnable centroids 
+
+M = {μj }kj=1 . Following the (Li et al., 2021a), the proba-bility pij of assigning sample ztab i to cluster Cj is computed via a softmax over the similarity scores: 
+
+pij = exp( ⟨ztab i , μj ⟩/τ )
+
+Pkj′=1 exp( ⟨ztab i , μj′ ⟩/τ ) . (9) Let P ∈ RB×k denote the soft assignment matrix with entries pij . To enforce high-confidence assignments, a target distribution matrix Q ∈ RB×k is generated, where each entry qij is obtained by sharpening pij :
+
+qij = p2 
+
+> ij
+
+/ P 
+
+> i
+
+pij 
+
+Pkj′=1 (p2 
+
+> ij ′
+
+/ P 
+
+> i
+
+pij ′ ) . (10) 
+
+Table 1. Dataset statistics. m, n, and k∗ are the numbers of features, samples, and true number of clusters, respectively.                                                                               
+
+> No. Dataset Abbrev. Domain mnk∗
+> 1Soybean SO Agriculture 35 307 15 2Breast cancer BR Healthcare 9286 23Car evaluation CA Transportation 61728 44Lenses LE Healthcare 424 35Mammographic MA Healthcare 5961 26Zoo ZO Biology 15 101 77Hayes-roth HA Social Science 4132 38Fertility FE Healthcare 9100 29Heart failure HE Healthcare 12 299 210 Nursery NU Social Science 812960 411 Mushroom MU Biology 21 8124 212 Adult AD Finance 14 48842 2
+
+The clustering loss then minimizes the Kullback-Leibler divergence between the target Q and the prediction P :
+
+Lproto = KL (Q∥P ) = 
+
+> B
+
+X
+
+> i=1
+> k
+
+X
+
+> j=1
+
+qij log qij 
+
+pij 
+
+. (11) Additionally, to prevent the trivial solution where all sam-ples collapse into a single cluster, an entropy regularization term Lent = −H(¯ p) is introduced, maximizing the entropy of the mean cluster assignment ¯p across the batch. Directly optimizing all terms may lead to suboptimal con-vergence due to the misalignment of feature spaces. To mitigate this cold-start problem, we implement a progres-sive curriculum. Specifically, for the initial Twarm epochs, the model is optimized solely via Lalign to establish a pre-liminary semantic topology. In the subsequent structure re-finement phase ( epoch > T warm ), the full objective Ltotal 
+
+is activated. This two-stage mechanism ensures that the cluster centroids M are initialized within a semantically meaningful manifold, thereby stabilizing the optimization of the decision boundaries. The algorithm is summarized as Algorithm ?? in Appendix ?? .
+
+5. Experiments 
+
+To comprehensively validate the effectiveness and inter-pretability of our proposed framework, the experiments are designed to answer five key research questions: • Q1: Does TagCC achieve state-of-the-art cluster-ing performance? Section 5.2 compares TagCC with traditional, popular, and state-of-the-art methods on multiple datasets and performs significance testing to confirm the reliability of performance gains. • Q2: Does semantic enhancement improve the ra-tionality of representations, and to what extent? 
+
+Section 5.3 conducts extensive ablation studies to iso-late the effects of the semantic-aware transformation, the dual-branch architecture, and the CL mechanism. 5Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering 
+
+Table 2. Clustering performance evaluated by the ACC, NMI, and ARI on various datasets (mean ± std). The best and second-best results on each dataset are highlighted in bold and underlined , respectively. ∆ denotes the relative performance gain of the best method over the second-best, calculated as (1 st − 2nd )/2nd × 100% .
+
+Data Index Kmeans DEC CC SCARF QGRL IDC TabDC TagCC ∆
+
+[ICLR’16] [AAAI’21] [ICLR’22] [SIGKDD’24] [ICML’24] [SIGMOD’25] [Ours] SO ARI 0.3918 ± 0.001 0.3808 ± 0.032 0.3050 ± 0.012 0.4015 ± 0.013 0.2620 ± 0.042 0.1489 ± 0.031 0.3340 ± 0.019 0.4773 ± 0.029 ↑ 18.88% ACC 0.5694 ± 0.001 0.5621 ± 0.039 0.4637 ± 0.020 0.5324 ± 0.019 0.3906 ± 0.031 0.2907 ± 0.045 0.4990 ± 0.018 0.6101 ± 0.034 ↑ 7.15% NMI 0.6689 ± 0.001 0.6679 ± 0.024 0.5842 ± 0.013 0.6759 ± 0.009 0.4265 ± 0.049 0.3533 ± 0.047 0.6440 ± 0.012 0.7122 ± 0.015 ↑ 5.37% BR ARI -0.0035 ± 0.000 0.0438 ± 0.058 0.0364 ± 0.033 -0.0033 ± 0.000 0.1700 ± 0.000 0.0564 ± 0.051 0.0150 ± 0.037 0.1489 ± 0.053 ↓ 12.41% ACC 0.5126 ± 0.000 0.5818 ± 0.083 0.5852 ± 0.051 0.5091 ± 0.003 0.7203 ± 0.000 0.6077 ± 0.063 0.5460 ± 0.068 0.7238 ± 0.015 ↑ 0.49% NMI 0.0034 ± 0.000 0.0242 ± 0.028 0.0357 ± 0.028 0.0019 ± 0.001 0.0866 ± 0.010 0.0397 ± 0.027 0.0080 ± 0.011 0.0746 ± 0.026 ↓ 13.86% CA ARI 0.0394 ± 0.000 0.0094 ± 0.013 0.0311 ± 0.012 0.0213 ± 0.015 -0.0013 ± 0.005 0.0160 ± 0.018 0.0270 ± 0.029 0.1862 ± 0.034 ↑ 372.59% ACC 0.3595 ± 0.001 0.3659 ± 0.043 0.3401 ± 0.018 0.3418 ± 0.033 0.6241 ± 0.090 0.5036 ± 0.031 0.3390 ± 0.034 0.5198 ± 0.072 ↓ 16.71% NMI 0.0859 ± 0.000 0.0240 ± 0.021 0.0683 ± 0.015 0.0524 ± 0.029 0.0029 ± 0.002 0.0201 ± 0.015 0.0560 ± 0.027 0.2392 ± 0.074 ↑ 178.46% LE ARI 0.0814 ± 0.005 0.1537 ± 0.172 0.1569 ± 0.068 0.1019 ± 0.171 0.1995 ± 0.127 0.0816 ± 0.169 0.1330 ± 0.085 0.4109 ± 0.145 ↑ 105.96% ACC 0.5333 ± 0.002 0.5667 ± 0.106 0.2875 ± 0.043 0.4958 ± 0.099 0.6667 ± 0.037 0.5333 ± 0.107 0.5290 ± 0.070 0.7042 ± 0.104 ↑ 5.62% NMI 0.2927 ± 0.010 0.3177 ± 0.095 0.3254 ± 0.083 0.2006 ± 0.139 0.2681 ± 0.081 0.1981 ± 0.136 0.3550 ± 0.120 0.4191 ± 0.017 ↑ 18.06% MA ARI 0.3421 ± 0.000 0.3232 ± 0.022 0.3429 ± 0.002 0.2895 ± 0.055 0.3823 ± 0.013 0.3107 ± 0.044 0.3470 ± 0.007 0.4134 ± 0.016 ↑ 8.13% ACC 0.7928 ± 0.000 0.7845 ± 0.010 0.7931 ± 0.001 0.7681 ± 0.027 0.7944 ± 0.011 0.7783 ± 0.021 0.7950 ± 0.003 0.8217 ± 0.006 ↑ 3.36% NMI 0.2823 ± 0.000 0.2558 ± 0.012 0.2665 ± 0.002 0.2427 ± 0.037 0.3108 ± 0.017 0.2528 ± 0.041 0.2790 ± 0.006 0.3365 ± 0.014 ↑ 8.27% ZO ARI 0.6586 ± 0.013 0.6419 ± 0.078 0.3494 ± 0.056 0.6616 ± 0.088 0.7847 ± 0.039 0.4122 ± 0.155 0.8050 ± 0.059 0.8548 ± 0.089 ↑ 6.19% ACC 0.7307 ± 0.007 0.7178 ± 0.066 0.4911 ± 0.053 0.7297 ± 0.070 0.8059 ± 0.017 0.6010 ± 0.085 0.8410 ± 0.054 0.8663 ± 0.069 ↑ 3.01% NMI 0.8044 ± 0.002 0.7934 ± 0.043 0.5716 ± 0.050 0.8020 ± 0.033 0.7754 ± 0.042 0.4959 ± 0.130 0.8660 ± 0.018 0.8839 ± 0.025 ↑ 2.07% HA ARI 0.0446 ± 0.001 0.0094 ± 0.013 0.0241 ± 0.022 0.0480 ± 0.035 -0.0024 ± 0.006 0.0463 ± 0.036 0.0390 ± 0.018 0.0863 ± 0.066 ↑ 79.79% ACC 0.4413 ± 0.001 0.4025 ± 0.032 0.3250 ± 0.025 0.4431 ± 0.030 0.3956 ± 0.021 0.4431 ± 0.038 0.4430 ± 0.026 0.5162 ± 0.060 ↑ 16.50% NMI 0.0575 ± 0.001 0.0240 ± 0.021 0.0413 ± 0.028 0.0582 ± 0.035 0.0091 ± 0.008 0.0746 ± 0.037 0.0600 ± 0.017 0.1027 ± 0.047 ↑ 37.67% FE ARI -0.0041 ± 0.000 -0.0098 ± 0.005 -0.0038 ± 0.003 0.0302 ± 0.035 0.0171 ± 0.082 0.0033 ± 0.029 -0.0080 ± 0.004 0.0637 ± 0.071 ↑ 110.93% ACC 0.5100 ± 0.000 0.5070 ± 0.009 0.5180 ± 0.010 0.6030 ± 0.075 0.7170 ± 0.108 0.5620 ± 0.073 0.5050 ± 0.005 0.7740 ± 0.103 ↑ 7.95% NMI 0.0028 ± 0.000 0.0127 ± 0.008 0.0060 ± 0.005 0.0176 ± 0.014 0.0474 ± 0.027 0.0128 ± 0.015 0.0110 ± 0.009 0.0321 ± 0.034 ↓ 32.28% HE ARI -0.0033 ± 0.000 0.0438 ± 0.058 -0.0014 ± 0.002 0.0273 ± 0.002 0.0829 ± 0.095 0.0036 ± 0.009 0.0090 ± 0.010 0.1563 ± 0.092 ↑ 88.54% ACC 0.5518 ± 0.000 0.5818 ± 0.083 0.5167 ± 0.012 0.6217 ± 0.003 0.6341 ± 0.081 0.5512 ± 0.021 0.5630 ± 0.031 0.7137 ± 0.033 ↑ 12.55% NMI 0.0003 ± 0.000 0.0242 ± 0.028 0.0014 ± 0.001 0.0058 ± 0.001 0.0955 ± 0.048 0.0029 ± 0.003 0.0030 ± 0.002 0.1109 ± 0.076 ↑ 16.13% NU ARI 0.0927 ± 0.005 0.0651 ± 0.071 0.0839 ± 0.086 0.0900 ± 0.101 0.0800 ± 0.048 0.0103 ± 0.008 0.0430 ± 0.025 0.2822 ± 0.026 ↑ 204.42% ACC 0.3326 ± 0.002 0.3211 ± 0.057 0.3110 ± 0.068 0.3336 ± 0.076 0.3383 ± 0.037 0.3014 ± 0.015 0.2920 ± 0.026 0.4741 ± 0.044 ↑ 40.14% NMI 0.1319 ± 0.009 0.0907 ± 0.094 0.1116 ± 0.116 0.1346 ± 0.131 0.1032 ± 0.058 0.0235 ± 0.016 0.0650 ± 0.035 0.3232 ± 0.037 ↑ 140.12% MU ARI 0.2067 ± 0.000 0.2026 ± 0.072 0.2567 ± 0.132 0.4464 ± 0.091 0.1974 ± 0.166 0.1932 ± 0.117 0.1260 ± 0.104 0.5266 ± 0.102 ↑ 17.97% ACC 0.7279 ± 0.000 0.7220 ± 0.041 0.7377 ± 0.088 0.8345 ± 0.042 0.7035 ± 0.098 0.7035 ± 0.086 0.6570 ± 0.094 0.8614 ± 0.035 ↑ 3.22% NMI 0.1471 ± 0.000 0.1634 ± 0.050 0.2246 ± 0.123 0.4341 ± 0.108 0.1986 ± 0.147 0.1553 ± 0.084 0.1370 ± 0.038 0.4667 ± 0.100 ↑ 7.51% AD ARI -0.0319 ± 0.000 -0.0319 ± 0.000 0.0727 ± 0.005 -0.0027 ± 0.001 -0.0422 ± 0.005 0.0150 ± 0.010 -0.0320 ± 0.000 0.0953 ± 0.043 ↑ 31.09% ACC 0.5016 ± 0.000 0.5016 ± 0.000 0.6348 ± 0.005 0.6171 ± 0.006 0.5010 ± 0.006 0.5872 ± 0.007 0.5020 ± 0.000 0.6504 ± 0.044 ↑ 2.46% NMI 0.0429 ± 0.000 0.0429 ± 0.000 0.0891 ± 0.009 0.0000 ± 0.000 0.0000 ± 0.000 0.0381 ± 0.006 0.0430 ± 0.000 0.1057 ± 0.063 ↑ 18.63% Average Rank 5.000 5.139 5.056 4.444 4.417 5.667 5.167 1.111 −
+
+• Q3: Does TagCC learn meaningful cluster struc-tures? Section 5.4 visualizes the learned latent topol-ogy via t-SNE to qualitatively examine the structural compactness and separability of the clusters. • Q4: Does the optimization process converge reliably and preserve open-world semantics? Section 5.5 an-alyzes the training dynamics, demonstrating stable con-vergence and the preservation of semantic consistency throughout the optimization. • Q5: Is TagCC robust to parameter and LLM vari-ations? Appendix ?? investigates the parameter sen-sitivity of the proposed framework and evaluates its robustness when utilizing different LLMs for semantic anchor generation. 
+
+5.1. Experimental Settings 
+
+Experimental settings are briefly described below. Please refer to Appendix ?? for the detailed experimental settings. 
+
+12 datasets from various domains are utilized for the ex-periments, with the number of samples ranging from 0.02k to 48.84k. All the datasets are real public datasets col-lected from the UCI Machine Learning Repository (Dua & Karra Taniskidou, 2017), and their statistical information is shown in Table 1. Each dataset is preprocessed by removing samples with missing values. For all comparison methods, the number of clusters k is set to k∗, i.e., the true number of clusters specified by the dataset labels. 
+
+Seven representative methods are selected for com-parison. k-means (Ball & Hall, 1967) and DEC (Xie et al., 2016) are adopted as traditional and generative baselines. Contrastive Clustering (CC) (Li et al., 2021b) and SCARF (Bahri et al., 2022) are included to represent CL paradigms. Moreover, Quaternion Graph Representa-tion Learning (QGRL) (Chen et al., 2024), Interpretable Deep Clustering (IDC) (Svirsky & Lindenbaum, 2024), and TableDC (Rauf et al., 2025) are employed as the latest state-of-the-art (SOTA) counterparts. Each method is executed ten times, and the average performance is reported. 6Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering 
+
+Table 3. Ablation studies of TagCC. TCC removes the semantic-aware transformation. TLC and TTC denote single-branch deep clustering using only textual or tabular embeddings, respectively. The best results are highlight in bold . AR reports Average Rank of each method.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+
+> Data ARI ACC NMI TTC TLC TCC TagCC TTC TLC TCC TagCC TTC TLC TCC TagCC SO 0.41 ±0.04 0.10 ±0.02 0.38 ±0.03 0.48 ±0.03 0.55 ±0.04 0.28 ±0.03 0.51 ±0.04 0.61 ±0.03 0.66 ±0.03 0.20 ±0.04 0.53 ±0.04 0.71 ±0.01
+> BR 0.02 ±0.05 0.02 ±0.03 0.07 ±0.03 0.15 ±0.05 0.56 ±0.06 0.59 ±0.06 0.67 ±0.03 0.72 ±0.02 0.02 ±0.03 0.01 ±0.01 0.03 ±0.02 0.07 ±0.03
+> CA 0.05 ±0.03 0.02 ±0.02 0.06 ±0.05 0.19 ±0.03 0.37 ±0.04 0.45 ±0.09 0.46 ±0.12 0.52 ±0.07 0.07 ±0.04 0.03 ±0.02 0.04 ±0.02 0.24 ±0.07
+> LE 0.08 ±0.12 0.12 ±0.13 0.21 ±0.18 0.41 ±0.15 0.50 ±0.09 0.57 ±0.07 0.62 ±0.11 0.70 ±0.10 0.22 ±0.18 0.16 ±0.10 0.27 ±0.13 0.42 ±0.02
+> MA 0.38 ±0.02 0.24 ±0.09 0.40 ±0.01 0.41 ±0.02 0.81 ±0.01 0.74 ±0.05 0.80 ±0.00 0.82 ±0.01 0.32 ±0.02 0.19 ±0.07 0.31 ±0.01 0.34 ±0.01
+> ZO 0.68 ±0.07 0.51 ±0.03 0.80 ±0.06 0.85 ±0.09 0.75 ±0.04 0.69 ±0.04 0.84 ±0.05 0.87 ±0.07 0.80 ±0.03 0.59 ±0.06 0.85 ±0.03 0.88 ±0.03
+> HA 0.04 ±0.03 0.00 ±0.00 0.05 ±0.02 0.09 ±0.07 0.46 ±0.04 0.00 ±0.00 0.47 ±0.04 0.52 ±0.06 0.05 ±0.02 0.00 ±0.00 0.05 ±0.02 0.10 ±0.05
+> FE -0.00 ±0.01 0.09 ±0.01 0.09 ±0.03 0.06 ±0.07 0.54 ±0.03 0.70 ±0.02 0.75 ±0.07 0.77 ±0.10 0.00 ±0.01 0.05 ±0.01 0.04 ±0.02 0.03 ±0.03 HE 0.01 ±0.02 0.03 ±0.02 0.05 ±0.02 0.16 ±0.09 0.56 ±0.04 0.59 ±0.02 0.63 ±0.03 0.71 ±0.03 0.01 ±0.01 0.02 ±0.01 0.04 ±0.02 0.11 ±0.08
+> NU 0.05 ±0.04 0.12 ±0.08 0.27 ±0.04 0.28 ±0.03 0.32 ±0.05 0.46 ±0.06 0.47 ±0.04 0.47 ±0.04 0.06 ±0.07 0.12 ±0.08 0.31 ±0.05 0.32 ±0.04
+> MU 0.35 ±0.19 0.21 ±0.16 0.28 ±0.12 0.53 ±0.10 0.78 ±0.10 0.70 ±0.11 0.76 ±0.07 0.86 ±0.04 0.32 ±0.17 0.16 ±0.13 0.21 ±0.09 0.47 ±0.10
+> AD 0.04 ±0.04 0.03 ±0.04 0.04 ±0.04 0.10 ±0.04 0.58 ±0.04 0.54 ±0.04 0.60 ±0.04 0.65 ±0.04 0.04 ±0.05 0.03 ±0.05 0.04 ±0.05 0.11 ±0.06
+> AR 3.25 3.42 2.17 1.17 3.25 3.50 2.25 1.00 2.92 3.58 2.33 1.17
+
+Three validity indices including clustering ACCuracy (ACC) (He et al., 2005), Normalized Mutual Informa-tion (NMI) (Powers, 2020), and Adjusted Rand Index (ARI) (Rand, 1971; Gates & Ahn, 2017), are adopted to evaluate clustering performance, where larger values indi-cate better performance. We also conduct the two-tailed Bonferroni-Dunn (BD) post-hoc test (Dem ˇsar, 2006) to sta-tistically analyze the superiority of our TagCC. 
+
+5.2. Clustering Performance 
+
+Clustering performances of different methods across ACC, NMI, and ARI indices are reported in Table 2. The best and second-best results on each dataset are highlighted in 
+
+bold and underlined , respectively. ∆ denotes the relative performance gain of the best method over the second-best, calculated as (1 st − 2nd )/2nd × 100% .The observations include the following four aspects: 1) TagCC achieves the best performance on 11 out of 12 datasets in terms of ARI and ACC, and 10 datasets in terms of NMI. This consistent performance across all three met-rics confirms its effectiveness compared to its counterparts; 2) On the BR and AD datasets, TagCC is not obviously better than the second-best method. However, the second-best method varies across different datasets, highlighting the robustness of TagCC against varying data distributions; 3) Although QGRL obtains a higher ACC on the CA dataset, its NMI and ARI scores are extremely low. This is be-cause QGRL tends to assign most samples to the majority class, whereas TagCC avoids such degeneracy by anchoring tabular feature to distinct prototypes, prevents the represen-tations from collapsing into a single cluster; 4) On datasets with relatively limited sample sizes, e.g., LE, ZO, HA, and FE, TagCC maintains a clear performance advantage over the competing methods, validating the effectiveness of se-mantic enhancement when statistical information is sparse. Furthermore, significance testing via the two-tailed Bonferroni-Dunn post-hoc test confirms that TagCC yields statistically significant improvements over all competing counterparts at the 95% confidence level. For detailed test statistics and the Critical Difference (CD) diagram, please refer to Appendix ?? .
+
+5.3. Ablation Studies 
+
+To demonstrate the effectiveness of the core components of TagCC, several ablated variants are compared as shown in Table 3. The best results are highlight in bold . To evalu-ate the semantic-aware transformation, TagCC is modified into TCC, which replaces the LLM-based semantic genera-tion with concatenation-based serialization. Furthermore, to highlight the necessity of the dual-branch contrastive align-ment, the TCC variant is decoupled into the single-branch llm-only TLC and table-only TTC models by conducting deep clustering exclusively on the isolated textual descrip-tions and tabular representations, respectively. As shown in Table 3, TagCC consistently outperforms the TCC variant on 11 out of 12 datasets, verifying that the proposed semantic-aware transformation effectively unveils open-world knowledge compared to the verbose and generic descriptions yielded by concatenation-based serialization. Furthermore, TCC generally surpasses the single-branch baselines, i.e., TLC and TTC, on 8 out of 12 datasets, demon-strating that the dual-branch contrastive mechanism success-fully harmonizes heterogeneous modalities to learn robust representations even without optimal semantic guidance. In contrast, TLC and TTC exhibit comparable but subopti-mal performance, highlighting their inherent deficiencies, i.e., the former lacks structural constraints, while the latter lacks explicit semantic guidance, relying instead on brittle statistical co-occurrence to infer relationships. Moreover, the results for TLC on the HA dataset are not reported be-cause the concatenation-based serialization of abstract codes yields indistinguishable textual representations, resulting in clustering failure. This phenomenon further underscores the critical importance of our semantic-aware mechanism in ensuring semantic discriminability. 7Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering Ta gCC (ours) TabDC SCARF   
+
+> Figure 3. t-SNE visualization of representations learned by SCARF, TabDC, and TagCC on the MU dataset. Orange and blue points mark the samples with the “true” cluster labels.
+
+5.4. Qualitative Results 
+
+To demonstrate the cluster discrimination ability of the pro-posed TagCC method, we use SCARF, TabDC, and TagCC to extract latent feature representations for the MU dataset, which are then projected into a 2-D space for visualization via t-SNE (Maaten & Hinton, 2008), as shown in Figure 3. Orange and blue points mark the samples with the “true” cluster labels. This visualizes how well each method cap-tures the distinguishable cluster distributions and preserves the intrinsic local structure for intuitive comparison. It can be seen from Figure 3 that TagCC obviously has better cluster discrimination ability compared to the counterparts. SCARF and TabDC exhibit blurred boundaries and con-siderable overlap between different categories; conversely, TagCC forms highly compact and well-separated clusters with clear margins. This indicates that TagCC performs representation learning more clustering-friendly, leveraging semantic constraints to disentangle the feature space and better suit the exploration of the underlying k∗ clusters. 
+
+5.5. Convergence Analysis 
+
+Figure 4 illustrates the convergence curves of TagCC on the CA (left) and MM (right) datasets. To simultaneously visualize the high-magnitude alignment loss and the low-magnitude prototype loss, we employ a broken-axis scale in the visualization. The training process is explicitly di-vided into two phases: the initial 50 epochs (indicated to the left of the vertical gray dashed line) constitute the semantic warm-up stage, followed by the structure refinement stage. Specifically, in the semantic warm-up stage, the model is optimized exclusively by the alignment loss Lalign to cap-ture global semantic dependencies. To subsequently induce compact cluster structures within this semantic manifold, the objective in the structure refinement stage, the objective transitions transitions to a sum Ltotal = Lalign + Lproto .During the semantic warm-up stage, the alignment loss 
+
+Lalign decreases rapidly, establishing a strong semantic con-sistency between tabular representations and the semantic anchors. A critical observation is the behavior of the proto- 
+
+> Figure 4. Convergence analysis on CA (left) and MA (right). The vertical dashed line at epoch 50 separates the semantic warm-up stage from the structure refinement stage.
+
+type loss Lproto upon its activation instructure refinement stage. As shown in the bottom section of the plots, Lproto 
+
+initializes at a remarkably low magnitude rather than a high random value. This empirically verifies that our semantic warm-up strategy has successfully pre-structured the latent space, providing a high-quality, low-entropy initialization for the clustering module. In the structure refinement stage, Lalign transitions from rapid descent to a stable plateau. This stability indicates that the alignment loss functions as a semantic regularizer, anchoring the learnable representations to the semantic man-ifold to prevent catastrophic forgetting while the model adapts to the data distribution. Concurrently, the continuous decrease in Lproto corresponds to the fine-grained refine-ment of decision boundaries, specifically resolving ambi-guity for hard samples near cluster margins. The smooth trajectory of the total loss demonstrates the robustness of our joint optimization scheme, successfully balancing semantic preservation with structural adaptation. 
+
+6. Concluding Remark 
+
+In this paper, we proposed TagCC, a novel framework de-signed to bridge the gap between statistical tabular learning and open-world semantics. To address the data sparsity inherent in discrete tabular data and the lack of discrimi-native focus in concatenation-based serialization, TagCC introduces a semantic anchoring paradigm. Specifically, by leveraging LLMs to distill intrinsic data semantics into structured and discriminative textual anchors, and explic-itly aligning tabular representations with these anchors via CL, our framework effectively enriches tabular represen-tations with open-world semantics, while mitigating the risk of overfitting to isolated statistical correlations. More-over, this alignment is jointly optimized with a clustering objective, which yields partitions that are both semantically coherent and structurally compact. Extensive experiments on multiple datasets have demonstrated that TagCC con-sistently outperforms its counterparts. In the future, it is promising to extend TagCC into more complex scenarios, e.g., handling tabular data with missing values, adapting it to non-stationary data distributions, or integrating privacy-preserving mechanisms for sensitive domains. 8Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering 
+
+References 
+
+Bahri, D., Jiang, H., Tay, Y., and Metzler, D. Scarf: Self-supervised contrastive learning using random feature cor-ruption. In International Conference on Learning Repre-sentations , 2022. Ball, G. H. and Hall, D. J. A clustering technique for sum-marizing multivariate data. Behavioral Science , 12(2): 153–155, 1967. Bo, D., Wang, X., Shi, C., Zhu, M., Lu, E., and Cui, P. Structural deep clustering network. In Proceedings of the Web Conference 2020 , pp. 1400–1410, 2020. Borisov, V., Leemann, T., Seßler, K., Haug, J., Pawelczyk, M., and Kasneci, G. Deep neural networks and tabular data: A survey. IEEE Transactions on Neural Networks and Learning Systems , 35(6):7499–7519, 2022. Chen, J., Mao, H., Woo, W. L., and Peng, X. Deep multiview clustering by contrasting cluster assignments. In Proceed-ings of the 2023 IEEE/CVF International Conference on Computer Vision , pp. 16752–16761, 2023. Chen, J., Ji, Y., Zou, R., Zhang, Y., and Cheung, Y.-m. Qgrl: Quaternion graph representation learning for heteroge-neous feature data clustering. In Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining , pp. 297–306, 2024. Dem ˇsar, J. Statistical comparisons of classifiers over mul-tiple data sets. Journal of Machine learning research , 7: 1–30, 2006. Dua, D. and Karra Taniskidou, E. UCI machine learning repository, 2017. URL http://archive.ics.uci. edu/ml .Fang, X., Xu, W., Tan, F. A., Zhang, J., Hu, Z., Qi, Y., Nick-leach, S., Socolinsky, D., Sengamedu, S., and Faloutsos, C. Large language models (llms) on tabular data: Pre-diction, generation, and understanding–a survey. arXiv preprint arXiv:2402.17944 , 2024. Gates, A. J. and Ahn, Y.-Y. The impact of random models on clustering similarity. Journal of Machine Learning Research , 18(1):3049–3076, 2017. Gorishniy, Y., Rubachev, I., Khrulkov, V., and Babenko, A. Revisiting deep learning models for tabular data. 
+
+Advances in neural information processing systems , 34: 18932–18943, 2021. Guo, X., Gao, L., Liu, X., and Yin, J. Improved deep embedded clustering with local structure preservation. In 
+
+Proceedings of the 26th International Joint Conference on Artificial Intelligence , pp. 1753–1759, 2017. He, X., Cai, D., and Niyogi, P. Laplacian score for feature selection. In Proceedings of the 18th International Con-ference on Neural Information Processing Systems , pp. 507–514, 2005. Hegselmann, S., Buendia, A., Lang, H., Agrawal, M., Jiang, X., and Sontag, D. Tabllm: Few-shot classification of tabular data with large language models. In International conference on artificial intelligence and statistics , pp. 5549–5581. PMLR, 2023. Hollmann, N., M ¨uller, S., Purucker, L., Krishnakumar, A., K ¨orfer, M., Hoo, S. B., Schirrmeister, R. T., and Hutter, F. Accurate predictions on small data with a tabular foundation model. Nature , 637(8045):319–326, 2025. Iida, H., Thai, D., Manjunatha, V., and Iyyer, M. Tabbie: Pretrained representations of tabular data. In Proceedings of the 2021 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies , pp. 3446–3456, 2021. Jiang, Z., Zheng, Y., Tan, H., Tang, B., and Zhou, H. Varia-tional deep embedding: An unsupervised and generative approach to clustering. In Proceedings of the 26th Inter-national Joint Conference on Artificial Intelligence , pp. 1965–1972, 2017. Li, J., Zhou, P., Xiong, C., and HOI, S. C. Prototypical con-trastive learning of unsupervised representations. In Pro-ceedings of the 9th International Conference on Learning Representations , pp. 4–8, 2021a. Li, Y., Hu, P., Liu, Z., Peng, D., Zhou, J. T., and Peng, X. Contrastive clustering. In Proceedings of the 35th AAAI Conference on Artificial Intelligence , volume 35, pp. 8547–8555, 2021b. Li, Z., Huang, Q., Yang, L., Shi, J., Yang, Z., van Stein, N., B ¨ack, T., and van Leeuwen, M. Diffusion models for tabular data: Challenges, current progress, and future directions. arXiv preprint arXiv:2502.17119 , 2025. Liu, Y., Tu, W., Zhou, S., Liu, X., Song, L., Yang, X., and Zhu, E. Deep graph clustering via dual correlation reduction. In Proceedings of the AAAI conference on artificial intelligence , volume 36, pp. 7603–7611, 2022. Maaten, L. v. d. and Hinton, G. Visualizing data using t-sne. Journal of Machine Learning Research , 9(11): 2579–2605, 2008. Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., Zhang, C., Agarwal, S., Slama, K., Ray, A., et al. Training language models to follow instructions with human feedback. Advances in neural information processing systems , 35:27730–27744, 2022. 9Beyond Statistical Co-occurrence: Unlocking Intrinsic Semantics for Tabular Data Clustering 
+
+Powers, D. M. Evaluation: From precision, recall and f-measure to roc, informedness, markedness and correla-tion. arXiv preprint arXiv:2010.16061 , 2020. Rabbani, S. B., Medri, I. V., and Samad, M. D. Deep clus-tering of tabular data by weighted gaussian distribution learning. Neurocomputing , 623:129359, 2025. Rand, W. M. Objective criteria for the evaluation of cluster-ing methods. Journal of the American Statistical Associ-ation , 66(336):846–850, 1971. Rauf, H. T., Freitas, A., and Paton, N. W. Tabledc: Deep clustering for tabular data. Proceedings of the ACM on Management of Data , 3(3):1–28, 2025. Razmadze, K., Amsterdamer, Y., Somech, A., Davidson, S. B., and Milo, T. Subtab: Data exploration with in-formative sub-tables. In Proceedings of the 2022 Inter-national Conference on Management of Data , pp. 2369– 2372, 2022. Ren, Y., Pu, J., Yang, Z., Xu, J., Li, G., Pu, X., Yu, P. S., and He, L. Deep clustering: A comprehensive survey. IEEE Transactions on Neural Networks and Learning Systems ,36(4):5858–5878, 2024. Svirsky, J. and Lindenbaum, O. Interpretable deep clus-tering for tabular data. In Proceedings of the 41st Inter-national Conference on Machine Learning , pp. 47314– 47330, 2024. Wang, T. and Isola, P. Understanding contrastive represen-tation learning through alignment and uniformity on the hypersphere. In Proceedings of the 37th International conference on machine learning , pp. 9929–9939, 2020. Wang, W.-Y., Du, W.-W., Xu, D., Wang, W., and Peng, W.-C. A survey on self-supervised learning for non-sequential tabular data. Machine Learning , 114(1):16, 2025. Wang, Z. and Sun, J. Transtab: Learning transferable tabular transformers across tables. Advances in Neural Informa-tion Processing Systems , 35:2902–2915, 2022. Xie, J., Girshick, R., and Farhadi, A. Unsupervised deep embedding for clustering analysis. In Proceedings of the 33rd International Conference on Machine Learning , pp. 478–487, 2016. Yang, L., Cheung, N.-M., Li, J., and Fang, J. Deep clus-tering by gaussian mixture variational autoencoders with graph embedding. In Proceedings of the 2019 IEEE/CVF International Conference on Computer Vision , pp. 6440– 6449, 2019. Zhang, Y. and Cheung, Y.-M. Graph-based dissimilarity measurement for cluster analysis of any-type-attributed data. IEEE Transactions on Neural Networks and Learn-ing Systems , 34(9):6530–6544, 2023. Zhang, Y., Zhao, M., Chen, Y., Lu, Y., and Cheung, Y.-m. Learning unified distance metric for heterogeneous at-tribute data clustering. Expert Systems with Applications ,273:126738, 2025. Zhou, S., Xu, H., Zheng, Z., Chen, J., Li, Z., Bu, J., Wu, J., Wang, X., Zhu, W., and Ester, M. A comprehensive survey on deep clustering: Taxonomy, challenges, and future directions. ACM Computing Surveys , 57(3):1–38, 2024. 10

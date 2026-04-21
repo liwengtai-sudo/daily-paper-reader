@@ -1,0 +1,1451 @@
+Title: Stochastic Trust-Region Methods for Over-parameterized Models
+
+URL Source: https://arxiv.org/pdf/2604.14017v1
+
+Published Time: Thu, 16 Apr 2026 01:09:21 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+Stochastic Trust-Region Methods for Over-parameterized Models 
+
+Aike Yang a and Hao Wang aaShanghaiTech University, Shanghai, China 
+
+ABSTRACT 
+
+Under interpolation-type assumptions such as the strong growth condition, stochas-tic optimization methods can attain convergence rates comparable to full-batch methods, but their performance—particularly for SGD—remains highly sensitive to step-size selection. To address this issue, we propose a unified stochastic trust-region framework that eliminates manual step-size tuning and extends naturally to equality-constrained problems. For unconstrained optimization, we develop a first-order stochastic trust-region algorithm and show that, under the strong growth condition, it achieves an iteration and stochastic first-order oracle complexity of 
+
+O(ε−2 log(1 /ε )) for finding an ε-stationary point. For equality-constrained problems, we introduce a quadratic-penalty-based stochastic trust-region method with penalty parameter μ, and establish an iteration and oracle complexity of O(ε−4 log(1 /ε )) to reach an ε-stationary point of the penalized problem, corresponding to an O(ε)-approximate KKT point of the original constrained problem. Numerical experi-ments on deep neural network training and orthogonally constrained subspace fit-ting demonstrate that the proposed methods achieve performance comparable to well-tuned stochastic baselines, while exhibiting stable optimization behavior and effectively handling hard constraints without manual learning-rate scheduling. 
+
+KEYWORDS 
+
+stochastic optimization; trust-region methods; interpolation; strong growth condition; over-parameterized models 
+
+1. Introduction 
+
+Stochastic optimization plays a fundamental role in modern machine learning, data science, and large-scale scientific computing. A canonical example is the empirical risk minimization (ERM) problem min  
+
+> x
+
+f (x) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+fi(x),
+
+where n denotes the number of data samples and fi(x) represents the loss associated with the i-th observation. This formulation encompasses a wide range of applications, including supervised learning, inverse problems, and parameter estimation in large-scale models [8, 30, 32]. Among stochastic optimization methods, stochastic gradient descent (SGD) and its variants are arguably the most widely used due to their simplicity and low per-iteration cost. By approximating the full gradient using randomly sampled data points or mini-batches, SGD significantly reduces computational overhead compared to deterministic 
+
+> This is a preprint.
+> arXiv:2604.14017v1 [math.OC] 15 Apr 2026
+
+gradient methods [7, 27]. The convergence behavior of SGD is classically analyzed under the bounded variance assumption, which postulates that the variance of the stochastic gradient estimator is uniformly bounded [16, 21]. While this assumption enables convergence guarantees in both convex and nonconvex settings, it can be overly conservative for modern over-parameterized models. Recent advances in stochastic optimization theory have emphasized the importance of interpolation and the strong growth condition (SGC) as refined characterizations of gradient noise in stochastic optimization [29, 34]. The interpolation condition asserts that any stationary point of the empirical objective is simultaneously a stationary point of each individual loss function, namely, 
+
+∇f (x) = 0 ⇒ ∇ fi(x) = 0 , ∀i. 
+
+This property is frequently observed in over-parameterized learning models, including deep neural networks trained to zero training error [1, 41]. Under interpolation, the stochastic gradient often satisfies the strong growth con-dition 
+
+E∥gk∥2 ≤ ρ∥∇ f (xk)∥2,
+
+where gk denotes the stochastic gradient at iteration k and ρ ≥ 1 is a constant. The SGC implies interpolation and provides a sharper control of gradient noise compared to bounded variance assumptions [34]. Notably, under the SGC, SGD with a constant step size can achieve convergence rates comparable to deterministic gradient descent, even in nonconvex optimization [34, 43]. Despite these developments, most existing results under interpolation-based as-sumptions focus on SGD-type methods. By contrast, comparatively little attention has been devoted to incorporating such assumptions into stochastic trust-region al-gorithms. Trust-region (TR) methods constitute a classical and powerful framework in deterministic nonlinear optimization [11, 22]. At each iteration, a TR method con-structs a local quadratic model and restricts the trial step to a region where the model is deemed reliable, accepting the step only if the ratio of actual to predicted reduc-tion exceeds a prescribed threshold. This mechanism endows TR methods with strong robustness and global convergence guarantees, even in nonconvex settings. Extending trust-region methods to stochastic optimization introduces substantial challenges. The local model is built from noisy gradient or Hessian information, and the acceptance ratio becomes a random quantity, complicating both algorithmic design and theoretical analysis [10, 13]. Several stochastic trust-region (STR) algorithms have been proposed in recent years, primarily under bounded variance assumptions [13, 36]. However, the interplay between STR methods and interpolation-based conditions such as the SGC remains largely unexplored. The problem becomes even more challenging in the presence of constraints. Con-strained stochastic optimization arises naturally in many applications, including con-strained learning formulations, signal processing, and scientific computing [3, 26]. In this work, we consider equality-constrained problems of the form min 
+
+> x∈Rd
+
+f (x) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+fi(x),
+
+s.t. c(x) = 0 ,
+
+2where c : Rd → Rm denotes a (possibly nonlinear) constraint function. A common strategy for handling equality constraints is the use of quadratic penalty or augmented Lagrangian methods [4, 22]. While these approaches are well under-stood in deterministic optimization, their stochastic counterparts often require the penalty parameter to scale as μ = O(1 /ϵ ) in order to achieve ϵ-feasibility, which can significantly deteriorate complexity bounds [6, 40]. Existing analyses of penalty-based stochastic methods largely focus on first-order schemes, and their integration with stochastic trust-region frameworks remains limited. In this paper, we develop a unified stochastic trust-region framework under interpolation-based assumptions for both unconstrained and constrained optimization problems. Our main contributions are summarized as follows: 
+
+• For the unconstrained case, we analyze a first-order stochastic trust-region algo-rithm under the strong growth condition and establish an iteration and stochastic first-order oracle complexity of O(ϵ−2 log(1 /ϵ )) to reach ∥∇ f (x)∥ ≤ ϵ.
+
+• For the constrained case, we propose a penalty-based stochastic trust-region method. By selecting the penalty parameter as μ = 1 /ϵ , we prove an iteration and oracle complexity of O(ϵ−4 log(1 /ϵ )) to obtain an O(ε)-approximate KKT point of the original constrained problem. 
+
+• We validate the proposed methods through numerical experiments on noncon-vex deep learning tasks and orthogonally constrained subspace fitting problems. The results demonstrate that stochastic trust-region methods are competitive with standard stochastic optimizers in unconstrained settings, while providing a principled and flexible framework for constrained stochastic optimization. 
+
+2. Literature review 
+
+Stochastic optimization has been extensively studied in the past decade. Early works focused on stochastic gradient descent (SGD) and its convergence under the bounded variance assumption. In particular, [16] established an O(1 /√K) rate for nonconvex stochastic optimization, which became the benchmark complexity result. To go beyond the variance-bounded setting, interpolation and the strong growth condition (SGC) were introduced. These assumptions, frequently satisfied in over-parameterized models, allow constant step-size SGD to achieve accelerated convergence. Notably, [28] showed fast rates of SGD under SGC in convex settings, and [33, 35] further extended such results to nonconvex problems. Trust-region (TR) methods have a long tradition in deterministic nonlinear op-timization. They are well known for global convergence and strong robustness, as surveyed in classical texts on nonlinear programming [11]. In recent years, several works have studied stochastic variants of TR methods, where the model is built from noisy gradients or Hessians. For example, [17] introduced a stochastic TR framework with probabilistic models, showing global convergence under noise; [10] and [9] ex-tended analysis to nonconvex and derivative-free settings; [24] proposed stochastic cubic-regularization versions with improved sample complexity. Moreover, variance-reduction techniques have recently been incorporated into stochastic TR frameworks, as in the TR-SVR method, which combines trust-region modelling with variance-reduced gradient estimators to enhance efficiency and stability in large-scale stochas-tic optimization tasks [42]. Beyond the classical Lipschitz-smooth setting, [39] ex-tend stochastic trust-region methods to the more general ( L0, L 1)-smoothness regime, 3relevant for deep learning and distributionally robust optimization, achieving first-and second-order convergence; notably, with variance reduction, their second-order TR method attains an O(ε−3) complexity—an optimal bound in this context. Ear-lier, [31] introduced a stochastic trust-region algorithm using variance-reduced Hes-sian estimators for nonconvex finite-sum minimization, obtaining convergence to an (ε, √ε)-approximate local minimum in ˜O(√n/ε 1.5) stochastic Hessian oracle calls—a state-of-the-art sample complexity at the time. Other notable approaches include the inexact-restoration-based SIRTR method ([2]), which establishes convergence in prob-ability for stochastic trust-region steps in finite-sum contexts, and STARS ([15]), a derivative-free trust-region framework using random subspaces with almost-sure con-vergence and competitive iteration complexity. Finally, [18] analyze variance-reduction enhancements in stochastic TR model-update and candidate-evaluation steps, show-ing dramatic improvements in almost-sure sample complexity—from ˜O(ε−6) to ˜O(ε−2)in smooth first-order settings. These works mainly focused on the unconstrained set-ting and demonstrated that stochastic TR methods can maintain favorable complexity guarantees comparable to stochastic gradient methods, while often achieving better practical robustness. However, theoretical understanding in this direction is still rela-tively limited compared to line-search–based methods [16]. The study of constrained stochastic optimization has largely centered on stochastic sequential quadratic programming (SQP) and augmented Lagrangian methods [4, 12]. Penalty-based approaches, although widely used in deterministic optimization [11], have received less attention in the stochastic context. One reason is that the choice of penalty parameter has a significant impact: ensuring feasibility typically requires setting μ = 1 /ϵ , which directly influences convergence complexity [5]. Recent works on stochastic min–max optimization and constrained learning have begun to address these challenges [20, 23, 25, 37], but penalty-based stochastic trust-region methods remain underexplored. Our work contributes to filling this gap by establishing a unified analysis for uncon-strained and penalty-based constrained stochastic trust-region methods. 
+
+3. Problem Statement and Algorithm 
+
+In this section, we present the stochastic trust-region framework studied in this paper. We first introduce the unconstrained finite-sum stochastic optimization problem and review a first-order stochastic trust-region method. We then extend the framework to equality-constrained problems by means of a quadratic penalty formulation, leading to a stochastic trust-region algorithm for constrained optimization. 
+
+3.1. Unconstrained Stochastic Optimization 
+
+We consider the finite-sum stochastic optimization problem min 
+
+> x∈Rd
+
+f (x) := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+fi(x),
+
+where each component function fi : Rd → R is assumed to be continuously differen-tiable. Problems of this form arise ubiquitously in machine learning and data-driven optimization, where the objective is typically accessed through inexpensive but noisy 4gradient evaluations of individual samples. Rather than relying on predetermined step sizes as in classical stochastic gradient methods, we adopt a stochastic trust-region perspective, which dynamically controls the step length according to local model adequacy. At iteration k, given the current iterate xk, a local quadratic model of f is constructed as 
+
+mquad  
+
+> k
+
+(p) = f (xk) + g⊤ 
+
+> k
+
+p + 12 p⊤Hkp, ∥p∥ ≤ ∆k,
+
+where gk denotes a stochastic estimator of ∇f (xk), Hk is an approximation to the Hessian, and ∆ k > 0 is the trust-region radius. The trial step pk is obtained by approximately solving the subproblem. To isolate the essential mechanisms of the method and facilitate complexity analysis, we first focus on a first-order variant in which curvature information is ignored by setting Hk = I. In this case, the model simplifies to 
+
+mk(p) = g⊤ 
+
+> k
+
+p + 12 ∥p∥2, ∥p∥ ≤ ∆k, (1) which admits a closed-form solution given by 
+
+pk = −akgk, ak =
+
+
+
+1, ∥gk∥ ≤ ∆k,
+
+∆k/∥gk∥, ∥gk∥ > ∆k.
+
+Thus, the step corresponds to a truncated negative gradient direction, where the trun-cation is automatically enforced by the trust-region constraint. This construction can be interpreted as an adaptive step-size rule driven by model-based acceptance criteria, rather than by predetermined schedules. The quality of the trial step is assessed through the ratio of actual to predicted reduction, computed using the same randomly sampled component function. Based on this ratio, the algorithm decides whether to accept the step and how to update the trust-region radius. The resulting procedure is summarized in Algorithm 1. 
+
+3.2. Equality-Constrained Optimization via Quadratic Penalty 
+
+In many practical scenarios the decision variables are required to satisfy structural constraints, which motivates extending the proposed stochastic trust-region framework to constrained settings. In this work, we restrict our attention to equality-constrained problems of the form min 
+
+> x∈Rd
+
+f (x) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+fi(x),
+
+s.t. c(x) = 0 ,
+
+(2) where c : Rd → Rm is continuously differentiable. Focusing on equality constraints allows us to clearly illustrate the interaction between stochasticity, trust-region mech-anisms, and constraint handling, while keeping the algorithmic structure tractable. Directly enforcing feasibility within a stochastic trust-region framework can be chal-lenging due to noisy gradient information. To circumvent this difficulty, we adopt a 5Algorithm 1 First-Order Stochastic Trust-Region Method 
+
+Require: Constants ¯∆ > 0, ∆ 0 ∈ (0 , ¯∆), 0 < c 0 ≤ c1 ≤ c2 < 1, and ν1, ν 2 > 1.  
+
+> 1:
+
+for k = 0 , 1, 2, . . . do  
+
+> 2:
+
+Sample an index i ∈ { 1, . . . , n } and compute a stochastic gradient gk = ∇fi(xk).  
+
+> 3:
+
+Compute a Cauchy-type step solving the trust-region subproblem: 
+
+pk = arg min 
+
+> ∥p∥≤ ∆k
+
+mk(p). 
+
+> 4:
+
+Evaluate the ratio of actual to predicted reduction: 
+
+rk = fi(xk) − fi(xk + pk)
+
+mk(0) − mk(pk) . 
+
+> 5:
+
+if rk > c 0 then  
+
+> 6:
+
+xk+1 = xk + pk. 
+
+> 7:
+
+else  
+
+> 8:
+
+xk+1 = xk. 
+
+> 9:
+
+end if  
+
+> 10:
+
+Update the trust-region radius: ∆k+1 =
+
+
+
+∆k/ν 1, rk < c 1,
+
+min( ν2∆k, ¯∆) , rk > c 2,
+
+∆k, otherwise.  
+
+> 11:
+
+end for 
+
+quadratic penalty approach, transforming the constrained problem into a sequence of unconstrained ones. Specifically, we consider the penalized objective 
+
+ϕ(x) := f (x) + μ
+
+2 ∥c(x)∥2,
+
+where μ > 0 is a fixed penalty parameter that controls the trade-off between objective minimization and constraint satisfaction. Accordingly, we define the per-sample penalized function 
+
+φi(x) := fi(x) + μ
+
+2 ∥c(x)∥2,
+
+and construct at iteration k the stochastic gradient and Hessian approximation 
+
+gk := ∇fi(xk) + μ∇c(xk)⊤c(xk), Hk := I + μ∇c(xk)⊤∇c(xk),
+
+where Hk is symmetric positive definite and captures curvature information induced by the constraint at negligible additional cost. The resulting quadratic model is 
+
+mϕk (p) = g⊤ 
+
+> k
+
+p + 12 p⊤Hkp, ∥p∥ ≤ ∆k,
+
+6whose minimizer over the trust region admits a Cauchy-type closed form 
+
+pk = −akgk, ak =
+
+
+
+∥gk∥2
+
+g⊤ 
+
+> k
+
+Hkgk
+
+, ∥pk∥ < ∆k,
+
+∆k
+
+∥gk∥ , ∥pk∥ = ∆ k.
+
+As in the unconstrained case, the step length is automatically regulated by the trust-region radius, while the penalty term steers the iterates toward feasibility. The complete stochastic trust-region method with quadratic penalty is summarized in Algorithm 2. Throughout the paper, we measure complexity in terms of stochastic first-order oracle calls. Since Algorithms 1 and 2 sample exactly one component gradi-ent per iteration, iteration complexity coincides with oracle complexity, a convention that will be adopted in the subsequent analysis. 
+
+Algorithm 2 Stochastic Trust-Region Method with Quadratic Penalty 
+
+Require: Constants ¯∆ > 0, ∆ 0 ∈ (0 , ¯∆), 0 < c 0 ≤ c1 ≤ c2 < 1, and ν > 1.  
+
+> 1:
+
+for k = 0 , 1, 2, . . . do  
+
+> 2:
+
+Sample an index i ∈ { 1, . . . , n } and compute ∇fi(xk).  
+
+> 3:
+
+Form gk = ∇fi(xk) + μ∇c(xk)⊤c(xk) and Hk = I + μ∇c(xk)⊤∇c(xk).  
+
+> 4:
+
+Compute a Cauchy-type step solving the trust-region subproblem: 
+
+pk = arg min 
+
+> ∥p∥≤ ∆k
+
+mϕk (p). 
+
+> 5:
+
+Evaluate the ratio 
+
+rk = φi(xk) − φi(xk + pk)
+
+mϕk (0) − mϕk (pk) . 
+
+> 6:
+
+if rk > c 0 then  
+
+> 7:
+
+xk+1 = xk + pk. 
+
+> 8:
+
+else  
+
+> 9:
+
+xk+1 = xk. 
+
+> 10:
+
+end if  
+
+> 11:
+
+Update ∆ k+1 as in Algorithm 1.  
+
+> 12:
+
+end for 4. Global Convergence Analysis 
+
+In this section we study the global convergence properties of the proposed stochastic trust-region algorithms. We first analyze the unconstrained method (Algorithm 1) and then extend the analysis to the equality-constrained variant (Algorithm 2). The latter algorithm can be viewed as a natural extension of the former through a quadratic penalty formulation. 74.1. Convergence Analysis for the Unconstrained Problem 
+
+In this subsection we analyze the global convergence of Algorithm 1. To establish the theoretical results, we first introduce several standard assumptions used throughout the analysis of the unconstrained problem. We first assume that the stochastic gradient estimator is unbiased. 
+
+Assumption 1. For all k ∈ N, the stochastic gradient estimator gk satisfies 
+
+Ek[gk] = ∇f (xk).
+
+This assumption ensures that the stochastic gradient is an unbiased estimator of the true gradient, which is standard in the analysis of stochastic optimization algorithms. Next we impose a standard smoothness condition on the component functions. 
+
+Assumption 2. Each function fi : Rd → R is Lipschitz continuously differentiable, i.e., 
+
+∥∇ fi(x) − ∇ fi(y)∥ ≤ Lf,i ∥x − y∥, ∀x, y ∈ Rd.
+
+Consequently, the averaged function f (x) satisfies 
+
+∥∇ f (x) − ∇ f (y)∥ ≤ Lf ∥x − y∥.
+
+At iteration k, the local constants satisfy 
+
+Lkf,i ≤ Lf,i .
+
+To control the stochasticity of the gradient estimators, we impose the strong growth condition. 
+
+Assumption 3. At any iteration k, the stochastic gradient estimator gk satisfies 
+
+E∥gk∥2 ≤ ρ ∥∇ f (xk)∥2,
+
+where ρ > 0 is a constant. 
+
+Assumption 3 has been widely used in the analysis of stochastic gradient meth-ods. It has been shown to hold in various learning problems, particularly in over-parameterized regimes encountered in modern machine learning models. Under the above assumptions, we first establish several auxiliary results that will be used throughout the convergence analysis. Recall from (1) that the step pk solves the trust-region subproblem and admits the form 
+
+pk = −akgk,
+
+where gk = ∇fi(xk) and ak ∈ (0 , 1]. Controlling the range of ak is crucial for estab-lishing sufficient descent at each successful iteration. The following Lemma 4.1 characterize the range of ak.8Lemma 4.1. Suppose that Assumption 2 holds. Then the parameter ak generated by the Algorithm 1 satisfies the following inequality 
+
+2 (1 − c0)
+
+Lkf,i − c0
+
+≤ ak ≤ 1.
+
+Proof. By the smoothness of fi, we have 
+
+fi (xk+1 ) ≤ fi (xk) − ⟨ gk, x k+1 − xk⟩ + Lkf,i 
+
+2 ∥xk+1 − xk∥2
+
+= fi (xk) − ak ∥gk∥2 + Lkf,i a2
+
+> k
+
+2 ∥gk∥2
+
+= fi (xk) − ak 1 − Lkf,i ak
+
+2
+
+!
+
+∥gk∥2 . (3) On the other hand, by the acceptance criterion in Algorithm 1, any successful iteration satisfies 
+
+fi(xk) − fi(xk+1 ) ≥ c0
+
+ mk(0) − mk(pk).
+
+Using the explicit form of pk, this implies 
+
+fi(xk+1 ) ≤ fi(xk) − c0ak
+
+
+
+1 − ak
+
+2
+
+
+
+∥gk∥2. (4) Combining (3) and (4) yields 
+
+c0
+
+
+
+1 − ak
+
+2
+
+
+
+≥ 1 − Lkf,i ak
+
+2 ,
+
+which is equivalent to 
+
+Lkf,i − c0
+
+2 ak ≥ 1 − c0.
+
+Since Lkf,i > c 0, we obtain 
+
+ak ≥ 2 (1 − c0)
+
+Lkf,i − c0
+
+The upper bound of ak ≤ 1 follows directly from the definition of ak.Next, we begin to analyze the lower bound on trust region radius to make sure that there must exist infinitely many accepted steps. 
+
+Lemma 4.2. Suppose that Assumption 2 holds. Then, there exists a constant M > 0
+
+such that 
+
+|mk(pk) − fi(xk + pk)| ≤ M ∥pk∥2,
+
+9where M = Lf, max and Lf, max = max i Lf,i .
+
+Proof. Since from Taylor’s theorem we have that 
+
+fi(xk + pk) = fi(xk) + g(xk)T pk +
+
+Z 10
+
+[g(xk + tp k) − g(xk)] T pk dt, 
+
+for some t ∈ (0 , 1), it follows from the definition of mk that 
+
+|mk(pk) − fi(xk + pk)| = 12 pTk pk −
+
+Z 10
+
+[g(xk + tp k) − g(xk)] T pk dt
+
+≤ Lf, max 
+
+2 ∥pk∥2 + Lf,i 
+
+2 ∥pk∥2
+
+= M ∥pk∥2
+
+≤ M ∆2
+
+> k
+
+.
+
+where M = Lf, max and Lf, max = max i Lf,i .To facilitate the subsequent analysis of both Algorithm 1 and Algorithm 2, we first establish a general Cauchy decrease result that holds for any symmetric matrix Hk.
+
+Lemma 4.3. The Cauchy point pk satisfies 
+
+gTk pk + 12 pTk Hkpk ≤ − 12 ∥gk∥2 min 
+
+
+
+∆k, ∥gk∥2
+
+∥Hk∥2
+
+
+
+.
+
+Lemma 4.4. In Algorithm 1, if at iteration k we have gk̸ = 0 and 
+
+∆k ≤ ∥gk∥
+
+rM 
+
+where r = 21−c2 , then we have that ∆k+1 = min( ν∆k, ¯∆) .
+
+Proof. Since r > 2, we have rM > 2M > ∥Hk∥, and thus ∆k < ∥gk∥/∥Hk∥,
+
+which means min(∆ k, ∥gk∥/∥Hk∥) = ∆ k.
+
+10 Then we have that for all ∆ k ≤ ∥gk ∥ 
+
+> rM
+
+,
+
+|rk − 1| = |fi(xk + pk) − mk(pk)|
+
+mk(0) − mk(pk)
+
+> (i)
+
+≤ M ∆2 
+
+> k
+> 12
+
+∥gk∥ · min[ ∥gk ∥∥Hk ∥ , ∆k]
+
+> (ii )
+
+< M ∆2 
+
+> k
+> 12
+
+∥gk∥∆k
+
+< M ∥gk ∥ 
+
+> rM
+> 12
+
+∥gk∥
+
+= 2
+
+r
+
+= 1 − c2,
+
+where ( i) is due to Lemma 4.3, and ( ii ) is from min(∆ k, ∥gk∥/∥Hk∥) = ∆ k. This implies that μk > c 2, and we have that ∆ k+1 = min( ν∆k, ¯∆). 
+
+Corollary 4.5. If there exists a constant ϵ > 0 such that ∥gk∥ ≥ ϵ for all k, then 
+
+∆k ≥ ϵ
+
+4rM 
+
+Proof. From Lemma 4.4, if ∆ k ≤ ∥gk ∥ 
+
+> rM
+
+, the trust region radius will be increased. Thus, the trust region radius can never be reduced below ϵ 
+
+> 4rM
+
+.Next lemma show that the ratio of unsuccessful iterations to successful ones remains bounded. Define 
+
+S = {k ∈ N|rk > c 0}, U = {k ∈ N|rk ≤ c0}.
+
+Lemma 4.6. Let #SK and #UK denote the number of successful and unsuccessful iterations within the first K iterations, respectively. If there exists a constant ϵ > 0
+
+such that ∥gk∥ ≥ ϵ for all k ∈ [K], then 
+
+#UK
+
+#SK
+
+≤ log 4rM ¯∆
+
+ϵ /logν. 
+
+Proof. Consider the scenario following a successful iteration. Suppose that after this successful iteration, the radius is updated to ∆ k+1 = ˆ∆. Then, there may follow a series of unsuccessful iterations. From Algorithm 1, we know that the radius of the trust region during these iterations cannot exceed ¯∆, and the successful iteration ensures that the radius is at least ˆ∆. Therefore, after m unsuccessful iterations, we can derive the following inequality by applying Corollary 4.5: 
+
+ 1
+
+ν
+
+m
+
+ˆ∆ ≥ ϵ
+
+4rM ,
+
+11 which simplifies to: 
+
+m ≤ log 4rM ˆ∆
+
+> ϵ
+
+log ν .
+
+Since ˆ∆ is bounded above by ¯∆, we obtain the upper bound: 
+
+m ≤ log 4rM ¯∆
+
+> ϵ
+
+log ν .
+
+Thus, after at most log 4rM ¯∆ 
+
+> ϵ
+
+/ log ν consecutive unsuccessful iterations, there must be a successful iteration. Therefore, we can bound the ratio of unsuccessful iterations to successful iterations as follows: #UK
+
+#SK
+
+≤ log 4rM ¯∆
+
+> ϵ
+
+log ν .
+
+This lemma states that as the number of iterations grows, the number of unsuccess-ful iterations relative to successful ones remains bounded by a constant ratio. We now analyze the convergence rate of the first-order stochastic trust region method for non-convex objectives. We show that the method achieves an iteration complexity of O(ϵ−2 log(1 /ϵ )), provided that the step parameter ak is restricted to the interva ak ∈ [amin , a max ]. Here, amin = 2(1 −c0) 
+
+> Lmax −c0
+
+is given in Lemma 4.1, while amax will be specified later. 
+
+Theorem 4.7. Suppose that Assumption 1, Assumption 2 and Assumption 3 hold. Algorithm 1 achieves the rate: 
+
+min  
+
+> k∈[K−1]
+
+E ∥∇ f (xk)∥2 ≤ 2δK 1 + log 4rM ¯∆
+
+> ϵ
+
+log ν
+
+!
+
+E[f (x0) − f (x∗)] .
+
+where δ = 1/(−ρLa 2max + (1 − ρ) amax + (1 + ρ) 2(1 −c0) 
+
+> Lmax −c0
+
+). Thus, for some K =
+
+O( 1 
+
+> ϵ
+
+log 1 
+
+> ϵ
+
+) one finds that 
+
+min  
+
+> k∈[K−1]
+
+E ∥∇ f (xk)∥2 ≤ ϵ. 
+
+Proof. Starting from L-smoothness of f :
+
+f (xk+1 ) − f (xk) ≤ ⟨∇ f (xk) , x k+1 − xk⟩ + Lf
+
+2 ∥xk+1 − xk∥2
+
+= −ak ⟨∇ f (xk) , g k⟩ + Lf a2
+
+> k
+
+2 ∥gk∥2
+
+= ak
+
+2
+
+
+
+∥∇ f (xk) − gk∥2 − ∥∇ f (xk)∥2 − ∥ gk∥2
+
++ Lf a2
+
+> k
+
+2 ∥gk∥2
+
+=⇒ 2 ( f (xk+1 ) − f (xk)) ≤ ak ∥∇ f (xk) − gk∥2 − ak
+
+
+
+∥∇ f (xk)∥2 + ∥gk∥2
+
++ Lf a2 
+
+> k
+
+∥gk∥2 .
+
+12 Let Lmax = max i Li. Then, if the k +1-th iteration is unsuccessful ( rk ≤ c0), we denote that ak = 0. Conversely, if the k + 1-th iteration is successful ( rk > c 0), Lemma 4.1 guarantees that amin = min { 2(1 −c0) 
+
+> Lmax −c0
+
+, a max } ≤ min { 2(1 −c0)  
+
+> Lik −c0
+
+, a max } ≤ ak ≤ amax . Thus, for any successful iteration k + 1, using this property and taking expectations with respect to gk,2E [f (xk+1 ) − f (xk)] ≤amax E
+
+h
+
+∥∇ f (xk) − gk∥2i
+
+− amin ∥∇ f (xk)∥2 − amin E
+
+h
+
+∥gk∥2i
+
++ Lf a2max E
+
+h
+
+∥gk∥2i
+
+=  amax − amin + Lf a2max 
+
+ E
+
+h
+
+∥gk∥2i
+
+− (amax + amin ) ∥∇ f (xk)∥2
+
+≤  amax − amin + Lf a2max 
+
+ ρ ∥∇ f (xk)∥2 − (amax + amin ) ∥∇ f (xk)∥2
+
+=    amax − amin + Lf a2max 
+
+ ρ − (amax + amin ) ∥∇ f (xk)∥2 .
+
+Suppose δ−1 = ( amax + amin )− amax − amin + Lf a2max 
+
+ ρ > 0, the gradient ∥∇ f (xk)∥2
+
+can be bounded as 
+
+∥∇ f (xk)∥2 ≤ 2δE [f (xk) − f (xk+1 )] .
+
+Note that for all the iteration that not successful, we have f (xk) − f (xk+1 ) = 0, 
+
+∀k ∈ UK due to ak = 0. Thus, for all the successful iterations, denoted as Sk, we have 1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+∥∇ f (xk)∥2 ≤ 2δ
+
+#SK
+
+X
+
+> k∈S
+
+f (xk) − f (xk+1 ).
+
+Taking expectations, 1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E ∥∇ f (xk)∥2 ≤ 2δ
+
+#SK
+
+X
+
+> k∈S
+
+E[f (xk) − f (xk+1 )] .
+
+From lemma 4.6, we derive a lower bound on the number of successful iterations: #SK ≥ K
+
+1 + log 4rM ¯∆ 
+
+> ϵ
+> log ν
+
+.
+
+Substituting # SK ≥ K   
+
+> 1+ log 4rM ¯∆
+> ϵ
+> log ν
+
+:1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E ∥∇ f (xk)∥2 ≤ 2δK 1 + log 4rM ¯∆
+
+> ϵ
+
+log ν
+
+!
+
+E[f (x0) − f (x∗)] .
+
+Thus, min  
+
+> k∈[K−1]
+
+E ∥∇ f (xk)∥2 ≤ 2δK 1 + log 4rM ¯∆
+
+> ϵ
+
+log ν
+
+!
+
+E[f (x0) − f (x∗)] .
+
+13 For some K = O( 1 
+
+> ϵ
+
+log 1 
+
+> ϵ
+
+) one finds that min  
+
+> k∈[K−1]
+
+E ∥∇ f (xk)∥2 ≤ ϵ. 
+
+It remains to choose amax such that δ > 0 holds. When amax ≤ 2(1 −c0) 
+
+> Lmax −c0
+
+, we have 
+
+amin = amax = 2(1 −c0) 
+
+> Lmax −c0
+
+and 1
+
+δ = ( amax + amin ) −  amax − amin + Lf a2max 
+
+
+
+= 2 amax − Lf ρa 2max > 0=⇒ amax < 2
+
+Lf ρ .
+
+When amax > 2(1 −c0) 
+
+> Lmax −c0
+
+, we have 1
+
+δ =
+
+
+
+amax + 2 (1 − c0)
+
+Lmax − c0
+
+
+
+−
+
+
+
+amax − 2 (1 − c0)
+
+Lmax − c0
+
++ Lf a2max 
+
+
+
+ρ
+
+= −ρL f a2max + (1 − ρ) amax + (1 + ρ) 2 (1 − c0)
+
+Lmax − c0
+
+.
+
+This is a concave quadratic in amax and is strictly positive when 
+
+amax ∈
+
+0, (1 − ρ) + 
+
+q
+
+(1 − ρ)2 + 4 ρL f (1 + ρ) 2(1 −c0)
+
+> Lmax −c0
+
+2ρL f
+
+ .
+
+To avoid contradiction with the case assumption 2(1 −c0) 
+
+> Lmax −c0
+
+< a max , we require (1 − ρ) + 
+
+q
+
+(1 − ρ)2 + 4 ρL f (1 + ρ) 2(1 −c0)
+
+> Lmax −c0
+
+2ρL f
+
+> 2 (1 − c0)
+
+Lmax − c0
+
+=⇒ 1 − c0
+
+Lmax − c0
+
+< 1
+
+ρL f
+
+.
+
+Thus, by choosing c0 such that 1−c0 
+
+> Lmax −c0
+
+< 1 
+
+> ρL f
+
+, we have a similar requirement for amax ,
+
+amax < (1 − ρ) + 
+
+q
+
+(1 − ρ)2 + 4 ρL f (1 + ρ) 2(1 −c0)
+
+> Lmax −c0
+
+2ρL f
+
+< (1 − ρ) + 
+
+q
+
+(1 − ρ)2 + 8 (1 + ρ)2ρL f
+
+= 1 − ρ + 3 + ρ
+
+2ρL f
+
+= 2
+
+ρL f
+
+.
+
+14 4.2. Convergence Analysis for the Equality-Constrained Problem 
+
+We now analyze Algorithm 2 for solving the equality-constrained problem. The al-gorithm adopts the same stochastic trust-region framework as Algorithm 1, but con-structs the quadratic model using the penalized objective 
+
+ϕi(x) = fi(x) + μ
+
+2 ∥c(x)∥2.
+
+Because of this structural similarity, most analytical results derived for the uncon-strained case remain valid after replacing fi with ϕi. In particular, the Cauchy decrease result (Lemma 4.3), the lower bound on the trust-region radius, and the bound on the ratio between unsuccessful and successful iterations continue to hold with only minor modifications. For brevity, we omit the detailed adjustments and focus on the addi-tional assumptions and arguments required by the penalty formulation. Throughout this subsection we assume without loss of generality that ε ≤ 1. Similar to the unconstrained case, we assume that the stochastic gradient estimator is unbiased and that the objective is sufficiently smooth. 
+
+Assumption 4. For all k ∈ N, the stochastic gradient estimator gk satisfies: 
+
+Ek[gk] = ∇ϕ(xk).
+
+Assumption 5. Each function fi : Rd → R and the constraint mapping c : Rd → Rm
+
+are Lipschitz continuously differentiable, i.e., 
+
+∥∇ fi(x) − ∇ fi(y)∥ ≤ Lf,i ∥x − y∥, ∥∇ c(x) − ∇ c(y)∥ ≤ Lc∥x − y∥.
+
+Under this assumption, the penalized function 
+
+ϕi(x) = fi(x) + μ
+
+2 ∥c(x)∥2
+
+is also Lipschitz continuously differentiable with constant Lϕ,i . Moreover, the averaged penalized function ϕ satisfies 
+
+∥∇ ϕ(x) − ∇ ϕ(y)∥ ≤ Lϕ∥x − y∥.
+
+At iteration k, the corresponding local constants satisfy 
+
+Lkf,i ≤ Lf,i , Lkϕ,i ≤ Lϕ,i .
+
+To simplify the analysis, we assume that the sequence of iterates remains in a bounded region. 
+
+Assumption 6. The sequence {xk} generated by the algorithm is contained in a com-pact set X ⊂ Rd; that is, there exists a bounded closed set X such that 
+
+xk ∈ X , ∀k ≥ 0.
+
+To ensure regularity of the feasible set, we impose the linear independence constraint qualification. 15 Assumption 7. The linear independence constraint qualification (LICQ) holds at any feasible point x of problem (2) . That is, the Jacobian J(x) has full row rank for all x
+
+satisfying c(x) = 0 , and 
+
+σmin (J(x)) ≥ σmin > 0.
+
+Assumption 7 imposes the linear independence constraint qualification (LICQ) at all feasible points. This condition ensures regularity of the feasible set and well-posedness of the associated Lagrange multipliers, which is essential for the analysis of equality-constrained trust-region methods. Finally, we extend the strong growth condition to the stochastic min–max formula-tion arising from the equality-constrained problem. Under mild regularity conditions, problem (2) is equivalent to the following unconstrained min–max problem: min 
+
+> x∈Rd
+
+max 
+
+> λ∈Rm
+
+L(x, λ ),
+
+where λ ∈ Rm denotes the Lagrange multiplier associated with the constraints, and 
+
+L(x, λ ) = f (x) + λ⊤c(x) is the Lagrangian function. In the stochastic setting, the objective admits the representation f (x) =
+
+Eξ∼P [f (x; ξ)], where ξ denotes a random sample drawn from the distribution P . And the Lagrangian can be written as 
+
+L(x, λ ) = Eξ∼P [L(x, λ ; ξ)] , L(x, λ ; ξ) = f (x; ξ) + λ⊤c(x).
+
+Assumption 8. There exists a constant τ > 1 such that, for any λ ∈ Rm,
+
+Eξ
+
+∥∇ xL(x, λ ; ξ)∥2 ≤ τ ∥∇ xL(x, λ )∥2.
+
+Assumption 8 extends the strong growth condition to the stochastic Lagrangian in the min–max formulation, controlling the variance of the stochastic gradients with re-spect to the primal variable, and coincides with the strong growth condition considered in [37]. Under the above assumptions, we next characterize the range of the parameter ak
+
+generated by Algorithm 2. 
+
+Lemma 4.8. Suppose that Assumptions 5 and 6 hold, and let μ = 1 /ε for some small 
+
+ε > 0. Let 
+
+Cc := sup 
+
+> x∈X
+
+∥∇ c(x)∥ < ∞
+
+and define 
+
+e := max {Lϕ,i , 1 + μC 2 
+
+> c
+
+}.
+
+Then the parameter ak generated by Algorithm 2 satisfies 
+
+ak ≥ 2(1 − c0)
+
+e − c0(1 + μC 2 
+
+> c
+
+) .
+
+16 Proof. The proof follows the same argument as Lemma 4.1 applied to the penalized objective 
+
+ϕi(x) = fi(x) + μ
+
+2 ∥c(x)∥2.
+
+Since c is continuously differentiable and the iterates {xk} remain in the compact set X by Assumption 6, there exists Cc > 0 such that 
+
+∥∇ c(xk)∥ ≤ Cc, ∀k. 
+
+By the smoothness of ϕi, we obtain 
+
+ϕi(xk+1 ) ≤ ϕi(xk) − ak∥gk∥2 + e
+
+2 a2
+
+> k
+
+∥gk∥2,
+
+where 
+
+e = max {Lϕ,i , 1 + μC 2 
+
+> c
+
+}.
+
+Using the acceptance criterion of Algorithm 2 and 
+
+∥∇ c(xk)gk∥2 ≤ C2 
+
+> c
+
+∥gk∥2,
+
+we obtain (c0 − 1) + ak
+
+2
+
+ e − c0(1 + μC 2 
+
+> c
+
+) ≥ 0.
+
+Since e > c 0(1 + μC 2 
+
+> c
+
+), the desired bound follows. 
+
+Lemma 4.9. Suppose that Assumption 5 holds. Then there exists a constant Mμ > 0
+
+such that 
+
+|mϕk (pk) − ϕi(xk + pk)| ≤ Mμ∥pk∥2,
+
+where 
+
+Mμ = 12 (Lϕ, max + Lf, max + μL c) .
+
+Proof. Repeating the proof of Lemma 4.2 for the function ϕi and using the Lipschitz bound on ∇ϕi yields the result. To analyze the convergence of stochastic algorithms for the constrained problem (2), it is necessary to specify an appropriate notion of approximate stationarity. Unlike unconstrained optimization, where ∥∇ f (x)∥ serves as a natural measure of optimality, constrained problems are typically characterized by the Karush–Kuhn–Tucker (KKT) conditions. Since stochastic methods can only be expected to achieve approximate optimality, we adopt the standard notion of an ε-KKT point. 17 Definition 4.10 (ε-KKT point) . Let ε > 0. A point x ∈ Rd is called an ε-KKT point of problem (2) if there exists a Lagrange multiplier λ ∈ Rm such that 
+
+∥∇ f (x) + ∇c(x)⊤λ∥ ≤ ε, ∥c(x)∥ ≤ ε. 
+
+Theorem 4.11. Suppose that Assumption 4, Assumption 5 Assumption 6 and As-sumption 8 hold. The algorithm operates as in Algorithm 2 with adaptive stepsizes ak,the penalty parameter is chosen as μ = 1 
+
+> ϵ
+
+for some small ϵ > 0 to guarantee feasibility accuracy. Then Algorithm 2 achieves the rate: 
+
+min  
+
+> k∈[K−1]
+
+E ∥∇ ϕ(xk)∥2 ≤ 2δK 1 + log 4rM μ ¯∆
+
+> ϵ
+
+log ν
+
+!
+
+E[ϕ(x0) − ϕ(x∗)] ,
+
+where 
+
+δ = 1 /(−τ La 2max + (1 − τ )amax + (1 + τ ) · 2(1 − c0)
+
+e − c0(1 + μC 2 
+
+> c
+
+) ).
+
+Hence, to guarantee E[∥∇ ϕ(xk)∥2] ≤ ϵ, it suffices to run 
+
+K = O
+
+ 1
+
+ϵ2 log 1
+
+ϵ
+
+
+
+iterations. 
+
+Proof. The proof follows the same line of argument as Theorem 4.7, applied to the penalized objective ϕ(x) = f (x) + μ 
+
+> 2
+
+∥c(x)∥2. From standard smoothness theory and the update xk+1 = xk − akgk, we obtain 
+
+ϕ(xk+1 ) − ϕ(xk) ≤ ak
+
+2
+
+ ∥∇ ϕ(xk) − gk∥2 − ∥∇ ϕ(xk)∥2 − ∥ gk∥2 + Lϕa2
+
+> k
+
+2 ∥gk∥2.
+
+As in the original analysis, for unsuccessful iterations, ak = 0. For successful iterations, the step parameter satisfies amin ≤ ak ≤ amax , where 
+
+amin := min 
+
+ 2(1 − c0)
+
+e − c0(1 + μC 2 
+
+> c
+
+) , a max 
+
+
+
+.
+
+Taking expectations for successful iterations yields 2E [ϕ(xk+1 ) − ϕ(xk)] ≤ (amax − amin + Lϕa2max )E[∥gk∥2] − (amax + amin )∥∇ ϕ(xk)∥2.
+
+Under Assumption 8, let λ = μc (xk). The stochastic gradient satisfies 
+
+E[∥gk∥2] ≤ τ ∥∇ ϕ(xk)∥2,
+
+which implies 2E[ϕ(xk+1 ) − ϕ(xk)] ≤  (amax − amin + Lϕa2max )τ − (amax + amin ) ∥∇ ϕ(xk)∥2.
+
+18 Define 
+
+δ−1 := ( amax + amin ) − τ (amax − amin + Lϕa2max ).
+
+To ensure δ > 0, the same quadratic argument as in Theorem 4.7 yields the admissible restriction 
+
+amax < 2
+
+τ L ϕ
+
+.
+
+Then, 
+
+∥∇ ϕ(xk)∥2 ≤ 2δE[ϕ(xk) − ϕ(xk+1 )] .
+
+Summing over successful iterations and using the standard bound on the number of unsuccessful steps gives min  
+
+> k∈[K−1]
+
+E∥∇ ϕ(xk)∥2 ≤ 2δK 1 + log 4rM μ ¯∆
+
+> ϵ
+
+log ν
+
+!
+
+E[ϕ(x0) − ϕ(x∗)] .
+
+Finally, since μ = 1 
+
+> ϵ
+
+,
+
+Lϕ = Lf + μL c = O
+
+ 1
+
+ϵ
+
+
+
+,
+
+which implies δ = O(1 /ϵ ) and therefore 
+
+K = O
+
+ 1
+
+ϵ2 log 1
+
+ϵ
+
+
+
+.
+
+Lemma 4.12. Suppose that Assumption 5, Assumption 6 and Assumption 7 hold and the penalty parameter is set as μ = 1 
+
+> ϵ
+
+for some small ϵ > 0.Then for any iterate xk satisfying ∥∇ ϕ(xk)∥ ≤ ϵ, it holds that 
+
+∥c(xk)∥ ≤ ϵ · ϵ + Gσmin 
+
+,
+
+where G > 0 is a uniform bound of ∥∇ f (x)∥ over the compact set X guaranteed by Assumption 6. 
+
+Proof. By definition of the penalized objective, 
+
+ϕ(x) = f (x) + μ
+
+2 ∥c(x)∥2, ∇ϕ(x) = ∇f (x) + μJ (x)⊤c(x).
+
+Evaluating at xk and rearranging yields 
+
+J(xk)⊤c(xk) = 1
+
+μ (∇ϕ(xk) − ∇ f (xk)) .
+
+19 Taking norms and using the triangle inequality gives 
+
+∥J(xk)⊤c(xk)∥ ≤ 1
+
+μ (∥∇ ϕ(xk)∥ + ∥∇ f (xk)∥) .
+
+Under Assumption 7, the Jacobian J(xk) has full row rank, and its smallest singular value satisfies σmin > 0. Consequently, 
+
+∥J(xk)⊤c(xk)∥ ≥ σmin · ∥ c(xk)∥.
+
+Combining the two inequalities yields 
+
+∥c(xk)∥ ≤ 1
+
+μ σ min 
+
+ ∥∇ ϕ(xk)∥ + ∥∇ f (xk)∥.
+
+Using Assumption 6, since ∇f is continuous and the iterates remain in a compact set, there exists a constant G > 0 such that 
+
+∥∇ f (xk)∥ ≤ G. 
+
+Together with the condition ∥∇ ϕ(xk)∥ ≤ ϵ, we obtain 
+
+∥c(xk)∥ ≤ 1
+
+μ σ min 
+
+(ϵ + G) = ϵ ϵ + Gσmin 
+
+,
+
+where the last equality uses μ = 1 /ϵ. 
+
+This concludes the proof. 
+
+Corollary 4.13. Suppose that the assumptions of Theorem 4.11 hold and let ε ≤ 1.Then for any iterate xk satisfying 
+
+∥∇ ϕ(xk)∥ ≤ ε, 
+
+there exists a multiplier λk := μc (xk) such that 
+
+∥∇ f (xk) + ∇c(xk)⊤λk∥ ≤ ε and ∥c(xk)∥ ≤ Cε, 
+
+where 
+
+C := G + 1 
+
+σmin 
+
+is a constant independent of ε. Hence, xk is an O(ε)-approximate KKT point. 
+
+5. Numerical Experiments 
+
+We evaluate the proposed STR method in over-parameterized stochastic optimiza-tion problems, considering both unconstrained and constrained settings. In all cases, STR is evaluated against standard stochastic optimization baselines and demonstrates competitive performance and improved robustness. 20 Figure 1. Comparison of training loss and test accuracy for SGD, Adam, SLS, and STR on CIFAR-10. 
+
+5.1. Unconstrained Setting: Multi-class Classification 
+
+We consider unconstrained multi-class image classification on the CIFAR-10 dataset, a standard benchmark for evaluating stochastic optimization methods in over-parameterized and highly nonconvex settings. As the learning model, we use a ResNet-20 architecture, following the standard design of [19]. We benchmark STR against representative stochastic optimization methods: (1) constant step-size SGD, (2) stochastic line-search methods (SLS), and (3) Adam, with hyperparameters selected by grid search using comparable tuning effort across meth-ods. For reproducibility, the final hyperparameters used in our experiments are listed below: 
+
+• SGD: learning rate lr = 0 .2, momentum = 0 .0, weight decay = 0 .0, mini-batch size = 128. 
+
+• Adam: learning rate lr = 10 −3, β1 = 0 .9, β2 = 0 .999, ϵ = 10 −8, mini-batch size = 128. 
+
+• SLS: c = 0 .05, β = 0 .9, maximum step size lr max = 2 .0, weight decay = 0 .0, mini-batch size = 128. 
+
+• STR: initial trust-region radius ∆ 0 = 8, maximum radius ∆ max = 80, c0 = 0 .05, 
+
+c1 = 0 .10, c2 = 0 .50, ν1 = 2 .0, ν2 = 5 .0, and δmax = 80, mini-batch size = 128. Each experiment is repeated over multiple independent runs with different random initializations, and performance is reported using the mean and standard deviation across runs. Figure 1 shows the training loss and test accuracy curves. All methods exhibit simi-lar convergence behavior and achieve nearly identical final test accuracy. STR matches the performance of the best baselines throughout training. While its training loss is slightly higher in later epochs, this conservative behavior does not affect generalization and reflects the stability of trust-region updates under stochastic noise. Overall, STR demonstrates competitive performance comparable to standard stochastic optimizers in unconstrained deep learning problems. 21 5.2. Constrained Setting: Orthogonal Subspace Fitting 
+
+We consider a constrained stochastic optimization problem arising in orthogonal sub-space estimation. Given a data matrix X ∈ Rd×n whose columns lie approximately in a k-dimensional subspace, we solve min  
+
+> W∈Rd×k
+
+L(W ) := ∥(I − W W ⊤)X∥2 
+
+> F
+
+s.t. W ⊤W = Ik.
+
+This formulation corresponds to the classical orthogonal subspace fitting (or PCA) problem and has been widely studied in the context of constrained optimization on the Stiefel manifold [38]. We convert the hard constraint into a quadratic penalty: Φμ(W ) = L(W ) + μ
+
+2 ∥W ⊤W − Ik∥2 
+
+> F
+
+,
+
+and apply the stochastic trust-region method described in Section 3 with penalty parameter μ = 1 .0. Synthetic data are generated according to the spiked covariance model in [14], with ambient dimension d and intrinsic subspace dimension k ≪ d.We compare the proposed stochastic trust-region method with penalty (STR-P) against the following constrained stochastic optimization methods: (1) Projected SGD with QR retraction (SGD+Proj), (2) Riemannian gradient descent on the Stiefel man-ifold (RiemannianGD), (3) Stochastic augmented Lagrangian method (AugLag), with hyperparameters selected by grid search using comparable tuning effort across meth-ods. For reproducibility, the final hyperparameters used in our experiments are listed below: 
+
+• SGD+Proj: learning rate 5 × 10 −2, mini-batch size 32. 
+
+• RiemannianGD: learning rate 5 × 10 −2, mini-batch size 32. 
+
+• AugLag: inner learning rate 0 .01, initial penalty parameter μ0 = 0 .1, penalty growth factor 1 .1, inner epochs 10, mini-batch size 32, and damping parameter 
+
+λdamp = 0 .5. 
+
+• STR-P: penalty parameter μ = 1 .0, initial trust-region radius ∆ 0 = 0 .2, max-imum radius ∆ max = 5 .0, c0 = 0 .05, c1 = 0 .1, c2 = 0 .9, ν1 = 1 .5, ν2 = 0 .5 and mini-batch size 32. Figure 2 and 3 compare different constrained stochastic optimization methods on the orthogonal subspace fitting problem for both moderate ( d = 100 , k = 5 , n = 500) and larger-scale ( d = 500 , k = 10 , n = 1000) settings. We report both the objective value and the constraint violation ∥W ⊤W −I∥F . Projection-based methods (SGD+Proj and RiemannianGD) maintain feasibility at near machine precision throughout the opti-mization due to QR-based retraction at every iteration. In contrast, penalty-based methods (STR-P and AugLag) do not enforce feasibility explicitly and therefore ex-hibit a gradual reduction of the constraint violation. Despite this, STR-P consistently achieves faster objective reduction in the early and intermediate phases and drives the constraint violation to near machine precision within a small number of epochs. This behavior is consistent across both problem scales, demonstrating that the pro-posed method effectively balances fast convergence with accurate constraint satisfac-tion without requiring explicit projection at each step. 22 Figure 2. Constrained orthogonal subspace fitting on synthetic spiked model data ( d = 100, k = 5, n =500). Comparison of STR-P with projected SGD, Riemannian gradient descent, and stochastic augmented Lagrangian.       
+
+> Figure 3. Constrained orthogonal subspace fitting on synthetic spiked model data ( d= 500, k= 10, n=1000). Comparison of STR-P with projected SGD, Riemannian gradient descent, and stochastic augmented Lagrangian.
+
+6. Conclusion 
+
+In this work, we proposed a unified framework for stochastic trust-region meth-ods in both unconstrained and equality-constrained over-parameterized optimization problems. By leveraging interpolation and strong growth conditions, our first-order stochastic trust-region algorithm achieves an iteration complexity of O(ϵ−2 log(1 /ϵ )) for unconstrained problems, while the quadratic-penalty-based method attains an ϵ-stationary point with O(ϵ−4 log(1 /ϵ )) iterations for constrained problems. The theoret-ical results are validated through numerical experiments on deep learning and orthog-onally constrained subspace fitting tasks, demonstrating that stochastic trust-region methods can achieve stable and competitive performance without extensive manual step-size tuning. To the best of our knowledge, this is the first unified complexity anal-ysis of stochastic trust-region methods under interpolation-type assumptions. Future work may explore extensions to second-order variants, improved model construction strategies, and adaptive penalty update mechanisms to further enhance efficiency and 23 scalability. 
+
+Acknowledgement(s) 
+
+The authors gratefully acknowledge Professor Xiao Wang from Sun Yat-sen University for her valuable guidance and helpful suggestions. 
+
+References 
+
+[1] M. Belkin, D. Hsu, S. Ma, and S. Mandal, Reconciling modern machine-learning practice and the classical bias–variance trade-off , Proceedings of the National Academy of Sciences 116 (2019), pp. 15849–15854. [2] S. Bellavia, B. Morini, and S. Rebegoldi, On the convergence properties of a stochastic trust-region method with inexact restoration , Axioms 12 (2023), p. 38. [3] D.P. Bertsekas, Nonlinear programming , Journal of the Operational Research Society 48 (1997), pp. 334–334. [4] D.P. Bertsekas, Constrained Optimization and Lagrange Multiplier Methods , Academic Press, 2014. [5] E.G. Birgin and J.M. Mart´ ınez, Practical Augmented Lagrangian Methods for Constrained Optimization , SIAM, 2014. [6] D. Boob, Q. Deng, and G. Lan, Stochastic first-order methods for convex and nonconvex functional constrained optimization , Mathematical Programming 197 (2023), pp. 215–279. [7] L. Bottou, Large-scale machine learning with stochastic gradient descent , Proceedings of COMPSTAT (2010), pp. 177–186. [8] L. Bottou, F.E. Curtis, and J. Nocedal, Optimization methods for large-scale machine learning , SIAM Review 60 (2018), pp. 223–311. [9] C. Cartis and K. Scheinberg, Global convergence rate analysis of unconstrained optimiza-tion methods based on probabilistic models , Mathematical Programming 169 (2018), pp. 337–375. [10] R. Chen, M. Menickelly, and K. Scheinberg, Stochastic optimization using a trust-region method and random models , Mathematical Programming 169 (2018), pp. 447–487. [11] A.R. Conn, N.I. Gould, and P.L. Toint, Trust region methods , SIAM, 2000. [12] F.E. Curtis, D.P. Robinson, and M. Samadi, A stochastic sequential quadratic optimization algorithm for nonlinear equality constrained optimization , Mathematical Programming 188 (2021), pp. 235–292. [13] F.E. Curtis and R. Shi, A fully stochastic second-order trust region method , Optimization Methods and Software 37 (2022), pp. 844–877. [14] Y. Dar, P. Mayer, L. Luzi, and R. Baraniuk, Subspace fitting meets regression: The effects of supervision and orthonormality constraints on double descent of generalization errors ,in International Conference on Machine Learning . PMLR, 2020, pp. 2366–2375. [15] K.J. Dzahini and S.M. Wild, Stochastic trust-region algorithm in random subspaces with convergence and expected complexity analyses (2022). arXiv preprint. [16] S. Ghadimi and G. Lan, Stochastic first- and zeroth-order methods for nonconvex stochas-tic programming , SIAM Journal on Optimization 23 (2013), pp. 2341–2368. [17] S. Gratton, C.W. Royer, L.N. Vicente, and Z. Zhang, Complexity and global rates of trust-region methods based on probabilistic models , IMA Journal of Numerical Analysis 36 (2015), pp. 1662–1695. [18] Y. Ha, S. Shashaani, and R. Pasupathy, Complexity of zeroth- and first-order stochastic trust-region algorithms (2024). arXiv preprint. [19] K. He, X. Zhang, S. Ren, and J. Sun, Deep Residual Learning for Image Recognition ,
+
+24 in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) . 2016, pp. 770–778. [20] T. Lin, C. Jin, and M.I. Jordan, Near-optimal algorithms for minimax optimization , in 
+
+Conference on Learning Theory (COLT) . 2020, pp. 2738–2779. [21] A. Nemirovski, A. Juditsky, G. Lan, and A. Shapiro, Robust stochastic approximation approach to stochastic programming , SIAM Journal on Optimization 19 (2009), pp. 1574– 1609. [22] J. Nocedal and S.J. Wright, Numerical Optimization , 2nd ed., Springer, 2006. [23] M. Nouiehed, M. Sanjabi, T. Huang, J.D. Lee, and M. Razaviyayn, Solving a class of nonconvex min–max games using iterative first-order methods , SIAM Journal on Opti-mization 29 (2019), pp. 3011–3040. [24] C. Paquette and K. Scheinberg, Stochastic cubic regularization with variance reduction ,Mathematical Programming 179 (2020), pp. 67–99. [25] H. Rafique, M. Liu, Q. Lin, and T. Yang, Weakly-convex concave minimax optimization: provable algorithms and applications in machine learning , Journal of Machine Learning Research 22 (2021), pp. 1–45. [26] B. Recht and C. R´ e, Parallel stochastic gradient algorithms for large-scale matrix com-pletion , Mathematical Programming Computation 5 (2013), pp. 201–226. [27] H. Robbins and S. Monro, A stochastic approximation method , Annals of Mathematical Statistics 22 (1951), pp. 400–407. [28] M. Schmidt and N.L. Roux, Fast convergence of stochastic gradient descent under a strong growth condition (2013). Available at https://arxiv.org/abs/1308.6370. [29] M. Schmidt, N.L. Roux, and F. Bach, Minimizing finite sums with the stochastic average gradient , Mathematical Programming 162 (2017), pp. 83–112. [30] S. Shalev-Shwartz and S. Ben-David, Understanding Machine Learning: From Theory to Algorithms , Cambridge University Press, 2014. [31] Z. Shen, P. Zhou, C. Fang, J. Xie, and A. Ribeiro, A stochastic trust region method for non-convex minimization (2020). ICLR 2020, revised 2025. [32] V.N. Vapnik, An overview of statistical learning theory , IEEE transactions on neural networks 10 (1999), pp. 988–999. [33] S. Vaswani, F. Bach, and M. Schmidt, Fast and Faster Convergence of SGD for Over-Parameterized Models and an Accelerated Perceptron , in Proceedings of the Twenty-Second International Conference on Artificial Intelligence and Statistics , K. Chaudhuri and M. Sugiyama, eds., Proceedings of Machine Learning Research Vol. 89, 16–18 Apr. PMLR, 2019, pp. 1195–1204. [34] S. Vaswani, K. Mishchenko, I. Laradji, M. Schmidt, and L. Bottou, Fast and faster conver-gence of SGD for over-parameterized models and an accelerated perceptron , in Advances in Neural Information Processing Systems . 2019. [35] S. Vaswani, A. Mishkin, I. Laradji, M. Schmidt, G. Gidel, and S. Lacoste-Julien, Painless stochastic gradient: Interpolation, line-search, and convergence rates , Advances in neural information processing systems 32 (2019). [36] X. Wang and Y.x. Yuan, Stochastic trust region methods with trust region radius depending on probabilistic models , arXiv preprint arXiv:1904.03342 (2019). [37] Z. Wang, K. Balasubramanian, S. Ma, and M. Razaviyayn, Zeroth-order algorithms for nonconvex–strongly-concave minimax problems with improved complexities , Journal of Global Optimization 87 (2023), pp. 709–740. [38] Z. Wen and W. Yin, A feasible method for optimization with orthogonality constraints ,Mathematical Programming 142 (2013), pp. 397–434. [39] C. Xie, C. Li, C. Zhang, Q. Deng, D. Ge, and Y. Ye, Trust Region Methods For Nonconvex Stochastic Optimization Beyond Lipschitz Smoothness , in AAAI . 2024. arXiv preprint. [40] Y. Xu, First-order methods for constrained convex programming based on linearized aug-mented lagrangian function , INFORMS Journal on Optimization 3 (2021), pp. 89–117. [41] C. Zhang, S. Bengio, M. Hardt, B. Recht, and O. Vinyals, Understanding deep learning requires rethinking generalization , arXiv preprint arXiv:1611.03530 (2016). 
+
+25 [42] X. Zheng, Trust-region stochastic optimization with variance reduction technique (2024). arXiv preprint. [43] Y. Zhou, J. Yang, H. Zhang, Y. Liang, and V. Tarokh, Sgd converges to global minimum in deep learning via star-convex path , arXiv preprint arXiv:1901.00451 (2019). 
+
+26
