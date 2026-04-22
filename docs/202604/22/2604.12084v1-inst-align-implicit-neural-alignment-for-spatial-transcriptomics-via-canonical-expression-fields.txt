@@ -1,0 +1,280 @@
+Title: INST-Align: Implicit Neural Alignment for Spatial Transcriptomics via Canonical Expression Fields
+
+URL Source: https://arxiv.org/pdf/2604.12084v1
+
+Published Time: Wed, 15 Apr 2026 00:40:44 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# INST-Align: Implicit Neural Alignment for Spatial Transcriptomics via Canonical Expression Fields 
+
+Bonian Han, Cong Qi, Przemyslaw Musialski, and Zhi Wei 
+
+New Jersey Institute of Technology, Newark, NJ, USA 
+
+{bh348, cq5, przemyslaw.musialski, zhi.wei}@njit.edu 
+
+Abstract. Spatial transcriptomics (ST) measures mRNA expression while preserving spatial organization, but multi-slice analysis faces two cou-pled difficulties: large non-rigid deformations across slices and inter-slice batch effects when alignment and integration are treated independently. We present INST-Align, an unsupervised pairwise framework that cou-ples a coordinate-based deformation network with a shared Canonical Expression Field, an implicit neural representation mapping spatial co-ordinates to expression embeddings, for joint alignment and reconstruc-tion. A two-phase training strategy first establishes a stable canonical embedding space and then jointly optimizes deformation and spatial-feature matching, enabling mutually constrained alignment and represen-tation learning. Cross-slice parameter sharing of the canonical field reg-ularizes ambiguous correspondences and absorbs batch variation. Across nine datasets, INST-Align achieves state-of-the-art mean OT Accuracy (0.702), NN Accuracy (0.719), and Chamfer distance, with Chamfer re-ductions of up to 94.9% on large-deformation sections relative to the strongest baseline. The framework also yields biologically meaningful spa-tial embeddings and coherent 3D tissue reconstruction. The code will be released after review phase. 
+
+Keywords: Spatial Transcriptomics · Implicit Neural Representation ·
+
+Spatial Registration · Cross-slice Integration · Unsupervised Learning 
+
+## 1 Introduction 
+
+Spatial transcriptomics (ST) enables gene expression measurement with spatial context [1, 2], spanning imaging-based approaches such as multiplexed FISH and in situ sequencing [2, 3] and sequencing-based spatial barcoding platforms [1, 4]. These technologies have enabled molecular mapping across diverse biological sys-tems [5–10], from the human dorsolateral prefrontal cortex [11] to whole mouse embryos [12], making multi-slice tissue analysis increasingly practical. However, reconstructing coherent 3D tissue volumes from serial sections remains challeng-ing [13]: slices undergo complex non-rigid distortions during sample preparation (tearing, folding, compression), and arbitrary inter-slice rotations further com-pound the geometric ambiguity. Biological complexity makes ground-truth cor-respondences largely unattainable, rendering alignment inherently unsupervised.  
+
+> arXiv:2604.12084v1 [cs.CV] 13 Apr 2026 2Han et al.
+
+Without a common coordinate frame, cross-slice expression integration is con-fined to individual 2D sections, leaving the collective three-dimensional context unexploited. Existing alignment methods fall into two categories [13]. Integration-based 
+
+methods such as STAligner [14], GraphST [15], SPACEL [16], and SANTO [17] learn joint spatial embeddings to correct coordinates, but their alignment qual-ity is bounded by representation fidelity. Geometric methods align coordinates directly via optimal transport [18], Gaussian processes [6, 19], or diffeomorphic mappings [20, 21], but treat alignment and integration as independent steps. A common limitation is that these approaches decouple spatial alignment from ex-pression integration: integration-based methods risk over-correcting and dimin-ishing genuine biological diversity [13], while geometric methods lack expression-level feedback. Since raw expression inherently contains inter-slice batch effects, we argue that alignment and integration should be solved jointly. Implicit Neural Representations (INRs) model signals as continuous coordinate-conditioned functions fθ : x 7 → y, enabling resolution-independent querying with compact parameterizations [22, 23]. Although INRs are naturally suited to this setting—jointly learning deformation and reconstruction from coordinates, as demonstrated by Nerfies [30] in novel-view synthesis—and implicit deformation models have been explored in medical image registration [26, 27], existing INR-based ST methods such as STINR [24] and SUICA [25] only model within-slice expression fields and do not estimate deformation fields for multi-slice alignment. In this paper, we propose INST-Align, a framework that couples spatial align-ment and expression integration through a shared Canonical Expression Field parameterized as an INR. Requiring all slices to be explained by a single contin-uous field regularizes the ill-posed registration problem, turning alignment into a mutually constrained reconstruction task. Our key contributions are: 
+
+– Joint alignment and integration via a shared canonical field. Ashared Canonical Expression Field coupled with a deformation network jointly solves spatial alignment and expression integration, achieving state-of-the-art mean alignment performance across nine datasets. 
+
+– Spatial-expression alignment loss. A unified cost combining geometric proximity and canonical-field feature similarity with adaptive soft assign-ment drives unsupervised non-rigid registration without ground-truth corre-spondences. 
+
+– Biologically meaningful embeddings. The canonical field produces spa-tial embeddings that support downstream analysis (e.g., clustering) without requiring dedicated graph-based embedding methods. 
+
+## 2 Method 
+
+Fig. 1 illustrates the overall pipeline of INST-Align. Given a pair of ST slices, we first perform rigid alignment via adaptive ICP, then jointly optimize a Canon-ical Expression Field and a Deformation Network through two-phase training. In Phase 1, we pretrain slice-specific expression fields with a shared decoder INST-Align: Implicit Neural Alignment for Spatial Transcriptomics 3Phase 1 - Canonical Expression Field Pretraining  
+
+> Phase 2 - Non-Rigid Alignment
+> sin / cos
+> features
+> ReLU
+> Implicit MLP
+> ReLU
+> ReLU  Reconstructed
+> expression
+> Reference Slice S
+> Windowed
+> Positional
+> Encoding
+> Alignment
+> Objective
+> Final
+> Objective
+> Alignment
+> +
+> Reconstruction
+> Spatial-Feature
+> Matching
+> Deformation Network
+> Matching Loss
+> Jacobian Regularization
+> Decoder
+> Decoder
+
+Fig. 1. Overview of the INST-Align pipeline. Phase 1 learns a shared canonical ex-pression field fθ as an implicit neural representation that maps spatial coordinates to embedding vectors and reconstructs gene expression profiles. Phase 2 jointly opti-mizes a non-rigid deformation network and feature-guided spatial matching within the shared field, enabling mutually reinforcing alignment and representation learning under smoothness regularization. 
+
+to establish a stable and biologically meaningful embedding space. In Phase 2, we switch to a single shared canonical field and jointly optimize deformation and alignment losses, enabling mutually constrained non-rigid registration and representation learning. 
+
+2.1 Problem Formulation 
+
+Let S1 = {(x(1)  
+
+> i
+
+, g(1)  
+
+> i
+
+)}N1 
+
+> i=1
+
+and S2 = {(x(2)  
+
+> j
+
+, g(2)  
+
+> j
+
+)}N2 
+
+> j=1
+
+denote two ST slices, where 
+
+x ∈ R2 are spatial coordinates and g ∈ RG are gene expression vectors. We designate S1 as the reference slice and S2 as the source slice. Our goal is to learn: (1) a deformation function ϕψ : R2 → R2 that maps source coordinates into the reference frame, and (2) a canonical expression field 
+
+fθ1 : R2 → Rd that maps any spatial location to a d-dimensional embedding capturing the biological identity at that position. The coordinate pairs are z-score normalized to a common scale, and a rigid pre-alignment is applied using adaptive ICP [28, 29] with expression-guided rotation selection. 4 Han et al. 
+
+2.2 Canonical Expression Field 
+
+The Canonical Expression Field is parameterized as an implicit neural represen-tation (ExprINR) fθ1 defined on the reference frame. Given a 2D coordinate x,we first apply a windowed positional encoding [30, 31]: 
+
+γ(x, α ) = 
+
+h
+
+x, w k(α) sin(2 πσ kx), w k(α) cos(2 πσ kx)
+
+iL−1
+
+> k=0
+
+(1) where σk = 2 k·lmax /(L−1) are log-linearly spaced frequencies and wk(α) is the coarse-to-fine window of [30]. The window parameter α ∈ [0 , L ] increases linearly during training, progressively enabling higher frequencies to prevent overfitting to noise in early epochs. The encoded coordinates are processed by a 4-layer MLP with LayerNorm and ReLU activations to produce a d-dimensional bottleneck embedding ( d =64 ): 
+
+e = fθ (x, α ) = MLP θ (γ(x, α )) ∈ Rd (2) An expression decoder hϕ : Rd → RG′
+
+reconstructs the highly variable gene (HVG) expression from the embedding: 
+
+ˆg = hϕ(e) (3) A key design choice spans both training phases. In Phase 1, two independent ExprINRs ( fθ1 for the reference, fθ2 for the source) share a single decoder, forcing their embedding spaces to align. In Phase 2, the source INR ( fθ2 ) is discarded: since the Deformation Network maps source coordinates into the reference frame, a single canonical field fθ1 can encode both slices. This progressive design—from paired to canonical—ensures the canonical field is well-initialized before joint optimization begins, providing a stable biological prior that guides deformation. 
+
+2.3 Deformation Network 
+
+The Deformation Network ϕψ maps source coordinates to a displacement field. Given rigidly aligned source coordinates x(2) , it predicts: 
+
+ˆx(2) = ϕψ (x(2) , α ) = x(2) + ∆x(x(2) ) (4) where ∆x is the learned displacement. The network consists of a 6-layer trunk MLP ( dhidden = 128 ) followed by a lightweight spatial head ( dhidden = 64 , 1 layer) that outputs the 2D displacement. The spatial head is initialized near zero so that ϕψ starts as an identity mapping, ensuring stable early-stage optimization. To ensure spatially smooth and physically plausible deformations, we regu-larize the Jacobian of ϕψ . For a sampled subset of points, we compute the 2 × 2
+
+Jacobian matrix J = ∂ ˆx/∂ x via automatic differentiation and extract its sin-gular values σ1, σ 2 via SVD. The regularization loss penalizes deviations from volume-preserving behavior with an asymmetric weighting: 
+
+Ljac = 1
+
+|B| 
+
+X
+
+> x∈B
+> 2
+
+X
+
+> k=1
+
+wk · (log σk)2, wk =
+
+(
+
+5.0 if log σk < 0 (compression) 
+
+1.0 otherwise (expansion) (5) INST-Align: Implicit Neural Alignment for Spatial Transcriptomics 5
+
+This asymmetry reflects the observation that compression (cells crowding together) is more pathological than moderate expansion in tissue alignment [32]. 
+
+2.4 Joint Optimization 
+
+Spatial-Expression Alignment Loss (ours). Our core registration objective is an original spatial-expression alignment loss that establishes correspondences be-tween deformed source points ˆx(2) and reference points x(1) using a unified geometry–feature cost derived from the canonical field. For each deformed point, we find its K nearest spatial neighbors in the reference and compute: 
+
+cij = ∥ˆx(2)  
+
+> j
+
+− x(1)  
+
+> i
+
+∥2
+
+ssp 
+
++ λf · 1 − ⟨ ¯e(2)  
+
+> j
+
+, ¯e(1)  
+
+> i
+
+⟩
+
+sft 
+
+(6) where ¯e = e/∥e∥ are L2-normalized ExprINR embeddings, ssp and sft are run-ning EMA scale factors, and λf balances the two terms. Soft assignment weights are obtained as pij = softmax (−cij /τ ), where τ is an adaptive temperature updated by EMA based on the mean weighted cost. The embeddings entering the cost matrix are computed within a torch.no_grad() 
+
+context, keeping the canonical embeddings as a frozen prior during correspon-dence estimation and preventing degenerate feature collapse. The matching loss is bidirectional: the forward loss pulls each deformed source point toward its weighted target centroid, while the reverse loss ensures each reference point is explained by at least one source point, preventing many-to-one collapse. 
+
+Reconstruction Loss. Following SUICA [25], the expression decoder reconstructs HVG profiles from INR embeddings using a composite loss: masked MSE on nonzero entries, L1 on all entries, and a Dice loss on the zero/nonzero pattern: 
+
+Lrecon = MSE masked + L1 + 0 .01 · L dice (7) 
+
+Two-Phase Training. Phase 1 (300 epochs): Two independent ExprINRs ( fθ1 for the reference, fθ2 for the source) share a single decoder and are jointly trained via Lrecon on both slices, aligning their embedding spaces. Concurrently, the DeformationNet is independently pre-trained with PCA-based matching. The coarse-to-fine α window opens progressively over the first third of training. The best reconstruction checkpoint is restored before Phase 2. 
+
+Phase 2 (400 epochs): fθ2 is discarded; all remaining components ( fθ1 , hϕ,
+
+ϕψ , and the matcher) are jointly optimized with the total loss: 
+
+L = Lmatch + λr Lrecon + λj Ljac (8) where λr = 0 .1 (reduced to prevent reconstruction from dominating alignment) and λj controls Jacobian regularization. A full-coverage reverse matching step is performed each epoch to address global collapse missed by mini-batch training. Learning rate is scheduled via ReduceLROnPlateau. 6 Han et al.   
+
+> Table 1. D1–D3: DLPFC samples; MB2/MB7/MB11: MERFISH Brain sections; ST: STARMap; MH: MERFISH Hypothalamus; ME: MouseEmbryo. Spatial alignment re-sults across nine datasets. Best in bold , second-best underlined. “–” indicates method not available or no alignment.
+
+DLPFC MERFISH Brain Metric Method D1 D2 D3 MB2 MB7 MB11 ST MH ME Mean OT Acc ↑
+
+Raw .745 .887 .673 .013 .050 .209 .860 .051 .116 .400 PASTE .859 .904 .806 .267 .726 .349 .882 .674 .031 .611 STalign .866 .905 .808 .022 .046 .143 .861 .051 .112 .424 Spateo .864 .884 .818 .343 .750 .298 .860 .681 .723 .691 ICP .829 .888 .829 .251 .709 .347 .852 .689 .710 .678 
+
+Ours .863 .899 .839 .318 .746 .357 .857 .690 .746 .702 
+
+NN Acc ↑
+
+Raw .765 .913 .729 .130 .064 .276 .890 .167 .172 .456 PASTE .859 .904 .804 .244 .731 .360 .883 .680 .032 .611 STalign .875 .894 .788 .136 .065 .181 .872 .167 .166 .460 Spateo .845 .925 .823 .378 .784 .215 .889 .745 .759 .707 ICP .851 .925 .831 .228 .723 .280 .889 .701 .733 .685 
+
+Ours .853 .920 .849 .322 .780 .365 .899 .693 .788 .719 
+
+Chamfer ↓
+
+Raw 0.1 0.1 0.5 – – – 136.5 – – –PASTE 0.3 0.3 0.2 173.1 5.8 51.7 15.3 4.4 235.5 54.1 STalign 0.6 0.6 0.7 – – – 140.6 – – –Spateo 0.6 0.7 0.7 166.2 16.8 103.3 142.7 12.2 12.0 50.6 ICP 0.0 0.1 0.4 77.9 18.7 107.0 135.7 11.0 15.3 40.7 
+
+Ours 0.7 0.6 0.6 12.6 13.9 17.1 135.0 11.0 11.9 22.6 
+
+## 3 Experiments 
+
+3.1 Datasets and Baselines 
+
+We evaluate nine ST datasets spanning grid-based and continuous-coordinate technologies: DLPFC [11] (3 samples, the first adjacent section pair per sample, 
+
+∼3.4–4.8k spots), STARMap [3] ( ∼1k spots), MERFISH Brain [34] (3 samples, 
+
+∼5.5–24.8k cells) and MERFISH Hypothalamus [35] (1 sample, ∼17–20k cells), and MouseEmbryo [12] ( ∼17–20k cells). Alignment baselines are PASTE [18], STalign [20], Spateo [21], plus Raw (unaligned) and ICP (rigid-only); integration-focused methods are evaluated separately in Table 2 to avoid task mismatch. We report OT Accuracy [18], NN Accuracy, and Chamfer distance [33, 13] for alignment, and ARI/NMI (mclust) for embedding quality. INST-Align: Implicit Neural Alignment for Spatial Transcriptomics 7
+
+Table 2. Embedding quality (ARI / NMI) via mclust clustering. Each is from the target slice. Baselines include STAligner [14], GraphST [15], SPIRAL [36], and Seurat [37].                                                                           
+
+> DLPFC Samp. 1 DLPFC Samp. 2 DLPFC Samp. 3 MouseEmbryo Mean Method ARI NMI ARI NMI ARI NMI ARI NMI ARI NMI PCA .298 .385 .205 .364 .208 .340 .128 .215 .210 .326 Seurat .237 .372 .285 .287 .253 .397 .078 .220 .213 .319 STAligner .273 .474 .463 .556 .293 .491 .356 .552 .346 .518 GraphST .431 .641 .490 .589 .618 .724 .266 .516 .451 .618
+> SPIRAL .558 .652 .359 .484 .356 .478 .192 .355 .366 .492 INST-Align (Ours) .397 .490 .463 .446 .246 .393 .341 .512 .362 .460
+
+3.2 Spatial Alignment Results 
+
+Table 1 summarizes alignment across nine datasets. INST-Align achieves the best mean OT Accuracy (0.702), NN Accuracy (0.719), and Chamfer distance (22.6), compared with Spateo (0.691/0.707/50.6). On near-aligned DLPFC (D1–D3), all methods are competitive after rigid initialization; our slightly higher Chamfer (0.6–0.7 vs. PASTE/ICP) reflects limited room for non-rigid improvement on already well-aligned grid data. On large-deformation datasets the gap widens: Chamfer drops from 173.1 to 12.6 on MB2 (vs. PASTE), from 51.7 to 17.1 on MB11, and from 235.5 to 11.9 on MouseEmbryo, while OT/NN scores remain comparable. STalign produces excessively large deformations on MERFISH Brain and MouseEmbryo, making its metrics non-comparable (marked “–”). Overall, the advantage of INST-Align grows with dataset size and deformation severity, suggesting that the canonical field provides stronger regularization as geometric ambiguity increases. 
+
+3.3 Downstream Analysis 
+
+Table 2 reports embeddings from the canonical expression field. Because INST-Align is optimized for alignment, embedding quality is a byproduct rather than the primary target, yet results remain competitive (e.g., ARI 0.463 on DLPFC Sample 2, matching STAligner; ARI/NMI 0.341/0.512 on MouseEmbryo). GraphST achieves the highest mean ARI/NMI with dedicated spatial graph networks. That a coordinate-conditioned INR designed for alignment produces biologically meaningful embeddings without graph construction supports the view that a well-regularized canonical field captures tissue structure as an emergent prop-erty. Fig. 2 shows that INST-Align resolves large non-rigid mismatches on MouseEm-bryo (a →b) and produces coherent layer structure in 3D reconstruction (c). 
+
+3.4 Ablation Studies 
+
+Table 3 shows that pretraining is critical for embedding quality (ARI drops from 0.334 to 0.045 without it), joint optimization improves geometric alignment (Chamfer 0.36 vs. 0.56), and Jacobian regularization benefits both. 8 Han et al. (a) (b)  
+
+> Slice 1 Slice 2 L1
+> L2
+> L3
+> L4
+> L5
+> L6
+> WM
+> (c)
+
+(a) • Slice 1 • Slice 2 (b) (c) Fig. 2. Qualitative results. (a) MouseEmbryo after rigid ICP pre-alignment; (b) INST-Align non-rigid alignment on the same pair; (c) 3D reconstruction of DLPFC Sample 3 from consecutively aligned slices, colored by cortical layer. 
+
+Table 3. Ablation study on DLPFC Sample 1. Each row removes one component from the full model.                          
+
+> Alignment Embedding Variant OT Acc ↑Chamfer ↓ARI ↑NMI ↑
+> Full (Ours) .810 0.36 .334 .450
+> w/o Phase 1 (pretrain) .813 0.47 .045 .079 w/o Phase 2 (joint opt.) .807 0.56 .295 .434 w/o Jacobian reg. .805 0.49 .287 .400
+
+## 4 Conclusion 
+
+We presented INST-Align, which couples a deformation network with a shared Canonical Expression Field for pairwise ST alignment and reconstruction. The shared field provides biological regularization for ambiguous correspondences un-der sparsity, batch effects, and large deformations. Across nine datasets, INST-Align achieves state-of-the-art mean OT Accuracy, NN Accuracy, and Chamfer distance, with consistent performance across both near-aligned grid data and large-deformation sections, yielding Chamfer reductions of up to 94.9% relative to PASTE. Ablations confirm contributions from Phase 1 pretraining, Phase 2 joint optimization, and Jacobian regularization. The current framework operates in a pairwise setting and lacks a global multi-slice consistency objective. In addi-tion, biological validation is limited to clustering-based metrics (ARI/NMI), and the learned embeddings remain below specialized embedding methods. Future work will extend the model toward globally consistent multi-slice 3D alignment with enhanced biological evaluation. INST-Align: Implicit Neural Alignment for Spatial Transcriptomics 9
+
+## References 
+
+1. Ståhl, P.L., et al.: Visualization and analysis of gene expression in tissue sections by spatial transcriptomics. Science 353 (6294), 78–82 (2016) 2. Chen, K.H., Boettiger, A.N., Moffitt, J.R., Wang, S., Zhuang, X.: Spatially resolved, highly multiplexed RNA profiling in single cells. Science 348 (6233), aaa6090 (2015) 3. Wang, X., et al.: Three-dimensional intact-tissue sequencing of single-cell transcrip-tional states. Science 361 (6400), eaat5691 (2018) 4. Stickels, R.R., et al.: Highly sensitive spatial transcriptomics at near-cellular reso-lution with Slide-seqV2. Nature Biotechnology 39 (3), 313–319 (2021) 5. Zhang, B., et al.: A human embryonic limb cell atlas resolved in space and time. Nature 635 (8039), 668–678 (2024) 6. Qi, C., Chen, Y., Wei, Z.: Clustering with communication: A variational framework for single cell representation learning. arXiv preprint arXiv:2505.04891 (2025) 
+
+7. Wang, W., Qi, C., Wei, Z.: Modeling TCR-pMHC binding with dual encoders and cross-attention fusion. In: Proc. IEEE Int. Conf. Bioinformatics and Biomedicine (BIBM), 5083–5090 (2025) 8. Allen, W.E., et al.: Molecular and spatial signatures of mouse brain aging at single-cell resolution. Cell 186 (1), 194–208 (2023) 9. Khaliq, A.M., et al.: Spatial transcriptomic analysis of primary and metastatic pancreatic cancers highlights tumor microenvironmental heterogeneity. Nature Ge-netics 56 (11), 2455–2465 (2024) 10. Longo, S.K., Guo, M.G., Ji, A.L., Khavari, P.A.: Integrating single-cell and spatial transcriptomics to elucidate intercellular tissue dynamics. Nature Reviews Genetics 
+
+22 (10), 627–644 (2021) 11. Maynard, K.R., et al.: Transcriptome-scale spatial gene expression in the human dorsolateral prefrontal cortex. Nature Neuroscience 24 (3), 425–436 (2021) 12. Chen, A., et al.: Spatiotemporal transcriptomic atlas of mouse organogenesis using DNA nanoball-patterned arrays. Cell 185 (10), 1777–1792 (2022) 13. Dong, K., et al.: Benchmarking multi-slice integration and downstream applications in spatial transcriptomics data analysis. Genome Biology 26 , 318 (2025) 14. Zhou, X., Dong, K., Zhang, S.: Integrating spatial transcriptomics data across different conditions, technologies and developmental stages. Nature Computational Science 3(10), 894–906 (2023) 15. Long, Y., et al.: Spatially informed clustering, integration, and deconvolution of spatial transcriptomics with GraphST. Nature Communications 14 (1), 1155 (2023) 16. Xu, H., et al.: SPACEL: deep learning-based characterization of spatial transcrip-tome architectures. Nature Communications 14 (1), 7603 (2023) 17. Li, H., et al.: SANTO: a coarse-to-fine alignment and stitching method for spatial omics. Nature Communications 15 , 6048 (2024) 18. Zeira, R., Land, M., Strzalkowski, A., Raphael, B.J.: Alignment and integration of spatial transcriptomics data. Nature Methods 19 (5), 567–575 (2022) 19. Jones, A., Townes, F.W., Li, D., Engelhardt, B.E.: Alignment of spatial genomics data using deep Gaussian processes. Nature Methods 20 (9), 1379–1387 (2023) 20. Clifton, K., et al.: STalign: Alignment of spatial transcriptomics data using diffeo-morphic metric mapping. Nature Communications 14 (1), 8123 (2023) 21. Qiu, X., et al.: Spatiotemporal modeling of molecular holograms. Cell 187 (26), 7351–7373 (2024) 22. Mildenhall, B., Srinivasan, P.P., Tancik, M., Barron, J.T., Ramamoorthi, R., Ng, R.: NeRF: Representing scenes as neural radiance fields for view synthesis. In: 10 Han et al. Vedaldi, A., Bischof, H., Brox, T., Frahm, J.-M. (eds.) ECCV 2020. LNCS, vol. 12346, pp. 405–421. Springer, Cham (2020) 23. Sitzmann, V., Martel, J.N.P., Bergman, A.W., Lindell, D.B., Wetzstein, G.: Im-plicit neural representations with periodic activation functions. In: NeurIPS, pp. 7462–7473 (2020) 24. Luo, Y., Zhao, X., Ye, K., Meng, D.: STINR: Deciphering spatial transcriptomics via implicit neural representation. In: CVPR, pp. 25930–25939 (2025) 25. Zhu, Q., Zheng, Y., Sang, Y., Zhan, Y., Zhu, Z., Ding, J., Zheng, Y.: SUICA: Learning super-high dimensional sparse implicit neural representations for spatial transcriptomics. In: ICML. PMLR, vol. 267, pp. 80448–80462 (2025) 26. Wolterink, J.M., Zwienenberg, J.C., Brune, C.: Implicit neural representations for deformable image registration. In: MIDL. PMLR, vol. 172, pp. 1349–1359 (2022) 27. Jena, R., Chaudhari, P., Gee, J.C.: Deep implicit optimization enables robust learnable features for deformable image registration. Medical Image Analysis 103 ,103577 (2025) 28. Besl, P.J., McKay, N.D.: Method for registration of 3-D shapes. IEEE Trans. Pat-tern Anal. Mach. Intell. 14 (2), 239–256 (1992) 29. Musialski, P.: Point cloud to model registration. Technical Report TR-VRVIS-009-2009, VRVis Research Center, Vienna (2009) 30. Park, K., et al.: Nerfies: Deformable neural radiance fields. In: ICCV, pp. 5845–5854 (2021) 31. Tancik, M., et al.: Fourier features let networks learn high frequency functions in low dimensional domains. In: NeurIPS, pp. 7537–7547 (2020) 32. Chun, S.Y., Fessler, J.A.: A simple regularizer for B-spline nonrigid image registra-tion that encourages local invertibility. IEEE Journal of Selected Topics in Signal Processing 3(1), 159–169 (2009) 33. Fan, H., Su, H., Guibas, L.J.: A point set generation network for 3D object recon-struction from a single image. In: CVPR, pp. 2463–2471 (2017) 34. Zhang, M., et al.: Spatially resolved cell atlas of the mouse primary motor cortex by MERFISH. Nature 598 (7879), 137–143 (2021) 35. Moffitt, J.R., et al.: Molecular, spatial, and functional single-cell profiling of the hypothalamic preoptic region. Science 362 (6416), eaau5324 (2018) 36. Guo, T., et al.: SPIRAL: integrating and aligning spatially resolved transcriptomics data across different experiments, conditions, and technologies. Genome Biology 
+
+24 , 241 (2023) 37. Stuart, T., Butler, A., Hoffman, P., Hafemeister, C., Papalexi, E., Mauck, W.M., Hao, Y., Stoeckius, M., Smibert, P., Satija, R.: Comprehensive integration of single-cell data. Cell 177 (7), 1888–1902 (2019)

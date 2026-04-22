@@ -1,0 +1,668 @@
+Title: Enhancing Ly{\alpha} Emitter Identification in HETDEX with a Convolutional Neural Network
+
+URL Source: https://arxiv.org/pdf/2604.12414v1
+
+Published Time: Wed, 15 Apr 2026 00:54:19 GMT
+
+Number of Pages: 31
+
+Markdown Content:
+Draft version April 15, 2026 
+
+Typeset using L ATEX twocolumn style in AASTeX631 
+
+Enhancing Ly α Emitter Identification in HETDEX with a Convolutional Neural Network 
+
+Shiro Mukae ,1, 2 Erin Mentuch Cooper ,1, 3 Karl Gebhardt ,1 Dustin Davis ,1 Lindsay R. House ,4, 5 
+
+Mahdi Qezlou ,1 Julian B. Mu˜ noz ,1 Shun Saito ,6, 7 Daniel J. Farrow ,8, 9 Caryl Gronwall ,10, 11 
+
+Donald P. Schneider ,10, 11 and Eric Gawiser 12 
+
+> 1
+
+Department of Astronomy, The University of Texas at Austin, 2515 Speedway Boulevard, Austin, TX 78712, USA 
+
+> 2
+
+MIRAI Technology Institute, Shiseido Co., Ltd., 1-2-11, Takashima, Nishi-ku, Yokohama, Kanagawa, 222-0011, Japan 
+
+> 3
+
+McDonald Observatory, The University of Texas at Austin, 2515 Speedway Boulevard, Austin, TX 78712, USA 
+
+> 4
+
+Data Science Institute, The University of Chicago, 5460 S University Ave, Chicago, IL 60615, USA 
+
+> 5
+
+The SkAI Institute, 875 N. Michigan Ave., Suite 3500, Chicago, IL 60611 
+
+> 6
+
+Institute for Multi-messenger Astrophysics and Cosmology, Department of Physics, Missouri University of Science and Technology, 1315 N. Pine St., Rolla MO 65409, USA 
+
+> 7
+
+Kavli Institute for the Physics and Mathematics of the Universe (WPI), The University of Tokyo Institutes for Advanced Study (UTIAS), The University of Tokyo, Chiba 277-8583, Japan 
+
+> 8
+
+E. A. Milne Centre for Astrophysics University of Hull, Cottingham Road, Hull, HU6 7RX, UK 
+
+> 9
+
+Centre of Excellence for Data Science, Artificial Intelligence & Modelling (DAIM), University of Hull, Cottingham Road, Hull, HU6 7RX, UK 
+
+> 10
+
+Department of Astronomy & Astrophysics, The Pennsylvania State University, University Park, PA 16802, USA 
+
+> 11
+
+Institute for Gravitation and the Cosmos, The Pennsylvania State University, University Park, PA 16802, USA 
+
+> 12
+
+Physics and Astronomy Department, Rutgers, The State University, Piscataway, NJ 08854, USA 
+
+ABSTRACT We present a deep learning framework to enhance the identification of Ly α emitters (LAEs) in the Hobby-Eberly Telescope Dark Energy Experiment (HETDEX), an untargeted spectroscopic survey of LAEs at 1 .9 < z < 3.5 without imaging pre-selection. We primarily address the low signal-to-noise ratio (S/N) regime (4 .8 ≤ S/N ≤ 5.5), where LAE candidates suffer from substantial noise contamination. To distinguish LAE candidates from artifacts and sky residuals, we employ a convolu-tional neural network (CNN) trained on two-dimensional spectral images of single emission lines. The training sample is constructed from the HETDEX COSMOS catalog, with external validation from ancillary observations and our participatory science project, Dark Energy Explorers . For small-format, low-resolution spectroscopic data, the model achieves a balanced accuracy, precision, and recall of 94 .1%, 97 .5%, and 97 .5%, respectively, in the high-S/N regime (S /N > 5.5), and 85 .1%, 78 .2%, and 84 .4% in the low-S/N regime. Using HETDEX LAEs independently identified by DESI spectroscopy, the model recovers 99% and 93% of the high- and low-S/N LAEs, respectively. Visual attribution indicates that the CNN attends to smooth, spatially extended central emission in true positives and to irregular or noisy features in true negatives. Applied to the full HETDEX catalog, the CNN enables an S/N threshold down to 4.8 by suppressing spurious spikes across z ∼ 1.9–2 .5 in the redshift distribu-tion. Our approach facilitates HETDEX cosmological analyses by mitigating false positives in galaxy clustering and highlights the value of domain-specific deep learning for refining low-S/N spectroscopic identification in untargeted surveys. 
+
+Keywords: Galaxy spectroscopy(2171); Ly-alpha galaxies(978); Convolutional neural networks (1938); Galaxy classification systems (582); 
+
+1. INTRODUCTION 
+
+Corresponding author: shiro.mukae@shiseido.com 
+
+Wide-field spectroscopic surveys are transforming ob-servational cosmology by mapping the large-scale struc-ture across vast spatial and redshift ranges, enabling measurements of baryon acoustic oscillations (BAO; Eisenstein et al. 2005; Cole et al. 2005), providing precise 
+
+> arXiv:2604.12414v1 [astro-ph.GA] 14 Apr 2026
+
+2constraints on cosmological parameters across cosmic time. Survey programs such as Sloan Digital Sky Sur-vey (SDSS: York et al. 2000), Baryon Oscillation Spec-troscopic Survey (Dawson et al. 2013), and Extended Baryon Oscillation Spectroscopic Survey (Dawson et al. 2016) over the past two decades, and more recently the Dark Energy Spectroscopic Instrument (DESI; DESI Collaboration et al. 2016, 2022), the Euclid mission (Eu-clid Collaboration et al. 2025a,b), and the Prime Focus Spectrograph (PFS; Takada et al. 2014; Tamura et al. 2024), have been expanding the number of galaxy spec-tra from about 10 5–10 6 in earlier surveys to 10 7 in on-going and upcoming programs. These new programs push observations into deeper, higher-redshift regimes and increase diverse astronomical data, including imag-ing, photometry, and spectroscopy. Consequently, effi-cient and scalable analytical approaches are essential for extracting robust scientific insights. A comparable large-scale galaxy survey is the Hobby-Eberly Telescope Dark Energy Experiment (HETDEX; Gebhardt et al. 2021; Hill et al. 2004), an optical spec-troscopic program aimed to identify over one million Lyman-α emitting galaxies (LAEs) at 1 .9 < z < 3.5across 540 deg 2 of the sky, corresponding to a cosmic volume of 10 .9 Gpc 3. One of HETDEX’s unique features is its untargeted survey design, in which spectra are obtained without prior imaging or target pre-selection. HETDEX employs the Visible Integral-field Replicable Unit Spectrograph (VIRUS; Hill et al. 2021; Hill & Mac-Queen 2002), a wide-field, fiber-fed array of integral-field spectrographs mounted on the HET (Ramsey et al. 1998). The instrument comprises 78 integral field units (IFUs), each covering a 51 .′′ × 51 .′′ region of the sky and feeding a pair of spectrographs through 448 fibers of 1 .′′ 5diameter. This configuration enables the simultaneous acquisition of ∼ 35 , 000 spectra per exposure. Over eight years of observations, HETDEX has collected more than 608 million fiber spectra across 87 deg 2 of sky, with a filling factor of 0.22, yielding 4.7 million detections of emission-line and continuum sources (Mentuch Cooper et al. 2026, in preparation; hereafter MC26) The ob-served LAEs serve as tracers of the large-scale structure (Ouchi et al. 2020), and are used to constrain the Hubble parameter H(z) and angular diameter distance DA(z) to percent-level precision (Gebhardt et al. 2021). A key challenge in HETDEX is the identification of LAEs in the low signal-to-noise ratio (S/N) regime. Fig-ure 1 shows the redshift distribution and the cumulative number of LAE candidates per VIRUS IFU as a function of S/N limit. The left panel presents histograms of LAE candidates selected by the HETDEX Emission Line eX-plorer software tool (ELiXer; Davis et al. 2023) after using a composite of data-quality flags ( flag best = 1) to exclude artifacts, bad fibers, bad pixels, and contami-nation from satellites and meteors (MC26). In the right panel, the solid curve indicates cumulative number of the LAE candidates. The HETDEX public source cat-alog (Mentuch Cooper et al. 2023) adopts a conserva-tive identification threshold of S /N > 5.5 for emission lines, combined with the quality flags to reduce contam-ination. While effective at minimizing spurious detec-tions, this criterion also excludes a substantial number of LAEs, lowering the source density below the target of 2 .5 LAEs per IFU and limiting the statistical power for cosmological analyses such as BAO measurements. The target LAE number density is estimated by inte-grating published LAE luminosity functions (Gronwall et al. 2007; Ouchi et al. 2008) down to the HETDEX flux limit for nominal observing conditions (a base exposure time of 18 min split into three 6 min dithers). Extend-ing the current selection threshold from S /N = 5 .5 into the lower S/N regime, down to the current detection limit of 4 .8, would exceed the target density at the cost of introducing significant contamination from spurious detections. At lower redshifts ( z ≲ 2.5), where the sensitivity of VIRUS decreases toward shorter wavelengths ( λ ≲
+
+4300 ˚ A; Hill et al. 2021), prominent spurious spikes ap-pear, as highlighted in the red-shaded regions of Fig-ure 1. The number of LAE candidates fluctuates by up to a factor of ∼ 2 between adjacent ∆ z = 0 .025 bins, even though the bright end of Ly α luminosity functions evolve monotonically across z ∼ 2–3 (Nagaraj et al. 2025; Umeda et al. 2025), which is the luminos-ity regime probed by HETDEX (Zhang et al. 2021). These spikes are likely caused by contamination from false detections, which are not randomly distributed in redshift space and can mimic clustering signals, poten-tially biasing the LAE clustering analysis. The redshift spikes may reflect the reduced VIRUS sensitivity and arise from sharp dips in the HETDEX sky model (Geb-hardt et al. 2021), where the background sky level is low and read noise dominates. These effects cause an under-estimation of the noise level at these wavelengths. As a result, sky-subtraction residuals can mimic emission-line signals, producing numerous false detections. Such false positives are not fully accounted by the current noise model or quality flags, making it difficult to dis-tinguish true emission lines from artifacts and residuals. Given the more than one million LAE candidates in the survey, visual inspection is labor-intensive and particu-larly challenging in the low-S/N regime, motivating the development of automated methods to suppress contam-ination and recover LAEs effectively. Deep learning has emerged as a promising tool for au-tomated source identification and classification in large astronomical datasets. Applications in galaxy surveys have demonstrated its effectiveness in identifying faint 3Source Catalog (MC23):             
+
+> S/ N> 5.5
+> Target LAE Density
+> Current Detection Limit
+> Possible Significant Contamination
+> Redshift Spikes
+> Figure 1. Redshift distribution and cumulative number of HETDEX LAE candidates as a function of S/N limits. Left: Redshift histograms of LAE candidates selected with data quality flags (MC26). The bin width is ∆ z= 0 .025. The dark and light gray bars indicate the LAE candidates with S /N>5.5 and S /N≤5.5, respectively. The blue spectrum depicts the sky model in the HETDEX survey (Gebhardt et al. 2021). The red-shaded regions indicate spurious redshift spikes, likely due to false detections, caused by reduced VIRUS sensitivity or dips in the sky model where read noise dominates and sky subtraction residuals can appear as spurious emission-like features. Right: The solid curve shows the cumulative number of LAE candidates per VIRUS IFU as a function of the S/N threshold, considering only the data quality flag-based selection. The horizontal arrow marks the current identification threshold adopted in HETDEX public source catalog of Mentuch Cooper et al. (2023). The vertical dotted line indicates the current HETDEX detection limit (S /N = 4 .8). The dashed line denotes the target LAE density in the HETDEX survey (Gebhardt et al. 2021). The vertical arrow implies possible significant contamination, where the density of LAE candidates exceeds the expected target density, introducing contamination from spurious detections. The cyan region highlights the S/N range in which this study aims to extend the identification threshold and distinguish LAEs from spurious detections.
+
+galaxies (Huertas-Company et al. 2018; Ono et al. 2021), characterizing galaxy spectra (Melchior et al. 2023; Hahn et al. 2025; Tardugno Poleo et al. 2023), and detecting artifacts or poor-quality exposures (Zhang & Bloom 2020; Chang et al. 2021; Tanoglidis et al. 2022; Luo et al. 2025). These methods are particularly valu-able for bridging the gap between low-level data process-ing and high-level scientific interpretation, addressing the challenges posed by the rapidly growing data vol-umes from current and next-generation surveys (Euclid Collaboration et al. 2025c; Parker et al. 2024). In this paper, we present a deep learning application for identifying LAEs and filtering noise contaminants in the HETDEX untargeted spectroscopy, with the goal of extending the S/N threshold to lower limits and increas-ing the number density of genuine LAEs. We develop a convolutional neural network (CNN; Le Cun et al. 1989), designed to extract morphological features through hier-archical convolutional operations, and address following key challenges: (i) Low-S/N source classification – de-veloping a CNN model that distinguishes Ly α emission from spurious features using two-dimensional (2D) spec-tral images of single emission lines on the detector plane; (ii) Data scale and resolution — tailoring the CNN to op-erate effectively on small-format and low-resolution 2D spectral images; (iii) Limited label availability – con-structing a reliable training set utilizing external val-idation data and contributions from our participatory science project; and (iv) Interpretability — integrat-ing attribution-based visualization methods to highlight the key input features driving the model’s predictions (Feng et al. 2024; Marcinkeviˇ cs & Vogt 2023). These approaches improve both the recovery and reliability of spectroscopic LAE identification in the low-S/N regime, complementing machine learning methods pioneered in early HETDEX data (House et al. 2024; Sakai 2021), and establish a methodological basis for applying deep learning to future large-scale spectroscopic surveys. This paper is organized as follows. Section 2 describes the HETDEX catalogs and spectra used in this study. Section 3 outlines our methodology, including training data preparation, CNN construction and training, and the visual attribution technique. Section 4 presents the results and discussion, including CNN classification per-4formance, attribution visualizations, and the application to the full HETDEX catalog. Finally, Section 5 summa-rizes our conclusions. Throughout this paper, we adopt the flat ΛCDM cosmology with H0 = 67 .7 km s −1 Mpc −1
+
+and Ω m,0 = 0.31 measured by Planck Collaboration et al. (2020). All magnitudes are expressed in the AB system (Oke & Gunn 1983).  
+
+> 2.
+
+DATA We construct a CNN model using HETDEX 2D spec-tral images of Ly α emission-line candidates from the HETDEX COSMOS catalog and subsequently apply it to the full HETDEX dataset (hereafter the HETDEX DEX catalog) to distinguish astronomical sources from artifacts and sky residuals. Details of the HETDEX cat-alogs and the 2D spectral images are provided in Sec-tions 2.1 and 2.2, respectively. 2.1. HETDEX Catalogs 
+
+2.1.1. HETDEX Emission-Line Data 
+
+The Ly α emission line candidates used in this study are drawn from the HETDEX Internal Data Release 5.0.1 (HDR5; released internally on 2025 May 31), which encompasses HETDEX observations conducted from January 1, 2017, through July 31, 2024. The HDR5 contains approximately 1 .6 million LAE candi-dates with S /N ≥ 4.8 and χ2 < 2.5, based on Gaussian fit in spectral axis. The S/N of each detected line is computed as the ratio of the fitted emission-line flux to the local noise level by grid searches of emission-line candidates in all spectral and spatial resolution el-ements (see Section 7 in Gebhardt et al. 2021). The HETDEX observations reach 50% completeness at a line flux of ∼ 1.1 × 10 −16 erg s −1 cm −2, corresponding to Ly α luminosities as low as ∼ 1.0 × 10 42 .8 erg s −1 at 
+
+z ∼ 2.7. This 50% completeness flux limit is wavelength dependent and is derived from source injection simula-tions that add mock Ly α lines to actual observed data, propagate element-by-element noise models, and mea-sure the recovery fraction with the HETDEX detection pipeline. Despite the wavelength dependence, the recov-ery fractions are nearly identical across the HETDEX science-verification fields at any fixed wavelength; the completeness curve is therefore obtained by averaging the field-by-field curves within ∼ 270˚ A wavelength bins (see Fig. 28 of Gebhardt et al. 2021). Because the VIRUS integral-field spectrographs have narrow wavelength coverage (3500 − 5500˚ A) and low spectral resolution ( R ∼ 800), LAEs at 1 .9 < z < 3.5and [O II ] emitters at z < 0.5 are typically observed as single emission-line sources. Since the spectral res-olution of VIRUS is insufficient to resolve either the asymmetry of the Ly α emission-line profiles or the [O II ]
+
+λ3727 doublet, LAEs and [O II] emitters cannot be read-ily distinguished (see Figure 1 of Leung et al. 2017). These high-redshift Ly α and low-redshift [O II ] emission lines are classified in the HETDEX ELiXer software tool (Davis et al. 2023). ELiXer is based on the Bayesian analysis of line luminosity and photometric equivalent width derived from ancillary broadband imaging data (Leung et al. 2017), which is further developed into an LAE probability estimator through the implemen-tation of Farrow et al. (2021) to evaluate the likelihood of Ly α relative to [O II ] based on line luminosity func-tions and equivalent-width distributions (Gronwall et al. 2007; Ciardullo et al. 2012, 2013). ELiXer expands on these analyses of emission line equivalent widths by ad-ditionally incorporating multiple metrics from the HET-DEX spectra and archival photometric imaging and cat-alogs. This approach provides reliable source classifica-tions. In the faint regime ( gmag > 22), misclassifications are found but constitute only a small fraction of the sources, where the continuum emission from [O II ] emit-ters is typically undetectable. The main objective of this study is to distinguish as-tronomical emission lines from artifacts and sky residu-als. ELiXer also incorporates disqualification checks to remove spurious detections caused by artifacts or poor data quality (Davis et al. 2023). As a whole, this study assesses whether the emission line evaluated by ELiXer, in combination with data quality flags (MC26) that are used in the HETDEX source catalog generation, rep-resents a true astrophysical source. A comprehensive classification of LAE and [O II ] emitters is undertaken separately by alternative machine learning techniques, including a Random Forest classifier (MC26). 2.1.2. HETDEX DEX and COSMOS Catalogs 
+
+This study uses two Ly α emission-line catalogs from HDR5, the HETDEX DEX and COSMOS catalogs, whose basic properties are summarized in Table 1. The DEX catalog includes 1,642,390 LAE candidates at 1 .9 < z < 3.5 across the survey area of 86 .67 deg 2.Because the HETDEX observations are tiled and non-contiguous, the VIRUS focal plane has filling factor of 22% (Gebhardt et al. 2021; Hill et al. 2021). This cata-log providing source coordinates, redshifts, S/N, source classifications as either ‘LAE’ or ‘AGN’, and SDSS g-band magnitudes ( gmag ) measured from HETDEX spec-tra. Through emission-line detection and catalog pro-duction, data quality filtering with the flag best in-dicator excluded obvious artifacts and unreliable detec-tions (e.g., those caused by bad fibers, defective pix-els, satellite trails, or meteor streaks). Nevertheless, the DEX catalog still contains ambiguous cases where dis-tinguishing between astrophysical signals from spurious ones remains difficult. To address this issue, we employ the HETDEX COS-MOS catalog, a subset of the DEX catalog augmented 5LAE Artifact 
+
+2D Spectral Image 
+
+> Spatial axis not corresponding to sky
+> due to 1 ″.5 fiber extraction
+
+1D Spectra 
+
+Fiber Spectral Arrays 
+
+with 112 Fiber Spectra 
+
+> Detector: R Amplifier: L
+
+Fiber Layout of 
+
+Three-dither Exposure 
+
+> Single IFU: 51 ″× 51 ″
+
+(a) (b) (c) 
+
+(d) Each exposure                        
+
+> & amplifier
+> Figure 2. Schematic illustration of (a) fiber layout, (b) fiber spectral arrays, (c) 2D spectral images, and (d) 1D spectra. (a): Fiber layout of a three-dither HETDEX observation for a single 51 .′′ ×51 .′′ IFU. VIRUS consists of 78 IFUs in total. Each filled circle marks the on-sky footprint of a 1 .′′ 5-diameter fiber, showing the positions sampled in the three dithered exposures. The different shades denote the four amplifier channels within the IFU. For each exposure and amplifier channel, 112 fiber spectra are obtained. The configuration of the IFU and its amplifiers is detailed in Figure 2 of Mentuch Cooper et al. (2023) and Figure 4 of Gebhardt et al. (2021). (b): Raw image of fiber spectral arrays associated with an IFU and one of its four amplifiers (IFU 076, amplifier “RL”). The 112 fiber spectra are encoded on the 1032 pixel ×1032 pixel detector. Each 2D spectral image is produced by summing the sky-subtracted spectral arrays for fibers centered on the source position, using PSF-based weights. (c): 2D spectral images of an LAE candidate and an artifact with 4 .8≤S/N≤5.5 shown as cutouts of 9 cross-dispersion pixels by 40 dispersion pixels. The cross-dispersion axis does not correspond to sky coordinates because each spectral image is not spatially resolved within the fiber’s 1 .′′ 5 diameter. The LAE candidate is drawn from the ODIN-confirmed LAEs (Firestone et al. 2024), whereas the artifact is taken from the HETDEX emission-line detections with a conservative vote-fraction of dee prob ≤0.1 (classified as ”throwback” false detections) in Dark Energy Explorers .(d): Corresponding 1D spectra of the sources in panel (c). While the LAE and artifact appear similar in 1D, they can be discerned when viewed in 2D.
+
+with multi-wavelength observations and additional val-idation data in the COSMOS field. The ancillary data used in this study are described in Section 3.1. The COSMOS catalog is designed to characterize spurious detections that remain after quality filtering and to fa-cilitate the development of machine learning models for their classification. This catalog contains 32,557 LAE candidates over the 2 .26 deg 2 COSMOS field. In this study, Active Galactic Nuclei (AGN) candi-dates are excluded from both the DEX and COSMOS catalogs. We remove AGN candidates with the HDR5 
+
+flag agn indicator, based on the AGN catalog com-piled by Liu et al. (2022, 2025). This catalog includes 15,940 sources across the redshift range z = 0 .1–4 .6, cross-matched with the SDSS Quasar Catalog DR16Q (Lyke et al. 2020), as well as AGN candidates identified by spectral features such as single broad emission lines with a rest-frame full width at half maximum (FWHM) greater than 1200 km s −1, or line pairs of Ly α and highly ionized lines (e.g., C iv λ1549). Such AGN sources could bias the model toward AGN-like spectral characteris-tics, thereby degrading its performance in distinguish-ing noisy LAE candidates from spurious detections, es-pecially in the low-S/N regime. The resulting source counts are 1,632,398 for the HETDEX DEX catalog and 32,319 for the COSMOS catalog, as summarized in Ta-ble 1. 2.2. HETDEX Spectral Images 
+
+The HETDEX 2D spectral images are constructed from compilations of fiber spectral arrays obtained with the VIRUS integral-field spectrographs. In Figure 2, panels (a), (b), and (c) illustrate the fiber layout, fiber spectral arrays, and 2D spectral images, respec-tively. During a typical HETDEX observation with three dithered exposures, the light collected by each IFU and its amplifier channel is dispersed by a spec-trograph, and a total of 112 fiber spectra are recorded on the 1032 pixel × 1032 pixel detecter. The 2D spectral image of each LAE candidate is created by summing the sky-subtracted fiber spectral arrays for fibers centered on the source position. As shown in Figure 2 of Men-tuch Cooper et al. (2023), multiple fibers whose sky co-ordinate lie within a 3 .′′ 5 circular aperture contribute to each summed spectrum, with fluxes weighted by a point-spread function (PSF) model. The weighting follows the optimal-extraction algorithm of Horne (1986), assuming a symmetric two-dimensional Moffat profile ( β = 3 .0; Moffat 1969) derived from stellar sources in the same exposure. In the HETDEX pipeline, each emission-line detection utilizes ∼20 fibers combined using PSF-based weights, whereas the CNN input 2D spectral image is 6              
+
+> Table 1. Summary of HETDEX Ly αEmission Line Catalogs Catalog Fields Total Area Number Count Number Count (after AGN removal) HETDEX DEX DEX-Spring, DEX-Fall, COSMOS, 86.67 deg 21,642,390 1,632,398 NEP, SSA22, and GOODS-N HETDEX COSMOS COSMOS 2.26 deg 232,557 32,319
+> Note —The data in this paper are based on HETDEX Internal Data Release 5.0.1.
+
+Input: 2D Spectral Images 
+
+Feature Extraction Classification 
+
+Convolution1 
+
+Output: C NN Score 
+
+(0.0 = Unlikely Real, 
+
+…1.0 = Likely Real) 
+
+Convolution2 
+
+Global 
+
+Average 
+
+Pooling 
+
+Fully 
+
+Connected 
+
+Layer 
+
+(channel, width, length) = (1, 9, 40) (16, 9, 40) (16, 9, 40) (16) (32) (1)     
+
+> Figure 3. Schematic overview of the CNN architecture employed in this work. The model takes a 2D spectral image (9 ×40 pixels) as input and outputs a confidence score between 0.0 and 1.0. Feature extraction is performed using two blocks of convolutional layers, followed by global average pooling and classification with two fully connected layers. The final CNN score represents the model’s confidence in the presence of an emission line. The model architecture, including the filter sizes, number of channels, batch normalization, and dropout, is listed in Table 4.
+
+constructed by summing the 2D spectral images of the four fibers with the highest PSF weights, as most of the source flux is contained within these fibers (Davis et al. 2023). The 2D spectral images are taken from the HDR5 data using the hetdex tools.get spec2D function from the hetdex api package 1. The spectral image (be-fore cutout) covers a wavelength range of 3500–5500 ˚ Aalong the dispersion axis, with 1032 pixels and a re-solving power of R ∼ 800 (corresponding to a spectral resolution of ∼ 400 km s −1). For each emission-line, we extract a spectral window of ±40˚ A (approximately 
+
+±2000 km s −1) centered on the line, following the visual diagnostics of House et al. (2023) and Davis et al. (2023). Since most LAE candidates, typically low-mass galaxies, show no discernible continuum or additional emission lines in the HETDEX spectra due to limited sensitivity (Ch´ avez Ortiz et al. 2023), including the entire spec-trum would only introduce additional noise and hinder training. By restricting the input to the emission-line region, we optimize the CNN to focus on the relevant and physically meaningful features.  
+
+> 1https://github.com/HETDEX/hetdex api
+
+The resulting 2D spectral images have a shape of (1 , 9, 40), corresponding to one intensity channel, nine spatial (cross-dispersion) pixels, and forty spectral (dis-persion) pixels, respectively. The spatial axis on the detector does not correspond to sky coordinates since each spectral image is extracted from a 1 .′′ 5-diameter fiber and is not spatially resolved within that diameter. Importantly, combination of the dispersion and cross-dispersion information allows the CNN to effectively rec-ognize characteristic morphologies of emission lines and artifacts that would otherwise be indistinguishable in one-dimensional (1D) spectra. Because emission lines and false detections can exhibit similar 1D profiles, clas-sification based solely on 1D spectra is inherently diffi-cult. Panel (d) of Figure 2 shows examples where LAEs and artifacts appear similar in 1D but are distinguished when viewed in 2D. We therefore employ 2D spectral images as CNN inputs to better capture emission-line structures. To prepare the data for model training, we standard-ize the intensities of the 2D spectral images. An exam-ple input is shown in Figure 3. Details of the training data and model setup are described in the following Sec-tion 3.1.  
+
+> 3.
+
+METHODS 7This section describes the development of the CNN model. Section 3.1 presents the construction of the training sample. Section 3.2 provides the CNN architec-ture, model training, and performance evaluation meth-ods. Section 3.3 outlines the visual attribution technique used to enhance model interpretability. 3.1. Training Sample Construction 
+
+The construction of representative training samples for Ly α emission lines and spurious detections is one of the most challenging aspects of this study. In the HET-DEX survey, which employs untargeted spectroscopy, a single emission line in the low-S/N regime provides insufficient information to confidently distinguish gen-uine astronomical sources from artifacts. To verify the sources responsible for the detected lines, HETDEX re-lies on ancillary data. Broadband imaging in the sur-vey fields assists in identifying continuum counterparts (Davis et al. 2023). However, LAEs are typically low-mass stellar systems with faint rest-UV continua due to their low star-formation rates, so their counterparts may remain undetected in the ancillary imaging data. Given these challenges, we construct the training sam-ple for our CNN model as follows. We select high-confidence Ly α emission lines and artifacts by leveraging ancillary multi-wavelength data and additional verifica-tion diagnostics from the HETDEX COSMOS catalog. These include (i) imaging and spectroscopic surveys, (ii) HETDEX repeat observations, and (iii) classifications from our participatory science project. The specific se-lection criteria for each category are described below.  
+
+> Likely Real —
+
+This category refers to sources considered likely to be galaxies, selected if any of the following cri-teria are satisfied: 
+
+• Detections whose Ly α-emission redshifts are con-firmed by external surveys and compilations. These include narrow-band surveys such as SIL-VERRUSH ( z = 2 .2 and 3 .3; Kikuta et al. 2023) and ODIN ( z = 2 .4 and 3 .1; Firestone et al. 2024), and narrow- and medium-band surveys of SC4K (z ∼ 2.2 – 3 .4; Sobral et al. 2018), as well as by spectroscopic (Khostovan et al. 2026) or pho-tometric (Weaver et al. 2022) redshift compila-tions in the COSMOS field. Detections are cross-matched to external surveys using a 1 ′′ matching radius. For spectroscopic samples, matches are ac-cepted when Deltaz/ (1 + z) < 0.02. For photo-metric redshifts, agreement is required at ∆ z/ (1 + 
+
+z) < 0.025. For narrow-band surveys, a detection is considered a match if the observed HETDEX Ly α wavelength falls within ±FWHM the central wavelength of the corresponding narrow-band fil-ter curve. 
+
+• Sources verified by visual inspection of repeat de-tections in multiple HETDEX observation shots (Gebhardt et al. 2021). The COSMOS field in-cludes regions with multiple HETDEX exposures. We visually confirm using ELiXer reports (Davis et al. 2023) that the repeat HETDEX detections are not an artifact. 
+
+• Sources classified as “keep” in the NASA Zooni-verse 2 participatory science project, Dark Energy Explorers (DEE; House et al. 2023) 3 with a vote fraction dee prob ≥ 0.7. In the DEE workflow “Fishing for Signal in a Sea of Noise”, the pri-mary goal is to further reduce false detections in the HETDEX source catalog 4. The param-eter dee prob is defined for each source as the fraction of “keep” votes among all binary classi-fications (“keep” for likely LAE vs.“throwback” for false detection), contributed by more than ten participants. Thus, dee prob close to 1.0 sug-gests broad consensus that the source is likely an LAE, whereas a value near 0.0 indicates that it is false detection. While the classification accu-racy of dee prob largely agree with those from the HETDEX astronomer team for sources with S/N > 5.5 (House et al. 2023), the lower-S/N regime (4 .8 ≤ S/N ≤ 5.5) remains under verifi-cation. To address this, we adopt a moderately conservative threshold of dee prob ≥ 0.7 (i.e., at least 70% of participants classified the source as an LAE), as our visual inspection indicates that this cut effectively removes false detections, while retaining a sufficient number of low-S/N sources for training.  
+
+> Unlikely Real —
+
+This category refers to sources identified as spurious detections, selected if both of the following criteria are satisfied: 
+
+• Sources classified as “throwback” in the DEE par-ticipatory science project, with a conservative vote fraction threshold, dee prob ≤ 0.1 (i.e., at most 10% of participants classified the source as an LAE). 
+
+• Sources not overlapping with ancillary datasets used to define the Likely Real category.          
+
+> 2https://www.zooniverse.org
+> 3https://www.zooniverse.org/projects/erinmc/ dark-energy-explorers
+> 4In the HDR5 data, this DEE workflow is applied to sources with S/N>5.5, except in the COSMOS fields, where classifications are also extended to the lower-S/N regime (4 .8≤S/N≤5.5). The DEE workflow for this lower-S/N regime is still in progress. This limited coverage motivates our combined use of CNN and DEE to reduce false detections across the HETDEX full sample.
+
+8The constructed training sample contains a total of 8481 sources, comprising 4106 Likely Real and 4375 Un-likely Real objects, corresponding to an overall class bal-ance of 48/52. The class counts and their breakdown by S/N regime are summarized in Tables 2 and 3. In the low-S/N regime (4 .8 ≤ S/N ≤ 5.5), the sample con-tains 2301 Likely Real and 3914 Unlikely Real objects (37/63), whereas in the high-S/N regime (S /N > 5.5), it contains 1805 Likely Real and 461 Unlikely Real ob-jects (80/20). The constructed training sample exhibits imbalances between Likely Real and Unlikely Real and between the low- and high-S/N regimes, arising from the combination of selection thresholds used to define the la-bels. To mitigate potential biases in model training, we stratify the data by both label and S/N regime when constructing the training/validation/test splits and the cross-validation folds (Section 3.2.2). Figure 4 shows the Ly α line S/N, Ly α luminosity, and Ly α FWHM (measured from a Gaussian model fit to the line emission) distributions for the HETDEX COSMOS catalog and for the labeled subsets described above. Since the primary goal of this study is to distinguish galaxy-origin emission lines from artifacts, detections of extended Ly α emission such as Lyman Alpha Nebula (LAN) and identifications of AGN signatures are beyond the scope of this work. In the HETDEX survey, LANs are identified using dedicated algorithms described in Mentuch Cooper et al. (2026) and AGNs using those in Liu et al. (2022, 2025). 3.2. Convolutional Neural Network 
+
+3.2.1. Model Architecture 
+
+CNNs are neural network algorithms that extract spa-tial features from input data through hierarchical con-volutional operations (Le Cun et al. 1989; Krizhevsky et al. 2012). By capturing local features such as edges, textures, and patterns, CNNs are particularly effective in image processing tasks such as segmentation and ob-ject recognition (e.g., Bishop & Bishop 2024; Murphy 2022). In our case, the 2D spectral images have a sim-ple structure, and the target emission line appears the center of each image. This makes CNNs well suited for our task, as their local feature extraction capabil-ities align with the goal of identifying a single emission line. While CNNs have limitations in modeling long-range dependencies (Lou et al. 2022), this is not a sig-nificant drawback in our setting. Models designed to capture global context in large and complex images, such as Transformer-based architectures, are less appropriate for our application. Transfer learning, which involves applying a pre-developed architecture that is often pre-trained on large-scale image datasets used in computer vision tasks, has recently achieved success in astronomical imaging ap-plications (e.g., Bhambra et al. 2022; Lee et al. 2025). However, such approaches are not feasible in our case. Pre-developed CNN architectures (e.g., ResNet) typi-cally assume input images of over 100 × 100 pixels with three color channels, whereas our 2D spectral images are significantly smaller (9 × 40 pixels) and consist of only a single channel. Consequently, we develop a CNN architecture tailored to our simple 2D spectral input. Figure 3 presents a schematic overview of the CNN architecture used in this study. The model takes a 2D spectral image of size 9 × 40 pixels as input and out-puts a scalar CNN score between 0 .0 to 1 .0. Feature ex-traction is carried out through two convolutional blocks. The first block consists of a convolutional layer with 16 channels and a kernel size of 3 ×3, followed by batch nor-malization, a Leaky Rectified Linear Unit (Leaky ReLU) activation, and dropout. The second block has the same structure but uses a larger kernel size of 7 × 7. The re-sulting feature maps are processed by a global average pooling to produce 16-channel vectors, which are then passed through a fully connected layer with 32 hidden units, followed by a Leaky ReLU activation. The out-put layer uses a sigmoid activation function to produce a score between 0 and 1, representing the model’s confi-dence in the presence of an emission line. This score is not a calibrated probability, as the output is not scaled linearly. Key architectural parameters, including the number of channels, kernel sizes, batch normalization, and dropout, are summarized in Table 4. We explore several architectural variations to optimize the model’s performance. For both the convolutional and fully connected layers, we test different depths, in-cluding configurations with 8, 16, and 32 channels. Vari-ous convolutional kernel sizes are also evaluated, includ-ing combinations of 3 × 3, 5 × 5, 7 × 7, and 9 × 9, along with different numbers of convolutional blocks, ranging from two to three. As for activation functions, we compare ReLU and Leaky ReLU. While ReLU is widely used due to its sim-plicity and fast convergence, it suppresses all negative input values, which may lead to information loss in noisy data. In contrast, Leaky ReLU allows a small, non-zero gradient in the negative region, enabling the network to preserve subtle negative-valued features that may be astrophysically meaningful and may aid in the identifi-cation of Ly α emission lines. In our experiments, Leaky 9HETDEX COSMOS Catalog HETDEX COSMOS Training Sample 
+
+# (a) 
+
+# (b) 
+
+# (c) 
+
+# (d) 
+
+Figure 4. Histograms for HETDEX COSMOS LAE candidates: (a) Redshift, (b) Ly α line S/N, (c) Ly α
+
+luminosity, and (d) Ly α FWHM from Gaussian fits. Left: Distribution of 32,319 LAE candidates in the HETDEX COSMOS catalog. Right: Subsample of the HETDEX COSMOS catalog used for the CNN model development in this study. The orange and blue colors represent 4106 Likely Real and 4375 Unlikely Real LAE candidates, respectively, as described in Section 3.1. The black vertical dashed line shows the Ly α luminosity of ∼ 1.0 × 10 42 .8 erg s −1 at z ∼ 2.7, corresponding to 50% completeness at at a line flux of ∼ 1.1 × 10 −16 erg s −1 cm −2, which marks the HETDEX survey’s sensitivity limit (Gebhardt et al. 2021). 10 
+
+Table 2. Ancillary Dataset Used for Class Label Likely Real 
+
+Class Label Likely Real 
+
+Category Narrow-Band Spec-z Photo-z Repeated Observations Participatory Science Datasets SILVERRUSH, COSMOS Spectroscopic COSMOS2020 HETDEX Dark Energy ODIN, and SC4K Redshift Compilation HDR 5.0.1 Explorers References Kikuta et al. (2023), Khostovan et al. (2026) Weaver et al. (2022) Gebhardt et al. (2021) House et al. (2023) Firestone et al. (2024), Davis et al. (2023) and Sobral et al. (2018) Number counts 991 578 911 604 2841 (271) (144) (349) (212) (1691) Total Count 4106 (2301) 
+
+Note — Numbers in parentheses give the counts in the low-S/N regime (4 .8 ≤ S/N ≤ 5.5). The total count reflects the net number of unique sources after accounting for overlaps between the ancillary data sets. 
+
+Table 3. Ancillary Dataset Used for Class Label Unlikely Real 
+
+Class Label Unlikely Real 
+
+Category Participatory Science Datasets Dark Energy Explorers References House et al. (2023) Number counts 4411 (3941) Total count 4375 (3914) 
+
+Note — Numbers in parentheses give the counts in the low-S/N regime (4 .8 ≤ S/N ≤ 5.5). The total counts exclude 36 sources (27 in the low-S/N regime) that are identified in multiple ancillary data sets and therefore overlap among the data sets used to define the Likely Real class. 11 ReLU prove to be more robust and sufficient across var-ious configurations, particularly with negative slopes of 0.01 and 0 .1. We also assess the impact of different pooling strate-gies on feature extraction. While max pooling has been successfully employed in many image-classification tasks (e.g., ´Ciprijanovi´ c et al. 2020; Tadaki et al. 2020), we find that average pooling yields superior performance in our case. This improvement is likely due to the rel-atively high background noise in the spectral images, where max pooling can occasionally amplify extreme noise, whereas average pooling helps retain diffuse fea-tures that are important for identifying Ly α emission lines (e.g., Ono et al. 2021). The final design, summarized in Table 4, is selected based on its overall stability and classification perfor-mance across validation trials. Details of the valida-tion scheme, optimization strategy, loss function, and learning rate scheduling are provided in Section 3.2.2. Since this study addresses a simple binary classification task using an uncomplicated image-based architecture, more advanced approaches, such as ensembles of clas-sifiers and the Bayesian optimization (Cheng & Cooke 2025; Frazier 2018) are left for future work, particularly in the context of fine-grained classification. 3.2.2. Model Training 
+
+We train the CNN model using a k-fold cross-validation procedure (Kohavi 1995; Buchner & Fo-topoulou 2024), which is robust to sample variations in the training data and effectively serves as an ensemble of predictors (Dietterich 2000). The constructed train-ing sample is first split into 80% for training+validation, and 20% for testing; for 8481 labeled sources, this cor-responds to 6784 and 1697 objects, respectively. Within each fold, the training+validation subset is further di-vided into three partitions, with one for validation and the remaining two for training (i.e., three-fold cross-validation). This process is repeated three times with different validation splits. Each fold uses ∼4523 sources for training and ∼2261 for validation. The final CNN score for each input is computed by averaging the output scores from the three trained models. For the data split, our constructed training sample ex-hibits (i) class imbalance between Likely Real and Un-likely Real and (ii) S/N imbalance between the low-S/N (4 .8 ≤ S/N ≤ 5.5) and high-S/N (S /N > 5.5) regimes (Section 3.1), either of which could bias the model train-ing. We therefore stratify the data by both label and S/N regime to ensure that these distributions are split evenly across the training, validation, and test sets, as well as across the cross-validation folds. The resulting stratified sample sizes are summarized in Table 5. Although the data splits are stratified by label and S/N regime across the training, validation, and test sub-sets, the training subset still has unequal sample sizes across the class–S/N subgroups. As a result, model pa-rameter updates can be dominated by the most populous subgroup. We therefore mitigate the class imbalance in the training subset using subgroup-dependent augmen-tation, as follows. For the low-S/N regime, we equal-ize the low-S/N counts between classes by leaving the largest subgroup ( Unlikely Real , low S/N) unchanged and augmenting the ( Likely Real , low S/N) subset by adding ≃ 862 spectral images until it matches the ( Un-likely Real , low S/N) count (2088 2D spectral images in total). For the high-S/N regime, we mitigate the class disparity by leaving the ( Likely Real , high S/N) subset unchanged, while augmenting only the small-est subgroup, ( Unlikely Real , high-S/N) by doubling its size (adding 246, for a total of 492 spectral images). For example, in the Fold 1 training split, the subgroup counts change from (962, 1226, 246, 2088) to (962, 2088, 492, 2088) for ( Likely Real , high S/N), ( Likely Real , low S/N), ( Unlikely Real , high S/N), and ( Unlikely Real , low S/N), respectively. Augmentation is applied only to the training subset, as applying it before the split could in-troduce data leakage into the validation or test subsets. For each augmented sample, we apply at least one flip, randomly selecting a vertical flip, a horizontal flip, or both with equal probability. Overall, the data are stratified by label and S/N regime when split into the training, validation, and test subsets, ensuring comparable distributions across them. In contrast, data augmentation is applied only to the training subset to increase the effective weight of the smaller class–S/N subgroups. Although some S/N imbalance remains, our primary focus is on low-S/N sources. Future work will explore class–S/N-specific training together with more fine-grained classification. Binary cross-entropy loss is employed for this binary classification task. The Adaptive Moment Estimation (Adam) optimizer (Kingma & Ba 2015), which adap-tively adjusts learning rates based on moments of the gradients, is employed with an initial learning rate of 0.0001, reduced by a factor of 0 .5 if the validation loss does not improve for five consecutive epochs. To en-hance generalization and reduce overfitting, L2 regular-ization (Krogh & Hertz 1991) with a weight decay of 0.0001 is applied to penalize large weights. Batch nor-malization (Ioffe & Szegedy 2015) and dropout (Srivas-tava et al. 2014) with a dropout rate of 0 .2 are incorpo-rated in the model, yielding the balance between gener-alization and classification performance. The model is trained for up to 150 epochs, with early stopping trig-gered if the validation loss does not decrease for 15 con-secutive epochs. The batch size is set to 32. Figure 5 shows the training and validation loss and accuracy as functions of training epoch for each cross-12 Dropout = 0.0 
+
+# Dropout = 0.2     
+
+> Figure 5. Learning curves of CNN model training with three-fold cross-validation. Top: Training and validation loss and accuracy as functions of training epoch for the models trained with dropout. Bottom: The corresponding curves for the models trained without dropout. In each panel, the color gradient from dark to light red indicates the validation curves for different folds, while the gradient from dark to light blue represents the corresponding training curves.
+
+validation fold. The upper panel corresponds to the model trained with dropout rate 0 .2. In this setting, the validation loss is systematically lower then the train-ing loss and the validation accuracy is higher than the training accuracy. This may be attributed to the small validation set and to the use of dropout during training but not during validation. At each epoch, 20% of the units are randomly masked, effectively making training more challenging, whereas validation is performed with dropout disabled and the full network capacity available. The observed curve may suggest that dropout provides effective regularization and may help mitigate overfit-ting. The lower panel of Figure 5 shows the correspond-ing learning curves with dropout disabled (dropout rate 0.0). In this case, the training and validation loss and accuracy curves become comparable. However, the val-idation curves exhibit substantial epoch-to-epoch fluc-tuations, whereas the training curves remain relatively smooth. Without dropout, the model can fit the train-ing set more closely, including both informative patterns and noise, which may increase sensitivity to small pa-rameter updates and lead to unstable validation behav-ior. This variability may be further amplified by the limited size of the validation set, resulting in larger sta-tistical fluctuations across epochs. 3.2.3. Performance Metrics 
+
+Following the model training, we apply the CNN to the test set (1697 2D spectral images) and evaluate its classification performance in both S/N regimes; high S/N (S /N > 5.5) and low S/N (4 .8 ≤ S/N ≤ 5.5). The model performance is assessed using the following met-rics: 
+
+• CNN Score Histograms: The distribution of the CNN output scores illustrates the model’s ability to separate the two classes. Histograms are gener-ated for sources labeled as Likely Real and Unlikely Real , separately for both S/N subsets. 
+
+• Confusion Matrix: The confusion matrix (Powers 2020) provides the trade-off between true positives and true negatives to evaluate the optimal clas-sification threshold. It is normalized by the to-tal number of sources in each true label category and includes the components TP (true positives), FP (false positives), FN (false negatives), and TN (true negatives). 13 
+
+Table 4. Architecture of the CNN Model Layer Type Data Format Activation Input (1, 9, 40) –Convolution (kernel=3 × 3, padding=1) (16, 9, 40) –Batch Normalization (16, 9, 40) Leaky ReLU (negative slope=0.1) Dropout (0.2) (16, 9, 40) –Convolution (kernel=7 × 7, padding=3) (16, 9, 40) –Batch Normalization (16, 9, 40) Leaky ReLU (negative slope=0.1) Dropout (0.2) (16, 9, 40) –Global Average Pooling (16) –Fully connected (32) Leaky ReLU (negative slope=0.1) Fully connected (1) Sigmoid 
+
+Note —The data format is (channel, width, length). 
+
+Table 5. Breakdown of the Stratified Dataset 
+
+Split Number counts Fraction Likely , High-S/N Likely , Low-S/N Unlikely , High-S/N Unlikely , Low-S/N Test 1697 20.0% 361 (21.3%) 461 (27.2%) 92 (5.4%) 783 (46.1%) Fold 1 Train 4522 53.3% 962 (21.3%) 1226 (27.1%) 246 (5.4%) 2088 (46.2%) Validation 2262 26.7% 482 (21.3%) 614 (27.1%) 123 (5.4%) 1043 (46.1%) Fold 2 Train 4523 53.3% 963 (21.3%) 1227 (27.1%) 246 (5.4%) 2087 (46.1%) Validation 2261 26.7% 481 (21.3%) 613 (27.1%) 123 (5.4%) 1044 (46.2%) Fold 3 Train 4523 53.3% 963 (21.3%) 1227 (27.1%) 246 (5.4%) 2087 (46.1%) Validation 2261 26.7% 481 (21.3%) 613 (27.1%) 123 (5.4%) 1044 (46.2%) 
+
+Note —The training sample (8481 sources) is stratified by class label ( Likely Real /Unlikely Real ) and S/N regime (High: S /N >
+
+5.5; Low: 4 .8 ≤ S/N ≤ 5.5). Percentages in parentheses are computed within each split (i.e., within the Test/Train/Validation set). Owing to rounding, the percentages may not sum to exactly 100%. 14 
+
+• Receiver Operating Characteristic (ROC) Curve and Area Under the Curve (AUC): The ROC curve (Fawcett 2006) characterizes the trade-off between the true positive rate TP/(TP + FN) and the false positive rate FP/(FP + TN). The AUC serves as a summary measure of classification performance: a value close to 1 .0 indicates strong discriminative power, while 0 .5 corresponds to random guessing. 
+
+• Precision-Recall (PR) Curve and Area Under the Precision-Recall Curve (AUPRC): For imbalanced data, the ROC curve can appear overly optimistic because the false positive rate could be dominated by the large number of true negatives (even a non-negligible number of false positives can yield a small false positive rate when TN ≫ FP) (Saito & Rehmsmeier 2015). The PR curve (Davis & Goadrich 2006) visualizes the trade-off between precision TP/(TP+FP), and recall TP/(TP+FN) (i.e., true positive rate), and is sensitive to per-formance on the positive class and to contamina-tion among predicted positives. We therefore com-pute the PR curve and its summary statistic, the AUPRC, which is informative under class imbal-ance and complements the ROC curve and AUC. The optimal classification threshold is calculated by maximizing the F1 score, which is the harmonic mean of precision and recall. 
+
+• Precision Curves: We also examine how the model’s precision changes with the CNN score threshold across different S/N limits. This pro-vides a quantitative insight into the model’s per-formance in both high- and low-S/N regimes. To quantify uncertainties in the performance metrics, we fixed the training/validation split within each fold and retrained the model using 50 different random seeds. This yields a total of 150 trained models (50 seeds ×
+
+3 folds). We report 95% confidence intervals for each metric. 3.3. Visual Attribution Technique 
+
+While modern deep learning models achieve high ac-curacy in computer vision tasks, they often remain non-transparent, with limited interpretability in their decision-making processes. In this study, we employ a simple and widely used attribution-based visualiza-tion method of Grad-CAM++ to visualize the features learned by our CNN models and to gain insight into the model predictions 5.Gradient-weighted Class Activation Mapping (Grad-CAM; Selvaraju et al. 2016) 6, highlights the regions in an input image that are most relevant to a model’s pre-diction by computing the gradient of the predicted class score with respect to the convolutional feature maps. Grad-CAM++ (Chattopadhyay et al. 2017) improves upon Grad-CAM by addressing its coarse object local-ization and limited ability to deal with multiple object occurrences. It achieves this goal by computing pixel-wise importance weights based on first-, second-, and third-order partial derivatives of the class score with re-spect to the feature maps: 
+
+Lcij = X
+
+> k
+
+wckAkij (1) 
+
+wck = X
+
+> i,j
+
+αkc ij · ReLU ∂Y c
+
+∂A kij 
+
+!
+
+(2) 
+
+αkc ij =  
+
+> ∂2Yc
+> (∂A kij )2
+
+2 · ∂2Y c  
+
+> (∂A kij )2
+
++ P 
+
+> a,b
+
+Akab · ∂3Y c 
+
+> (∂A kij )3
+
+, (3) where Lcij is the class-specific localization map for class 
+
+c at spatial location ( i, j ), Akij denotes the activation at location ( i, j ) in the k-th feature map of convolutional layer, wck is its importance weight for class c, αkc ij is a co-efficient capturing the contribution of Akij to class c, and 
+
+Y c is the final score. These higher-order weights enable pixel-level attribution within each feature map, resulting in more precise and interpretable visualizations. This approach is particularly effective in cases with multiple contributing regions or diffuse features, such as those observed in astronomical images (Lee et al. 2025). We apply Grad-CAM++ to each CNN model trained in our three-fold cross-validation and compute the class-specific localization maps for the training set using the weighting scheme defined in Equations 1–3. Each Grad-CAM++ map has a shape of (1 , 9, 40), identical to the input. To examine the relative importance of activations within each image, we normalize each map by rescal-ing its minimum and maximum values to 0 .0 and 1 .0, respectively. Since the three folds achieve comparable performance (Figure 5), the resulting localization maps   
+
+> 5Saliency-based explanation methods are subject to well-known limitations, such as limited sensitivity to model parameters or input data and a lack of quantitative interpretability (Adebayo et al. 2018; Rudin 2019). We therefore regard these visualizations as complementary insights rather than definitive explanations. In particular, they are useful for checking whether the model’s focus broadly aligns with human expectations.
+> 6For a comprehensive overview and recent advancements in Class Activation Mapping techniques, see, e.g., Feng et al. (2024) and Gildenblat & contributors (2021).
+
+15 are consistent across folds. Thus, we present the Grad-CAM++ maps averaged over all folds as a robust rep-resentative visualization of the model behavior. Although Grad-CAM++ is typically applied to the final convolutional layer to highlight class-relevant re-gions, we also apply it to both the first and second (i.e., final) convolutional layers of our CNN model. Given that our model architecture is simple and straightfor-ward, this dual-layer analysis sheds light on the model’s hierarchical operation: the first layer captures low-level, edge-like features, while the final layer integrates higher-level semantic information (Zeiler & Fergus 2014). By visually inspecting and comparing Grad-CAM++ maps across classification categories (TP, FP, FN, and TN), we qualitatively assess which features the model attends to and whether it consistently focuses on the emission-line regions in the 2D spectral images. This provides complementary insights into the model’s be-havior rather than definitive explanations.  
+
+> 4.
+
+RESULTS AND DISCUSSIONS 4.1. CNN Classification 
+
+Figure 6 summarizes the performance of the CNN model on the test set in two S/N regimes: high S/N (S /N > 5.5) and low S/N (4 .8 ≤ S/N ≤ 5.5). Panel (a) shows the distributions of CNN scores for the Likely Real 
+
+and Unlikely Real categories. For individual sources, the standard deviation of the CNN score across 50 real-izations of the three-fold procedure with different ran-dom seeds is ≲ 0.05. In both the S/N regimes, the score distributions exhibit bimodal-like structures de-spite the class imbalance. For comparison within the existing HETDEX classification framework, we present the ELiXer confidence score distributions for the same test sample in Appendix A.1. Since ELiXer is opti-mized primarily for Ly α/non-Ly α classification rather than false-detection rejection, we regard it as a refer-ence metric rather than a baseline. Panel (b) presents the confusion matrices. The clas-sification thresholds optimized by F1 scores and the corresponding performance metrics are summarized in Table 6. Although the CNN model performs better in the high-S/N regime than in the low-S/N regime, it re-mains effective in both. The classification thresholds optimized by F1 scores are 0 .400 +0 .176  
+
+> −0.140
+
+(high S/N) and 0.372 +0 .100  
+
+> −0.093
+
+(low S/N), yielding F1 scores of 0 .976 +0 .003 
+
+> −0.003
+
+and 0 .810 +0 .009 
+
+> −0.006
+
+, respectively. When the two regimes are combined (S /N > 4.8), the F1-optimized thresh-old is 0 .400 +0 .091  
+
+> −0.095
+
+with F1 score = 0 .881 +0 .006 
+
+> −0.005
+
+. The corresponding precisions are 0.975 +0 .011  
+
+> −0.008
+
+(high S/N), 0.782 +0 .035  
+
+> −0.043
+
+(low S/N), and 0.870 +0 .024  
+
+> −0.023
+
+(combined), while the recalls are 0.975 +0 .009 
+
+> −0.014
+
+, 0.844 +0 .032 
+
+> −0.014
+
+, and 0.892 +0 .024 
+
+> −0.026
+
+, respectively. The corresponding accuracies, (TP + TN) /(TP + TN + FP + FN), are 0 .960 +0 .004  
+
+> −0.004
+
+(high S/N), 0.854 +0 .009  
+
+> −0.010
+
+(low S/N), and 0.883 +0 .006  
+
+> −0.007
+
+(com-bined), respectively. We also compute the balanced ac-curacies, (TP /(TP + FN) + TN /(TN + FP)) /2, which is 0 .941 +0 .018  
+
+> −0.016
+
+(high S/N), 0 .851 +0 .008  
+
+> −0.006
+
+(low S/N), and 0.883 +0 .006  
+
+> −0.007
+
+(combined), respectively. To provide a simple baseline for comparison, a naive classifier that always predicts Likely Real would achieve 79.7% accuracy in the high-S/N test subset (361/92 for Likely Real /Unlikely Real ; Table 5). For the low-S/N test subset, a classifier always predicting Unlikely Real would yield 62.9% accuracy (461/783 for Likely Real /Unlikely Real ). By contrast, the balanced-accuracy baseline for such a naive classifier is 50%. In both S/N regimes, the CNN model outperforms these baselines in accuracy and balanced accuracy, demonstrating that its predictive power is not simply driven by class imbalance. Panel (c) presents the ROC curves, with AUC = 0.988 +0 .001  
+
+> −0.002
+
+(high S/N) and 0.912 +0 .003  
+
+> −0.004
+
+(low S/N). In both regimes, the model performs well above the random-classifier baseline (AUC = 0 .5). Panel (d) shows the PR curves with AUPRC = 0 .997 +0 .0004  
+
+> −0.0003
+
+(high S/N) and 0 .860 +0 .008  
+
+> −0.007
+
+(low S/N). The high AUPRC values in-dicate that the model maintains relatively high precision over a broad range of recall. At low recall, the preci-sion can change discretely due to the small number of selected samples; a single false positive can produce a visible dip, with a minor effect on the overall AUPRC. Figure 7 shows the precision as a function of the CNN score threshold for various S/N cuts. The preci-sion increases with threshold. For thresholds above 0.5, the model achieves precisions of 0 .981 +0 .006  
+
+> −0.006
+
+(high S/N), 0.825 +0 .024  
+
+> −0.019
+
+(low S/N), and 0 .896 +0 .019  
+
+> −0.014
+
+(combined). The combined sample reaches a precision of nearly 90%, sug-gesting that the use of this threshold can be a practical choice, although the optimal threshold depends on the scientific objective. Figure 8 exhibits classification examples of the TP, FP, FN, and TN categories for the high- and low-S/N regimes. Higher CNN scores typically correspond to cen-tral emission lines with spatially extended structures, while lower scores often reflect sharp or noisy features. To better understand the model’s classification behav-ior, we examine each category through attribution-based visualization in the following section. 4.2. Grad-CAM++ Visualization 
+
+Figure 9 presents Grad-CAM++ map examples for the same 2D spectral images shown in Figure 8. For each classification category (TP, FP, FN, and TN), the top panels display the original 2D spectral images, while the middle and bottom panels show the corresponding Grad-CAM++ maps for the first and second convolu-16 False Positive True Negative 
+
+False Negative True Positive 
+
+False Positive True Negative 
+
+False Negative True Positive 
+
+# (a) 
+
+# (b) 
+
+# (c) (d) 
+
+Figure 6. Performance metrics of the CNN model. The trained model is applied to the test set (1697 2D spectral images) drawn from the HETDEX COSMOS catalog. (a) Distributions of CNN scores. The orange and blue histograms represent sources labeled as Likely Real and Unlikely Real , respectively. The left and right panels show the high-S/N (S /N > 5.5) and low-S/N (4 .8 ≤ S/N ≤ 5.5) subsets. (b) Confusion matrices at CNN-score thresholds of 0.40 (high-S/N) and 0.37 (low-S/N), presenting the numbers of TP, FP, FN, and TN. The values in each classification (bracket) indicate the fraction normalized by the total number of sources (number counts) in the corresponding true-label category. (c) ROC curves for the high-S/N (blue) and low-S/N (cyan) subsets; the corresponding AUC values are shown in the inset. The gray dashed line denotes the random-classifier baseline (AUC = 0 .5). (d) PR curves for the high-S/N (blue) and low-S/N (cyan) subsets; the corresponding AUPRC values are shown in the inset. Shaded regions and error bars indicate 95% confidence intervals estimated from 150 retrained models (50 different random-seeds realizations of the three-fold procedure). 17 
+
+Figure 7. Precision curves as a function of CNN score threshold across various S/N limits. Solid lines indicate subsets defined by S/N lower limits, while dashed line shows an S/N lower limit combined with an upper limit of S /N ≤ 5.5. All curves are based on the test set drawn from the HETDEX COSMOS catalog. The shaded regions and error bars indicate 95% confidence intervals estimated from 150 retrained models (50 different random-seeds realizations of the three-fold procedure). 
+
+Table 6. Summary of Classification Performance in Different S/N Regimes 
+
+S/N regime F1-optimized threshold F1 score Precision Recall Accuracy Balanced accuracy AUC AUPRC High S/N (S /N > 5.5) 0.400 +0 .176  
+
+> −0.140
+
+0.976 +0 .003  
+
+> −0.003
+
+0.975 +0 .011  
+
+> −0.008
+
+0.975 +0 .009  
+
+> −0.014
+
+0.960 +0 .004  
+
+> −0.004
+
+0.941 +0 .018  
+
+> −0.016
+
+0.988 +0 .001  
+
+> −0.002
+
+0.997 +0 .0004 
+
+> −0.0003
+
+Low S/N (4 .8 ≤ S/N ≤ 5.5) 0.372 +0 .100  
+
+> −0.093
+
+0.810 +0 .009  
+
+> −0.006
+
+0.782 +0 .035  
+
+> −0.043
+
+0.844 +0 .032  
+
+> −0.014
+
+0.854 +0 .009  
+
+> −0.010
+
+0.851 +0 .008  
+
+> −0.006
+
+0.912 +0 .003  
+
+> −0.004
+
+0.860 +0 .008 
+
+> −0.007
+
+Combined (S /N ≥ 4.8) 0.400 +0 .091  
+
+> −0.095
+
+0.881 +0 .006  
+
+> −0.005
+
+0.870 +0 .024  
+
+> −0.023
+
+0.892 +0 .024  
+
+> −0.026
+
+0.883 +0 .006  
+
+> −0.007
+
+0.883 +0 .006  
+
+> −0.007
+
+0.945 +0 .002  
+
+> −0.003
+
+0.948 +0 .002 
+
+> −0.003
+
+Note — The classification thresholds are optimized using the F1 score. Accuracy is defined as (TP + TN) /(TP + TN + FP + FN), and balanced accuracy as (TP /(TP + FN) + TN /(TN + FP)) /2. The uncertainties represent 95% confidence intervals estimated from 150 retrained models based on 50 random-seed realizations of the three-fold procedure. 18         
+
+> Figure 8. Classification examples for the TP, FP, FN, and TN categories. Each panel shows representative 2D spectral images randomly selected from each category. The HETDEX detection ID and the corresponding S/N and CNN score are displayed at the top of each image. The two left columns show S /N>5.5, while the two right columns show 4 .8≤S/N≤5.5.
+
+tional layers. The color scale indicates the relative im-portance of activations within each input image, where values closer to 1.0 signify a higher importance attribu-tion. The Grad-CAM++ maps from the first convolutional layer (Conv1) show two common features across all cat-egories and S/N regimes: activation around the cen-tral emission feature and responses distributed along the wavelength direction of the spectral image. In addition, each category exhibits the following characteristic pat-terns: 
+
+• TP : Central emission lines with smooth, spatially and spectrally extended profiles, extending about 6 pixels along the spectral axis ( ∼12 ˚ A in the ob-served frame). 
+
+• FP : Central features resembling emission lines but with relatively irregular or elongated shapes, ac-companied by scattered noise, covering roughly 6– 8 pixels along the spectral axis ( ∼12–16 ˚ A in the observed frame). 
+
+• FN : Elongated or sharp central emission lines with noise distributed across the spectrum, ex-tending over 10–15 pixels ( ∼20–30 ˚ A in the ob-served frame). 
+
+• TN : Irregular or absent central and smooth emission-line features, with noise dominating the spectral images. These patterns are consistent with the trends identified through visual inspection of the 2D spectral images in Section 4.1. The Grad-CAM++ maps from the second convolu-tional layer (Conv2) are more concentrated on the cen-tral part of emission line than those from Conv1. The highlighted region typically indicates a single vertical feature spanning about four pixels along the spectral axis, corresponding to ∼ 8 ˚ A in the observed frame, or ∆v ≈ 430 km s −1 at z = 2 .7. To gain further intuition into these patterns from both Conv1 and Conv2, we also present the corresponding pseudo one-dimensional (1D) spectra computed by collapsing the 2D spectral images along the cross-dispersion axis using the mean, as pro-vided in Figure B.1 in APPENDIX B. The qualitative analyses of the Conv1 and Conv2 maps suggest that positive and negative predictions could be discerned through different uses of spectral in-formation across layers. The Conv1 maps imply that 19 
+
+Figure 9. Grad-CAM++ maps for the TP, FP, FN, and TN classifications. Same as Figure 8, but with Grad-CAM++ maps for the convolutional layers of the CNN model used in this study. The maps are superimposed on the corresponding 2D spectral images, and the color scale indicates the relative importance of activations within each input image, with values closer to 1.0 representing higher importance. 20 (a) (b) 
+
+# (e) 
+
+# (c) (d) 
+
+Figure 10. Redshift distribution of DESI-confirmed HETDEX LAEs used in this study, along with histograms of their S/N and CNN scores. The dark and light gray colors indicate the DESI-confirmed HETDEX LAEs with S /N > 5.5and S/N ≤ 5.5 respectively. Panels (a) and (b) show the HETDEX redshift and S/N distributions, while panels (c) and (d) 
+
+present CNN score histograms for S /N > 5.5 and S/N ≤ 5.5, respectively. Panel (e) displays examples of 2D spectral images of DESI-confirmed HETDEX LAEs that are classified as positive and negative by the CNN model using the F1-optimized thresholds of 0.40 for the high-S/N, and 0.37 for the low-S/N sources (Section 4.1). These are presented in the same manner as Figure 8. 21 the model could inspect the full wavelength range of the 2D spectra while identifying a spatially and spectrally extended central emission line feature. In contrast, the Conv2 maps are more concentrated around the central feature, suggesting that this layer could serve to fur-ther assess the presence and profile of the emission line. These patterns indicate that the model decisions could be guided by physically meaningful features in the input 2D spectral images. While Grad-CAM++ provides intuitive and spatially informative visualizations, it is inherently limited to qualitative assessments. Future work will incorporate alternative attribution-based techniques, such as SHAP (SHapley Additive exPlanations; Lundberg & Lee 2017; Alfonzo et al. 2024), to enable quantitative interpreta-tion, particularly for fine-grained classification of the emission-line features. 4.3. Application to HETDEX DEX Catalog 
+
+We apply our CNN model to 2D spectral images from the HETDEX DEX catalog to distinguish the LAE can-didates from artifacts and sky residuals. Section 4.3.1 evaluates the recovery of HETDEX LAEs in survey fields beyond COSMOS. Section 4.3.2 examines the red-shift distribution of HETDEX LAE candidates in the DEX catalog. Section 4.3.3 presents the cumulative number of LAE candidates obtained by extending the identification into the low-S/N regime, and Section 4.3.4 discusses the limitations and potential improvements of our deep learning–based approach. 4.3.1. Model Performance Beyond the COSMOS Field 
+
+We investigate the capability of our CNN model to identify emission-line features in survey fields beyond COSMOS, where the model is originally trained. Re-cently, DESI optical spectroscopy by Landriau et al. (2025) confirmed redshifts for approximately 1000 HET-DEX LAEs in the HETDEX DEX-Spring field through visual inspection of their Ly α emission lines. We use these DESI-confirmed LAEs (hereafter DESI-HETDEX LAEs) in our analysis. By cross-matching the DESI-HETDEX LAEs with HDR5 data and applying a selection cut of a high-confidence flag VI QUALITY ≥ 3 and a data quality flag 
+
+DEX FLAG = 1 provided by Landriau et al. (2025), we obtain a total of 891 DESI-HETDEX LAEs, consisting of 778 sources with high S/N (S /N > 5.5) and 112 with 4.8 ≤ S/N ≤ 5.5 in the HETDEX DEX-Spring field 7.As noted by Landriau et al. (2025), the overall recov-ery rate of this dataset cannot be precisely quantified  
+
+> 7The DESI-HETDEX LAEs have been originally identified as LAE candidates in the earlier HETDEX Internal Data Release HDR3. Some of these objects are later excluded from HDR5 after appli-cation of the latest data quality control.
+
+due to inherent observational limitations. A key lim-itation arises from the 1 .′′ 5 diameter of the HETDEX fibers and variations in fiber-to-fiber throughput (Geb-hardt et al. 2021), which can displace the computed cen-troid of a low-S/N source by more than 1 ′′ from its true sky position. Astrometric uncertainties become increas-ingly severe at lower S/N (S /N ≤ 5.5). At the current HETDEX detection limit, the median positional accu-racy is 0 .′′ 6, with more than 20% of sources offset by over 1.′′ 0. Because the DESI spectrograph employs single 1 .′′ 5fibers, any misalignment between the fiber positions and the LAE locations can result in a partial or even com-plete loss of signal. Consequently, such sources would not be captured by DESI spectroscopy and are absent from their analysis. Thus, this analysis can only confirm that a source is real; it is more difficult to prove that a source is false. Accordingly, the confirmation rate rep-resents a lower limit on the true fraction of real sources. Future work using unbiased IFU observations, such as VLT/MUSE or Keck/KCWI, will be needed to quantify the unconfirmed fraction. We use the 2D spectral images of the DESI-HETDEX LAEs to compute the distribution of their CNN scores. Figure 10 shows the redshift distribution (Panel (a)), as well as histograms of S/N (Panel (b)) and CNN scores (Panels (c) and (d)). The dark and light gray col-ors indicate the DESI-HETDEX LAEs with high S/N (S /N > 5.5) and low S/N (4 .8 ≤ S/N ≤ 5.5), re-spectively. Adopting the F1-optimized thresholds from Section 4.1, our CNN model recovers 99% of DESI-HETDEX LAEs with high S/N and 93% of those with low S/N at thresholds of 0.40 and 0.37, respectively. Panel (e) displays representative 2D spectral images of DESI-confirmd LAEs classified as positive and nega-tive by the CNN model using the thresholds. A small fraction (a few percent) of spectral images receive low CNN scores. These cases exhibit sharp and noisy cen-tral emission-line features consistent with the signatures of FN predictions seen in the Grad-CAM++ maps in Section 4.2. These noisy structures may partly reflect data taken under poor observing conditions during some HETDEX observations. Overall, these results indicate that our CNN model, trained on the COSMOS field, provides consistent score-assignment performance for LAE candidates in the in-dependent survey field. 4.3.2. Redshift distribution of HETDEX LAEs 
+
+We apply the CNN model to a total of 1,632,398 2D spectral images of the LAE candidates from the HET-DEX DEX catalog. Figure 11 shows the CNN score histograms across different S/N regimes. The distribu-tions exhibit a bimodal-like structure, similar to that observed in the training sample. Figure 12 presents the distributions of Ly α luminosity and FWHM for LAE 22       
+
+> Figure 11. Distribution of CNN scores for LAE can-didates in the HETDEX DEX catalog across differ-ent S/N ranges. The dark and light gray indicate sources with S /N>5.5 and S /N≤5.5, respectively.
+
+candidates selected at a CNN score threshold of 0.5, where the overall precision reaches nearly 90% when the high-S/N and low-S/N regimes are combined (Sec-tion 4.1). Both the distributions closely resemble those of the COSMOS LAE candidates (Figure 4). The CNN model is trained exclusively on the COSMOS catalog, using a limited training sample ( ∼ 5000 sources), which is ∼ 1/300 of the size of the DEX catalog. Such a disparity could limit generalization to DEX. However, the similarity between the DEX and COSMOS distri-butions likely reflects the uniform observing strategy of HETDEX, which ensures relatively homogeneous data quality, although variations in observing conditions and instrumental performance introduce some degree of in-homogeneity (Gebhardt et al. 2021). Taken together, these results suggest that the CNN model can be ap-plied to LAE candidates in the HETDEX DEX catalog beyond COSMOS. Figure 13 presents the redshift distributions of LAE candidates selected with different CNN score thresholds in the HETDEX DEX catalog. The CNN model filters out approximately 69% (1,122,221/1,632,398) of sources at a threshold of 0.70, 56% (916,211/1,632,398) at 0.50, and 42% (689,670/1,632,398) at 0.30 from the DEX cat-alog over the entire S/N range. Notably, the model also substantially suppresses redshift spikes at z ∼ 1.9 – 2 .5, thereby mitigating possible contamination and yielding a smoother LAE distribution across the survey redshift range. 4.3.3. Cumulative Number of HETDEX LAEs 
+
+Figure 14 shows the cumulative number of LAE can-didates per IFU as a function of the S/N limit for the different CNN score thresholds, compared with the data quality–only selection. The CNN model extends the identification of LAE candidates into 4 .8 ≤ S/N ≤ 5.5, while assigning lower scores to candidates with less con-vincing spectral features across the entire S/N range, in-cluding at S /N > 5.5. The cumulative number of LAE candidates indicates that a CNN score threshold of 0.3 reaches the survey’s target LAE density of 2.5, although this threshold is likely to include a higher level of con-tamination. In contrast, a threshold of 0.5 may provide a practical threshold by reducing contamination while retaining a large LAE candidate sample in the DEX cat-alog, with a cumulative number density of ∼ 2.0, close to the target value although slightly below it. 4.3.4. Current Limitations and Potential Improvements 
+
+The slight shortfall relative to the survey target den-sity seen in the cumulative number of LAE candidates may indicate that the CNN model does not yet fully capture the characteristics of Ly α emission lines under the noisy conditions of the observed data. Two primary factors contribute to this limitation: the predictive un-certainty of the model and the limited representative-ness of the training set 8. The predictive uncertainty of the CNN score is evaluated by a Monte Carlo method (Appendix C), and estimated to be ≲ 0.17 for S/N ≲ 7. With or without this uncertainty, a non-negligible frac-tion of sources remain ambiguously classified (e.g., CNN scores of 0 .3 – 0 .7 in Figure 11), suggesting that such cases are inherently challenging for the model and may be underrepresented in training. For instance, the observed Ly α line profiles can vary due to both redshift-dependent variations and intrin-sic physical diversity (Ouchi et al. 2020). The redshift variations over z = 2–3 may have little impact on the CNN’s score assignment, as the input spectra are cen-tered on the detected emission and the visual attribution analysis indicates that the model primarily focuses on the central part of the emission line. In contrast, even within similar redshift ranges, the physical diversity of Ly α emission can be subtle in low resolution spectra and easily obscured by noise, which may lead to the am-biguous predictions. Even if these factors are mitigated, developing a perfect classifier that can distinguish true emission lines from false detections based solely on a single emission line in untargeted spectroscopic surveys remains unrealistic, as such a model would likely overfit to specific samples. Our best practice for utilizing the CNN scores is to adopt a relatively relaxed threshold and combine it with  
+
+> 8A highly sophisticated model that employs Dirichlet head and normalizing flow, exclusively disentangling these uncertainty es-timations, will be presented in a forthcoming paper (Shen et al. in prep.).
+
+23 
+
+Figure 12. Distribution of Ly α luminosity and FWHM for LAE candidates in the HETDEX DEX catalog at a CNN score threshold of 0.5. The yellow and blue colors indicate LAE candidates with a CNN scores > 0.5 and ≤ 0.5, respectively. The vertical black dashed line in the left panel marks the Ly α luminosity of ∼ 1.0 × 10 42 .8 erg s −1 at z ∼ 2.7, which corresponds to the HETDEX survey’s sensitivity limit, as in Fig 4. 
+
+complementary statistical or machine-learning methods to further recover LAE candidates. At a threshold of 0.5, the model attains a precision close to 90% across the entire S/N range (Figure 7), broadly consistent with the 10% false-detection requirement (Gebhardt et al. 2021) 
+
+> 9
+
+, although the optimal threshold should ultimately be chosen by balancing the gain in LAE sample size against the increase in false-positive contamination. Potentially effective complementary approaches include statistical removal of systematic residuals, random forest classifiers based on emission-line source properties (MC26), and unsupervised clustering of the HETDEX spectra (House et al. 2024). One promising direction is the use of self-supervised learning (Huertas-Company et al. 2023; Parker et al. 2024; Desmons et al. 2024). Contrastive learning, for instance, embeds large data volumes into a meaning-ful latent space by drawing similar examples closer and pushing dissimilar ones apart. Such pre-training method has been shown to outperform supervised learning in downstream tasks (e.g., classification), even when only a small fraction of labeled data is available (Euclid Col-laboration et al. 2025c; Hayat et al. 2021; Stein et al. 2021). 
+
+5. CONCLUSIONS     
+
+> 9This requirement is distinct from the separate HETDEX sci-ence requirement that contamination of the LAE sample by low-redshift interlopers, primarily [O II] emitters, remain below 2% (Gebhardt et al. 2021). The present CNN analysis is not in-tended to address that LAE/[O II] classification requirement. The interloper-contamination requirement is largely satisfied in the ELiXer framework, for which Davis et al. (2023) reported a projected [O II] contamination rate of 1.2% in the LAE sample.
+
+In this work, we present a deep learning approach for enhancing LAE identification and suppressing false de-tections in the HETDEX untargeted spectroscopic sur-vey, which obtains optical spectra over wide sky ar-eas without imaging pre-selection. We develop a CNN model that operates on 2D spectral images of 1,632,398 Ly α emission-line candidates at 1 .9 < z < 3.5 across the 87 deg 2 survey area. Our model addresses the following key challenges: (i) Low-S/N classification: To distinguish the Ly α
+
+emission-line candidates from artifacts and sky residuals primarily in the low-S/N regime (4 .8 ≤
+
+S/N ≤ 5.5), we use 2D spectral images that encode both spectral (dispersion) and cross-dispersion profiles on the detector plane. (ii) Data scale and resolution: The model is designed for small-format (1 channel × 9 × 40 pixels), low-resolution ( R ∼ 800) 2D spectral images, for which transfer-learning approaches are not well suited. (iii) Limited label availability: We construct a fiducial custom-labeled training sample utilizing ancillary observational data in the COSMOS field and lever-aging diagnostics contributed by our participatory science project Dark Energy Explorers .(iv) Interpretability: We employ a simple and widely used visual attribution technique, Grad-CAM++, to highlight the spectral–spatial features attended to by the model. The CNN achieves a balanced accuracy, precision, and recall of 94 .1%, 97 .5%, and 97 .5% in the high-S/N regime (S /N > 5.5), and 85 .1%, 78 .2%, and 84 .4% in 24 HETDEX DEX Catalog: S/ N > 5.5 
+
+# HETDEX DEX Catalog: 4.8 ≤ S/ N ≤ 5.5 
+
+# Redshift Spikes 
+
+# Redshift Spikes 
+
+Figure 13. Redshift distributions of LAE candidates selected with different CNN score thresholds in the HETDEX DEX catalog. Histograms showing the redshift distribution of LAE candidates selected by data-quality flags alone (gray; same as the left panel of Figure 1), and by applying additional CNN score thresholds of 0.70 (cyan), 0.50 (blue), and 0.30 (green). The top and bottom panels correspond to sources with 4 .8 ≤ S/N ≤ 5.5 and S /N > 5.5, respectively. The bin width is ∆ z = 0 .025. The red-shaded regions highlight spurious redshift spikes, and the dashed lines represent the sky model in the HETDEX survey. Both correspond to those shown in the left panel of Figure 1. 25     
+
+> Figure 14. Cumulative number of LAE candidates selected with different CNN score thresholds in the HETDEX DEX catalog. Same as the right panel of Fig-ure 1, but for LAE candidates selected using CNN score thresholds of 0.70 (cyan), 0.50 (blue), and 0.30 (green), along with data quality flags (gray). Each curve shows the cu-mulative number of LAE candidates per VIRUS IFU as a function of the S/N threshold. The dashed line marks the target LAE density adopted in the HETDEX survey (Geb-hardt et al. 2021).
+
+the low-S/N regime. For the combined sample with S/N ≥ 4.8, the corresponding values are 88 .3%, 87 .0%, and 89 .2%, respectively. Using HETDEX LAEs inde-pendently confirmed by DESI spectroscopy, the model recovers 99% and 93% of the high- and low-S/N LAEs, respectively, providing an external assessment of model performance. Grad-CAM++ attribution maps show that true positives exhibit smooth, spectrally and spa-tially extended central emission, while true negatives show irregular or absent emission-line features accom-panied by noise across the spectra. Applied to 2D spectral images from the full HETDEX catalog, the CNN extends confident LAE identification down to the low-S/N regime while suppressing spuri-ous redshift spikes over z ∼ 1.9–2 .5, where instrumental sensitivity and noise modeling affect the redshift distri-bution. At a practical threshold of 0.5, which yields a precision of nearly 90% in the test sample, the model retains a large fraction of LAE candidates in the cata-log while keeping the cumulative number density close to the survey target. The CNN application paves the way for HETDEX cosmological analyses by increasing the effective sample size while mitigating false positives in galaxy correlation measurements. Our work demonstrates the value of domain-specific deep learning for low-S/N spectroscopic identification and its potential to enhance the scientific yield of large-scale, untargeted spectroscopic surveys. ACKNOWLEDGEMENTS We thank the anonymous referee for constructive comments and suggestions that helped to improve the manuscript. We are grateful to Meredith C. Pow-ell, Hasti Khoraminezhad, Donghui Jeong, Eiichiro Ko-matsu, and Delaney A. Dunne for insightful input from cosmological analyses; and Satoshi Kikuta for making the LAE catalog available. HETDEX is led by the University of Texas at Austin McDonald Observatory and Department of Astron-omy with participation from the Ludwig-Maximilians-Universit¨ at M¨ unchen, Max-Planck-Institut f¨ ur Ex-traterrestrische Physik (MPE), Leibniz-Institut f¨ ur As-trophysik Potsdam (AIP), Texas A&M University, The Pennsylvania State University, Institut f¨ ur Astrophysik G¨ ottingen, The University of Oxford, Max-Planck-Institut f¨ ur Astrophysik (MPA), The University of Tokyo, and Missouri University of Science and Technol-ogy. In addition to Institutional support, HETDEX is funded by the National Science Foundation (grant AST-0926815), the State of Texas, the US Air Force (AFRL FA9451-04-2-0355), and generous support from private individuals and foundations. Observations were obtained with the Hobby-Eberly Telescope (HET), which is a joint project of the Uni-versity of Texas at Austin, the Pennsylvania State University, Ludwig-Maximilians-Universit¨ at M¨ unchen, and Georg-August-Universit¨ at G¨ ottingen. The HET is named in honor of its principal benefactors, William P. Hobby and Robert E. Eberly. VIRUS is a joint project of the University of Texas at Austin, Leibniz-Institut f¨ ur Astrophysik Potsdam (AIP), Texas A&M University (TAMU), Max-Planck-Institut f¨ ur Extraterrestrische Physik (MPE), Ludwig-Maximilians-Universit¨ at Muenchen, Pennsylvania State University, Institut fur Astrophysik G¨ ottingen, Univer-sity of Oxford, and the Max-Planck-Institut f¨ ur As-trophysik (MPA). In addition to Institutional support, VIRUS was partially funded by the National Science Foundation, the State of Texas, and generous support from private individuals and foundations. The authors acknowledge the Texas Advanced Com-puting Center (TACC) at The University of Texas at Austin for providing high performance computing, vi-sualization, and storage resources that have contributed to the research results reported within this paper. URL: http://www.tacc.utexas.edu Dark Energy Explorers is recognized as an official NASA Citizen Science partner. This publication utilizes data generated through the Zooniverse.org platform, the development of which is supported by generous funding, 26 including a Global Impact and Award from Google a grant from the Alfred P. Sloan Foundation. The results of the Dark Energy Explorers would not be as robust and useful if not for the care and dedication of the volunteers. We are extremely grateful for their work. It is having a large impact and is motivational. The Institute for Gravitation and the Cosmos is sup-ported by the Eberly College of Science and the Office of the Senior Vice President for Research at the Penn-sylvania State University. K.G. acknowledges support from NSF-2008793. S.S. acknowledges support from the National Science Foun-dation under grants NSF-2219212 and NSF-2511145. C.G. acknowledges support from the National Science Foundation under grant AST-2408358. 
+
+# Facility: The Hobby-Eberly Telescope (McDonald Observatory) 
+
+# Software: This research was made possible by the open-source projects hetdex-api (https://github.com/ HETDEX/hetdex api), astropy (Astropy Collaboration et al. 2018), pytorch (Paszke et al. 2019), scipy (Virta-nen et al. 2020), numpy (Harris et al. 2020), and python 
+
+(Van Rossum & Drake 2009). APPENDIX  
+
+> A.
+
+COMPARISON WITH ELIXER P (LY α) SCORE As a comparison with the existing HETDEX classi-fication framework, we compare our CNN score with the ELiXer p(Ly α) score for the same test sample. The p(Ly α) score, listed in the HETDEX catalogs as plya classification , is a confidence score, not a proper probability, ranging from 0 to 1, with higher val-ues indicating stronger support that the detected emis-sion line is Ly α (Davis et al. 2023; Melchior et al. 2023). We clarify, however, that ELiXer is not a direct base-line because the two quantities are optimized for related but not identical tasks. The p(Ly α) score is primary developed to distinguish Ly α emitters from non-Ly α
+
+emission-line sources, in particular low-redshift [O II] in-terlopers. In addition, the ELiXer also incorporates dis-qualification logic for other emission lines and for prob-lematic detections (including meteors, reduction prob-lems, and poor observations) so that such cases receive lower p(Ly α) values or be effectively disfavored within the classification framework. By contrast, our CNN is designed to operate one step earlier in the work-flow. Rather than performing line-identity classification directly, it is optimized to reject noise/artifact-driven false detections among ELiXer -selected Ly α candidates. Therefore, ELiXer is not treated here as a baseline model for our specific task. Figure A.1 shows the score distributions of the ELiXer 
+
+p(Ly α) for the same test data as that used in panel (a) of Figure 6. We focus on the score histograms, rather than confusion matrices or ROC/PR curves, because the p(Ly α) values for the HETDEX Ly α candidates are concentrated near the high-score end. In this regime, histogram-based comparisons provide a clearer view of how the two methods behave on the same set of de-tection candidates. Compared with the p(Ly α) score, the CNN score spans a broader dynamic range and ex-hibits stronger separation between Likely Real and Un-likely Real classes, consistent with its intended role as a false-detection rejection step in the HETDEX Ly α-candidate identification workflow.  
+
+> B.
+
+COLLAPSED 1D SPECTRA FOR GRAD-CAM++ MAPS Figure B.1 shows the pseudo–1D spectra correspond-ing to Figure 9, obtained by collapsing the 2D spectral images along the spatial (cross-dispersion) axis using a mean operation. These spectra are provided for visual inspection only. The model’s predictions are primarily guided by the central emission feature, with responses spanning along the wavelength direction of the spectral image in the Conv1 and becoming more concentrated around the central feature in the Conv2.  
+
+> C.
+
+PREDICTIVE UNCERTAINTY OF CNN SCORE Section 4.3.4 refers to the potential model limitations, which primarily arise from the predictive uncertainty and the limited representativeness of the training set. This appendix evaluates the predictive uncertainty of the CNN score. We conduct a Monte Carlo method by adding detector noise with a Gaussian distribution to each input spectral image. For each LAE candidate in the HETDEX COS-MOS catalog, we randomly select up to 1000 sources per Ly α line S/N bin between 4.8 and 10.0, with a bin width of 0.4, excluding those flagged as AGNs. For each selected source, we generate 1000 noise-added realiza-tions of the spectral image and re-evaluate the CNN outputs. The standard deviation of the resulting CNN scores, σCNN Score , is computed for each source. For each S/N bin, we then calculate the mean σCNN Score and the standard deviation of these means. Figure C.1 shows the mean σCNN Score as a function of S/N, with error bars representing the standard deviation of these mean estimates within each bin. As predictions are consistent across all three folds, we present the re-sults averaged over the three folds as the representative result. The σCNN Score increases with decreasing S/N, 27 
+
+Figure A.1. Score Distributions of the ELiXer p(Ly α). The plot format is the same as that of panel (a) in Figure 6. The 
+
+p(Ly α) values for LAE candidates in both the Likely Real and Unlikely Real classes are concentrated toward the high-score end. 
+
+indicating a predictive uncertainty of σCNN Score ≲ 0.17 for S/N ≲ 7. REFERENCES 
+
+Adebayo, J., Gilmer, J., Muelly, M., et al. 2018, in Proceedings of the 32nd International Conference on Neural Information Processing Systems, NIPS’18 (Red Hook, NY, USA: Curran Associates Inc.), 9525–9536 Alfonzo, J. P., Iyer, K. G., Akiyama, M., et al. 2024, ApJ, 967, 152, doi: 10.3847/1538-4357/ad3b95 Astropy Collaboration, Price-Whelan, A. M., Sip˝ ocz, B. M., et al. 2018, AJ, 156, 123, doi: 10.3847/1538-3881/aabc4f Bhambra, P., Joachimi, B., & Lahav, O. 2022, MNRAS, 511, 5032, doi: 10.1093/mnras/stac368 Bishop, C. M., & Bishop, H. 2024, Deep Learning: Foundations and Concepts (Springer) Buchner, J., & Fotopoulou, S. 2024, Nature Reviews Physics, 6, 535, doi: 10.1038/s42254-024-00743-y Chang, C., Drlica-Wagner, A., Kent, S., et al. 2021, Astronomy and Computing, 36, 100474, doi: https://doi.org/10.1016/j.ascom.2021.100474 Chattopadhyay, A., Sarkar, A., Howlader, P., & Balasubramanian, V. N. 2017, arXiv e-prints, arXiv:1710.11063, doi: 10.48550/arXiv.1710.11063 Ch´ avez Ortiz, ´O. A., Finkelstein, S. L., Davis, D., et al. 2023, ApJ, 952, 110, doi: 10.3847/1538-4357/acc403 Cheng, T.-Y., & Cooke, R. J. 2025, MNRAS, 540, 128, doi: 10.1093/mnras/staf690 Ciardullo, R., Gronwall, C., Wolf, C., et al. 2012, ApJ, 744, 110, doi: 10.1088/0004-637X/744/2/110 Ciardullo, R., Gronwall, C., Adams, J. J., et al. 2013, ApJ, 769, 83, doi: 10.1088/0004-637X/769/1/83 ´Ciprijanovi´ c, A., Snyder, G. F., Nord, B., & Peek, J. E. G. 2020, Astronomy and Computing, 32, 100390, doi: 10.1016/j.ascom.2020.100390 Cole, S., Percival, W. J., Peacock, J. A., et al. 2005, MNRAS, 362, 505, doi: 10.1111/j.1365-2966.2005.09318.x Davis, D., Gebhardt, K., Cooper, E. M., et al. 2023, ApJ, 946, 86, doi: 10.3847/1538-4357/acb0ca Davis, J., & Goadrich, M. 2006, in Proceedings of the 23rd International Conference on Machine Learning, ICML ’06 (New York, NY, USA: Association for Computing Machinery), 233–240, doi: 10.1145/1143844.1143874 Dawson, K. S., Schlegel, D. J., Ahn, C. P., et al. 2013, AJ, 145, 10, doi: 10.1088/0004-6256/145/1/10 Dawson, K. S., Kneib, J.-P., Percival, W. J., et al. 2016, AJ, 151, 44, doi: 10.3847/0004-6256/151/2/44 DESI Collaboration, Aghamousa, A., Aguilar, J., et al. 2016, arXiv e-prints, arXiv:1611.00036. https://arxiv.org/abs/1611.00036 DESI Collaboration, Abareshi, B., Aguilar, J., et al. 2022, AJ, 164, 207, doi: 10.3847/1538-3881/ac882b Desmons, A., Brough, S., & Lanusse, F. 2024, MNRAS, 531, 4070, doi: 10.1093/mnras/stae1402 Dietterich, T. G. 2000, in Multiple Classifier Systems (Berlin, Heidelberg: Springer Berlin Heidelberg), 1–15 Eisenstein, D. J., Zehavi, I., Hogg, D. W., et al. 2005, ApJ, 633, 560, doi: 10.1086/466512 Euclid Collaboration, Mellier, Y., Abdurro’uf, et al. 2025a, A&A, 697, A1, doi: 10.1051/0004-6361/202450810 28 
+
+Figure B.1. Pseudo 1D Grad-CAM++ maps for the TP, FP, FN, and TN classifications. Same as Figure 9, but for the pseudo–1D spectra derived from the 2D spectral images and their Grad-CAM++ maps. Each spectral pixel corresponds to 2˚ A. The Grad-CAM++ maps (red) are overlaid on the corresponding pseudo–1D spectra (gray) using the same panel layout. Values closer to 1.0 indicate higher relative activation importance. Shown for qualitative purposes only. 29 
+
+Figure C.1. Standard deviation of CNN scores for LAE candidates as a function of S/N. Each point rep-resents the mean σCNN Score in S/N bins of 0.4. The error bars show the standard deviation of the mean values within each bin. Euclid Collaboration, Aussel, H., Tereno, I., et al. 2025b, arXiv e-prints, arXiv:2503.15302, doi: 10.48550/arXiv.2503.15302 Euclid Collaboration, Siudek, M., Huertas-Company, M., et al. 2025c, arXiv e-prints, arXiv:2503.15312, doi: 10.48550/arXiv.2503.15312 Farrow, D. J., S´ anchez, A. G., Ciardullo, R., et al. 2021, MNRAS, 507, 3187, doi: 10.1093/mnras/stab1986 Fawcett, T. 2006, Pattern Recognition Letters, 27, 861, doi: https://doi.org/10.1016/j.patrec.2005.10.010 Feng, Z., Ji, H., Dakovi´ c, M., et al. 2024, Neural Networks, 178, 106473, doi: https://doi.org/10.1016/j.neunet.2024.106473 Firestone, N. M., Gawiser, E., Ramakrishnan, V., et al. 2024, ApJ, 974, 217, doi: 10.3847/1538-4357/ad71c9 Frazier, P. I. 2018, arXiv e-prints, arXiv:1807.02811, doi: 10.48550/arXiv.1807.02811 Gebhardt, K., Mentuch Cooper, E., Ciardullo, R., et al. 2021, ApJ, 923, 217, doi: 10.3847/1538-4357/ac2e03 Gildenblat, J., & contributors. 2021, PyTorch library for CAM methods, https://github.com/jacobgil/pytorch-grad-cam, GitHub Gronwall, C., Ciardullo, R., Hickey, T., et al. 2007, ApJ, 667, 79, doi: 10.1086/520324 Hahn, C., Gontcho, S. G. A., Melchior, P., et al. 2025, arXiv e-prints, arXiv:2506.18986, doi: 10.48550/arXiv.2506.18986 Harris, C. R., Millman, K. J., van der Walt, S. J., et al. 2020, Nature, 585, 357, doi: 10.1038/s41586-020-2649-2 Hayat, M. A., Stein, G., Harrington, P., Luki´ c, Z., & Mustafa, M. 2021, ApJL, 911, L33, doi: 10.3847/2041-8213/abf2c7 Hill, G. J., Gebhardt, K., Komatsu, E., & MacQueen, P. J. 2004, in American Institute of Physics Conference Series, Vol. 743, The New Cosmology: Conference on Strings and Cosmology, ed. R. E. Allen, D. V. Nanopoulos, & C. N. Pope, 224–233, doi: 10.1063/1.1848329 Hill, G. J., & MacQueen, P. J. 2002, in Society of Photo-Optical Instrumentation Engineers (SPIE) Conference Series, Vol. 4836, Survey and Other Telescope Technologies and Discoveries, ed. J. A. Tyson & S. Wolff, 306–312, doi: 10.1117/12.458114 Hill, G. J., Lee, H., MacQueen, P. J., et al. 2021, AJ, 162, 298, doi: 10.3847/1538-3881/ac2c02 Horne, K. 1986, PASP, 98, 609, doi: 10.1086/131801 House, L. R., Gebhardt, K., Finkelstein, K., et al. 2024, ApJ, 975, 172, doi: 10.3847/1538-4357/ad782c —. 2023, ApJ, 950, 82, doi: 10.3847/1538-4357/accdd0 Huertas-Company, M., Sarmiento, R., & Knapen, J. H. 2023, RAS Techniques and Instruments, 2, 441, doi: 10.1093/rasti/rzad028 Huertas-Company, M., Primack, J. R., Dekel, A., et al. 2018, ApJ, 858, 114, doi: 10.3847/1538-4357/aabfed Ioffe, S., & Szegedy, C. 2015, in Proceedings of the 32nd International Conference on International Conference on Machine Learning - Volume 37, ICML’15 (JMLR.org), 448–456 Khostovan, A. A., Kartaltepe, J. S., Salvato, M., et al. 2026, ApJS, 282, 6, doi: 10.3847/1538-4365/ae1cb9 Kikuta, S., Ouchi, M., Shibuya, T., et al. 2023, ApJS, 268, 24, doi: 10.3847/1538-4365/ace4cb Kingma, D. P., & Ba, J. 2015, in International Conference on Learning Representations (ICLR) Kohavi, R. 1995, in Proceedings of the 14th International Joint Conference on Artificial Intelligence - Volume 2, IJCAI’95 (San Francisco, CA, USA: Morgan Kaufmann Publishers Inc.), 1137–1143 Krizhevsky, A., Sutskever, I., & Hinton, G. E. 2012, in Advances in Neural Information Processing Systems, ed. F. Pereira, C. Burges, L. Bottou, & K. Weinberger, Vol. 25 (Curran Associates, Inc.). https://proceedings.neurips.cc/paper files/paper/2012/ file/c399862d3b9d6b76c8436e924a68c45b-Paper.pdf Krogh, A., & Hertz, J. 1991, in Advances in Neural Information Processing Systems, ed. J. Moody, S. Hanson, & R. Lippmann, Vol. 4 (Morgan-Kaufmann). https://proceedings.neurips.cc/paper files/paper/1991/ file/8eefcfdf5990e441f0fb6f3fad709e21-Paper.pdf Landriau, M., Mentuch Cooper, E., Davis, D., et al. 2025, ApJ, 995, 220, doi: 10.3847/1538-4357/ae1ae6 Le Cun, Y., Jackel, L., Boser, B., et al. 1989, IEEE Communications Magazine, 27, 41, doi: 10.1109/35.41400 30 
+
+Lee, M. W., Soo, J. Y., & Sharoni, S. M. 2025, Astronomy and Computing, 52, 100965, doi: https://doi.org/10.1016/j.ascom.2025.100965 Leung, A. S., Acquaviva, V., Gawiser, E., et al. 2017, ApJ, 843, 130, doi: 10.3847/1538-4357/aa71af Liu, C., Gebhardt, K., Mentuch Cooper, E., et al. 2022, arXiv e-prints, arXiv:2204.13658. https://arxiv.org/abs/2204.13658 —. 2025, ApJS, 276, 72, doi: 10.3847/1538-4365/ada4a5 Lou, J., Lin, H., Marshall, D., Saupe, D., & Liu, H. 2022, Neurocomputing, 494, 455, doi: https://doi.org/10.1016/j.neucom.2022.04.080 Lundberg, S., & Lee, S.-I. 2017, arXiv e-prints, arXiv:1705.07874, doi: 10.48550/arXiv.1705.07874 Luo, Y., Myers, A. D., Drlica-Wagner, A., et al. 2025, arXiv e-prints, arXiv:2507.12784, doi: 10.48550/arXiv.2507.12784 Lyke, B. W., Higley, A. N., McLane, J. N., et al. 2020, ApJS, 250, 8, doi: 10.3847/1538-4365/aba623 Marcinkeviˇ cs, R., & Vogt, J. E. 2023, WIREs Data Mining and Knowledge Discovery, 13, e1493, doi: https://doi.org/10.1002/widm.1493 Melchior, P., Liang, Y., Hahn, C., & Goulding, A. 2023, AJ, 166, 74, doi: 10.3847/1538-3881/ace0ff Mentuch Cooper, E., Gebhardt, K., Davis, D., & the HETDEX Collaboration. 2026, HETDEX Public Data Release 1, https://hetdex.org Mentuch Cooper, E., Gebhardt, K., Davis, D., et al. 2023, ApJ, 943, 177, doi: 10.3847/1538-4357/aca962 Mentuch Cooper, E., Gebhardt, K., Davis, D., et al. 2026, The Astrophysical Journal, 1000, 38, doi: 10.3847/1538-4357/ae44f3 Moffat, A. F. J. 1969, A&A, 3, 455 Murphy, K. P. 2022, Probabilistic Machine Learning: An introduction (MIT Press). http://probml.github.io/book1 Nagaraj, G., Ciardullo, R., Gronwall, C., et al. 2025, arXiv e-prints, arXiv:2506.14510, doi: 10.48550/arXiv.2506.14510 Oke, J. B., & Gunn, J. E. 1983, ApJ, 266, 713, doi: 10.1086/160817 Ono, Y., Itoh, R., Shibuya, T., et al. 2021, ApJ, 911, 78, doi: 10.3847/1538-4357/abea15 Ouchi, M., Ono, Y., & Shibuya, T. 2020, ARA&A, 58, 617, doi: 10.1146/annurev-astro-032620-021859 Ouchi, M., Shimasaku, K., Akiyama, M., et al. 2008, ApJS, 176, 301, doi: 10.1086/527673 Parker, L., Lanusse, F., Golkar, S., et al. 2024, MNRAS, 531, 4990, doi: 10.1093/mnras/stae1450 Paszke, A., Gross, S., Massa, F., et al. 2019, arXiv e-prints, arXiv:1912.01703, doi: 10.48550/arXiv.1912.01703 Planck Collaboration, Aghanim, N., Akrami, Y., et al. 2020, A&A, 641, A1, doi: 10.1051/0004-6361/201833880 Powers, D. M. W. 2020, arXiv e-prints, arXiv:2010.16061, doi: 10.48550/arXiv.2010.16061 Ramsey, L. W., Adams, M. T., Barnes, T. G., et al. 1998, in Society of Photo-Optical Instrumentation Engineers (SPIE) Conference Series, Vol. 3352, Advanced Technology Optical/IR Telescopes VI, ed. L. M. Stepp, 34–42, doi: 10.1117/12.319287 Rudin, C. 2019, Nature Machine Intelligence, 1, 206, doi: 10.1038/s42256-019-0048-x Saito, T., & Rehmsmeier, M. 2015, PLOS ONE, 10, 1, doi: 10.1371/journal.pone.0118432 Sakai, N. 2021, Master’s thesis, The University of Tokyo Selvaraju, R. R., Das, A., Vedantam, R., et al. 2016, CoRR, abs/1610.02391 Sobral, D., Santos, S., Matthee, J., et al. 2018, MNRAS, 476, 4725, doi: 10.1093/mnras/sty378 Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., & Salakhutdinov, R. 2014, Journal of Machine Learning Research, 15, 1929. http://jmlr.org/papers/v15/srivastava14a.html Stein, G., Harrington, P., Blaum, J., Medan, T., & Lukic, Z. 2021, arXiv e-prints, arXiv:2110.13151, doi: 10.48550/arXiv.2110.13151 Tadaki, K.-i., Iye, M., Fukumoto, H., et al. 2020, MNRAS, 496, 4276, doi: 10.1093/mnras/staa1880 Takada, M., Ellis, R. S., Chiba, M., et al. 2014, PASJ, 66, R1, doi: 10.1093/pasj/pst019 Tamura, N., Yabe, K., Koshida, S., et al. 2024, in Society of Photo-Optical Instrumentation Engineers (SPIE) Conference Series, Vol. 13096, Ground-based and Airborne Instrumentation for Astronomy X, ed. J. J. Bryant, K. Motohara, & J. R. D. Vernet, 1309605, doi: 10.1117/12.3015967 Tanoglidis, D., ´Ciprijanovi´ c, A., Drlica-Wagner, A., et al. 2022, Astronomy and Computing, 39, 100580, doi: 10.1016/j.ascom.2022.100580 Tardugno Poleo, V., Finkelstein, S. L., Leung, G., et al. 2023, AJ, 165, 153, doi: 10.3847/1538-3881/acba92 Umeda, H., Ouchi, M., Kikuta, S., et al. 2025, ApJS, 277, 37, doi: 10.3847/1538-4365/adb1c0 Van Rossum, G., & Drake, F. L. 2009, Python 3 Reference Manual (Scotts Valley, CA: CreateSpace) Virtanen, P., Gommers, R., Oliphant, T. E., et al. 2020, Nature Methods, 17, 261, doi: 10.1038/s41592-019-0686-2 Weaver, J. R., Kauffmann, O. B., Ilbert, O., et al. 2022, ApJS, 258, 11, doi: 10.3847/1538-4365/ac3078 31 
+
+York, D. G., Adelman, J., Anderson, Jr., J. E., et al. 2000, AJ, 120, 1579, doi: 10.1086/301513 Zeiler, M. D., & Fergus, R. 2014, in Computer Vision – ECCV 2014, ed. D. Fleet, T. Pajdla, B. Schiele, & T. Tuytelaars (Cham: Springer International Publishing), 818–833 Zhang, K., & Bloom, J. S. 2020, ApJ, 889, 24, doi: 10.3847/1538-4357/ab3fa6 Zhang, Y., Ouchi, M., Gebhardt, K., et al. 2021, ApJ, 922, 167, doi: 10.3847/1538-4357/ac1e97
