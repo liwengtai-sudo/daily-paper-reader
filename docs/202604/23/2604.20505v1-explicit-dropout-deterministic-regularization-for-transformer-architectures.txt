@@ -1,0 +1,1495 @@
+Title: 2604.20505v1.pdf
+
+URL Source: https://arxiv.org/pdf/2604.20505v1
+
+Published Time: Thu, 23 Apr 2026 00:54:32 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# Explicit Dropout: Deterministic Regularization for Transformer Architectures 
+
+## Vidhi Agrawal a,∗, Illia Oleksiienko b and Alexandros Iosifidis c
+
+> aFaculty of Information Technology and Communications,Tampere University, Tampere, 33720, Finland
+> bDepartment of Electrical and Computer Engineering, Aarhus University, Aarhus, 8000, Denmark
+> bFaculty of Information Technology and Communications,Tampere University, Tampere, 33720, Finland
+
+A R T I C L E I N F O 
+
+> Keywords :Dropout Explicit Regularization Attention Regularization
+
+A B S T R A C T 
+
+> Dropout is a widely used regularization technique in deep learning, but its effects are typically realized through stochastic masking rather than explicit optimization objectives. We propose a deterministic formulation that expresses dropout as an additive regularizer directly incorporated into the training loss. The framework derives explicit regularization terms for Transformer architectures, covering attention query, key, value, and feed-forward components with independently controllable strengths. This formulation removes reliance on stochastic perturbations while providing clearer and fine-grained control over regularization strength. Experiments across image classification, temporal action detection, and audio classification show that explicit dropout matches or outperforms conventional implicit methods, with consistent gains when applied to attention and feed-forward network layers. Ab-lation studies demonstrate stable performance and controllable regularization through regularization coefficients and dropout rates. Overall, explicit dropout offers a practical and interpretable alternative to stochastic regularization while maintaining architectural flexibility across diverse tasks.
+
+## 1. Introduction 
+
+Regularization is a fundamental component of modern machine learning, enabling models with high expressive power to generalize beyond the training data. Classical ap-proaches such as 𝓁 2 weight decay [19], early stopping [26], and Jacobian or gradient-norm regularization [28] directly modify the training objective to penalize complex hypothe-ses and sensitivity to perturbations. As deep neural networks have grown in depth, width, and structural sophistication, the design of effective regularization techniques has become in-creasingly critical for achieving robust generalization across diverse learning regimes. Among existing regularization methods, dropout [15] remains one of the most widely adopted. Originally in-troduced as a stochastic training procedure that randomly deactivates neurons, dropout was shown to significantly reduce overfitting by preventing co-adaptation and implicitly averaging over an ensemble of subnetworks [29]. Since its introduction, dropout has been successfully applied across a wide range of architectures and tasks, including convolu-tional networks, recurrent models, and Transformers [21]. Subsequent work has revealed that dropout does not simply “turn off” neurons at random. It rather implicitly reshapes the loss landscape, modifies the effective hypothesis class, and induces noise to the network for more effective gen-eralization [33, 10]. Over the past decade, a rich variety of dropout variants has been proposed, targeting different stages of the training pipeline and different structural as-pects of deep models. A recent survey [21] reviews dropout            
+
+> ∗Corresponding author
+> vidhi.agrawal@tuni.fi (V. Agrawal); io@ece.au.dk (I. Oleksiienko); io@ece.au.dk (A. Iosifidis)
+> ORCID (s): 0009-0004-7594-8741 (V. Agrawal); 0000-0001-7592-365X (I. Oleksiienko); 0000-0003-4807-1345 (A. Iosifidis)
+
+variants across architectural design, embedding spaces, and input-level transformations. Despite its empirical success, dropout is fundamentally implemented as a stochastic operation whose regularization effect is implicit, indirect, and controlled primarily through architectural choices and dropout probabilities. As a con-sequence, it is difficult to reason about or finely tune its regularization effect. In this work, we revisit dropout from a principled regularization perspective and ask a fundamen-tal question: can dropout be reformulated as an explicit, deterministic regularizer that directly controls parameter regularization strength? Rather than treating dropout as a training-time perturbation, we seek a formulation in which its regularization effect appears explicitly as an additive term in the loss function, analogous to classical regularizers such as 𝓁 2 penalties. Such a formulation would enable precise control over regularization strength, eliminate reliance on stochastic masking, and provide clearer theoretical and prac-tical insights into how dropout shapes learned representa-tions. Our work makes the following contributions: 
+
+• We formulate dropout as an explicit, additive regular-izer by deriving its deterministic counterpart, trans-forming it from a stochastic training heuristic into a principled loss-based regularization method. 
+
+• We instantiate this formulation for deep architectures and Transformer models by deriving explicit regu-larization terms corresponding to dropout applied on attention query, key, value, and feed-forward repre-sentations, with separate coefficients to enable fine-grained regularization strength control. 
+
+: Preprint submitted to Elsevier Page 1 of 13 • Through extensive experiments across image classi-fication, temporal action detection, and audio clas-sification tasks, we show that explicit dropout con-sistently matches or outperforms standard implicit dropout variants. The code for the project can be found at https://github.com/ vidhi0206/Explicit-dropout .
+
+## 2. Related Works 
+
+Dropout was introduced in [15] as a simple yet effective method to improve generalization and reduce overfitting by preventing co-adaptation. It has since become a standard component of deep neural networks, including convolu-tional, feed-forward, and Transformer architectures. From a theoretical perspective, dropout has been interpreted as training an implicit ensemble of subnetworks [29] or as ap-proximate Bayesian inference under variational assumptions [8]. A complementary line of work treats dropout through complexity measures and generalization bounds. Rademacher based analyses derive bounds on the generalization gap that depend explicitly on dropout rates, revealing that the stochastic masks induce data-dependent regularizers that adapt to the learned representations [34, 1]. These results motivate adaptive dropout schemes that optimize dropout rates to minimize theoretical generalization bounds, rather than tuning them as fixed hyperparameters [34]. Beyond vanilla dropout, many works adapt the dropout rate or structure of masking. Concrete Dropout [9] intro-duces a continuous relaxation of Bernoulli dropout using the Concrete distribution, enabling gradient-based opti-mization of dropout probabilities within a Bayesian frame-work. Variational Nested Dropout [5] organizes features into nested subnetworks with learned importance, while Rademacher [34] dropout derives adaptive masks by opti-mizing generalization-gap bounds. Y-Drop [11] uses con-ductance based scores to drop influential neurons in fully connected layers, and Progressive Data Dropout [27] re-moves training samples in a curriculum manner to regularize deep face recognition. Stochastic-depth-style method [24] views layer-wise dropout as a form of depth-wise regulariza-tion that can be interpreted as a variant of stochastic depth. Augment dropout [10] separates the dropout in forward and backward passes and uses them with different rates, as for-ward pass dropout acts as a data augmentation and backward pass dropout acts as a process inserting noise to the model for improving generalization. It emphasized that the precise placement of dropout with respect to batch normalization and convolutions substantially affects both regularization strength and computational efficiency. [2] systematically explores ordering and insertion points of dropout and batch normalization, demonstrating that inappropriate placement can hurt convergence or waste compute, whereas carefully chosen positions yield better accuracy–efficiency trade-offs.  
+
+> Figure 1: Transformer encoder architecture highlighting all locations where dropout can be applied, including within the multi-head attention mechanism and the feed-forward network.
+
+2.1. Dropout in Transformer Architectures 
+
+Transformers [32] have become the dominant archi-tecture for data modeling in language, vision, audio, and multimodal tasks, largely due to their ability to capture long-range dependencies through attention. A Transformer encoder consists of stacked layers, each composed of a multi-head attention sublayer, a feed-forward network, resid-ual connections, layer normalization, and dropout applied throughout (Fig. 1). In a standard encoder layer, the input 
+
+𝐗 ∈ ℝ𝑁 ×𝑑 , formed by 𝑁 tokens with embedding dimen-sion 𝑑 , is first linearly projected into query, key, and value representations: 
+
+𝐐 = 𝐗𝐖 𝑇 𝑞 , 𝐊 = 𝐗𝐖 𝑇 𝑘 , 𝐕 = 𝐗𝐖 𝑇 𝑣 , (1) where 𝐖 𝑞 , 𝐖 𝑘 , 𝐖 𝑣 ∈ ℝ𝑑 ×𝑑 are trainable parameter matri-ces. The scaled dot-product attention mechanism computes similarity scores stored in 𝐒 , which are normalized row-wise by a softmax to obtain attention weights 𝐀 and the attention output: 
+
+𝐒 = 𝐐𝐊 𝑇 
+
+√𝑑 , (2) 
+
+𝐀 = sof tmax( 𝐒 ), Attention( 𝐐 , 𝐊 , 𝐕 ) = 𝐀𝐕 .
+
+Equivalently, one may write Attention( 𝐐 , 𝐊 , 𝐕 ) = 𝐀𝐕𝐃 −1 ,where 𝐃 = diag( 𝐀 1𝑁 ) contains the row sums of 𝐀 and 
+
+1𝑁 is an 𝑁 -dimensional vector of ones, highlighting the normalization inherent in the softmax. Dropout is typically applied at multiple locations in-side this encoder block, such as the attention block or the feed-forward network. DropAttention [23] and DropKey [20] explore the different positionings of dropout within the multi-head attention block. Subsequent works explored structured variants such as head dropout [39] and LayerDrop [7] which stochastically removes entire Transformer heads and layers respectively during training. These approaches improve robustness and generalization, particularly in large-scale models. R-Drop [22] enforces consistency between multiple stochastic forward passes with dropout, effectively tightening the output distribution. 
+
+2.2. Explicit Dropout Regularization 
+
+While dropout is often implemented as stochastic mask-ing, several works make its explicit regularization effect precise by rewriting the expected dropout objective as an   
+
+> :Preprint submitted to Elsevier Page 2 of 13
+
+empirical risk plus an additive penalty term. For generalized linear models, Wager et al. [33] show that dropout training is equivalent to solving a deterministic problem with an adap-tive 𝓁 2–type regularizer that scales features by an estimate of the inverse Fisher information. They further disentangle explicit and implicit effects, defining the explicit regularizer as the difference between the expected dropout objective and the standard loss. Iosifidis et al. [17] incorporate dropout into the linear regression step of single-hidden layer random-ized networks and provide a closed-form formulation. They show that dropout can be interpreted as inducing an explicit weight-dependent regularizer by minimizing the discrep-ancy between original and noise-perturbed representations. Arora et al. [1] extend this line of work and provide explicit forms and capacity-control guarantees for dropout in matrix completion and two-layer ReLU networks, showing that dropout induces a data-dependent regularizer whose value directly controls Rademacher complexity and generalization bounds. We focus on the explicit regularizer induced by dropout in a two-layer feed-forward network, following the formula-tion of Arora et al. [1]. Consider a network 
+
+𝑓 (𝐱 ; 𝐖 1, 𝐖 2) = 
+
+> 𝑑 1
+
+∑
+
+> 𝑗 =1
+
+𝜎 (𝐱𝐖 𝑇  
+
+> 1,𝑗
+
+) 𝐖 𝑇  
+
+> 2,𝑗
+
+, (3) where 𝐱 ∈ ℝ𝑑 is the input vector, 𝐖 1 = [ 𝐰 1,1, … , 𝐰 1,𝑑 1 ] ∈ 
+
+ℝ𝑑 1×𝑑 is the first-layer weight matrix, 𝐖 2 ∈ ℝ𝑑 2×𝑑 1 is the second-layer weight matrix, and 𝜎 (⋅) is the ReLU activation function. Let {( 𝐱 𝑖 , 𝑦 𝑖 )} 𝑁 𝑖 =1 be the training set, and let 𝐁 =diag( 𝐵 11 , … , 𝐵 𝑑 1𝑑 1 ) be a diagonal random matrix with 
+
+𝐵 𝑗𝑗 ∼ 11 − 𝑝 Bernoulli(1 − 𝑝 ), 𝑗 ∈ [ 𝑑 1], (4) for dropout rate 𝑝 ∈ (0 , 1) . The diagonal matrix represents column dropout, i.e., dropout of certain feature embeddings from the whole input mini-batch. Arora et al. [1] show that the final loss function can be decomposed as 
+
+𝐿 (𝐖 1, 𝐖 2) = 1
+
+𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑖 =1
+
+(𝑦 𝑖 −𝑓 (𝐱 𝑖 ; 𝐖 1, 𝐖 2))2 +̂ 𝑅 (𝐖 1, 𝐖 2),
+
+(5) where ̂ 𝑅 (𝐖 1, 𝐖 2) is the explicit regularizer due to dropout. For the two-layer network above with ReLU activations, the explicit regularizer takes the form ̂𝑅 (𝐖 1, 𝐖 2) = 𝜆 
+
+> 𝑑 1
+
+∑
+
+> 𝑗 =1
+
+‖𝐰 2,𝑗 ‖22̂𝑎 2 
+
+> 𝑗
+
+, (6) 
+
+𝜆 =
+
+√ 𝑝 
+
+1 − 𝑝 ,̂ 𝑎 2 
+
+> 𝑗
+
+= 1
+
+𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑖 =1
+
+𝜎 (𝐱 𝑖 𝐰 𝑇 
+
+> 1,𝑗
+
+)2.̂ 𝑎 2 
+
+> 𝑗
+
+is the empirical second moment of the 𝑗 -th hidden neu-ron’s activation. Thus, dropout induces a data-dependent penalty that couples the norm of each hidden weight 𝑤 1,𝑗 
+
+with the magnitude of its responses on the training data. Increasing the dropout rate 𝑝 increases 𝜆 = √𝑝 ∕(1 − 𝑝 ),thereby intensifying the penalty and tightening generaliza-tion bounds in terms of the value of ̂ 𝑅 (𝐖 1, 𝐖 2).While this explicit dropout formulation provides use-ful theoretical insight, it has limitations when extended to modern attention-based architectures. It assumes column-wise (feature-level) dropout, with a regularizer acting in-dependently per feature, failing to capture cross-feature in-teractions that are central to attention mechanisms based on matrix multiplications and softmax normalization. These structural considerations motivate the development of an explicit regularizer tailored to Transformer architectures, which we describe in the following section. Section B of Ap-pendix provides the relation and highlights the differences between the regularizer presented by Arora et al. [1] and the proposed regularizer. 
+
+## 3. Explicit Transformer Dropout Regularization 
+
+We propose an explicit regularization framework for Transformer architectures by formulating dropout on the attention query, key, value, and feed-forward representations as an additive regularization term in the training objective. Unlike conventional dropout, which is applied implicitly through stochastic masking, our formulation yields a de-terministic regularizer analogous to 𝓁 2 regularizer that can be directly added to the task loss, and its strength can be balanced using a regularization coefficient 𝜆 .
+
+3.1. Dropout as a Regularizer on Queries 
+
+We derive the regularization loss induced by applying dropout to the query representations, expressing a weight-dependent regularizer [17] to attention queries. Specifically, we consider standard inverted dropout, where a Bernoulli mask 𝐌 𝑡 = [ 𝐦 1𝑡 , 𝐦 2𝑡 , … , 𝐦 𝑁𝑡 ] ∈ {0 , 1} 𝑁 ×𝑑 with keep probability (1 − 𝑝 ) is applied to the query vectors across training epochs indexed by 𝑡 .Let 𝐗 = [𝐱 1, 𝐱 2, … , 𝐱 𝑁 ] ∈ ℝ𝑁 ×𝑑 denote the input tokens, where each 𝐱 𝑖 ∈ ℝ1× 𝑑 . For a query corresponding to token 𝐱 𝑖 , the attention score is defined as 
+
+𝐒 𝑖 = 𝐱 𝑖 𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 . (7) During training, dropout is applied to the input representa-tion at epoch 𝑡 as 𝐱 𝑖𝑡 = 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 , where ⊙ denotes element-wise multiplication. The resulting attention scores become 
+
+𝐒 𝑖𝑡 = ( 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 )𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 . (8) To encourage consistency between the original and dropout-perturbed queries over training, we seek weights that mini-mize the discrepancy between 𝐒 𝑖 and 𝐒 𝑖𝑡 :
+
+𝐒 𝑖 − 𝐒 𝑖𝑡 =̃ 𝐱 𝑖𝑡 𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 , (9) where ̃ 𝐱 𝑖 = 𝐱 𝑖 − ( 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 ).  
+
+> :Preprint submitted to Elsevier Page 3 of 13
+
+Consider 𝑁 𝑇 stochastic training epochs with dropout applied to the input 𝐗 , leading to ̃ 𝐗 𝑡 = [̃ 𝐱 1𝑡 ,̃ 𝐱 2𝑡 , … ,̃ 𝐱 𝑁𝑡 
+
+] ∈
+
+ℝ𝑁 ×𝑑 representing the deviations between the original and the dropout-perturbed representations at epoch 𝑡 . The pro-posed regularizer is defined as: 
+
+𝐽 𝑞 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+‖‖‖̃ 𝐗 𝑡 𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 ‖‖‖ 
+
+> 2
+> 𝐹
+
+. (10) Using ‖𝐀 ‖2 
+
+> 𝐹
+
+= Tr( 𝐀 𝑇 𝐀 ) and rearranging terms 
+
+𝐽 𝑞 = 12 Tr 
+
+[( 
+
+1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 
+
+)
+
+𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 𝐗𝐖 𝑇 𝑘 𝐖 𝑞 
+
+]
+
+.
+
+(11) Let 
+
+𝐁 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 , Λ𝑞 = 𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 𝐗𝐖 𝑇 𝑘 𝐖 𝑞 .
+
+(12) Assuming independent Bernoulli dropout with drop proba-bility 𝑝 , the expectation over masks yields 
+
+𝐁 ≈ ( 𝐗 𝑇 𝐗 ) ⊙ 𝑝 2. (13) The resulting query regularizer becomes 
+
+𝐽 𝑞 = 12 Tr [( (𝐗 𝑇 𝐗 ) ⊙ 𝑝 2)Λ𝑞 
+
+] . (14) Full derivation of 𝐁 is provided in Section A of the Ap-pendix. 
+
+3.2. Key and Value Regularizers 
+
+Key Regularization. We follow a similar analysis for the attention keys, yielding the following regularizer: 
+
+𝐽 𝑘 = 12 Tr [( (𝐗 𝑇 𝐗 ) ⊙ 𝑝 2) Λ𝑘 
+
+] , (15) 
+
+Λ𝑘 = 𝐖 𝑇 𝑘 𝐖 𝑞 𝐗 𝑇 𝐗𝐖 𝑇 𝑞 𝐖 𝑘 .
+
+Value Regularization (Token-level Dropout). When dropout is applied directly to the input tokens before value projection, the induced regularizer takes the form: 
+
+𝐽 𝑣 = 12 Tr [( (𝐗 𝑇 𝐗 ) ⊙ 𝑝 2)Λ𝑣 
+
+] , (16) 
+
+Λ𝑣 = 𝐖 𝑇 𝑣 𝐖 𝑣 .
+
+This formulation reflects the effect of feature-level noise propagation through the value projection, leading to a penalty on the value transformation. 
+
+Value Regularization (Attention-conditioned Dropout). 
+
+When dropout is instead applied after attention mixing, the resulting regularizer becomes: 
+
+𝐽 𝑎𝑣 = 12 Tr [( (𝐗 𝑇 𝐀 𝑇 𝐀𝐗 ) ⊙ 𝑝 2)Λ𝑣 
+
+] , (17) 
+
+Λ𝑣 = 𝐖 𝑇 𝑣 𝐖 𝑣 .
+
+Here, the attention matrix 𝐀 modulates the effective struc-ture, making the regularization explicitly dependent on the learned attention patterns. Detailed derivations of the above regularizers are pro-vided in Section A of the Appendix. 
+
+3.3. Feed-Forward Network Regularizer 
+
+Each Transformer layer contains a position-wise feed-forward network 
+
+FF( 𝑋 ) = 𝜎 (𝑋 𝐖 f f ,1)𝐖 f f ,2, (18) where 𝐖 f f ,1 and 𝐖 f f ,2 denote the first- and second-layer weight matrices, respectively. Following the derivation used for the attention projections, dropout induces an explicit reg-ularizer on both feed-forward weight matrices. The resulting regularization terms are: 
+
+𝐽 f f ,𝑚 = 12 Tr [( (𝐗 𝑇 𝐗 ) ⊙ 𝑝 2) Λf f ,m
+
+] , (19) 
+
+Λf f ,m = 𝐖 𝑇 
+
+> f f ,𝑚
+
+𝐖 f f ,𝑚 
+
+where 𝑚 ∈ {1 , 2} denotes the corresponding feed-forward network layer. Thus, dropout in the feed-forward network leads to a quadratic, data-dependent regularization term on each of the two linear transformations. The detailed deriva-tion is provided in Section A of the Appendix. 
+
+3.4. Final Training Objective 
+
+The final training objective combines the task-specific loss with the dropout-induced regularizers from all Trans-former components. Let 𝐿 denote the number of encoder blocks. The overall objective is defined as 
+
+𝐽 f inal = 𝐽 task + 𝐽 𝑞 + 𝐽 𝑘 + 𝐽 𝑣 + 𝐽 f f . (20) Each term aggregates the corresponding regularizers across layers. For example, the query regularizer is given by 
+
+𝐽 𝑞 =
+
+> 𝐿
+
+∑
+
+> 𝑙 =1
+
+𝜆 (𝑙 ) 
+
+> 𝑞
+
+𝐽 (𝑙 ) 
+
+> 𝑞
+
+, 𝜆 (𝑙 ) 
+
+> 𝑞
+
+≥ 0, (21) where 𝐽 (𝑙 ) 
+
+> 𝑞
+
+denotes the query regularizer at layer 𝑙 , and 𝜆 (𝑙 )
+
+> 𝑞
+
+controls its strength. Setting 𝜆 (𝑙 ) 
+
+> 𝑞
+
+= 0 effectively disables the regularizer for that layer. Analogous expressions hold for the key, value, and feed-forward network regularizers: 
+
+𝐽 𝑘 =
+
+> 𝐿
+
+∑
+
+> 𝑙 =1
+
+𝜆 (𝑙 ) 
+
+> 𝑘
+
+𝐽 (𝑙 ) 
+
+> 𝑘
+
+, (22) 
+
+𝐽 𝑣 =
+
+> 𝐿
+
+∑
+
+> 𝑙 =1
+
+𝜆 (𝑙 ) 
+
+> 𝑣
+
+𝐽 (𝑙 ) 
+
+> 𝑣
+
+,𝐽 f f =
+
+> 𝐿
+
+∑
+
+> 𝑙 =1 2
+
+∑
+
+> 𝑚 =1
+
+𝜆 (𝑙 )f f 𝐽 (𝑙 )f f ,𝑚 ,
+
+with layer-wise regularization coefficients 𝜆 (𝑙 ) 
+
+> 𝑘
+
+, 𝜆 (𝑙 ) 
+
+> 𝑣
+
+, 𝜆 (𝑙 )f f ≥ 0.This formulation allows independent control of the regular-ization strength for each component and each layer of the Transformer encoder. 
+
+: Preprint submitted to Elsevier Page 4 of 13 Table 1                                                 
+
+> Effect of implicit and explicit dropout regularization on CIFAR-10 with dropout ratio of 0.2 using a 7-layer Vision Transformer. Results report test accuracy.
+> Dropout on Attention Sequence Dropout on FF network Accuracy (%)
+> DropAttention (Implicit) [23] Implicit 85.24 ±0.75 DropKey (Implicit) [20] Implicit 85.45 ±0.41 None Implicit 85.14 ±0.63 (Q) Arora et al. [1] Explicit 61.08 ±0.80 (K) Arora et al. [1] Explicit 47.01 ±1.58 (V) Arora et al. [1] Explicit 59.22 ±1.80 none Arora et al. [1] 86.02 ±0.51 None Explicit 86.14 ±0.36 Explicit (Q) Explicit 83.92 ±0.98 Explicit (K) Explicit 84.06 ±0.85 Explicit (V) Explicit 86.38 ±0.44
+> Explicit (AV) Explicit 86.11 ±0.41
+
+## 4. Experiments 
+
+We evaluate the proposed explicit dropout regularization across diverse tasks and Transformer architectures. Our goal is to assess whether formulating dropout as an explicit, ad-ditive regularizer can match or even exceed the performance of commonly used implicit dropout strategies, including DropAttention [23] and DropKey [20], while providing more direct control over regularization strength. In addition, we also adapt prior explicit dropout formulations for Transform-ers and perform direct comparisons. This allows us to eval-uate whether our formulation offers practical improvements in terms of performance. We conduct experiments on image classification, temporal action detection, and audio classifi-cation benchmarks, covering both vision-only Transformers and Transformer encoders operating on pretrained features. Unless otherwise stated, all methods use identical training settings for fair comparison. 
+
+4.1. Experimental Setup 
+
+4.1.1. Datasets and Baselines: 
+
+For image classification, experiments are conducted on CIFAR-10 and CIFAR-100 [18]. For both datasets, the orig-inal training set is further split into training and validation subsets using a 70:30 ratio, while the standard test set is used for final evaluation. For temporal action detection, we report results on THUMOS14 [16], which contains 413 training videos spanning 20 action categories with frame-level anno-tations. Similar to the CIFAR setup, the provided training set is split into training and validation subsets in a 70:30 ratio, and evaluation is performed on the official test set. Following prior work [36], we employ a Temporal Segment Network (TSN) [35] pretrained on ActivityNet [14] or Kinetics-400 [3] for feature extraction, producing sequences of 64 tokens. For audio classification, we utilize the GTZAN Music Genre Classification dataset [31]. Consistent with previous studies [13, 37], Mel spectrograms are extracted and converted into sequences of 120 tokens using a VGGish network, after which the data are split into training, validation, and test sets. Our primary baseline consists of Transformer encoder layers [32] trained with conventional dropout applied to attention modules or feed-forward network layers. We com-pare against related stochastic attention strategies, including DropKey [20] and DropAttention [23], as well as variants with dropout disabled in certain modules or applied explic-itly through formulations from [1]. 
+
+4.1.2. Models Used: 
+
+For CIFAR-10 and CIFAR-100, we use a Vision Trans-former (ViT) [6, 25] with seven Transformer encoder lay-ers and a patch-based embedding and classification to-ken (CLS). For THUMOS14 and GTZAN, we employ a lightweight Transformer encoder with two layers [12] operating on pre-extracted video and audio features, re-spectively. Across all models, we evaluate explicit dropout regularization applied to Query (Q), Key (K), Value (V), and feed-forward network layers, controlled by the regularization coefficients 𝜆 . Experiments are conducted across multiple values of the regularization coefficient 𝜆 and learning rates. For each experiment, the reported test results correspond to the configuration achieving the highest validation accuracy. This protocol ensures a fair comparison between implicit and explicit regularization strategies. 
+
+4.2. Evaluation Results 
+
+Tables 1–4 present a comprehensive comparison be-tween implicit dropout strategies and the proposed explicit regularization across multiple modalities and model scales. Overall, the results demonstrate that explicit dropout yields competitive or superior performance compared to conven-tional implicit methods while offering more controllable regularization behavior. For all experiments, we report the mean and standard deviation of the evaluation metrics over five independent runs with different random seeds. This                                                  
+
+> :Preprint submitted to Elsevier Page 5 of 13 Table 2
+> Effect of implicit and explicit dropout regularization on CIFAR-100 with dropout ratio of 0.2 using a 7-layer Vision Trans-former. Results report test accuracy.
+> Dropout on Attention Sequence Dropout on FF network Accuracy (%)
+> DropAttention (Implicit) [23] Implicit 58.01 ±1.20 DropKey (Implicit) [20] Implicit 59.11 ±1.23
+> None Implicit 59.01 ±1.13 (Q) Arora et al. [1] Explicit 37.59 ±0.79 (K) Arora et al. [1] Explicit 29.61 ±0.85 (V) Arora et al. [1] Explicit 37.16 ±1.51 none Arora et al. [1] 55.42 ±1.37 None Explicit 56.81 ±2.84 Explicit (Q) Explicit 53.79 ±4.82 Explicit (K) Explicit 51.53 ±0.90 Explicit (V) Explicit 55.15 ±0.84 Explicit (AV) Explicit 56.62 ±2.03
+
+protocol ensures a fair comparison and provides a reliable estimate of performance stability. 
+
+CIFAR-10 and CIFAR-100. On CIFAR-10 (Table 1), explicit dropout—particularly when applied to the value (V) branch—achieves the best overall performance, reach-ing 86 .38% , outperforming all implicit methods and other explicit variants. While implicit approaches such as DropAt-tention and DropKey remain in a competitive range, they do not surpass the strongest explicit configuration. In contrast, Arora et al. [1] is competitive only when applied to the feed-forward network, while its performance drops significantly when applied to attention components. Overall, CIFAR-10 results indicate that value-based explicit regularization provides the most effective inductive bias for improving generalization. On CIFAR-100 (Table 2), the task is more sensitive to the choice of regularization strategy. Among implicit methods, DropKey performs best at 59 .11% , slightly outperforming other implicit variants. Explicit dropout remains competitive but is generally weaker overall, with the best explicit con-figuration (AV) reaching 56 .62% . Despite this gap, explicit methods still provide stable performance and offer a more structured and controllable alternative to implicit dropout across settings. 
+
+THUMOS14 (Kinetics and ActivityNet Features). For THUMOS14 features extracted from TSN backbones pre-trained on Kinetics and ActivityNet, explicit dropout again demonstrates strong performance. On Kinetics features, Explicit (V)/Explicit achieves the highest mAP (64.68 %), slightly surpassing both implicit DropKey and the None/Explicit baseline. A similar trend holds for ActivityNet features, where Explicit (V)/Explicit reaches 56.51 %, outperforming all implicit configurations. In contrast, the Arora et al. [1]-style attention dropout variants exhibit larger variance and weaker performance under similar dropout ratios. This sug-gests that our formulation improves robustness in temporally structured representations where attention dynamics are more complex. 
+
+GTZAN (Audio Classification). On the GTZAN audio classification benchmark (Table 4), implicit dropout meth-ods already achieve strong performance ( ≈ 85% accuracy). The performance differences between methods are compar-atively smaller, reflecting the relatively simpler structure of the dataset. Nevertheless, the proposed dropout remains competitive ( 85 .78% accuracy), with explicit (K) achieving the best overall accuracy. This indicates that key-based reg-ularization can be beneficial in low-data or low-complexity regimes, where over-regularization may otherwise degrade performance. Across datasets and modalities, explicit regularization applied to values, or feed-forward network components con-sistently provides strong or state-of-the-art performance, while explicit query and key dropout demonstrate task-dependent sensitivity. The regularization from Arora et al. [1] consistently performs poorly when applied to attention input values, i.e., Q, K, and V, as the regularizer is based on dropping out whole specific features instead of some particular dimensions in the features. This causes instability in the attention output, therefore not allowing the model to learn the patterns fully. The results indicate that explicit dropout can match or exceed implicit methods, particularly on complex datasets and structured sequence tasks, sup-porting the effectiveness and generality of the proposed framework. 
+
+4.3. Ablation Study 
+
+We conduct ablation experiments on CIFAR-10 to an-alyze the effect of explicit dropout regularization across different attention components and hyperparameter settings. In particular, we evaluate explicit dropout applied indepen-dently to the key (K), query (Q), and value (V) projections while varying both the learning rate and the regularization coefficient 𝜆 dr . Results are summarized in Table 5. From Table 5, we observe distinct trends in how explicit dropout interacts with different attention components. Ap-plying dropout to the value (V) projection consistently yields the strongest performance across most hyperparameter con-figurations, with accuracy peaking around 86 .4% at a moder-ate dropout regularization weight ( 𝜆 = 0 .0005 ) and learning rate 0.0005. This suggests that injecting stochasticity into the value representation helps improve robustness without destabilizing attention distributions. On the other hand, dropout applied to the key (K) or query (Q) projections leads to noticeably higher variance and degraded accuracy, especially at larger learning rates (e.g., 0.005). This degradation likely stems from the fact that perturbations in K and Q directly affect the attention weighting mechanism, leading to unstable gradients and noisier optimization. A combined dropout on the attention–value (AV) path-ways produces intermediate results, closer to those of V-only                                                                                                                                        
+
+> :Preprint submitted to Elsevier Page 6 of 13 Table 3
+> Comparison of implicit and explicit dropout on THUMOS14 features, extracted from the TSN model pre-trained on ActivityNet and Kinetics-400, with dropout ratio of 0.2 using a 2-layer Transformer encoder. Results report test mAP.
+> Dropout on Attention Sequence Dropout on FF network Kinetics ActivityNet
+> DropAttention [23] Implicit 62.03 ±0.26 53.89 ±0.46 DropKey [20] Implicit 64.58 ±0.33 55.87 ±0.61 None Implicit 64.53 ±0.47 55.62 ±0.74 (Q) Arora et al. [1] Explicit 48.66 ±6.52 46.67 ±2.03 (K) Arora et al. [1] Explicit 51.84 ±4.14 44.52 ±5.80 (V) Arora et al. [1] Explicit 52.23 ±7.40 36.96 ±2.28 None Arora et al. [1] 57.76 ±0.90 48.44 ±1.05 None Explicit 63.96 ±0.46 54.92 ±0.33 Explicit (Q) Explicit 63.70 ±0.56 54.98 ±0.84 Explicit (K) Explicit 63.78 ±0.54 54.92 ±0.76 Explicit (V) Explicit 64.68 ±0.36 56.51 ±0.37
+> Explicit (AV) Explicit 64.24 ±0.40 56.10 ±0.55
+> Table 4
+> Comparison of implicit and explicit dropout on GTZAN (audio classification dataset) with dropout ratio of 0.2 using a 2-layer Transformer encoder. Results report test accuracy.
+> Dropout on Attention Sequence Dropout on FF network Accuracy (%)
+> DropAttention [23] Implicit 84.84 ±0.89 DropKey [20] Implicit 84.84 ±0.89 None Implicit 85.00 ±0.86 (Q) Arora et al. [1] Explicit 85.31 ±0.86 (K) Arora et al. [1] Explicit 84.22 ±1.02 (V) Arora et al. [1] Explicit 85.16 ±0.55 None Arora et al. [1] 84.84 ±0.43 None Explicit 85.16 ±0.55 Explicit (Q) Explicit 85.68 ±0.65 Explicit (K) Explicit 85.78 ±0.65
+> Explicit (V) Explicit 85.00 ±0.86 Explicit (AV) Explicit 85.00 ±0.35
+
+dropout, reinforcing that controlling noise primarily in the value stream retains the most beneficial regularization effect. Overall, these results highlight that the placement of dropout within the attention mechanism critically governs training stability. Moderate dropout regularization on the value projection strikes the right balance between represen-tation smoothing and information retention, improving gen-eralization on CIFAR-10 without sacrificing convergence speed. The full set of ablation results for the remaining datasets is reported in Section 3 of the supplementary reader. 
+
+## 5. Conclusions 
+
+This work introduced an explicit formulation of dropout as an additive regularization mechanism for Transformer architectures, enabling direct and interpretable control over regularization strength across attention and feed-forward network components. Even though we did not identify a straightforward way to derive a unified regularization ex-pression when dropout is applied simultaneously to multiple input matrices within the attention block, explicit dropout regularization can be induced to multiple architectural com-ponents by incorporating the corresponding regularization terms into the final loss. Extensive experiments across image classification, tem-poral action detection, and audio classification demonstrate that explicit dropout achieves performance comparable to, or exceeding, conventional implicit dropout strategies such as DropAttention and DropKey. In particular, explicit reg-ularization applied to value projections and feed-forward network layers consistently yields strong and stable im-provements across modalities, while explicit value-based regularization proves especially beneficial in more complex classification tasks such as CIFAR-100. Results on THU-MOS14 further show that explicit value dropout improves temporal modeling performance, achieving the highest mean Average Precision across multiple feature extractors. The ab-lation study confirms that the proposed formulation provides fine-grained control over regularization strength through the choice of the regularization coefficients and dropout ratio, allowing practitioners to balance generalization and regular-ization capacity. Although derived for the processing blocks used in Transformer architectures, the proposed explicit dropout regularization naturally extends to convolutional operations. A convolution operation can be rewritten as a vector-based affine transformation by extracting local patches from the in-put feature maps, flattening them into vectors, and reshaping the convolutional kernels into an equivalent weight matrix 
+
+𝐖 conv while preserving structured weight sharing [4]. The corresponding explicit dropout regularizer has the same structure as the one derived for the feed-forward network   
+
+> :Preprint submitted to Elsevier Page 7 of 13
+
+Table 5 
+
+Accuracy ( acc ) on CIFAR-10 for dropout applied on different attention matrices (K, Q, V) across regularization coefficients 𝜆 and learning rates. 
+
+Learning Rate 𝜆 
+
+0.001 0.005 0.0001 0.0005 K 0.001 83.65 ± 0.81 79.56 ± 5.18 81.15 ± 1.53 84.06 ± 0.85 K 0.005 66.48 ± 2.19 61.02 ± 5.84 69.46 ± 0.94 68.30 ± 0.71 K 0.0001 78.02 ± 0.72 77.61 ± 0.65 78.80 ± 0.98 78.09 ± 1.01 K 0.0005 83.91 ± 0.84 81.87 ± 0.99 82.96 ± 1.37 83.73 ± 0.66 Q 0.001 83.44 ± 0.94 79.08 ± 5.31 80.76 ± 1.30 83.74 ± 0.45 Q 0.005 67.17 ± 0.36 58.33 ± 1.66 69.16 ± 0.72 68.81 ± 0.32 Q 0.0001 78.18 ± 0.62 77.65 ± 0.56 78.81 ± 1.03 78.23 ± 0.90 Q 0.0005 83.92 ± 0.98 81.93 ± 1.02 83.33 ± 1.22 83.70 ± 0.65 V 0.001 86.11 ± 0.38 85.91 ± 0.78 85.66 ± 0.82 85.85 ± 0.42 V 0.005 70.57 ± 1.38 71.31 ± 0.44 70.61 ± 1.44 70.57 ± 1.25 V 0.0001 78.79 ± 0.54 78.14 ± 0.54 79.28 ± 0.53 78.99 ± 0.51 V 0.0005 86.38 ± 0.44 86.16 ± 0.48 85.92 ± 0.62 86.05 ± 0.57 AV 0.001 85.47 ± 0.63 80.90 ± 1.63 85.71 ± 0.52 85.48 ± 0.87 AV 0.005 70.58 ± 0.80 70.23 ± 0.96 70.73 ± 0.78 70.41 ± 0.88 AV 0.0001 79.80 ± 0.57 78.88 ± 0.49 80.11 ± 0.41 79.84 ± 0.67 AV 0.0005 85.20 ± 0.72 84.30 ± 0.67 86.11 ± 0.41 86.04 ± 0.61 
+
+layers in Section 3.3 and is provided in Section 1 of the supplementary material. 
+
+## 6. Declaration of generative AI and AI-assisted technologies in the manuscript preparation process 
+
+During the preparation of this work, the author used ChatGPT and Perplexity AI to assist with formatting the manuscript. All generated content was critically evaluated, verified, and edited by the author, who takes full responsi-bility for the final content of the published article. 
+
+## A. Full Derivation of Dropout-Induced Regularizers 
+
+A.1. Derivation of Query Regularizer 
+
+We consider 𝑁 𝑇 stochastic training epochs with dropout masks applied to the input matrix 𝐗 . The query regularizer is 
+
+𝐽 𝑞 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+‖̃ 𝐗 𝑡 𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 ‖2 
+
+> 𝐹
+
+. (23) Using ‖𝐀 ‖2 
+
+> 𝐹
+
+= Tr( 𝐀 𝑇 𝐀 ) it becomes 
+
+𝐽 𝑞 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+Tr 
+
+[
+
+𝐗𝐖 𝑇 𝑘 𝐖 𝑞 ̃ 𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 ]
+
+. (24) Rearranging the terms: 
+
+𝐽 𝑞 = 12 Tr 
+
+[( 
+
+1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 
+
+)
+
+𝐖 𝑇 𝑞 𝐖 𝑘 𝐗 𝑇 𝐗𝐖 𝑇 𝑘 𝐖 𝑞 
+
+]
+
+.
+
+(25) We define 
+
+𝐁 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 . (26) 
+
+A.2. Expansion of 𝐵 
+
+Let dropout masks for epoch 𝑡 be 𝐌 𝑡 ∈ {0 , 1} 𝑛 ×𝑑 .Each element of the mask is sampled independently from a Bernoulli distribution with keep probability (1 − 𝑝 ). Then, at epoch 𝑡 :̃
+
+𝐗 𝑡 = 𝐗 − ( 𝐌 𝑡 ⊙ 𝐗 ). (27) Expanding Eq 26, 
+
+𝐁 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[( 𝐗 − 𝐗 𝑡 )𝑇 (𝐗 − 𝐗 𝑡 )] (28) 
+
+= 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[𝐗 𝑇 𝐗 − 𝐗 𝑇 𝐗 𝑡 − 𝐗 𝑇 𝑡 𝐗 + 𝐗 𝑇 𝑡 𝐗 𝑡 ]. (29) Substituting 𝐗 𝑡 = 𝐌 𝑡 ⊙ 𝐗 ,
+
+𝐁 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[𝐗 𝑇 𝐗 − 𝐗 𝑇 (𝐌 𝑡 ⊙ 𝐗 )− (30) 
+
+(𝐌 𝑡 ⊙ 𝐗 )𝑇 𝐗 + ( 𝐌 𝑡 ⊙ 𝐗 )𝑇 (𝐌 𝑡 ⊙ 𝐗 )] .
+
+Following an element-wise analysis, for the (𝑗, 𝑘 ) entry of (𝐌 𝑡 ⊙ 𝐗 )𝑇 (𝐌 𝑡 ⊙ 𝐗 ) − 𝐗 𝑇 (𝐌 𝑡 ⊙ 𝐗 ) − ( 𝐌 𝑡 ⊙ 𝐗 )𝑇 𝐗 ,
+
+> 𝑛
+
+∑
+
+> 𝑖 =1
+
+[
+
+(𝑚 𝑡,𝑖𝑗 𝑋 𝑖𝑗 )( 𝑚 𝑡,𝑖𝑘 𝑋 𝑖𝑘 ) − 𝑋 𝑖𝑗 (𝑚 𝑡,𝑖𝑘 𝑋 𝑖𝑘 ) − ( 𝑚 𝑡,𝑖𝑗 𝑋 𝑖𝑗 )𝑋 𝑖𝑘 
+
+]
+
+.
+
+(31) Thus, 
+
+𝐵 𝑗𝑘 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[ 𝑛 ∑
+
+> 𝑖 =1
+
+𝑋 𝑖𝑗 𝑋 𝑖𝑘 + (32) 
+
+: Preprint submitted to Elsevier Page 8 of 13 𝑛 ∑
+
+> 𝑖 =1
+
+𝑋 𝑖𝑗 𝑋 𝑖𝑘 (𝑚 𝑡,𝑖𝑗 𝑚 𝑡,𝑖𝑘 − 𝑚 𝑡,𝑖𝑘 − 𝑚 𝑡,𝑖𝑗 )
+
+]
+
+𝐵 𝑗𝑘 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[ 𝑛 ∑
+
+> 𝑖 =1
+
+(𝑋 𝑖𝑗 𝑋 𝑖𝑘 )(1 (33) 
+
++ 𝑚 𝑡,𝑖𝑗 𝑚 𝑡,𝑖𝑘 − 𝑚 𝑡,𝑖𝑘 − 𝑚 𝑡,𝑖𝑗 )
+
+]
+
+𝐵 𝑗𝑘 =
+
+> 𝑛
+
+∑
+
+> 𝑖 =1
+
+𝑋 𝑖𝑗 𝑋 𝑖𝑘 
+
+[ 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+(1 (34) 
+
++ 𝑚 𝑡,𝑖𝑗 𝑚 𝑡,𝑖𝑘 − 𝑚 𝑡,𝑖𝑘 − 𝑚 𝑡,𝑖𝑗 )
+
+]
+
+.
+
+To compute the inner summation, we can apply an importance sampling Monte Carlo integration method in reverse. According to importance sampling Monte Carlo, 
+
+∫ 𝑓 (𝑥 )𝑝 (𝑥 ) 𝑑𝑥 ≈ 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+𝑓 (𝑥 𝑡 ), 𝑥 𝑡 ∼ 𝑝 (𝑥 ). (35) Applying this to our case, 
+
+1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+(1 + 𝑚 1 
+
+> 𝑡
+
+𝑚 2 
+
+> 𝑡
+
+− 𝑚 1 
+
+> 𝑡
+
+− 𝑚 2 
+
+> 𝑡
+
+) (36) 
+
+≈ ∬ (1 + 𝑚 1𝑚 2 − 𝑚 1 − 𝑚 2)𝑃 (𝑚 1)𝑃 (𝑚 2) 𝑑𝑚 1𝑑𝑚 2.
+
+(37) Since both 𝑚 1 and 𝑚 2 are binary, the integral has only four possible values: 
+
+∬
+
+(1+ 𝑚 1𝑚 2 − 𝑚 1 − 𝑚 2) × 𝑃 (𝑚 1) 𝑃 (𝑚 2) 𝑑𝑚 1 𝑑𝑚 2
+
+(38) 
+
+= 𝑆 1 + 𝑆 2 + 𝑆 3 + 𝑆 4 = 𝑝 2, (39) 
+
+𝑃 (𝑚 1) = (1 − 𝑝 )𝑚 1
+
+𝑝 (1− 𝑚 1), (40) 
+
+𝑃 (𝑚 2) = (1 − 𝑝 )𝑚 2
+
+𝑝 (1− 𝑚 2), (41) 
+
+𝑆 1 = (1 + 1 − 1 − 1)(1 − 𝑝 )2, (42) 
+
+𝑆 2 = (1 + 0 − 1 − 0) 𝑝 (1 − 𝑝 ), (43) 
+
+𝑆 3 = (1 + 0 − 0 − 1)(1 − 𝑝 )𝑝, (44) 
+
+𝑆 4 = (1 + 0 − 0 − 0) 𝑝 2. (45) Therefore, 
+
+𝐁 ≈ ( 𝐗 𝑇 𝐗 )𝑝 2. (46) 
+
+A.3. Derivation of the Key Dropout Regularizer 
+
+For the key corresponding to token 𝐱 𝑖 , the attention score is defined as 
+
+𝐒 𝑖 = 𝐗𝐖 𝑇 𝑞 𝐖 𝑘 𝐱 𝑇 𝑖 . (47) When a dropout mask is applied, the attention score becomes 
+
+𝐒 𝑖𝑡 = 𝐗𝐖 𝑇 𝑞 𝐖 𝑘 (𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 )𝑇 , (48) where 𝐦 𝑖𝑡 denotes the dropout mask at training epoch 𝑡 .Assume training proceeds for 𝑁 𝑇 stochastic epochs with independently sampled dropout masks applied to the input matrix 𝐗 . The key dropout regularizer is defined as 
+
+𝐽 𝑘 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+‖𝐗𝐖 𝑇 𝑞 𝐖 𝑘 ̃ 𝐗 𝑇 𝑡 ‖2 
+
+> 𝐹
+
+. (49) Using ‖𝐀 ‖2 
+
+> 𝐹
+
+= Tr( 𝐀𝐀 𝑇 ), we obtain 
+
+𝐽 𝑘 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+Tr 
+
+(
+
+𝐗𝐖 𝑇 𝑞 𝐖 𝑘 ̃ 𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 𝐖 𝑇 𝑘 𝐖 𝑞 𝐗 𝑇 )
+
+.
+
+(50) By the cyclic property of the trace, 
+
+𝐽 𝑘 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+Tr 
+
+(̃
+
+𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 𝐖 𝑇 𝑘 𝐖 𝑞 𝐗 𝑇 𝐗𝐖 𝑇 𝑞 𝐖 𝑘 
+
+)
+
+.
+
+(51) Rearranging the summation and using the definition of 𝐁 in Eq. (4), we obtain 
+
+𝐽 𝑘 = 12 Tr 
+
+(
+
+𝐁𝐖 𝑇 𝑘 𝐖 𝑞 𝐗 𝑇 𝐗𝐖 𝑇 𝑞 𝐖 𝑘 
+
+)
+
+. (52) 
+
+A.4. Derivation of the Value Dropout Regularizer 
+
+The value representation is obtained by 
+
+𝐕 = 𝐗𝐖 𝑇 𝑣 . (53) For a token 𝐱 𝑖 , the corresponding value vector is 
+
+𝐯 𝑖 = 𝐱 𝑖 𝐖 𝑇 𝑣 . (54) When a dropout mask is applied at training epoch 𝑡 , the perturbed value becomes 
+
+𝐯 𝑖𝑡 = ( 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 )𝐖 𝑇 𝑣 , (55) where 𝐦 𝑖𝑡 denotes the independently sampled binary dropout mask and ⊙ represents element-wise multiplication. Let ̃ 𝐱 𝑖𝑡 denote the input token after dropout, i.e., ̃
+
+𝐱 𝑖𝑡 = 𝐱 𝑖 − ( 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 ). (56) Then the deviation induced by dropout in the value space is 
+
+𝐯 𝑖 − 𝐯 𝑖𝑡 =̃ 𝐱 𝑖𝑡 𝐖 𝑇 𝑣 . (57) To enforce consistency between the original and dropout-perturbed value representations, we penalize this deviation. Assuming 𝑁 𝑇 stochastic training epochs with independently sampled dropout masks applied to 𝐗 , and denoting the stacked dropped components at epoch 𝑡 by ̃ 𝐗 𝑡 , we define the value dropout regularizer as 
+
+𝐽 𝑣 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+‖‖‖̃
+
+𝐗 𝑡 𝐖 𝑇 𝑣 
+
+‖‖‖ 
+
+> 2
+> 𝐹
+
+. (58) 
+
+: Preprint submitted to Elsevier Page 9 of 13 Using the identity ‖𝐴 ‖2 
+
+> 𝐹
+
+= Tr( 𝐴 𝑇 𝐴 ), this becomes 
+
+𝐽 𝑣 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+Tr (𝐖 𝑣 ̃ 𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 𝐖 𝑇 𝑣 
+
+) . (59) Rearranging terms and collecting the summation yields 
+
+𝐽 𝑣 = 12 Tr 
+
+(( 
+
+1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 
+
+)
+
+𝐖 𝑇 𝑣 𝐖 𝑣 
+
+)
+
+. (60) Using the definition of 𝐁 in Eq. (4), we finally obtain the compact expression 
+
+𝐽 𝑣 = 12 Tr (𝐁𝐖 𝑇 𝑣 𝐖 𝑣 
+
+) . (61) 
+
+A.5. Derivation of the Value Dropout Regularizer (Attention-conditioned) 
+
+The value representation can also be obtained by 
+
+𝐕 = 𝐀𝐗𝐖 𝑇 𝑣 . (62) For a token 𝐱 𝑖 , the corresponding value vector is 
+
+𝐯 𝑖 = 𝐀𝐱 𝑖 𝐖 𝑇 𝑣 . (63) When a dropout mask is applied at training epoch 𝑡 , the perturbed value becomes 
+
+𝐯 𝑖𝑡 = 𝐀 (𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 )𝐖 𝑇 𝑣 , (64) where 𝐦 𝑖𝑡 denotes the independently sampled binary dropout mask and ⊙ represents element-wise multiplication. Let ̃ 𝐱 𝑖𝑡 denote the input token after dropout, i.e., ̃
+
+𝐱 𝑖𝑡 = 𝐱 𝑖 − ( 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 ). (65) Then the deviation induced by dropout in the value space is 
+
+𝐯 𝑖 − 𝐯 𝑖𝑡 = 𝐀 ̃𝐱 𝑖𝑡 𝐖 𝑇 𝑣 . (66) To enforce consistency between the original and dropout-perturbed value representations, we penalize this deviation. Assuming 𝑁 𝑇 stochastic training epochs with independently sampled dropout masks applied to 𝐗 , and denoting the stacked dropped components at epoch 𝑡 by ̃ 𝐗 𝑡 , we define the value dropout regularizer as 
+
+𝐽 𝑣 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+‖‖‖𝐀 ̃ 𝐗 𝑡 𝐖 𝑇 𝑣 
+
+‖‖‖ 
+
+> 2
+> 𝐹
+
+. (67) Using the identity ‖𝐴 ‖2 
+
+> 𝐹
+
+= Tr( 𝐴 𝑇 𝐴 ), this becomes 
+
+𝐽 𝑣 = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+Tr (𝐖 𝑣 ̃ 𝐗 𝑇 𝑡 𝐀 𝑇 𝐀 ̃ 𝐗 𝑡 𝐖 𝑇 𝑣 
+
+) (68) 
+
+= 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+Tr (̃
+
+𝐗 𝑇 𝑡 𝐀 𝑇 𝐀 ̃ 𝐗 𝑡 𝐖 𝑇 𝑣 𝐖 𝑣 
+
+) . (69) Rearranging terms and collecting the summation yields 
+
+𝐽 𝑣 = 12 Tr 
+
+(( 
+
+1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 𝐘 ̃ 𝐗 𝑡 
+
+)
+
+𝐖 𝑇 𝑣 𝐖 𝑣 
+
+)
+
+. (70) where 𝐘 = 𝐀 𝑇 𝐀 . We define 
+
+𝜓 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 𝐘 ̃ 𝐗 𝑡 .. (71) Then, 
+
+𝐽 𝑣 = 12 Tr (𝜓 𝐖 𝑇 𝑣 𝐖 𝑣 
+
+) . (72) 
+
+A.5.1. Expansion of 𝜓 
+
+Expanding Eq 71, 
+
+𝜓 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[( 𝐗 − 𝐗 𝑡 )𝑇 𝐘 (𝐗 − 𝐗 𝑡 )] (73) 
+
+= 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[𝐗 𝑇 𝐘𝐗 − 𝐗 𝑇 𝐘𝐗 𝑡 − 𝐗 𝑇 𝑡 𝐘𝐗 + 𝐗 𝑇 𝑡 𝐘𝐗 𝑡 ].
+
+(74) Substituting 𝐗 𝑡 = 𝐌 𝑡 ⊙ 𝐗 ,
+
+𝜓 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[𝐗 𝑇 𝐘𝐗 − 𝐗 𝑇 𝐘 (𝐌 𝑡 ⊙ 𝐗 )− (75) 
+
+(𝐌 𝑡 ⊙ 𝐗 )𝑇 𝐘𝐗 + ( 𝐌 𝑡 ⊙ 𝐗 )𝑇 𝐘 (𝐌 𝑡 ⊙ 𝐗 )] = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+[( (1 − 𝐌 𝑡 ) ⊙ 𝐗 )𝑇 𝐘 ((1 − 𝐌 𝑡 ) ⊙ 𝐗 )] 
+
+(76) Following an element-wise analysis, for the (𝑖, 𝑗 ) entry of 𝜓 , where 𝑖, 𝑗 = 1 , ⋯ , 𝑑 and 𝑎, 𝑏 = 1 , ⋯ , 𝑛 ,
+
+𝜓 𝑖𝑗 = 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+> 𝑛
+
+∑
+
+> 𝑎 =1
+> 𝑛
+
+∑
+
+> 𝑏 =1
+
+[
+
+(1 − 𝑚 𝑡,𝑎𝑖 )𝑋 𝑎𝑖 𝑌 𝑎𝑏 (1 − 𝑚 𝑡,𝑏𝑗 )𝑋 𝑏𝑗 
+
+]
+
+(77) 
+
+= 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+> 𝑛
+
+∑
+
+> 𝑎 =1
+> 𝑛
+
+∑
+
+> 𝑏 =1
+
+[
+
+(1 − 𝑚 𝑡,𝑎𝑖 )(1 − 𝑚 𝑡,𝑏𝑗 )𝑋 𝑎𝑖 𝑌 𝑎𝑏 𝑋 𝑏𝑗 
+
+]
+
+(78) 
+
+= 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+> 𝑛
+
+∑
+
+> 𝑎 =1
+> 𝑛
+
+∑
+
+> 𝑏 =1
+
+((𝑋 𝑎𝑖 𝑌 𝑎𝑏 𝑋 𝑏𝑗 )(1 − 𝑚 𝑡,𝑎𝑖 (79) 
+
+− 𝑚 𝑡,𝑏𝑗 + 𝑚 𝑡,𝑎𝑖 𝑚 𝑡,𝑏𝑗 ))
+
+=
+
+> 𝑛
+
+∑
+
+> 𝑎 =1
+> 𝑛
+
+∑
+
+> 𝑏 =1
+
+(𝑋 𝑎𝑖 𝑌 𝑎𝑏 𝑋 𝑏𝑗 )[ 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+(1 − 𝑚 𝑡,𝑎𝑖 (80) 
+
+− 𝑚 𝑡,𝑏𝑗 + 𝑚 𝑡,𝑎𝑖 𝑚 𝑡,𝑏𝑗 )]
+
+To compute the inner summation, we can apply an importance sampling Monte Carlo integration method in 
+
+: Preprint submitted to Elsevier Page 10 of 13 reverse. According to importance sampling Monte Carlo, 
+
+∫ 𝑓 (𝑥 )𝑝 (𝑥 ) 𝑑𝑥 ≈ 1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+𝑓 (𝑥 𝑡 ), 𝑥 𝑡 ∼ 𝑝 (𝑥 ). (81) Applying this to our case, 
+
+1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+(1 + 𝑚 1 
+
+> 𝑡
+
+𝑚 2 
+
+> 𝑡
+
+− 𝑚 1 
+
+> 𝑡
+
+− 𝑚 2 
+
+> 𝑡
+
+) (82) 
+
+≈ ∬ (1 + 𝑚 1𝑚 2 − 𝑚 1 − 𝑚 2)𝑃 (𝑚 1)𝑃 (𝑚 2) 𝑑𝑚 1𝑑𝑚 2.
+
+(83) Since both 𝑚 1 and 𝑚 2 are binary, the integral has only four possible values: 
+
+∬
+
+(1+ 𝑚 1𝑚 2 − 𝑚 1 − 𝑚 2) × 𝑃 (𝑚 1) 𝑃 (𝑚 2) 𝑑𝑚 1 𝑑𝑚 2
+
+(84) 
+
+= 𝑆 1 + 𝑆 2 + 𝑆 3 + 𝑆 4 = 𝑝 2, (85) 
+
+𝑃 (𝑚 1) = (1 − 𝑝 )𝑚 1
+
+𝑝 (1− 𝑚 1), (86) 
+
+𝑃 (𝑚 2) = (1 − 𝑝 )𝑚 2
+
+𝑝 (1− 𝑚 2), (87) 
+
+𝑆 1 = (1 + 1 − 1 − 1)(1 − 𝑝 )2, (88) 
+
+𝑆 2 = (1 + 0 − 1 − 0) 𝑝 (1 − 𝑝 ), (89) 
+
+𝑆 3 = (1 + 0 − 0 − 1)(1 − 𝑝 )𝑝, (90) 
+
+𝑆 4 = (1 + 0 − 0 − 0) 𝑝 2. (91) Therefore, 
+
+𝜓 ≈ ( 𝐗 𝑇 𝐘𝐗 )𝑝 2. (92) 
+
+A.6. Derivation of the Feedforward Network Dropout Regularizer 
+
+We derive the regularizer for a single linear transforma-tion; the extension to multi-layer FFNs follows analogously. Consider the position-wise feedforward layer 
+
+𝐇 = 𝐗𝐖 𝑇  
+
+> ff
+
+, (93) where 𝐖 ff denotes the feedforward weight matrix. For a token 𝐱 𝑖 , the corresponding output is 
+
+𝐇 𝑖 = 𝐱 𝑖 𝐖 𝑇  
+
+> ff
+
+. (94) When a dropout mask 𝐦 𝑖𝑡 is applied at training epoch 𝑡 , the perturbed output becomes 
+
+𝐇 𝑖𝑡 = ( 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 )𝐖 𝑇  
+
+> ff
+
+. (95) The discrepancy between the original and perturbed outputs is therefore 
+
+𝐇 𝑖 − 𝐇 𝑖𝑡 =̃ 𝐱 𝑖𝑡 𝐖 𝑇  
+
+> ff
+
+, (96) where, ̃ 𝐱 𝑖𝑡 = 𝐱 𝑖 − ( 𝐦 𝑖𝑡 ⊙ 𝐱 𝑖 ).Assuming 𝑁 𝑇 stochastic training epochs with indepen-dently sampled dropout masks applied to 𝐗 , and denoting the stacked dropped components at epoch 𝑡 by ̃ 𝐗 𝑡 , we define the feedforward dropout regularizer as 
+
+𝐽 ff = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+‖‖‖̃
+
+𝐗 𝑡 𝐖 𝑇 
+
+> ff
+
+‖‖‖ 
+
+> 2
+> 𝐹
+
+. (97) Using ‖𝐴 ‖2 
+
+> 𝐹
+
+= Tr( 𝐴 𝑇 𝐴 ), we obtain 
+
+𝐽 ff = 12𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+Tr (𝐖 ff ̃ 𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 𝐖 𝑇 
+
+> ff
+
+) . (98) Rearranging terms yields 
+
+𝐽 ff = 12 Tr 
+
+(( 
+
+1
+
+𝑁 𝑇 𝑁 𝑇 ∑
+
+> 𝑡 =1
+
+̃
+
+𝐗 𝑇 𝑡 ̃ 𝐗 𝑡 
+
+)
+
+𝐖 𝑇  
+
+> ff
+
+𝐖 ff 
+
+)
+
+. (99) Using the definition of 𝐁 in Eq. (4), the regularizer admits the compact form 
+
+𝐽 ff = 12 Tr (𝐁𝐖 𝑇  
+
+> ff
+
+𝐖 ff 
+
+) . (100) 
+
+## B. Relationship Between the Proposed Explicit Dropout Regularizer and the Prior Explicit Dropout Regularization [1] 
+
+In this section, we show that the proposed explicit dropout regularizer can be decomposed into the previously derived explicit dropout regularizer [1] plus an additional structured attention-dependent term. This provides theoret-ical insight into how our formulation generalizes earlier explicit dropout formulations. 
+
+B.1. Preliminaries 
+
+For completeness and clarity, we rewrite the explicit dropout regularizer of [1] for the special case of a single linear layer. Consider a supervised learning problem with a batch of inputs 𝐗 = [ 𝐱 1, 𝐱 2, … , 𝐱 𝑁 ] where each 𝐱 𝑖 ∈ ℝ1× 𝑑 ,targets 𝑦 𝑖 , and a linear layer 𝑓 (𝐗 ; 𝐖 ) = 𝐗𝐖 𝑇 with weights 
+
+𝐖 ∈ ℝ𝑑 1×𝑑 . For a mini-batch 𝐗 ∈ ℝ𝑁 ×𝑑 , the empirical task loss is 
+
+𝐽 task (𝐗 , 𝐖 ) = 1
+
+𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑟 =1
+
+𝓁 (𝑓 (𝐱 𝑖 ; 𝑊 ), 𝑦 𝑖 ), (101) where 𝐱 𝑟 is the 𝑖 -th input of a mini-batch. Feature-wise dropout with probability 𝑝 multiplies each feature by a Bernoulli mask. Prior work [1] shows that the expected dropout objective can be written as 
+
+𝐽 (𝐗 , 𝐖 ) = 𝐽 task (𝐗 , 𝐖 ) + ̂ 𝑅 (𝐗 , 𝐖 ), (102) where the explicit regularizer for a single linear layer is ̂𝑅 (𝐗 , 𝐖 ) = 𝑝 
+
+1 − 𝑝 
+
+> 𝑑
+
+∑
+
+> 𝑗 =1
+
+‖𝐖 𝑗 ‖22
+
+(
+
+1
+
+𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑟 =1
+
+𝑋 2
+
+> 𝑟𝑗
+
+)
+
+(103) 
+
+= 𝑝 
+
+1 − 𝑝 
+
+> 𝑑
+
+∑
+
+> 𝑗 =1
+
+̂𝜎 2 
+
+> 𝑗
+
+‖𝐖 𝑗 ‖22, (104) with ̂𝜎 2 
+
+> 𝑗
+
+being the empirical second moment of feature 𝑗 .
+
+: Preprint submitted to Elsevier Page 11 of 13 B.2. Proposed Explicit Dropout Regularizer 
+
+Our proposed formulation introduces a structured ex-plicit dropout regularizer for a single linear layer. The final training objective is 
+
+𝐽 (𝐗 , 𝐖 ) = 𝐽 task (𝐗 , 𝐖 ) + 𝐑 (𝐗 , 𝐖 ), (105) where, 
+
+𝐑 (𝐗 , 𝐖 ) = 𝑝 2
+
+2𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑟 =1
+> 𝑑 1
+
+∑
+
+> 𝑘 =1
+> 𝑑
+
+∑
+
+> 𝑖 =1
+> 𝑑
+
+∑
+
+> 𝑗 =1
+
+𝑋 𝑟𝑖 𝑋 𝑟𝑗 𝑊 𝑘𝑖 𝑊 𝑘𝑗 . (106) Here 𝑛 is the batch size, 𝑊 ∈ ℝ𝑑 1×𝑑 is the weights matrix of the linear layer, and 𝑝 is the dropout probability. Each term in the summation corresponds to a contribu-tion from a specific pair of input features (𝑖, 𝑗 ) and output unit 
+
+𝑘 , capturing both diagonal (feature-wise) and off-diagonal (cross-feature) interactions. The diagonal component recov-ers the prior explicit dropout regularizer [1], while the off-diagonal terms introduce additional structured regulariza-tion dependent on feature covariances. 
+
+B.3. Decomposition of the Proposed Regularizer 
+
+We now show that the proposed regularizer can be written as 
+
+𝑅 (𝐗 , 𝐖 ) = ̂ 𝑅 (𝐗 , 𝐖 ) + Δ 𝑅 (𝐗 , 𝐖 ), (107) 
+
+= 𝑝 2
+
+2𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑟 =1
+> 𝑑 1
+
+∑
+
+> 𝑘 =1
+
+( 𝑑 ∑
+
+> 𝑖 =𝑗
+
+𝑋 2
+
+> 𝑟𝑖
+
+𝑊 2 
+
+> 𝑘𝑖
+
++
+
+> 𝑑
+
+∑
+
+> 𝑖 ≠𝑗
+
+𝑋 𝑟𝑖 𝑋 𝑟𝑗 𝑊 𝑘𝑖 𝑊 𝑘𝑗 
+
+)
+
+.
+
+(108) 
+
+Diagonal Term ( 𝑖 = 𝑗 ). The first term corresponds to the classical explicit dropout regularizer structure: 
+
+𝑅 diag (𝐗 , 𝐖 ) = 𝑝 2
+
+2𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑟 =1
+> 𝑑 1
+
+∑
+
+> 𝑘 =1
+> 𝑑
+
+∑
+
+> 𝑗 =1
+
+𝑋 2 
+
+> 𝑟𝑗
+
+𝑊 2 
+
+> 𝑘𝑗
+
+. (109) Rearranging the sums gives 
+
+𝑅 diag (𝐗 , 𝐖 ) = 𝑝 2
+
+2
+
+> 𝑑
+
+∑
+
+> 𝑗 =1
+> 𝑑 1
+
+∑
+
+> 𝑘 =1
+
+𝑊 2
+
+> 𝑘𝑗
+
+(
+
+1
+
+𝑁 
+
+> 𝑁
+
+∑
+
+> 𝑟 =1
+
+𝑋 2
+
+> 𝑟𝑗
+
+)
+
+(110) 
+
+= 𝑝 2
+
+2
+
+> 𝑑
+
+∑
+
+> 𝑗 =1
+
+‖𝐖 𝑗 ‖22̂𝜎 2 
+
+> 𝑗
+
+.
+
+Hence, the diagonal term is proportional to the prior explicit dropout regularizer: 
+
+𝑅 diag (𝐗 , 𝐖 ) = 𝑝 (1 − 𝑝 )2
+
+⏟⏞⏟⏞⏟ 
+
+> 𝛼
+
+̂𝑅 (𝐗 , 𝐖 ), (111) where 𝛼 is a scaling factor determined by the constants in the two formulations. 
+
+Off-Diagonal Term ( 𝑖 ≠ 𝑗 ). The remaining component captures cross-feature interactions: 
+
+𝑅 cross (𝐗 , 𝐖 ) = 𝑝 2
+
+2𝑛 
+
+> 𝑁
+
+∑
+
+> 𝑟 =1
+> 𝑑 1
+
+∑
+
+> 𝑘 =1
+
+∑
+
+> 𝑖 ≠𝑗
+
+𝑋 𝑟𝑖 𝑋 𝑟𝑗 𝑊 𝑘𝑖 𝑊 𝑘𝑗 . (112) 
+
+Final Decomposition. Combining both terms yields 
+
+𝑅 (𝐗 , 𝐖 ) = 𝛼̂ 𝑅 (𝐗 , 𝐖 ) + 𝑅 cross (𝐗 , 𝐖 ). (113) This shows that the proposed regularizer extends the classical explicit dropout regularizer by incorporating cross-feature covariance terms, which capture interactions be-tween different input dimensions rather than only feature-wise magnitudes. These additional terms provide a finer control over generalization by accounting for correlations in the input data. 
+
+## CRediT authorship contribution statement 
+
+Vidhi Agrawal: Formal analysis,Investigation, Method-ology, Software, Validation, Visulaization, Writing – origi-nal draft. Illia Oleksiienko: Formal analysis, Supervision, Writing – review and editing. Alexandros Iosifidis: Con-ceptualization, Supervision, Writing – review and editing. 
+
+## References 
+
+[1] Arora, R., Bartlett, P., Mianjy, P., Srebro, N., 2021. Dropout: Explicit forms and capacity control, in: Proceedings of the 38th International Conference on Machine Learning, pp. 351–361. [2] Cai, S., Shu, Y., Wang, W., Chen, G., Ooi, B.C., Zhang, M., 2019. Ef-fective and efficient dropout for deep convolutional neural networks. doi: 10.48550/arXiv.1904.03392 .[3] Carreira, J., Zisserman, A., 2017. Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset , in: IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 6299–6308. doi: 10. 1109/CVPR.2017.502 .[4] Chumachenko, K., Iosifidis, A., Gabbouj, M., 2022. Feedforward neural networks initialization based on discriminant learning. Neural Networks 146, 220–229. doi: 10.1016/J.NEUNET.2021.11.020 .[5] Cui, Y., Liu, Z., Li, Q., Chan, A.B., Xue, C.J., 2021. Bayesian nested neural networks for uncertainty calibration and adaptive compression, in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 2392–2401. doi: 10.1109/CVPR46437. 2021.00242 .[6] Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., Uszkoreit, J., Houlsby, N., 2021. An image is worth 16x16 words: Transformers for image recognition at scale, in: International Conference on Learning Representations. [7] Fan, A., Grave, E., Joulin, A., 2020. Reducing transformer depth on demand with structured dropout, in: International Conference on Learning Representations. [8] Gal, Y., Ghahramani, Z., 2016. Dropout as a bayesian approximation: Representing model uncertainty in deep learning, in: Proceedings of The 33rd International Conference on Machine Learning, pp. 1050– 1059. [9] Gal, Y., Hron, J., Kendall, A., 2017. Concrete dropout, in: Advances in Neural Information Processing Systems, pp. 3581–3590. [10] Gao, H., Pei, J., Huang, H., 2019. Demystifying dropout, in: Proceed-ings of the 36th International Conference on Machine Learning, pp. 2112–2121. [11] Georgiou, E., Paraskevopoulos, G., Potamianos, A., 2024. Y-drop: A conductance based dropout for fully connected layers. doi: 10.48550/ arXiv.2409.09088 .[12] Hedegaard, L., 2021. Cooadtr. https://github.com/LukasHedegaard/ CoOadTR/tree/no-decoder . Computer software. Version: no-decoder branch. Accessed: 2026-04-20. [13] Hedegaard, L., Bakhtiarnia, A., Iosifidis, A., 2023. Continual trans-formers: Redundancy-free attention for online inference, in: Interna-tional Conference on Learning Representations. 
+
+: Preprint submitted to Elsevier Page 12 of 13 [14] Heilbron, F.C., Escorcia, V., Ghanem, B., Niebles, J.C., 2015. Activ-itynet: A large-scale video benchmark for human activity understand-ing, in: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 961–970. [15] Hinton, G.E., Srivastava, N., Krizhevsky, A., Sutskever, I., Salakhut-dinov, R., 2012. Improving neural networks by preventing co-adaptation of feature detectors. doi: 10.48550/arXiv.1207.0580 .[16] Idrees, H., Zamir, A.R., Jiang, Y., Gorban, A., Laptev, I., Sukthankar, R., Shah, M., 2017. The thumos challenge on action recognition for videos “in the wild”. Computer Vision and Image Understanding 155, 1–23. doi: https://doi.org/10.1016/j.cviu.2016.10.018 .[17] Iosifidis, A., Tefas, A., Pitas, I., 2015. Dropelm: Fast neural network regularization with dropout and dropconnect. Neurocomputing 162, 57–66. doi: 10.1016/J.NEUCOM.2015.04.006 .[18] Krizhevsky, A., 2009. Learning multiple layers of features from tiny images. Technical Report. University of Toronto. [19] Krogh, A., Hertz, J.A., 1991. A simple weight decay can improve gen-eralization, in: Advances in Neural Information Processing Systems, p. 950–957. [20] Li, B., Hu, Y., Nie, X., Han, C., Jiang, X., Guo, T., Liu, L., 2023a. Dropkey for vision transformer, in: 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 22700– 22709. doi: 10.1109/CVPR52729.2023.02174 .[21] Li, Y., Ma, W., Chen, C., Zhang, M., Liu, Y., Ma, S., Yang, Y., 2023b. A survey on dropout methods and experimental verification in recommendation. IEEE Transactions on Knowledge and Data Engineering 35, 6595–6615. [22] Liang, X., Wu, L., Li, J., Wang, Y., Meng, Q., Qin, T., Chen, W., Zhang, M., Liu, T.Y., 2021. R-drop: regularized dropout for neural networks, in: Advances in Neural Information Processing Systems, pp. 10890–10905. [23] Lin, Z., Liu, P., Huang, L., Chen, J., Qiu, X., Huang, X., 2019. Dropat-tention: A regularization method for fully-connected self-attention networks. doi: 10.48550/arXiv.1907.11065 .[24] Liu, Z., Xu, Z., Jin, J., Shen, Z., Darrell, T., 2023. Dropout reduces underfitting, in: Proceedings of the 40th International Conference on Machine Learning, pp. 22233–22248. [25] OmiHub777, 2024. Vit-cifar. https://github.com/omihub777/ ViT-CIFAR/tree/main . Computer software. Version: not specified. Accessed: 2026-04-20. [26] Prechelt, L., 2012. Early Stopping — But When? Springer Berlin Heidelberg. doi: 10.1007/978-3-642-35289-8_5 .[27] S, S.M., Hao, X., Hou, S., Lu, Y., Sevilla-Lara, L., Arnab, A., Gowda, S.N., 2025. Progressive data dropout: An embarrassingly simple approach to train faster 39. [28] Sokolić, J., Giryes, R., Sapiro, G., Rodrigues, M.R.D., 2017. Robust large margin deep neural networks. IEEE Transactions on Signal Processing 65, 4265–4280. doi: 10.1109/TSP.2017.2708039 .[29] Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., Salakhutdi-nov, R., 2014. Dropout: A simple way to prevent neural networks from overfitting. Journal of Machine Learning Research 15, 1929–1958. [30] Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J., Wojna, Z., 2016. Rethinking the inception architecture for computer vision, in: Pro-ceedings of the IEEE conference on computer vision and pattern recognition, pp. 2818–2826. doi: 10.1109/CVPR.2016.308 .[31] Tzanetakis, G., Cook, P., 2002. Musical genre classification of audio signals. IEEE Transactions on Speech and Audio Processing 10, 293– 302. [32] Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A.N., Kaiser, L., Polosukhin, I., 2017. Attention is all you need, in: Advances in Neural Information Processing Systems, p. 6000–6010. [33] Wager, S., Wang, S., Liang, P., 2013. Dropout training as adaptive regularization, in: Advances in Neural Information Processing Sys-tems, p. 351–359. [34] Wang, H., Yang, W., Zhao, Z., Luo, T., Wang, J., Tang, Y., 2019a. Rademacher dropout: An adaptive dropout for deep neural network via optimizing generalization gap. Neurocomputing 357, 177–187. [35] Wang, L., Xiong, Y., Wang, Z., Qiao, Y., Lin, D., Tang, X., Van Gool, L., 2019b. Temporal segment networks for action recognition in videos. IEEE transactions on pattern analysis and machine intelli-gence 41, 2740–2755. [36] Wang, X., Zhang, S., Qing, Z., Shao, Y., Zuo, Z., Gao, C., Sang, N., 2021. Oadtr: Online action detection with transformers, in: Proceedings of the IEEE/CVF International Conference on Computer Vision, pp. 7545–7555. doi: 10.1109/ICCV48922.2021.00747 .[37] Zaman, K., Li, K., Sah, M., Direkoglu, C., Okada, S., Unoki, M., 2025. Transformers and audio detection tasks: An overview. Digital Signal Processing 158, 104956. [38] Zhao, Y., Dada, O., Mullins, R., Gao, X., 2024. Revisiting structured dropout, in: Proceedings of the 15th Asian Conference on Machine Learning, pp. 1699–1714. [39] Zhou, W., Ge, T., Wei, F., Zhou, M., Xu, K., 2020. Scheduled drop-head: A regularization method for transformer models, in: Findings of the Association for Computational Linguistics: EMNLP 2020, pp. 1971–1980. doi: 10.18653/v1/2020.findings-emnlp.178 .
+
+: Preprint submitted to Elsevier Page 13 of 13

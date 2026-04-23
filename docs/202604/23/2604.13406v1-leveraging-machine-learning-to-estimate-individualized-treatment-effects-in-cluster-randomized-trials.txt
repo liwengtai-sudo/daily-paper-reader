@@ -1,0 +1,2335 @@
+Title: Leveraging machine learning to estimate individualized treatment effects in cluster-randomized trials
+
+URL Source: https://arxiv.org/pdf/2604.13406v1
+
+Published Time: Thu, 16 Apr 2026 00:28:07 GMT
+
+Number of Pages: 82
+
+Markdown Content:
+# LEVERAGING MACHINE LEARNING TO ESTIMATE INDIVIDUALIZED TREATMENT EFFECTS IN CLUSTER -RANDOMIZED TRIALS 
+
+Changjun Li 
+
+Department of Biostatistics Yale School of Public Health New Haven, CT, USA 
+
+Xi Fang 
+
+Department of Biostatistics Yale School of Public Health New Haven, CT, USA 
+
+Michael O. Harhay 
+
+Center for Clinical Trials Innovation Department of Biostatistics, Epidemiology & Informatics Perelman School of Medicine University of Pennsylvania Philadelphia, PA, USA 
+
+Andrew B. Forbes 
+
+Division of Quantitative Research Methodology School of Public Health and Preventive Medicine Monash University Melbourne, VIC, Australia 
+
+F. Perry Wilson 
+
+Section of Nephrology Department of Internal Medicine Yale School of Medicine New Haven, CT, USA 
+
+Guangyu Tong 
+
+Department of Biostatistics Yale School of Public Health New Haven, CT, USA 
+
+Fan Li 
+
+Department of Biostatistics Yale School of Public Health New Haven, CT, USA 
+
+fan.f.li@yale.edu 
+
+April 16, 2026 
+
+## ABSTRACT 
+
+Cluster-randomized trials (CRTs) are widely used to evaluate interventions delivered at the clinic, practice, or community level. Although standard analyses typically target average treatment effects, such summaries mask potentially meaningful variation in treatment response across individuals and clusters. This work addresses the estimation of conditional average treatment effects (CATEs) for continuous outcomes in two-arm parallel CRTs by defining causal estimands that incorporate both individual- and cluster-level baseline covariates while marginalizing over unobserved cluster heterogeneity. To estimate these quantities, we develop a unified framework based on mixed-effects machine learning, integrating and extending a range of existing approaches, including Bayesian addi-tive regression trees with random effects, multilevel Bayesian causal forests, mixed-effects random forests, several mixed-effects gradient boosting procedures, and generalized additive mixed models, while incorporating cluster-specific random intercepts to account for within-cluster dependence. We evaluate these methods across diverse simulation scenarios and demonstrate their use in the Task Shifting and Blood Pressure Control in Ghana CRT, which investigates strategies for improving hy-pertension management. Drawing on these investigations, we provide practical guidance for applying 
+
+> arXiv:2604.13406v1 [stat.ME] 15 Apr 2026
+
+A PREPRINT - A PRIL 16, 2026 mixed-effects machine learning to quantify treatment-effect heterogeneity in CRTs, together with reproducible code that enables investigators to implement all methods within a coherent workflow. 
+
+Keywords Bayesian Additive Regression Trees; Causal inference; Cluster-randomized trial; Machine learning; Random-effects; Treatment effect heterogeneity 
+
+## 1 Introduction 
+
+Cluster-randomized trials (CRTs) represent a widely used experimental design in biomedical and public health research, wherein entire clusters such as clinics, schools, or communities are randomized to intervention arms, but outcomes are typically measured at the individual level (Murray, 1998). Cluster randomization is often motivated by logistical or ethical considerations, or by the need to minimize treatment contamination. The hierarchical structure inherent to CRTs induces within-cluster correlation and between-cluster heterogeneity, leading to nontrivial implications for both the definition and the estimation of causal estimands (Eldridge & Kerry, 2012; Kahan et al., 2023) . Traditional CRT analyses typically target the average treatment effect under cluster-level randomization, often using cluster-level summaries or model-based estimators (F. Li et al., 2025; B. Wang et al., 2024). Despite the advancement of the estimation methods for average treatment effect, a sole focus on population averages may obscure important variation in causal effects across individual participants. The resulting heterogeneity, if appropriately quantified, often carries important evidence base for precision medicine and underlies the individualized treatment rules. Recent developments in causal inference have thus emphasized the estimation of heterogeneous treatment effects (HTEs) or conditional average treatment effects (CATEs), defined as the expected contrast in potential outcomes given measured covariates (Wager & Athey, 2018). HTEs extend beyond global comparisons to characterize the functional relationship between treatment effects and baseline covariates, thereby informing individualized decision making and adaptive intervention strategies (Kent et al., 2018). However, the hierarchical dependence structure and cluster-level randomization in CRTs pose unique challenges for HTE estimation. The vast number of existing causal learners have been developed based on independent data and do not properly address clustering in the estimation and inference, and hence may not be directly applicable to the CRT context (Anoke et al., 2019; Powers et al., 2018). On the other hand, conventional multilevel models that have been routinely used in CRTs impose restrictive parametric forms that limit flexibility in capturing nonlinear or high-dimensional effect modification. In contemporary CRTs, investigators routinely collect a rich set of baseline features at both the individual and cluster level, and the potential effect modification may be nonlinear in nature and possibly driven by higher-order interactions. These features make parametric multilevel models less attractive for individualized treatment effect estimation, because explicitly specifying complex treatment by covariate interactions quickly becomes infeasible and risks substantial misspecification bias. This has motivated the development of flexible machine-learning approaches for estimating heterogeneous treatment effects in the multilevel data settings, where the regression function is learned in a data-adaptive manner while accounting for within-cluster dependence. Under the frequentist paradigm, generalized additive mixed models offer a structured compromise by combining smooth functions with cluster-level random effects and allowing treatment-by-covariate interactions through by-treatment smooth terms (Cho et al., 2022, 2024; Lin & Zhang, 1999). Traditional ensemble methods, such as random forests and gradient boosting, have also been extended to hierarchical data settings by incorporating cluster-specific random effects. Mixed-effects random forests embed a standard random forest algorithm within an expectation-maximization (EM) framework to account for cluster-level random effects (Capitaine et al., 2021; Hajjem et al., 2011, 2014). For gradient boosting, several extensions have been proposed for multilevel data, using different strategies to incorporate grouped random effects and to model the associated covariance structure while growing trees sequentially (Knieper et al., 2025; Olaniran et al., 2025; Sigrist, 2022). In parallel, Bayesian tree ensembles provide a flexible alternative for modeling complex response surfaces. Among them, the Bayesian additive regression trees (BART) and their mixed-effects extensions incorporate cluster-level random effects to capture residual heterogeneity while retaining nonparametric flexibility in the fixed-effects components, while 2A PREPRINT - A PRIL 16, 2026 the Bayesian causal forest further separates prognostic and treatment-effect components to regularize heterogeneous effect estimation (Chipman et al., 2010; Dorie et al., 2022; Hahn et al., 2020; Spanbauer & Sparapani, 2021; Yeager et al., 2022). From a causal machine learning perspective, many of these mixed-effects learners are naturally deployed within an S-learner framework, in which a single predictive model for the outcome includes treatment as one of the inputs and heterogeneous effects are obtained by contrasting model predictions under different treatment assignments. In contrast, R-learner and related orthogonalized approaches separate baseline outcome modeling from treatment-effect modeling, typically using residualization or doubly robust constructions to target heterogeneity more directly, although these approaches have not been generalized to accommodate clustered data (Chernozhukov et al., 2018; Nie & Wager, 2021). Finally, the causal forests have been developed and implemented as a mainstream causal machine learning method, combining honesty, local weighting, and orthogonalization to estimate heterogeneous effects while reducing bias from adaptive partitioning; in standard software, they have been adapted to clustered data through cluster-level subsampling and appropriate variance adjustments (Athey & Wager, 2019; Wager & Athey, 2018). Despite these seemingly parallel methodological advancements, few prior studies have systematically compared how different flexible machine learning methods perform for HTE estimation in CRTs, where the clustered data structure, within-cluster dependence, and multilevel covariates create challenges that are not present in individually randomized settings. This paper addresses that gap by reporting on a comprehensive, simulation-based evaluation of off-the-shelf mixed-effects machine learning methods for HTE estimation in CRTs. Specifically, we compare frequentist and Bayesian approaches across a range of scenarios varying in intracluster correlation, sample size, and level of treatment effect heterogeneity, with a focus on their estimation accuracy, inference validity, and overall performance in the presence of clustering. We then present a case study that demonstrates how the potential insights can be gained through using causal machine learning methods to explore effect heterogeneity in CRTs. Our central objective is to offer some empirical guidance for estimating treatment effect heterogeneity in increasingly common CRT designs and to identify methods that perform reliably in the case of a continuous outcome. The remainder of this paper is organized as follows. In Section 2, we introduce the notation and define the target estimands. We then describe the ten machine learning methods that have been implemented in R and will be compared, along with some implementation details. Section 3 reports a simulation study that evaluates these methods across diverse scenarios. Section 4 provides sensitivity analyses to assess the robustness of the findings. Section 5 illustrates an application by estimating heterogeneous treatment effects in the TASSH real data. Section 6 concludes with a discussion of the main results, practical implications, limitations, and directions for future research. 
+
+## 2 Statistical Methods 
+
+2.1 Notation and estimands 
+
+We consider a two-arm parallel group cluster-randomized trial with I clusters, where cluster i contains Ni individuals indexed by j = 1 , . . . , N i. Let Ai ∈ { 0, 1} denote the treatment assignment for cluster i, with Ai = 1 if cluster i
+
+is assigned to the intervention and Ai = 0 otherwise. Under the potential outcomes framework, let Yij (a) denote the outcome that would be observed for individual j in cluster i if, possibly contrary to fact, cluster i were assigned to treatment level a ∈ { 0, 1}. The pair {Yij (1) , Y ij (0) } represents the individual-level potential outcomes under intervention and control, respectively. In a given study, it is impossible to fully observe the pair {Yij (1) , Y ij (0) } for each individual. We describe two typical assumptions that are plausible in CRTs for identification. First, under the cluster-level Stable Unit Treatment Value Assumption (SUTVA), the observed outcome for individual j = 1 , . . . , N i
+
+in cluster i = 1 , . . . , I can be expressed as Yij = AiYij (1) + (1 − Ai)Yij (0) . Second, we assume a cluster-level randomization mechanism such that Ai ⊥ { Yi(1) , Yi(0) } | (Xi, Vi), where Yi(a) = ( Yi1(a), . . . , Y iN i (a)) ⊤ is the vector of potential outcomes in cluster i under treatment a, Xi = ( Xi1, . . . , XiN i )⊤ denotes the collection of individual baseline covariates, and Vi denotes the cluster-level covariates in cluster i. Cluster-level covariates Vi may include the geographical region of the cluster or the cluster-population size, whereas individual-level covariates Xij often 3A PREPRINT - A PRIL 16, 2026 include demographics and baseline clinical characteristics. Although the above cluster randomization assumptions are described more generally by conditioning on Xi and Vi to allow for stratified randomization, in most cases we have marginal cluster randomization such that Ai ⊥ { Yi(1) , Yi(0) }. We will focus on the marginal cluster randomization in our subsequent development. To describe the causal estimand of interest, we further assume that given baseline covariates Xi and Vi, the distribution of {Yij (1) , Y ij (0) } is identical across individuals within each cluster; hence this can be viewed as the restricted 
+
+informative cluster size assumption as Vi includes cluster size Ni. This then permits us to define the CATE in CRTs as 
+
+τ (x, v) = E[Yij (1) − Yij (0) | Xij = x, Vi = v]. (1) Several remarks follow from expression (1) . First, analogous to the individually randomized trial setting, τ (x, v)
+
+describes how treatment effects vary across individuals with baseline covariates. However, unlike in the individually randomized setting, τ (x, v) in (1) is defined with respect to both individual-level and cluster-level characteristics, and is more precisely interpreted as the CATE for individuals with covariates Xij = x in clusters characterized by 
+
+Vi = v. Second, the estimand in (1) is both conditional and marginal. It is conditional on the observed individual-and cluster-level covariates, yet marginal with respect to any unmeasured cluster-level heterogeneity, such as latent random effects that are routinely used to conceptualize the distribution of clustered observations. This marginalization is deliberate and practical, as τ (x, v) is often used as the basis to guide subgroup identification or the development of individualized treatment rules—tasks that rely on measured baseline information rather than unmeasured latent variables. Thus, although machine learning models should ideally account for unmeasured heterogeneity (to more precisely approximate the unknown data-generating process), the CATE estimand must remain defined in terms of observed covariates to yield actionable insights in the context of CRTs. Third, although (1) is defined on the difference scale, the framework is general and can be extended to other scales, such as the risk ratio or odds ratio. In this paper, we focus on estimating CATE on the difference scale, leaving ratio estimands to future work. We next describe a set of machine learning models that may be used to quantify the CATE estimand in CRTs. 
+
+2.2 Using machine learning tools to quantify CATE in CRTs 2.2.1 Mixed-Effects BART 
+
+Bayesian Additive Regression Trees (BART) (Chipman et al., 2010) is a Bayesian nonparametric ensemble method that expresses an unknown regression function as a sum over multiple shallow binary trees. Let f (Xij , Vi, A i) denote the regression surface for the observed outcome Yij . In BART, this surface is modeled as a sum of K tree-structured functions, 
+
+fBART (Xij , Vi, A i) = 
+
+> K
+
+X
+
+> k=1
+
+gk(Xij , Vi, A i; Tk, Mk),
+
+where each gk is a decision tree defined by structure Tk (i.e., internal splitting rules) and a set of terminal node values 
+
+Mk. Each tree partitions the covariate space into disjoint regions and assigns a constant value to each region. The additive sum across trees provides a flexible, nonlinear approximation to the regression function. BART imposes priors that regularize the ensemble by shrinking individual tree contributions toward zero and favoring shallow trees, yielding global shrinkage with local adaptivity. The model is fitted using a Bayesian backfitting Markov chain Monte Carlo (MCMC) algorithm, which iteratively samples each tree conditional on the rest. To account for within-cluster correlations in CRTs, a convenient off-the-shelf extension is the random-intercept BART (riBART), which introduces a cluster-specific random intercept to capture the cluster structure. More specifically, the model is defined as 
+
+Yij = fBART (Xij , Vi, A i) + bi + εij , bi ∼ N (0 , σ 2 
+
+> b
+
+), εij ∼ N (0 , σ 2), (2) 4A PREPRINT - A PRIL 16, 2026 where bi captures residual intra-cluster correlation not explained by the cluster-level covariates Vi, and εij denotes an individual-level error term. Under this model, the CATE for individuals with covariates Xij = x and Vi = v is estimated by contrasting posterior draws of the regression surface under treatment and control: 
+
+bτ (xij , vi) = 1
+
+S
+
+> S
+
+X
+
+> s=1
+
+n bf (s)(xij , vi, 1) − bf (s)(xij , vi, 0) 
+
+o
+
+, (3) where bf (s) is the s-th posterior draw for s = 1 , . . . , S of the BART surface from the fitted riBART model. These draws marginalize over posterior samples of the trees and random intercepts bi, providing a flexible estimate of treatment effect conditional on observed covariates. This method can be implemented as rbart_vi in the dbarts R package (Tan et al., 2018). It augments the BART mean with a cluster-specific Gaussian intercept that is updated by conjugate Gaussian steps while the trees are fitted via the standard Bayesian backfitting sampler. In addition to this implementation, since model (2) is a special case of the mixed-effect BART framework with random effects restricted to an intercept term, it can also be implemented using the general mixed BART package. Spanbauer and Sparapani (2021) developed a mixed-effect BART (mixedBART) framework that extends standard BART to account for hierarchical structure through random intercept and slopes. The treatment variable and all covariates are incorporated into the BART surface, and inference is performed using a Gibbs sampler that alternates between conjugate updates for 
+
+bi and Metropolis-Hastings updates for the tree structures and node parameters. This enables flexible borrowing of information across clusters while capturing both within- and between-cluster heterogeneity. This method is implemented in the R package mxbart which builds on the dbarts engine and supports both clustered or repeated-measures data as well as simpler intercept-only specifications for CRTs. In addition to this, the stan4bart (R package stan4bart )framework developed by Dorie et al. (2022) also extends BART to include random effects, but does so through a modular specification, combining a nonparametric BART component with a parametric multilevel block (fixed and random effects with variance components) estimated in Stan using Hamiltonian Monte Carlo. The resulting model is essentially the same form as in Spanbauer and Sparapani (Spanbauer & Sparapani, 2021). The difference is that rather than placing the mixed-effects updates inside the tree backfitting loop as in mixedBART (Spanbauer & Sparapani, 2021), stan4bart alternates BART updates with Stan’s Hamiltonian Monte Carlo for the hierarchical block. Thus, both approaches integrate BART with random effects, but they differ in posterior computation. 
+
+2.2.2 Multilevel Bayesian Causal Forest 
+
+In mixed-effects BART, the treatment indicator enters the BART surface in the same way as the other predictors, together with the cluster-level random intercept. Bayesian causal forest (BCF) takes the same ingredients but models the response surface as the sum of a prognostic function and a treatment-effect function, learned by separate tree ensembles with separate regularization to stabilize heterogeneous effect estimation (Hahn et al., 2020). The baseline BCF takes the form 
+
+Yij = μ {xij , vi, bπ(xij , vi)} + τ (xij , vi)Ai + εij . εij ∼ N (0 , σ 2),
+
+Here μ(·) denotes the prognostic component that captures baseline outcome variation under control, and τ (·) denotes the conditional treatment effect component. The term πij represents the treatment assignment probability included in the prognostic component, following the usual BCF parameterization. In our CRT setting with equal-probability randomization, this quantity is known and constant, so we set πij = 0 .5 for all individuals rather than estimating a propensity score. Therefore, this term does not contribute additional subject-specific information in our implementation and serves only as a constant offset. In designs with unequal allocation or stratified randomization, the known overall assignment probability or the stratum-specific assignment probability could be used analogously. 5A PREPRINT - A PRIL 16, 2026 To accommodate intra-cluster correlation in CRTs, the model augments the same cluster-specific random intercept as (2), yielding the multilevel BCF (MBCF): 
+
+Yij = μ {xij , vi, bπ(xij , vi)} + τ (xij , vi)Ai + bi + εij , bi ∼ N (0 , σ 2 
+
+> b
+
+), εij ∼ N (0 , σ 2), (4) where the random intercept bi captures unmeasured cluster-level heterogeneity that induces within-cluster dependence while leaving the estimand unchanged. Since τ (xij , vi) conditions only on observed baseline covariates and is marginal with respect to bi, it coincides with the CATE defined in (1) . Both μ(·) and τ (·) are represented by two BART-type ensembles with distinct priors, typically a richer, and more weakly regularized forest for μ(.), and a smaller, more strongly regularized forest for τ (·), so that effect heterogeneity is expressed only when supported by the data, and the random intercept bi can be updated by conjugate Gaussian steps exactly as those in BART with random intercept implementation. In practice, at each MCMC iteration, the model gives a draw of the τ forest at (xij , vi) and averaging these draws over iterations gives a posterior estimator bτ (xij , vi) as (3) . This can be implemented in the multibart Rpackage (Yeager et al., 2022) . 
+
+2.2.3 Causal Forest 
+
+Causal forests estimate heterogeneous treatment effects by learning an adaptive notion of local neighborhoods in covariate space and then comparing treated and control outcomes within those neighborhoods. A central design used in many causal forest implementations is “honesty,” meaning that the data used to choose splits are separated from the data used to estimate within-leaf quantities; for example, Wager and Athey’s “double-sample” construction uses one subsample to select splits and a held-out subsample to estimate leaf-level effects, which reduces bias and supports valid large-sample inference (Wager & Athey, 2018). For covariate-adjusted and observational studies, causal forests are naturally motivated by the Robinson residualization (Robinson, 1988) and orthogonal (Neyman-orthogonal) scores. Specifically, define nuisance functions m(x, v) = E(Yij | Xij = x, Vi = v) and π(x, v) = P(Ai = 1 | Xij =
+
+x, Vi = v), and form the residualized outcome and treatment, Yij − m(Xij , Vi) and Ai − π(Xij , Vi), respectively. Then the CATE τ (x, v) can be characterized as the local solution to the conditional orthogonal moment equation (Athey & Wager, 2019) 
+
+E
+
+h
+
+{Ai − π(Xij , Vi)}
+
+n
+
+Yij − m(Xij , Vi) − τ (x, v){Ai − π(Xij , Vi)}
+
+o
+
+Xij = x, Vi = v
+
+i
+
+= 0 , (5) so that τ (x, v) is the best local coefficient relating the residualized outcome to the residualized treatment. This same orthogonalization yields the R-learner viewpoint of Nie and Wager (2021), which defines τ (·) as the minimizer of a residualized squared-error criterion (with regularization), and provides a principled target for tuning forests specifically for treatment effect heterogeneity rather than for outcome prediction. In the cluster-randomized trials considered here, treatment is randomized with equal allocation at the cluster level, so this probability is known by design and fixed at 
+
+π(x, v) ≡ 0.5.The generalized random forests (GRF) framework was further developed to formalize the view of forests as adaptive kernel methods (Athey et al., 2019), under which a fitted forest induces similarity weights αℓ(x, v) that define the learned neighborhood around (x, v). For each tree, the weight assigned to training unit ℓ is proportional to the indicator that ℓ falls in the same leaf as (x, v) (typically scaled by the leaf size), and αℓ(x, v) is obtained by averaging these tree-wise weights over trees, yielding nonnegative weights that sum to one. These weights are then used to solve a locally weighted version of the residual-on-residual estimating equation, typically with out-of-bag (cross-fitted) estimates of 
+
+m(·) and π(·), producing an estimator of τ (x, v) and associated standard errors and confidence intervals via GRF’s asymptotic normal approximation and variance estimation machinery. In the general GRF template, the target may be any local parameter θ(x, v) defined by a conditional moment restriction Eψθ(x,v),ν (x,v)(O) | X = x, V = v = 0 ,where ν(x, v) denotes additional nuisance or auxiliary parameters required to specify and solve the local moment equation (e.g., local intercept or other components estimated jointly with θ within each neighborhood). Estimation proceeds by using the honest forest weights αℓ(x, v) to form and solve a weighted empirical analogue of this moment 6A PREPRINT - A PRIL 16, 2026 restriction. Causal forests arise as a special case with θ = τ and ψ chosen as an orthogonalized treatment-effect score based on residualization. These methods are implemented in R in the package grf (Athey et al., 2019), which accommodates within-cluster dependence by subsampling at the cluster level (i.e., sampling clusters first, then sampling observations within sampled clusters) and by defining out-of-bag predictions at the cluster level (i.e., an observation is out-of-bag only if its entire cluster was not sampled), aligning resampling, nuisance prediction, and uncertainty quantification with the dependence structure induced by clustering. 
+
+2.2.4 Mixed-Effects Random Forest 
+
+As a frequentist counterpart to Bayesian tree ensembles, the mixed-effects random forest extends the random forest framework to clustered data by combining a flexible nonparametric fixed-effects surface with a cluster-specific random intercept. The model is specified as 
+
+Yij = fRF (Xij , Vi, A i) + bi + εij , bi ∼ N (0 , σ 2 
+
+> b
+
+), εij ∼ N (0 , σ 2), (6) where fRF (.) denotes the forest predictor trained on (Xij , Vi, A i), and bi captures unmeasured cluster-level hetero-geneity (Capitaine et al., 2021; Hajjem et al., 2011). The fixed-effects surface inherits the forest mechanism, which is an aggregation of many decorrelated trees grown on bootstrap resamples with feature subsampling so that averaging over trees stabilizes prediction while accommodating nonlinearities and interactions without parametric specification (Breiman, 2001). Estimation in MERF proceeds through an alternating iterative algorithm: (i) initial values of the random intercepts (bi) are assigned, typically set to zero; (ii) the forest predictor fRF (.) is fitted to the residualized out-comes Yij − bi that have been adjusted for these current intercepts; (iii) the random intercepts and variance components 
+
+(bi, σ 2 
+
+> b
+
+, σ 2) are updated using best linear unbiased prediction (BLUP) and EM (BLUP-EM) algorithm based on the residuals obtained from the previous forest fit, Yij − fRF (Xij , Vi, A i) (Hajjem et al., 2011; Sela & Simonoff, 2012) . Heterogeneous treatment effects by contrasting predictions under the two treatment assignments can be estimated as 
+
+bτ (x, v) = bfRF (x, v, 1) − bfRF (x, v, 0) ,
+
+which is conditional on observed baseline covariates and is marginal with respect to bi. This method can be implemented via the LongituRF R package. 
+
+2.2.5 Mixed-Effects Gradient Boosting 
+
+Unlike mixed-effects random forests, which estimate the fixed-effects surface by averaging many trees grown in parallel on bootstrap samples, boosting constructs an additive predictor sequentially. Each shallow tree is fit to the current residuals or to a second-order approximation, contributing a small corrective step to the fitted function. This stage-wise construction provides fine control of model complexity through shrinkage and early stopping, while flexibly capturing nonlinearities and interactions. For CRTs, we consider the mixed-effects boosting model 
+
+Yij = fGB (Xij , Vi, A i) + bi + εij , bi ∼ N (0 , σ 2 
+
+> b
+
+), εij ∼ N (0 , σ 2), (7) where the working covariance for cluster i is Ωi = σ2 
+
+> b
+
+JNi + σ2 INi , with JNi denoting the Ni × Ni all-ones matrix and 
+
+INi the identity. Estimation of boosting algorithm proceeds through a blockwise alternating scheme at each iteration m,consisting of two coordinated updates: (i) a boosting step, which refines the fixed-effects surface by adding a weak learner (e.g., decision tree) 
+
+f (m)GB = f (m−1) GB + νh m, (8) where hm is a shallow regression tree at m-th iteration and 0 < ν ≤ 1 is the learning rate controlling the contribution of the new tree; and (ii) a variance step, which updates the random-effects estimates and variance components (σ2 
+
+> b
+
+, σ 2).7A PREPRINT - A PRIL 16, 2026 The variance parameters are typically obtained by minimizing a function related to the negative log-likelihood 
+
+LRE (fGB , σ 2 
+
+> b
+
+, σ 2) = 12
+
+> I
+
+X
+
+> i=1
+
+log |Ωi| + ( yi − fi)⊤Ω−1 
+
+> i
+
+(yi − fi) ,
+
+where yi = ( Yi1, . . . , Y iN i )⊤ and fi = {fGB (Xi1, V i, A i), . . . , f GB (XiN i , V i, A i)}⊤. Three methods have been proposed regarding how these two steps are implemented. Gaussian process boosting (GPBoost) (Sigrist, 2022) treats estimation as a joint problem by alternating coordinate-wise updates of the covariance and the fixed-effects surface under a single working objective. At iteration m, GPBoost pro-ceeds in two steps: (i) it updates the covariance parameters by (bσ2 ( m) 
+
+> b
+
+, bσ2 ( m)) = arg min σ2  
+
+> b,σ 2
+
+LRE (f (m−1) GB , σ 2 
+
+> b
+
+, σ 2),and (ii) then updates the fixed part by adding a weak learner as in (8) . In this second step, the tree is grown under the updated covariance with candidate splits, which are scored by their GLS reduction of the objective, and leaf values are computed using either a GLS gradient update, a Newton-GLS update, or a hybrid variant which combines gradient-based split selection with Newton leaf values. This can be implemented through the R package gpboost (Sigrist, 2022). Mixed-effects gradient boosting (MEGB) (Olaniran et al., 2025) adopts a fixed-first least-squares update that learns each new tree from pseudo-outcomes. At iteration m, a pseudo-response is formed by removing the current cluster intercept, Y ∗(m) 
+
+> ij
+
+= Yij − bb(m−1)  
+
+> i
+
+, and the pseudo-outcome to be learned is the prediction error on this pseudo-response, 
+
+r(m) 
+
+> ij
+
+= Y ∗(m) 
+
+> ij
+
+− f (m−1) GB (Xij , Vi, A i). A shallow regression tree hm is then fitted by ordinary least squares to minimize 
+
+PIi=1 
+
+PNi
+
+> j=1
+
+n
+
+r(m) 
+
+> ij
+
+− hm(Xij , Vi, A i)
+
+o2
+
+, and the fixed-effects surface is updated as in equation (8) . With the fixed part refined, cluster intercepts are recalculated via BLUP shrinkage, namely, shrinking each cluster’s mean residual toward zero with weight σ2 
+
+> b
+
+/(σ2 
+
+> b
+
++ σ2/N i), and the variance components σ2 
+
+> b
+
+and σ2 are refreshed through an EM update for numerical stability. Conceptually, these two steps alternate descent on the same Gaussian working objective 
+
+LRE (fGB , σ 2 
+
+> b
+
+, σ 2). The tree step improves model fit by refining fGB , while the BLUP-EM step reduces the same objective by updating the random effects and variance components. This method has been implemented in the R package MEGB (Olaniran et al., 2025). Building on a similar alternating scheme, the mermboost method (Knieper et al., 2025) treats the CRT model as a generalized additive mixed model and implements component-wise gradient boosting for the fixed effects while refitting the entire random-effects block at each iteration. The fixed part is represented as a sum of base learners fGB = PRr=1 fr ,with each learner equipped with its own penalty to control complexity. At boosting step s, every candidate base learner 
+
+hr is fit to the negative gradient of the penalized objective Lpen = LRE (fGB , σ 2 
+
+> b
+
+, σ 2) + PRr=1 λr Jr (fr ) with respect to the current linear predictor f (m−1) GB (Xij , Vi, A i) + bi. Here Jr (fr ) denotes the learner-specific penalty with tuning parameter λr . The learner that reduces Lpen the most is selected, and the fixed predictor is updated according to equation (8) . Next, given f (m)GB , the random effects bi and variance components (σ2 
+
+> b
+
+, σ 2) are re-estimated by minimizing 
+
+LRE via a Laplace (REML-style) step. An implementation of this method is available in the R package mermboost .Within the present framework, each method can be used as an S-learner for heterogeneous effects. The model takes 
+
+(Xij , Vi, A i) as inputs to produce a prediction function fGB (x, v, a ), while the dependence structure is handled internally by the corresponding mixed-effects machinery. The CATE is then estimated by 
+
+bτ (x, v) = bfGB (x, v, 1) − bfGB (x, v, 0) ,
+
+obtained as the difference of two predictions for the same covariate profile under the two treatment levels. These three methods target the same estimand, while differing in the parameterization of dependence, in the alternation between boosting and variance-component updates, and in mechanisms that separate fixed and random contributions. 8A PREPRINT - A PRIL 16, 2026 
+
+2.2.6 Generalized Additive Mixed Models 
+
+Finally, as a semiparametric counterpart to tree-based methods, the generalized additive mixed model (GAMM) represents the fixed-effect surface as a structured sum of smooth functions of covariates, with random effects to capture cluster dependence. For CRTs with continuous outcomes, the GAMM with nonlinear treatment-by-covariate interactions can be written as 
+
+Yij = β0 + Ai βA +
+
+> R
+
+X
+
+> r=1
+
+fr (Xr,ij , Vr,i ) + AiRX
+
+> r=1
+
+f τr (Xr,ij , Vr,i ) + bi + εij , (9) with bi ∼ N (0 , σ 2 
+
+> b
+
+) and εij ∼ N (0 , σ 2). The function fr (·) denotes prognostic smooth functions common to both treatment arms, and the “by-treatment” smooths f τr (·) allow the treatment effect to vary flexibly with prognostic characteristics. The vector bi and εij introduce the same working covariance Ωi for cluster i as in Section 2.2.5. Each smooth term is represented by a spline basis function. For a univariate x entering the r-th smooth term, the prognostic and by-treatment components are written as fr (x) = Br (x)⊤θr and f τr (x) = Br (x)⊤θτr , where Br (x) is the vector of predetermined basis functions (e.g., B-splines or P-splines) and θr , θτr are the associated basis coefficients. Smoothness is controlled by quadratic penalties λr θ⊤ 
+
+> r
+
+Sr θr and λτr θτr ⊤Sr θτr , with penalty matrix Sr and smoothing parameters 
+
+λr and λτr . Under the mixed model representation, the penalized spline coefficients are treated as Gaussian random effects whose covariance depends on the smoothing parameters, and estimation proceeds under a Gaussian working model by restricted maximum likelihood, jointly estimating the fixed effects β0 and βA, the random intercept bi, and spline coefficients, along with variance components σ2 
+
+> b
+
+, σ 2 and the smoothing parameters. Let bη(x, v, a ) denote the fitted linear predictor from equation (9) evaluated at covariate profile (x, v) and treatment level a ∈ { 0, 1}. For continuous outcomes, the CATE can be estimated as 
+
+bτ (x, v) = bη(x, v, 1) − bη(x, v, 0) .
+
+This simplifies to bτ (x, v) = bβA + PRr=1 bf τr
+
+ xr , v r
+
+ under model (9) . The resulting treatment effect surface is a smooth, potentially non-linear function of the baseline covariates and marginal with respect to unobserved cluster effects. This method can be implemented via the mgcv R package (Wood, 2011). 
+
+## 3 Simulation Studies 
+
+3.1 Simulation Design 
+
+We conducted a simulation study to evaluate the performance of the machine learning methods discussed in Section 2.2 for estimating the CATE in CRTs with continuous outcomes. We simulated data with I ∈ { 10 , 30 , 100 } clusters, fixing the total sample size I · E[Ni] = 3000 , where Ni follows a discrete uniform distribution. Clusters were randomized to treatment or control with a 1:1 allocation ratio. Two cluster-level covariates were generated and denoted as 
+
+Vi = ( Vi1, V i2), where Vi1 ∼ N (0 , 1) and Vi2 ∼ Bernoulli (0 .5) . Within each cluster, eight individual-level covariates were generated and denoted as Xij = ( Xij 1, . . . , X ij 8), with Xij 1, . . . , X ij 5 ∼ N (0 , 1) and Xij 6, X ij 7, X ij 8 ∼
+
+Bernoulli (0 .5) . The two potential outcomes were simulated from 
+
+Yij (0) = f0(Xij , Vi) + bi + ϵij ,Yij (1) = f0(Xij , Vi) + τ (Xij , Vi) + bi + ϵij ,
+
+where f0(·) is a baseline outcome function, τ (·) is the conditional treatment effect, bi ∼ N (0 , σ 2 
+
+> b
+
+) is a cluster-level random effect, and ϵij ∼ N (0 , σ 2) is an individual-level error. We fixed the total variance at 1 and set σ2 
+
+> b
+
+= 0 .1 and 
+
+σ2 = 0 .9 yielding an intraclass correlation (ICC) of 0.1 .We also examined the alternative settings with ICCs of 0.01 and 0.05. For this investigation, we focused on I = 30 clusters and the patterns of findings remained the same; these 9A PREPRINT - A PRIL 16, 2026 results are presented in the Appendix 1.3. The baseline function was held fixed across all scenarios in the form of 
+
+f0(Xij , Vi) = sin( πX ij 1Xij 2) −
+
+q
+
+|Xij 4 − Vi1| + log(1 + Vi2) + 0 .5Xij 6.
+
+We considered three different heterogeneity settings (HS), each defined by distinct conditional treatment effect functions 
+
+τ (Xij , Vi) with increasing levels of complexity. Scenario HS1 (low-complexity nonlinearity) introduced nonlinear transformations of covariates: 
+
+τ (Xij , Vi) = 1 − 0.81 + exp( −Xij 2) − 0.4X2 
+
+> ij 3
+
++ 0 .5Vi2.
+
+Scenario HS2 (moderate-complexity nonlinearity with interactions) incorporated covariate interactions and non-additive terms: 
+
+τ (Xij , Vi) = −0.5 + 0 .6 sin( πX ij 1Xij 2) + 0 .3 cos( Xij 4) − 0.4X2 
+
+> ij 5
+
++ 0 .4Vi2.
+
+Scenario HS3 (high-complexity nonlinearity with higher-order interactions) incorporated more complex covariate interactions: 
+
+τ (Xij , Vi) = 0 .6 + 0 .7 log( |Xij 1Xij 2 + Xij 8|) + 0.41 + exp( −(Xij 2 + Xij 5)) − 0.3 sin( πX ij 4Xij 5) + 0 .3Vi2.
+
+We controlled the signal-to-total variance ratio (STR) around 0.6–0.65 for all scenarios which is defined as 
+
+STR = Var (f0(Xij , Vi) + Ai τ (Xij , Vi) + bi)
+
+Var (f0(Xij , Vi) + Ai τ (Xij , Vi) + bi + εij ) .
+
+3.2 Implementation 
+
+We estimate CATEs using the 10 machine-learning methods described in Section 2.2. All models were trained on pooled individual-level data with covariates (Xij , Vi) and the cluster-level treatment Ai. For BART-based methods, including stan4bart, mixedBART, riBART, and MBCF, we used ensembles of 200 trees and ran 5,000 burn-in iterations followed by 5,000 posterior draws under default prior and hyperparameter specifications. The MBCF specification employed separate prognostic and treatment-effect ensembles (200 trees each), and the propensity score was fixed at 0.5 reflecting the randomized assignment. For causal forest, we used 2,000 trees by default with the propensity score fixed at 0.5. For the random forest- and boosting-based mixed-effects methods (MERF, GPBoost, MEGB, and mermboost), we used default settings with minor deviations for computational reasons. MERF was fitted with 500 trees, and a maximum interaction order of 2. GPBoost was trained using 2,000 boosting iterations with a learning rate of 0.1, maximum tree depth of 4, and L2 regularization. MEGB was specified with 500 boosting iterations, and a maximum interaction order of 2. The mermboost model was implemented with spline-based learners and up to 5,000 iterations. For all methods, variance estimation was obtained via nonparametric bootstrap with 200 replicates. Finally, we fitted GAMMs with treatment and covariates as fixed effects and smooth spline terms for continuous covariates. For every method, the CATE was computed as the difference between fitted outcomes under Ai = 1 and Ai = 0 .Interval estimation was method-specific. For the Bayesian methods (stan4bart, mixedBART, riBART, and MBCF), 95% intervals were obtained from posterior draws and were therefore posterior credible intervals. For causal forest, we used the asymptotic variance estimates returned by grf and constructed 95% confidence intervals as ˆτ ± 1.96 × cSE(ˆ τ ). For GAMM, we constructed 95% confidence intervals by simulating coefficient draws from the approximate sampling distribution N ( ˆβ, dVar( ˆβ)) using the unconditional covariance matrix from mgcv , propagating these draws through the treatment-specific linear predictors, and taking empirical quantiles of the resulting simulated treatment-effect contrasts. For MERF, GPBoost, MEGB, and mermboost, which do not directly provide posterior draws or analytic CATE interval estimators in our implementation, we used a nonparametric cluster-level bootstrap with 200 replicates to construct 10 A PREPRINT - A PRIL 16, 2026 Table 1: Implementation details for all methods, including R packages, key tuning parameters and interval estimation. 
+
+> Method  R package  Key settings  Reference
+> Mixed-effects BART with STAN (stan4bart)
+> stan4bart ; Version: 0.0.12 200 trees; burn-in 5,000; posterior draws 5,000  Dorie et al. (2022) Mixed-effects BART for longitudinal data (mixedBART)
+> mxbart ; Version: 1.1 (GitHub: https://github.com/ rsparapa/bnptools/ tree/master/mxBART) 200 trees; burn-in 5,000; posterior draws 5,000; default hyperparameters  Spanbauer and Sparapani (2021) BART with random intercept (riBART)
+> dbarts ; Version: 0.9.33 200 trees; burn-in 5,000; posterior draws 5,000  Tan et al. (2018) Multilevel Bayesian Causal Forest (MBCF)
+> multibart ; Version: 0.3 (OSF: https://osf.io/3zmqc/) Prognostic forest 200 trees; treatment-effect forest 200 trees; burn-in 5,000; posterior draws 5,000; propensity = 0.5 Hahn et al. (2020); Yeager et al. (2022) Causal Forest (CF)  grf ; Version: 2.6.1  2000 trees; propensity = 0.5  Athey et al. (2019);Wager and Athey (2018) Mixed-effects random forest (MERF)
+> LongituRF ; Version: 0.9 500 trees; max interaction order 2;  mtry  = p/ 3; cluster bootstrap with 200 replicates Capitaine et al. (2021) Gradient boosting with grouped random effects / Gaussian Process (GPBoost)
+> GPBoost ; Version: 1.6.6 2,000 boosting rounds; learning rate 0.1; max depth 4;  L2 regularization; mini-mum data in leaf 100; cluster bootstrap with 200 replicates Sigrist (2022) Mixed-effects gradient boosting (MEGB)
+> MEGB ; Version: 0.2  Shrinkage 0.05; max interaction order 2; 500 base learners; cluster bootstrap with 200 replicates Olaniran et al. (2025) Component-wise boosting for GAMMs (mermboost)
+> mermboost ; Version: 0.1.1 Learning rate 0.1; max iterations 5,000; cluster bootstrap with 200 replicates  Knieper et al. (2025) Generalized additive mixed model (GAMM)
+> mgcv ; Version: 1.9.4  REML; random intercept by cluster; spline basis; by-treatment smooths as applicable Wood (2011); Cho et al. (2022, 2024)
+
+11 A PREPRINT - A PRIL 16, 2026 95% confidence intervals. We considered 200 replicates since more replicates lead to prohibitive computations for our simulation studies. Finally, the performance of each method in each scenario was assessed over 500 Monte Carlo replications. All hyperparameter choices and package implementations are summarized in Table 1, and fully reproducible code for the simulation study is available in our GitHub repository : https://github.com/changjun-li/crt-hte-ml-continuous. All simulations were conducted in R version 4.4.3. 
+
+3.3 Performance Metrics 
+
+We evaluated the performance of the CATE estimators from each method using five metrics: precision in estimation of heterogeneous effects (PEHE), absolute bias, expected regret, average interval length, and empirical coverage probability. The PEHE is defined as the root mean squared error between the estimated and true conditional treatment effects across all individuals: PEHE =
+
+vuut 1
+
+PIi=1 NiIX
+
+> i=1
+> Ni
+
+X
+
+> j=1
+
+{bτ (Xij , Vi) − τ (Xij , Vi)}2.
+
+To assess bias, we compute the absolute bias, defined as: Absolute Bias = 1
+
+PIi=1 NiIX
+
+> i=1
+> Ni
+
+X
+
+> j=1
+
+|bτ (Xij , Vi) − τ (Xij , Vi)| .
+
+To evaluate the utility of estimated effects for informing individualized treatment decisions, we computed the expected regret, defined as the average magnitude of the true effect among individuals for whom the estimated optimal treatment assignment (based on the sign of bτij (Xij , Vi)) differed from the true optimal assignment: Regret = 1
+
+PIi=1 NiIX
+
+> i=1
+> Ni
+
+X
+
+> j=1
+
+[|τ (Xij , Vi)| · I {sign( bτ (Xij , Vi)) ̸ = sign( τ (Xij , Vi)) }] .
+
+Finally, to quantify the uncertainty of estimators, we compute the average interval length, defined as mean width of the 
+
+95% confidence/credible intervals across all individuals. We also calculate the empirical coverage probability, defined as the proportion of cases in which the true value lies within the corresponding 95% confidence interval. Although the Bayesian methods yield posterior credible intervals, whereas the remaining methods yield frequentist confidence intervals, we evaluated all interval estimates on a common empirical scale through the Monte Carlo coverage of the nominal 95% interval. 
+
+## 4 Simulation Results 
+
+4.1 Performance under different scenarios 
+
+Figure 1 summarizes results for the setting with I = 30 clusters. The four rows report, from top to bottom, absolute bias, PEHE, empirical coverage of nominal 95% intervals, and expected regret. Smaller values of absolute bias, PEHE, and regret indicate better performance, whereas coverage values close to the horizontal 0.95 reference line indicate better frequentist calibration. The three columns correspond to HS1–HS3, and within each panel, the same ten methods appear in a fixed left-to-right order (stan4bart, mixedBART, riBART, MBCF, CF, MERF, gpboost, MEGB, mermboost, GAMM). Under HS1 (column 1), the four BART-based methods form a clear low-bias group, with MBCF having slightly smaller absolute bias than stan4bart, mixedBART, and riBART. GAMM also performs favorably in this setting, with absolute 12 A PREPRINT - A PRIL 16, 2026 bias comparable to the BART-based methods, which is plausible because the additive and smooth structure of the GAMM working model is well aligned with the HS1 data-generating mechanism. CF exhibits somewhat larger absolute bias than the BART-based methods and GAMM, whereas MERF and the boosting-based methods, especially MEGB, show less favorable performance. Under HS2 (column 2), absolute bias increases across all methods relative to HS1, but the overall ranking remains similar: the BART-based methods continue to perform best, with MBCF retaining a modest advantage, CF remains the strongest non-BART tree-based competitor, and GAMM loses the advantage it had under HS1. Under HS3 (column 3), where the heterogeneity structure is most complex, the separation becomes more pronounced. The BART-based methods continue to exhibit the smallest absolute bias, whereas GAMM performs substantially worse, reflecting the difficulty of capturing nonlinearities and higher-order interactions using a structured additive model. Among the remaining machine-learning approaches, CF and gpboost are generally more competitive than MERF, MEGB, and mermboost, but they are still generally worse than the BART-based methods. The PEHE results (second row of Figure 1) are broadly consistent with the bias patterns. Under HS1, the four BART-based methods again form a low-error group. Among them, stan4bart, mixedBART, and riBART have nearly indistinguishable PEHE, while MBCF presents modestly lower PEHE than the other BART-based methods, indicating slightly better recovery of the CATE surface. CF exhibits higher PEHE than the BART group, but remains more accurate than MERF in this simplest setting. The boosting-style mixed-effects methods show more diverse performance under HS1: gpboost improves upon MEGB, while mermboost has the smallest PEHE among the three boosting methods, although it still does not outperform the BART-based methods. Among all frequentist methods, GAMM delivers the most favorable PEHE under HS1, with values as small as those of the BART-based methods. Taken together with the low absolute bias noted above, this suggests that the good HS1 performance of GAMM reflects genuine alignment between its working model and the true data-generating mechanism. In HS2, PEHE increases across all methods relative to HS1, with an upward shift in the PEHE distributions, but the overall ranking remains similar. The BART-based methods continue to yield the smallest PEHE, with MBCF remaining slightly better than the other BART methods, and CF again representing the best non-BART tree-based method. In this setting, however, the relative advantage of GAMM disappears, and it presents higher PEHE than the BART-based methods. In HS3, where the heterogeneity structure is the most complex, GAMM performs substantially worse than the BART-based methods, with markedly larger PEHE, indicating that it fails to capture nonlinearities and higher-order interactions between features. In this setting, the BART-based methods clearly dominate the other approaches. Among the remaining machine-learning methods, gpboost and CF show better performance than MERF, MEGB, mermboost, and GAMM, although their PEHE remains generally higher than that of the BART-based methods. The coverage results (third row of Figure 1) summarize the frequentist calibration of the interval estimators across methods. Comparisons with interval length are provided in Appendix 1.2. Under HS1 (column 1), the four BART-based methods (stan4bart, mixedBART, riBART, MBCF) are the only methods whose coverage is consistently close to the frequentist nominal 0.95 level, with MBCF exhibiting the highest coverage within this class of methods. This slight conservatism is explained by its comparatively wider intervals, whereas the other BART methods achieve near-nominal coverage with narrower intervals. GAMM also attains near-nominal coverage in HS1, since the HS1 data-generating mechanism remains additive. Interval estimators from the remaining methods exhibit undercoverage even under HS1; that is, CF and MERF have coverage below 0.95 , and the undercoverage is even more pronounced for boosting-based methods, especially MEGB. Interestingly, the bootstrap intervals for MEGB are noticeably narrower than those produced by the other methods, thereby contributing to undercoverage. The mermboost is comparatively less anti-conservative than gpboost and MEGB in HS1, with coverage closer to nominal, but its distribution is substantially more variable across Monte Carlo replications. Under HS2 (column 2), coverage declines across all methods relative to HS1. Nevertheless, the BART-based methods remain the closest to the nominal level, and MBCF continues to have the highest coverage within this group, again partially due to its wider intervals. By comparison, CF and MERF remain sub-nominal, the boosting-based methods continue to under-cover, and MEGB performs the worst. Under HS3 (column 3), the same ordering persists but becomes more pronounced. Even the BART-based methods can lead to undercoverage, 13 A PREPRINT - A PRIL 16, 2026 HS1 HS2 HS3 
+
+> Absolute Bias PEHE Coverage Regret
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> 0.00 0.25 0.50 0.75 1.00
+> 0.25 0.50 0.75 1.00 1.25
+> 0.00 0.25 0.50 0.75 1.00
+> 0.0 0.1 0.2 0.3
+
+Figure 1: Absolute bias, PEHE, empirical coverage, and regret across methods for the setting with ICC = 0 .1 and 
+
+I = 30 clusters. Columns correspond to scenarios HS1–HS3. Rows show absolute bias (top), PEHE (second), empirical coverage of nominal 95% intervals (third), and expected regret (bottom). Boxplots summarize Monte Carlo replicates, and the red dashed line marks the nominal 0.95 frequentist coverage level. 14 A PREPRINT - A PRIL 16, 2026 although they remain the best-performing group. In this case, gpboost and MEGB again stand out for particularly low coverage and therefore lead to less credible uncertainty quantification for estimating CATE in CRTs. The regret results (bottom row of Figure 1) are also broadly consistent with the patterns for absolute bias and PEHE. Under HS1, the BART-based methods and GAMM exhibit the smallest regret, CF shows intermediate performance, and MERF together with the boosting-based methods tends to have larger regret, especially MERF and MEGB. As the scenarios become more complex, regret increases across all procedures. Nevertheless, the BART-based methods continue to outperform the other approaches, with MBCF again tending to be the most favorable within this class. These findings reinforce the conclusion that better recovery of treatment-effect heterogeneity translates into improved treatment decision performance. We also conducted additional simulations varying the number of clusters to I = 10 and I = 100 , where the correspond-ing figures are reported in the Appendix 1.1. For I = 10 clusters, the relative performance of methods is similar to that for I = 30 , where the BART-based procedures (and, in HS1, GAMM) yield the smallest absolute bias, PEHE, and regret across HS1–HS3. Under HS1, GAMM becomes quite competitive with this top-performing group due to the additive data-generating process, but this advantage diminishes in HS2 and HS3. By contrast, CF, MERF and the boosting-type methods perform less favorably and exhibit pronounced undercoverage. The main effect of moving from I = 30 to 
+
+I = 10 is therefore not a change in ranking for the performance across various methods, but increased variability of all performance metrics and amplifies the undercoverage of the frequentist machine learning methods. When the number of clusters increases to I = 100 , all procedures benefit from improved estimation accuracy, as reflected in lower absolute bias, PEHE, and regret, together with more stable coverage. However, the performance ranking of methods remains unchanged. BART-based methods still dominate, with MBCF retaining its advantage in frequentist coverage, i.e., more conservative and therefore closer to (or slightly above) the nominal 95% level. Methods such as CF, MERF, gpboost, MEGB, mermboost, and GAMM perform inadequately overall, particularly under the more complex scenarios HS2 and HS3. 
+
+4.2 Sensitivity to the distribution of random intercepts 
+
+We assessed the sensitivity of our findings to a more complex specification of the random intercepts. Specifically, we replicated the simulation for I = 30 using the same data-generating process described in Section 3.1, but assumed that the cluster-specific random intercepts bi follow a gamma distribution rather than a normal distribution. In particular, we assumed bi ∼ Gamma( k, θ ) with density f (b) = bk−1e−b/θ {Γ( k) θk} for b > 0, where k and θ are the shape and scale parameters, respectively. In our setting, we took bi ∼ Gamma  2, σ b/√2, so that the skewness of the random intercepts is fixed at √2. For ICC = 0 .1, we set σ2 
+
+> b
+
+= 0 .1, matching the variance used in the normal random-intercept specification. The results are shown in Appendix 2. Performance is qualitatively similar to that in Figure 1 under normally distributed intercepts, indicating limited sensitivity to the random effect distribution misspecification. 
+
+4.3 Performance when handling high-dimensional covariates 
+
+In certain CRT applications, the number of baseline covariates may be more than a handful, and high-dimensional covariate spaces require methods to reliably separate true signal from substantial noise. To investigate performance in such settings, we conducted additional simulations with 20, 50, and 100 covariates. These simulations were based on the scenario with ICC=0.1 and I = 30 , and were designed as high-dimensional extensions of the HS3 mechanism: we increased the number of effect-modifying covariates entering τ (each governed by HS3-style nonlinearities and interactions) and also added additional covariates, including irrelevant noise variables, to raise the overall dimensionality. For the designs with 20, 50, and 100 covariates, we selected 10, 15, and 20 covariates, respectively, to enter either the baseline outcome function or the treatment effect function. We calibrated the variance components so that σ2 
+
+> b
+
++ σ2
+
+equals 1.5, 2, and 2.5 in the three designs, which yielded a signal-to-total variance ratio (STR) of approximately 0.65 in each case. Due to space constraint, the detailed data-generating mechanisms are provided in the Appendix 3. 15 A PREPRINT - A PRIL 16, 2026 Because the frequentist machine-learning methods were both less accurate and substantially more computationally demanding in these more complex scenarios, and given that we have already established that BART-based methods perform best overall, we restricted the high-dimensional simulations to the BART-based approaches and examined how their performance degraded. Here we focus on the top-performing class of methods based on BART. The simulation results for the high-dimensional scenarios are summarized in Figure 2, which displays absolute bias, PEHE, coverage and regret, and in Supplementary Figure 13, which reports interval length. As the dimensionality increases, the relative advantage of MBCF becomes more pronounced. With 20 covariates, the four BART-based methods perform broadly similarly in terms of absolute bias, PEHE, and regret, although MBCF already shows somewhat better coverage than the other three methods. When additional noise covariates are introduced, yielding 50 and 100 covariates, stan4bart, mixedBART, and riBART deteriorate more noticeably, with higher absolute bias, larger PEHE, higher regret, and persistent undercoverage. In contrast, MBCF remains comparatively robust in these higher-dimensional settings. For both 50 and 100 covariates, it achieves the smallest absolute bias, lowest PEHE, and lowest regret among the four BART-based methods, while also maintaining coverage much closer to the nominal 95% level. These results indicate that the advantage of MBCF becomes increasingly substantial as the covariate space expands and irrelevant features are added, reinforcing its overall strong performance for estimating CATEs in CRTs. 
+
+## 5 Estimating Conditional Average Treatment Effects in the TASSH cluster-randomized trial 
+
+We analyzed data from the Task Shifting and Blood Pressure Control in Ghana (TASSH), a CRT that evaluated a nurse-led task shifting strategy for hypertension control (Ogedegbe et al., 2018). Thirty-two community health centers (clusters) in Ghana’s public healthcare system were randomized in a 1:1 ratio to receive either health insurance coverage (HIC) alone or HIC plus the TASSH intervention. TASSH recruited 389 patients in the TASSH plus HIC arm and 368 patients in the HIC alone arm, with the cluster sizes varying from 17 to 31 participants. Among the 757 enrolled patients, 641 had a well-defined 12-month outcome, corresponding to an overall completion rate of 85% (88% in the TASSH+HIC group and 82% in the HIC group). We estimated the CATEs on 12-month diastolic blood pressure (DBP) using the multilevel Bayesian causal forest, which was identified as the top performing approach in our simulation study. CATEs were defined as the difference between the fitted 12-month outcomes under intervention ( Ai = 1 ) and control ( Ai = 0 ), conditional on prespecified baseline covariates at both the individual and cluster levels. We used 200 trees for the prognostic forest and 200 trees for the treatment-effect forest, with 5,000 burn-in iterations followed by 5,000 posterior draws (default priors and initialization); the propensity score was fixed at 0.5 reflecting 1:1 cluster randomization. Individual-level features included baseline diastolic blood pressure and systolic blood pressure (SBP), demographics and behaviors (age, sex, education level, literacy, smoking status, and employment status); baseline physical activity measured as all activity in weighted metabolic equivalent minutes per week. Cluster-level features included staffing and setting characteristics (number of doctors and nurses on staff, annual patient volume, and rural versus urban location). All 13 baseline covariates had less than 10% missingness, and, for illustrative purposes, missing covariate values were imputed using the mean for continuous variables and the mode for binary or categorical variables. After estimating individual-level CATEs with MBCF, we assessed which baseline covariates contributed most to treatment effect heterogeneity using a leave-one-out treatment effect variable importance measure (TE-VIM) as introduced by Hines et al. (2025). Let Zij = {X⊤ 
+
+> ij
+
+, V ⊤ 
+
+> i
+
+}⊤ denote the P -dimensional collection of individual- and cluster-level baseline covariates for individual j in cluster i, and let Zij, −p denote the same vector with the p-th covariate removed. For each covariate p ∈ { 1, . . . , P }, the population TE-VIM is defined as 
+
+TE -VIM p = E
+
+h
+
+{τ (Zij ) − τ−p(Zij )}2i
+
+,
+
+16 A PREPRINT - A PRIL 16, 2026 20 covariates 50 covariates 100 covariates 
+
+> Absolute Bias PEHE Coverage Regret
+> stan4bart mixedBART riBART MBCF
+> stan4bart mixedBART riBART MBCF
+> stan4bart mixedBART riBART MBCF
+> 0.0 0.3 0.6 0.9
+> 0.0 0.4 0.8 1.2
+> 0.00 0.25 0.50 0.75 1.00
+> 0.0 0.1 0.2 0.3
+
+Figure 2: Absolute bias, PEHE, empirical coverage, and regret across BART-based methods in high-dimensional settings with ICC = 0 .1 and I = 30 clusters. Columns correspond to 20, 50, and 100 covariates. Rows show absolute bias (top), PEHE (second), empirical coverage of nominal 95% intervals (third), and expected regret (bottom). Boxplots summarize Monte Carlo replicates, and the red dashed line marks the nominal 0.95 frequentist coverage level. where τ (Zij ) = τ (xij , vi) is the CATE conditional on the full covariate vector, and 
+
+τ−p(Zij ) = E[τ (Zij ) | Zij, −p]
+
+is the best prediction of the treatment effect when covariate p is omitted from the conditioning set. Thus, TE -VIM p ≥ 0
+
+quantifies the increase in mean squared error in predicting the CATE when covariate p is excluded, with larger values indicating greater importance of that covariate in explaining treatment effect heterogeneity. 17 A PREPRINT - A PRIL 16, 2026 In our analysis, we adopt a projection-based plug-in approach motivated by Hines et al. (2025), using the posterior mean CATE estimates from the fitted MBCF model as surrogates for the true CATEs. Specifically, let bτ (xij , vi) denote the posterior mean CATE obtained from the full MBCF model fit including all P covariates. For each covariate p, we estimate τ−p(Zij ) by regressing the full-model posterior mean CATE estimates bτ (xij , vi) on the reduced covariate set 
+
+Zij, −p using a BART regression model, yielding the projected estimate eτ−p(zij, −p). The TE-VIM for covariate p is then estimated as 
+
+\TE -VIM p = 1
+
+PIi=1 NiIX
+
+> i=1
+> Ni
+
+X
+
+> j=1
+
+{bτ (xij , vi) − eτ−p(zij, −p)}2 .
+
+We further characterized clinically interpretable subgroups with differential benefits from TASSH plus HIC versus HIC alone by adopting a “fit-the-fit” strategy (Foster et al., 2011; Logan et al., 2019) . Under this strategy, we selected the six most important covariates identified by the TE-VIM analysis and fitted a classification and regression tree (CART) to the posterior mean CATE estimates from the MBCF model, using these baseline covariates as predictors, in order to identify key effect modifiers and define clinically interpretable subgroups. 0.0 0.1 0.2 0.3 0.4                 
+
+> −6 −5 −4 −3 −2 −1 012345
+> (a) Distribution of CATE for treatment versus control
+> −10 −5 0510
+> 0128 256 385 513 641
+> (b) CATE of treatment versus control in ascending order
+
+Figure 3: Estimated CATEs for DBP at 12 months. Panel (a) shows the posterior distribution of individual CATEs; values below zero indicate lower DBP under the intervention. The posterior mean ATE is −1.00 with a 95% credible interval [ −3.48 , 1.40 ]. Panel (b) plots participant specific CATEs in ascending order; the solid line is the posterior mean and the shaded band is the corresponding 95% credible interval. Panel (a) of Figure 3 shows the posterior distribution of the individual CATE estimates for 12-month DBP. The distribution is shifted markedly toward negative values, with most estimates indicating lower 12 - month DBP under the intervention. This overall leftward pattern suggests that many individuals are expected to benefit from the treatment. Nonetheless, the posterior mean ATE was −1.00 with a 95% credible interval [−3.48 , 1.40] , and the estimated intraclass correlation coefficient (ICC) 0.027 (95% credible interval: 0.000 to 0.094); the average treatment effect hence is associated with a credible interval crossing zero. Panel (b) plots participant -specific CATEs for 12-month DBP ordered by their posterior mean. The solid curve traces the posterior mean CATE for each individual, and the shaded band gives the corresponding 95% credible interval. The curve spans a wide range from strongly negative to clearly positive values, which shows substantial between-individual heterogeneity in the estimated treatment response. Although a large fraction of intervals cross zero, the overall gradient remains evident, with a sizable portion of participants exhibiting reductions in DBP, while others show little to no effect or even increases in DBP. Figure 4 presents the TE-VIM results for each baseline covariate. For each covariate, the boxplots summarize the distribution of the individual-level squared differences contributing to the TE-VIM. Larger values indicate greater changes in the estimated CATEs when that covariate is omitted, suggesting that the covariate plays a more important role in explaining treatment-effect heterogeneity. The figure suggests that education level, sex, employment status, 18 A PREPRINT - A PRIL 16, 2026 and smoking status have the greatest influence on the estimated heterogeneity, whereas the remaining covariates have comparatively smaller contributions. Number of doctors on staff Number of nurses on staff Rural vs urban setting Patients seen annually All activity (MET−min/week) at baseline Age at baseline (years) Baseline diastolic BP (mmHg) Literacy status Baseline systolic BP (mmHg) Smoking status Employment status Sex Education level      
+
+> 0.0 0.5 1.0 1.5 2.0 2.5
+> LOO TE−VIM estimate
+> Covariate
+> Leave−one−out TE−VIM distribution across covariates
+
+Figure 4: Leave-one-out TE-VIM across baseline covariates. For each covariate p, we first obtained the full-model posterior mean CATE estimates bτ (x, v), and then regressed these estimates on the reduced covariate set excluding p
+
+using a BART projection model to obtain eτ−p(z−p). Individual-level contributions to the TE-VIM were computed as {bτ (x, v) − eτ−p(z−p)}2, and the boxplots summarize their distribution across participants. Larger values indicate that omitting the covariate leads to poorer prediction of the full-model CATEs and therefore greater importance for treatment-effect heterogeneity. Education level, sex, employment status, and smoking status show the largest TE-VIM values, whereas most other covariates display comparatively small contributions. We then selected the six covariates with the largest TE-VIM values to fit a depth-2 classification and regression tree (CART). These six covariates were education level, sex, employment status, smoking status, baseline SBP, and literacy status. Figure 5 further summarizes heterogeneity by a two-level classification and regression tree fit to the posterior mean CATEs. Subgroup effects were obtained by averaging the individual CATE draws for participants in each terminal node, and 95% credible intervals were computed from the corresponding posterior samples within each node. The first split is sex, with women exhibiting a more favorable average response to TASSH plus health insurance coverage than men. Among women, the next split is education level, indicating that those with any schooling show the largest average reduction in 12-month DBP, whereas women with no schooling have smaller estimated benefit. Among men, the next split is smoking status: non-smokers have more favorable average effects than those with any smoking. These patterns are consistent with the idea that factors related to health literacy, adherence, and risk behaviors may modify the intervention’s effect, although the exact mechanisms underlying effect modification cannot be established in this exploratory analysis alone. A three-level tree is reported in Appendix 4.1 as an additional exploration; employment status enter that more elaborate trees structure. 19 A PREPRINT - A PRIL 16, 2026 Female Never Smoker Any Education           
+
+> yes no yes yes no no
+> 1
+> Fitted Mean:− 1.00
+> 95% C rI: (− 3.48 ,1.40 )
+> n=641
+> 2
+> Fitted Mean:−2.03 95% C rI: (− 4.93 ,0.67 )
+> n=392
+> 4
+> Fitted Mean:−2.47 95% C rI: (− 5.83 ,0.59 )
+> n=199
+> 5
+> Fitted Mean:−1.58 95% C rI: (− 4.70 ,1.29 )
+> n=193
+> 3
+> Fitted Mean:0.6 3
+> 95% C rI: ( −2.38 ,3.80 )
+> n=249
+> 6
+> Fitted Mean:0.22 95% C rI: (− 2.75 ,3.30 )
+> n=197
+> 7
+> Fitted Mean:2.17
+> 95% C rI: ( −2.12 ,7.50 )
+> n=52
+
+Figure 5: CART for posterior mean CATE on DBP at 12 months. The tree regresses participant-specific posterior mean CATEs (from MBCF) on baseline covariates to summarize treatment effect heterogeneity between TASSH plus HIC and HIC. Internal nodes show splitting variables and cut points, and terminal nodes report the node-specific mean CATE and sample size. Negative values indicate lower 12-month DBP under TASSH plus HIC relative to HIC. Tree depth was limited to two for interpretability. As a supplementary analysis, we also repeated the analysis using three other BART-based methods, namely stan4bart, mixedBART, and riBART, to examine whether the findings were consistent across methods. The estimation and analysis strategy was the same as that used for MBCF. For each method, we used 200 trees, 5,000 burn-in iterations, and 5,000 posterior draws. Additional results from this supplementary analysis are presented in Appendix 4.2–4.5. Overall, the four methods yielded highly consistent findings. Figure 6 summarizes the agreement of posterior mean CATE estimates across the four BART-based methods. Most points lie close to the 45-degree line, indicating close agreement in participant-specific CATE estimates across methods. In addition, all pairwise Pearson and Spearman correlations exceeded 0.95 across the four methods. The three mixed-effects BART methods were especially similar to one another, with correlations close to 0.99, whereas their correlations with MBCF were slightly lower, but still very high. The distributions of the posterior mean CATE estimates were also very similar across methods. The TE-VIM results were broadly consistent, with sex, education level, smoking status, and employment status consistently ranked among the most important covariates. Finally, the fitted classification and regression trees had the same overall structure across methods, differing only slightly in subgroup-specific point estimates and credible intervals. 20 A PREPRINT - A PRIL 16, 2026 r = 0.951 r = 0.967 
+
+r = 0.991 
+
+r = 0.979 
+
+r = 0.992 
+
+r = 0.993 
+
+MBCF stan4bart mixedBART riBART              
+
+> MBCF  stan4bart  mixedBART  riBART
+> −2.5 0.0 2.5 −4 −2 02−2 02−4 −2 02
+> 0.0 0.1 0.2 0.3
+> −4 −2 02
+> −2 02
+> −4 −2 02
+
+Figure 6: Pairwise scatterplot matrix of participant-specific posterior mean CATE estimates across the four BART-based methods in the TASSH analysis for 12-month DBP. Diagonal panels show marginal density estimates, upper panels report Pearson correlations, and lower panels display pairwise scatterplots. 21 A PREPRINT - A PRIL 16, 2026 
+
+## 6 Discussion 
+
+Understanding treatment effect heterogeneity is crucial for generating scientifically meaningful hypotheses and discov-ering subgroups with differential benefit (Assmann et al., 2000; Kent et al., 2020; R. Wang et al., 2007). A substantial literature has now grown to advise on methods for estimating heterogeneous treatment effects with independent data, and prior studies have compared their performance across randomized trials and observational settings with a variety of outcomes (Hu et al., 2021). However, these findings may not directly apply to CRTs where individual outcomes are nested within clusters that are randomized to conditions. As multilevel study designs have become more common, machine learning methods have also been extended to account for the clustering structure, including Bayesian Additive Regression Trees, gradient boosting, random forests, and generalized additive mixed models. In light of the growing interest in quantifying treatment effect heterogeneity in CRTs, this study is the first to evaluate the performance of these mixed-effects learning tools to estimate CATE in CRTs and provides supporting evidence to guide practice with continuous outcomes across various representative HTE scenarios. Our simulation results indicate that methods in the BART family were the most robust overall. Multilevel Bayesian causal forest showed consistently strong performance for estimating individual conditional average treatment effects, producing stable and interpretable rankings of effect modifiers, and conservative credible intervals with coverage close to nominal levels. Random intercept BART variants also performed well in low to moderate dimensional settings. However, as the covariate dimension increased, their performance became more sensitive to noise variables, underscoring the need for explicit variable selection in high-dimensional CATE estimation. By contrast, gradient boosting and random forest implementations with random intercepts, such as mixed-effects gradient boosting, mixed-effects random forest, and GPBoost, were competitive for point estimation in simpler heterogeneity structures and under favorable signal-to-noise conditions, although uncertainty quantification was less reliable and variable importance was more sensitive to correlation among covariates. Generalized additive mixed models provided transparent smooth effects and interpretable modifier patterns in simpler settings but degraded as nonlinearity and higher-order interactions increased. All these results support using MBCF, or, more broadly, BART methods with cluster effect when estimating CATEs or conducting subgroup discovery is the primary goal. They also motivate sparsity-aware regularization in high-dimensional settings. For BART-based methods, one natural extension is to replace the uniform prior on splitting probabilities with a sparse Dirichlet prior, as in the Dirichlet additive regression trees (DART) framework. This prior concentrates probability mass on a small subset of covariates and shrinks the selection probabilities of noise variables toward zero, thereby improving robustness and efficiency in high-dimensional settings (Spanbauer & Sparapani, 2021). In mixedBART, the mxbart package implements this sparse Dirichlet prior, and in additional simulations, we found that it can meaningfully improve the performance of mixedBART in high-dimensional settings. The corresponding simulation results are reported in Appendix 3.1. We then apply the MBCF to the TASSH reanalysis, posterior mean CATEs for diastolic blood pressure at twelve months were mostly below zero, consistent with a tendency toward better control under the combined intervention, whereas the average effect was associated with a credible interval that crossed zero; leave one out treatment effect variable importance highlighted education level, sex, employment status and smoking as influential modifiers, and a shallow classification and regression tree on posterior mean CATEs yielded simple, clinically interpretable subgroups. Our findings highlight several directions for further work. First, CRTs routinely feature outcomes beyond continuous measures, including binary endpoints, time to event outcomes, and outcomes truncated by death, each of which raises distinct estimands and modeling challenges. For binary outcomes, not all learners considered here have principled extensions, and future studies should therefore compare methods under clearly defined causal scales, for example, risk difference, risk ratio, and odds ratio, and evaluate their ability to recover CATE surface, rank effect modifiers, and support reliable inference. For survival outcomes, models must accommodate censoring and clustering; recent developments in random intercept accelerated failure time BART provide a promising foundation, but systematic evaluation across ICC levels, cluster size imbalance, and varying event rates is needed (Hu, 2024; Hu et al., 2022). Second, real-world CRTs can encounter intermediate outcomes such as patient compliance and death where treatment 22 A PREPRINT - A PRIL 16, 2026 effect heterogeneity is only well defined among a subset of individuals (Cheng et al., 2025; Tong et al., 2023, 2025). In this setting, combining principal stratification with Bayesian machine learning offers a principled framework for subgroup-specific causal estimation. For clustered settings, C. Li et al. (2026) recently developed a mixture of mixed-effects BART approaches for estimating conditional survivor average causal effects, highlighting the need for broader validation, guidance on estimand choice, and sensitivity analysis. Third, longitudinal data are common in CRTs; methods must account simultaneously for within-cluster and within individual correlation and allow time-varying effect modification. Extending mixed-effects learners to jointly model trajectories and treatment interactions, and benchmarking them in longitudinal CRT scenarios, would be valuable (Donner et al., 2000; Liang & Zeger, 1986). Fourth, stepped wedge and cluster-randomized crossover designs are increasingly used. In stepped wedge designs, clusters cross over from control to intervention at prespecified time points so that all clusters eventually receive the intervention, whereas in cluster-randomized crossover designs, clusters switch back and forth between control and intervention according to designated schedules. Learners for these designs must handle period effects, staggered adoption or repeated crossover, and potential temporal confounding while preserving the unit of randomization. Flexible machine learners must simultaneously handle period effects, staggered adoption, and potential temporal confounding while preserving the unit of randomization. 
+
+## Acknowledgments 
+
+MOH and FL are supported by the United States National Institutes of Health (NIH), National Heart, Lung, and Blood Institute (NHLBI, grant numbers R01-HL168202 and R01-HL178513). All statements in this report, including its findings and conclusions, are solely those of the authors and do not necessarily represent the views of the NIH. The research of ABF is supported in part by the National Health and Medical Research Council of Australia (Ideas Grant number 2027218). 
+
+## Supplementary Material 
+
+The supplementary material includes additional simulation results, data analysis and the implementation code in R for all methods in Section 2.2. 
+
+## Data availability 
+
+The TASSH data can be obtained via https://datadryad.org/dataset/doi:10.5061/dryad.16c9m51, which is publicly available. 
+
+## Conflict of interest 
+
+The author(s) declared no potential conflicts of interest with respect to the research, authorship, and/or publication of this article. 23 A PREPRINT - A PRIL 16, 2026 
+
+## References 
+
+Anoke, S. C., Normand, S. - L., & Zigler, C. M. (2019). Approaches to treatment effect heterogeneity in the presence of confounding. Statistics in Medicine , 38 (15), 2797–2815. Assmann, S. F., Pocock, S. J., Enos, L. E., & Kasten, L. E. (2000). Subgroup analysis and other (mis) uses of baseline data in clinical trials. The Lancet , 355 (9209), 1064–1069. Athey, S., Tibshirani, J., & Wager, S. (2019). Generalized random forests. The Annals of Statistics , 47 (2), 1148–1178. Athey, S., & Wager, S. (2019). Estimating treatment effects with causal forests: An application. Observational Studies ,
+
+5(2), 37–51. Breiman, L. (2001). Random forests. Machine Learning , 45 (1), 5–32. Capitaine, L., Genuer, R., & Thiébaut, R. (2021). Random forests for high-dimensional longitudinal data. Statistical Methods in Medical Research , 30 (1), 166–184. Cheng, C., Papadogeorgou, G., & Li, F. (2025). Identification and efficient estimation of compliance and network causal effects in cluster-randomized trials. arXiv preprint arXiv:2512.16857 .Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C., Newey, W., & Robins, J. (2018). Dou-ble/debiased machine learning for treatment and structural parameters. The Econometrics Journal , 21 (1), C1–C68. Chipman, H. A., George, E. I., & McCulloch, R. E. (2010). BART: Bayesian additive regression trees. The Annals of Applied Statistics , 4(1), 266–298. https://doi.org/10.1214/09-AOAS285 Cho, S. - J., Preacher, K. J., Yaremych, H. E., Naveiras, M., Fuchs, D., & Fuchs, L. S. (2022). Modelling multilevel nonlinear treatment-by-covariate interactions in cluster randomized controlled trials using a generalized additive mixed model. British Journal of Mathematical and Statistical Psychology , 75 (3), 493–521. Cho, S. - J., Preacher, K. J., Yaremych, H. E., Naveiras, M., Fuchs, D., & Fuchs, L. S. (2024). Modeling variability in treatment effects for cluster randomized controlled trials using by-variable smooth functions in a generalized additive mixed model. Behavior Research Methods , 56 (3), 2094–2113. Donner, A., Klar, N., & Klar, N. S. (2000). Design and analysis of cluster randomization trials in health research 
+
+(Vol. 27). Arnold London. Dorie, V., Perrett, G., Hill, J. L., & Goodrich, B. (2022). Stan and bart for causal inference: Estimating heterogeneous treatment effects using the power of stan and the flexibility of machine learning. Entropy , 24 (12), 1782. Eldridge, S., & Kerry, S. (2012). A practical guide to cluster randomised trials in health services research . John Wiley & Sons. Foster, J. C., Taylor, J. M., & Ruberg, S. J. (2011). Subgroup identification from randomized clinical trial data. Statistics in Medicine , 30 (24), 2867–2880. Hahn, P. R., Murray, J. S., & Carvalho, C. M. (2020). Bayesian regression tree models for causal inference: Regulariza-tion, confounding, and heterogeneous effects (with discussion). Bayesian Analysis , 15 (3), 965–1056. Hajjem, A., Bellavance, F., & Larocque, D. (2011). Mixed effects regression trees for clustered data. Statistics & Probability Letters , 81 (4), 451–459. Hajjem, A., Bellavance, F., & Larocque, D. (2014). Mixed-effects random forest for clustered data. Journal of Statistical Computation and Simulation , 84 (6), 1313–1328. Hines, O. J., Diaz-Ordaz, K., & Vansteelandt, S. (2025). Variable importance measures for heterogeneous treatment effects. Biometrics , 81 (4), ujaf140. Hu, L. (2024). A new method for clustered survival data: Estimation of treatment effect heterogeneity and variable selection. Biometrical Journal , 66 (1), 2200178. Hu, L., Ji, J., Ennis, R. D., & Hogan, J. W. (2022). A flexible approach for causal inference with multiple treatments and clustered survival outcomes. Statistics in Medicine , 41 (25), 4982–4999. Hu, L., Ji, J., & Li, F. (2021). Estimating heterogeneous survival treatment effect in observational data using machine learning. Statistics in Medicine , 40 (21), 4691–4713. 24 A PREPRINT - A PRIL 16, 2026 Kahan, B. C., Li, F., Copas, A. J., & Harhay, M. O. (2023). Estimands in cluster-randomized trials: Choosing analyses that answer the right question. International Journal of Epidemiology , 52 (1), 107–118. Kent, D. M., Paulus, J. K., Van Klaveren, D., D’Agostino, R., Goodman, S., Hayward, R., Ioannidis, J. P., Patrick-Lake, B., Morton, S., Pencina, M., et al. (2020). The predictive approaches to treatment effect heterogeneity (path) statement. Annals of Internal Medicine , 172 (1), 35–45. Kent, D. M., Steyerberg, E., & Van Klaveren, D. (2018). Personalized evidence based medicine: Predictive approaches to heterogeneous treatment effects. BMJ , 363 .Knieper, L., Hothorn, T., Bergherr, E., & Griesbach, C. (2025). Gradient boosting for generalised additive mixed models. 
+
+Statistics and Computing , 35 (4), 1–20. Li, C., Allore, H., Harhay, M. O., Li, F., & Tong, G. (2026). Uncovering treatment effect heterogeneity in pragmatic gerontology trials. Experimental Gerontology , 113055. Li, F., Tong, J., Fang, X., Cheng, C., Kahan, B. C., & Wang, B. (2025). Model-robust standardization in cluster-randomized trials. Statistics in Medicine , 44 (20-22), e70270. Liang, K. -Y., & Zeger, S. L. (1986). Longitudinal data analysis using generalized linear models. Biometrika , 73 (1), 13–22. Lin, X., & Zhang, D. (1999). Inference in generalized additive mixed models by using smoothing splines. Journal of the Royal Statistical Society Series B: Statistical Methodology , 61 (2), 381–400. Logan, B. R., Sparapani, R., McCulloch, R. E., & Laud, P. W. (2019). Decision making and uncertainty quantification for individualized treatments using bayesian additive regression trees. Statistical Methods in Medical Research ,
+
+28 (4), 1079–1093. Murray, D. M. (1998). Design and analysis of group-randomized trials (Vol. 29). Monographs in Epidemiology and. Nie, X., & Wager, S. (2021). Quasi-oracle estimation of heterogeneous treatment effects. Biometrika , 108 (2), 299–319. Ogedegbe, G., Plange-Rhule, J., Gyamfi, J., Chaplin, W., Ntim, M., Apusiga, K., Iwelunmor, J., Awudzi, K. Y., Quakyi, K. N., Mogaverro, J., et al. (2018). Health insurance coverage with or without a nurse-led task shifting strategy for hypertension control: A pragmatic cluster randomized trial in ghana. PLoS Medicine , 15 (5), e1002561. Olaniran, O. R., Olaniran, S. F., Allohibi, J., Alharbi, A. A., & Alharbi, N. M. (2025). Mixed effect gradient boosting for high-dimensional longitudinal data. Scientific Reports , 15 (1), 30927. Powers, S., Qian, J., Jung, K., Schuler, A., Shah, N. H., Hastie, T., & Tibshirani, R. (2018). Some methods for heterogeneous treatment effect estimation in high dimensions. Statistics in Medicine , 37 (11), 1767–1787. Robinson, P. M. (1988). Root-n-consistent semiparametric regression. Econometrica: journal of the Econometric Society , 931–954. Sela, R. J., & Simonoff, J. S. (2012). Re-em trees: A data mining approach for longitudinal and clustered data. Machine Learning , 86 (2), 169–207. Sigrist, F. (2022). Gaussian process boosting. Journal of Machine Learning Research , 23 (232), 1–46. Spanbauer, C., & Sparapani, R. (2021). Nonparametric machine learning for precision medicine with longitudinal clinical trials and bayesian additive regression trees with mixed models. Statistics in Medicine , 40 (11), 2665– 2691. Tan, Y. V., Flannagan, C. A. C., & Elliott, M. R. (2018). Predicting human-driving behavior to help driverless vehicles drive: Random intercept bayesian additive regression trees. Statistics and Its Interface , 11 (4), 557–572. Tong, G., Li, C., Velazquez, E., Harhay, M. O., & Li, F. (2025). Bayesian inference for cluster-randomized trials with multivariate outcomes subject to both truncation by death and missingness. arXiv preprint arXiv:2505.02310 .Tong, G., Li, F., Chen, X., Hirani, S. P., Newman, S. P., Wang, W., & Harhay, M. O. (2023). A bayesian approach for estimating the survivor average causal effect when outcomes are truncated by death in cluster-randomized trials. American Journal of Epidemiology , 192 (6), 1006–1015. Wager, S., & Athey, S. (2018). Estimation and inference of heterogeneous treatment effects using random forests. 
+
+Journal of the American Statistical Association , 113 (523), 1228–1242. 25 A PREPRINT - A PRIL 16, 2026 Wang, B., Park, C., Small, D. S., & Li, F. (2024). Model-robust and efficient covariate adjustment for cluster-randomized experiments. Journal of the American Statistical Association , 119 (548), 2959–2971. Wang, R., Lagakos, S. W., Ware, J. H., Hunter, D. J., & Drazen, J. M. (2007). Statistics in medicine—reporting of subgroup analyses in clinical trials. New England Journal of Medicine , 357 (21), 2189–2194. Wood, S. N. (2011). Fast stable restricted maximum likelihood and marginal likelihood estimation of semiparametric generalized linear models. Journal of the Royal Statistical Society Series B: Statistical Methodology , 73 (1), 3–36. Yeager, D. S., Bryan, C. J., Gross, J. J., Murray, J. S., Krettek Cobb, D., HF Santos, P., Gravelding, H., Johnson, M., & Jamieson, J. P. (2022). A synergistic mindsets intervention protects adolescents from stress. Nature , 607 (7919), 512–520. 26 A PREPRINT - A PRIL 16, 2026 
+
+## 1 Additional simulation results 
+
+This section provides additional simulation results that complement the findings in the main text. We first examine how the relative performance of the competing methods changes when the number of clusters is reduced to I = 10 or increased to I = 100 . We then report interval-length results, which complement the coverage findings in the main text. Finally, we present sensitivity analyses under lower intraclass correlation settings ( ICC = 0 .01 and 0.05 ). 
+
+1.1 Simulation results for I = 10 and I = 100 clusters 
+
+We conducted additional simulation experiments by varying the number of clusters to I = 10 and I = 100 , while keeping all other data-generating mechanisms and analysis settings identical to those in the main text ( ICC = 0 .1). Figures 7 and 8 summarize absolute bias, PEHE, empirical coverage, and regret across methods under HS1–HS3. These results are used to assess whether the relative ranking of methods is stable when the number of clusters changes. 
+
+1.2 Simulation results for interval length 
+
+To complement the empirical coverage results, we also examined average interval length across methods. Figure 9 reports interval lengths for the main simulation setting with ICC = 0 .1, allowing comparisons of uncertainty quantification across methods beyond coverage alone. 
+
+1.3 Simulation results for ICC = 0 .01 and 0.05 
+
+We further assessed the sensitivity of the simulation findings to lower intraclass correlation settings. Figures 10 and 11 present the corresponding results for ICC = 0 .01 and ICC = 0 .05 , respectively. These figures allow us to evaluate whether the comparative performance of the methods changes materially when within-cluster dependence is weaker. 27 A PREPRINT - A PRIL 16, 2026 HS1 HS2 HS3 
+
+> Absolute Bias PEHE Coverage Regret
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> 0.00 0.25 0.50 0.75 1.00
+> 0.25 0.50 0.75 1.00 1.25
+> 0.00 0.25 0.50 0.75 1.00
+> 0.0 0.1 0.2 0.3
+
+Figure 7: Absolute bias, PEHE, empirical coverage, and regret across methods for the setting with ICC = 0 .1 and 
+
+I = 10 clusters. Columns correspond to scenarios HS1–HS3. Rows show absolute bias (top), PEHE (second), empirical coverage of nominal 95% intervals (third), and expected regret (bottom). Boxplots summarize Monte Carlo replicates, and the red dashed line marks the nominal 0.95 frequentist coverage level. 28 A PREPRINT - A PRIL 16, 2026 HS1 HS2 HS3 
+
+> Absolute Bias PEHE Coverage Regret
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> 0.00 0.25 0.50 0.75
+> 0.25 0.50 0.75 1.00
+> 0.00 0.25 0.50 0.75 1.00
+> 0.0 0.1 0.2 0.3
+
+Figure 8: Absolute bias, PEHE, empirical coverage, and regret across methods for the setting with ICC = 0 .1 and 
+
+I = 100 clusters. Columns correspond to scenarios HS1–HS3. Rows show absolute bias (top), PEHE (second), empirical coverage of nominal 95% intervals (third), and expected regret (bottom). Boxplots summarize Monte Carlo replicates, and the red dashed line marks the nominal 0.95 frequentist coverage level. 29 A PREPRINT - A PRIL 16, 2026 HS1 HS2 HS3 
+
+> Number of clusters = 10 Number of clusters = 30 Number of clusters = 100
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> 0246
+> 0123
+> 0.0 0.5 1.0 1.5 2.0
+
+Figure 9: Average interval length across methods for the setting with ICC = 0 .1. Columns correspond to scenarios HS1–HS3, and panels summarize results for I = 10 , I = 30 , and I = 100 clusters, respectively. Boxplots summarize Monte Carlo replicates. Larger values indicate wider interval estimates. 30 A PREPRINT - A PRIL 16, 2026 HS1 HS2 HS3 
+
+> PEHE Coverage Absolute Bias Regret Interval Length
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> 0.25 0.50 0.75 1.00
+> 0.00 0.25 0.50 0.75 1.00
+> 0.00 0.25 0.50 0.75
+> 0.0 0.1 0.2 0.3
+> 0.0 0.5 1.0 1.5 2.0
+
+Figure 10: Absolute bias, PEHE, empirical coverage, regret, and average interval length across methods for the setting with ICC = 0 .01 and I = 30 clusters. Columns correspond to scenarios HS1–HS3. Rows summarize absolute bias, PEHE, empirical coverage, regret, and interval length, respectively. Boxplots summarize Monte Carlo replicates. 31 A PREPRINT - A PRIL 16, 2026 HS1 HS2 HS3 
+
+> PEHE Coverage Absolute Bias Regret Interval Length
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> 0.25 0.50 0.75 1.00
+> 0.00 0.25 0.50 0.75 1.00
+> 0.00 0.25 0.50 0.75
+> 0.0 0.1 0.2 0.3
+> 0.0 0.5 1.0 1.5 2.0 2.5
+
+Figure 11: Absolute bias, PEHE, empirical coverage, regret, and average interval length across methods for the setting with ICC = 0 .05 and I = 30 clusters. Columns correspond to scenarios HS1–HS3. Rows summarize absolute bias, PEHE, empirical coverage, regret, and interval length, respectively. Boxplots summarize Monte Carlo replicates. 
+
+## 2 Sensitivity to gamma-distributed random intercepts 
+
+To assess robustness to departures from the normal random-intercept assumption, we repeated the main simulation setting with I = 30 clusters and ICC = 0 .1, but generated cluster-specific random intercepts from a gamma distribution. All other data-generating mechanisms and analysis settings remained identical to those in the main text. Figure 12 summarizes absolute bias, PEHE, empirical coverage, regret, and interval length across methods under HS1–HS3 in this sensitivity analysis. 32 A PREPRINT - A PRIL 16, 2026 HS1 HS2 HS3 
+
+> Absolute Bias PEHE Coverage Regret Interval Length
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> stan4bart mixedBART riBART MBCF CF MERF gpboost MEGB mermboost GAMM
+> 0.00 0.25 0.50 0.75
+> 0.25 0.50 0.75 1.00 1.25
+> 0.00 0.25 0.50 0.75 1.00
+> 0.0 0.1 0.2 0.3
+> 0.0 0.5 1.0 1.5 2.0
+
+Figure 12: Absolute bias, PEHE, empirical coverage, regret, and average interval length across methods under gamma-distributed random intercepts for the setting with ICC = 0 .1 and I = 30 clusters. Columns correspond to scenarios HS1–HS3. Rows show absolute bias (top), PEHE (second), empirical coverage of nominal 95% intervals (third), expected regret (fourth), and average interval length (bottom). Boxplots summarize Monte Carlo replicates, and the red dashed line marks the nominal 0.95 frequentist coverage level. 33 A PREPRINT - A PRIL 16, 2026 
+
+## 3 Sensitivity to high-dimensional cases 
+
+We assess robustness of our findings under three high-dimensional data-generating mechanisms (DGMs) that vary the number and type of covariates while preserving the cluster-randomized structure and the functional forms of the baseline outcome f0(·) and the conditional treatment effect τ (·). In all DGMs, clusters are the unit of randomization and outcomes are continuous. Across settings we fix the number of clusters to I = 30 and draw cluster sizes {Ni}Ii=1 from a discrete uniform distribution on integers {nmin , . . . , n max } with nmin = ⌊0.5·3000 /I ⌋ and nmax = ⌈1.5·3000 /I ⌉, ensuring I ·E[Ni] = 3000 . Treatment is assigned at the cluster level with balanced 1:1 allocation. Potential outcomes follow 
+
+Yij (0) = f0(Xij , Vi) + bi + εij , Yij (1) = f0(Xij , Vi) + τ (Xij , Vi) + bi + εij ,
+
+where bi
+
+> i.i.d.
+
+∼ N (0 , σ 2 
+
+> b
+
+) denotes a cluster random effect and εij 
+
+> i.i.d.
+
+∼ N (0 , σ 2) an individual error. For a specified total variance σ2 
+
+> b
+
++ σ2 and intracluster correlation ICC , we set σ2 
+
+> b
+
+= ICC × (σ2 
+
+> b
+
++ σ2) and σ2 = (1 − ICC) × (σ2 
+
+> b
+
++ σ2).
+
+DGM with 20 covariates. We consider 4 cluster-level covariates Vi = ( Vi1, . . . , V i4) and 16 individual-level covariates Xij = ( Xij 1, . . . , X ij 16 ) with 
+
+Vi1, V i2
+
+> i.i.d.
+
+∼ N (0 , 1) , Vi3, V i4
+
+> i.i.d.
+
+∼ Bernoulli(1 /2) ,Xij 1, . . . , X ij 8
+
+> i.i.d.
+
+∼ N (0 , 1) , Xij 9, . . . , X ij 16 
+
+> i.i.d.
+
+∼ Bernoulli(1 /2) .
+
+We fix the total outcome variance to 1.5 with ICC = 0 .1. The baseline function and conditional treatment effect are 
+
+f0(Xij , Vi) = sin( πX ij 1Xij 2) + log  |Xij 5 + Vi3| + 0 .3 Xij 10 − 0.7 Xij 15 ,τ (Xij , Vi) = 0 .5− 0.81 + exp   − (Xij 1 + Xij 2) +0 .4 sin( πX ij 6Xij 8)+0 .3 Xij 10 +0 .7 log  |0.5+ Xij 16 |−0.6 Vi2+0 .2 Vi3.
+
+DGM with 50 covariates. We consider 8 cluster-level covariates Vi = ( Vi1, . . . , V i8) and 42 individual-level covariates Xij = ( Xij 1, . . . , X ij 42 ) with 
+
+Vi1, . . . , V i4
+
+> i.i.d.
+
+∼ N (0 , 1) , Vi5, . . . , V i8
+
+> i.i.d.
+
+∼ Bernoulli(1 /2) ,Xij 1, . . . , X ij 21 
+
+> i.i.d.
+
+∼ N (0 , 1) , Xij 22 , . . . , X ij 42 
+
+> i.i.d.
+
+∼ Bernoulli(1 /2) .
+
+We fix the total outcome variance to 2 with ICC = 0 .1. The baseline function and conditional treatment effect are 
+
+f0(Xij , Vi) = sin( πX ij 1Xij 2) + log  |Xij 5 + Vi6| + 0 .3 Xij 16 −
+
+q
+
+|Xij 20 − Xij 30 | + 0 .4 X2 
+
+> ij 36
+
+− 0.5 Vi2,τ (Xij , Vi) = 0 .7 + 0 .5 sin( πX ij 5Xij 6) + 0 .2 Xij 13 − 0.3 X2 
+
+> ij 17
+
+− 0.61 + exp   − (Xij 18 + Xij 20 ) − 0.4 cos( Xij 21 )+ 0 .7 Xij 30 + 0 .6 log  |0.5 + Xij 42 | − 0.6 Vi2 + 0 .4 Vi6.
+
+DGM with 100 covariates. We consider 10 cluster-level covariates Vi = ( Vi1, . . . , V i10 ) and 90 individual-level covariates Xij = ( Xij 1, . . . , X ij 90 ) with 
+
+Vi1, . . . , V i5
+
+> i.i.d.
+
+∼ N (0 , 1) , Vi6, . . . , V i10 
+
+> i.i.d.
+
+∼ Bernoulli(1 /2) ,Xij 1, . . . , X ij 50 
+
+> i.i.d.
+
+∼ N (0 , 1) , Xij 51 , . . . , X ij 90 
+
+> i.i.d.
+
+∼ Bernoulli(1 /2) .
+
+34 A PREPRINT - A PRIL 16, 2026 We fix the total outcome variance to 2.5 with ICC = 0 .1. The baseline function and conditional treatment effect are 
+
+f0(Xij , Vi) = sin( πX ij 1Xij 2) + log  |Xij 5 + Vi6| + 0 .3 Xij 10 − 0.7 Xij 15 −
+
+q
+
+|Xij 20 − Xij 60 |
+
++ 0 .4 X2 
+
+> ij 25
+
++ 0 .5 Xij 60 + 0 .8 Xij 62 − log  1 + Xij 70 
+
+,τ (Xij , Vi) = 1 .5 − 0.81 + exp   − (Xij 1 + Xij 2) − 0.4 X2 
+
+> ij 6
+
+− cos( Xij 22 ) + 0 .3 sin( πX ij 30 Xij 34 ) + 0 .1 Xij 36 − 0.2 X2
+
+> ij 50
+
++ 0 .7 Xij 60 − 0.5 Xij 65 + 0 .8 log  |1 + Xij 80 | − 0.6 Vi2 − 0.2 exp  Vi5
+
+ + 0 .5 Vi6.
+
+Signal-to-total variance ratio. For each DGM we summarize the strength of the systematic signal relative to total outcome variability via 
+
+STR = Var  f0(Xij , Vi) + Ai τ (Xij , Vi) + bi
+
+
+
+Var  f0(Xij , Vi) + Ai τ (Xij , Vi) + bi + εij 
+
+ .
+
+We control the STR around 0.65. The corresponding results for absolute bias, PEHE, empirical coverage, and regret are reported in the main text. Figure 13 supplements those results by presenting interval length across the four BART-based methods under the three high-dimensional settings. 20 covariates 50 covariates 100 covariates 
+
+> stan4bart mixedBART riBART MBCF
+> stan4bart mixedBART riBART MBCF
+> stan4bart mixedBART riBART MBCF
+> 0123
+
+Figure 13: Average interval length across the four BART-based methods in the high-dimensional sensitivity analysis. Columns correspond to 20, 50, and 100 covariates. Boxplots summarize Monte Carlo replicates. Larger values indicate wider interval estimates. 
+
+3.1 Comparison of mixedBART and mixedDART in high-dimensional settings 
+
+To further examine the role of sparsity-aware regularization in high-dimensional settings, we conducted an additional comparison between mixedBART and mixedDART, where mixedDART denotes the mixedBART model fitted with the sparse Dirichlet prior on splitting probabilities. Across all three high-dimensional settings, mixedDART generally improved upon mixedBART in terms of absolute bias, PEHE, empirical coverage, and regret, with the improvement becoming more pronounced as the number of covariates increased from 20 to 50 and 100. In particular, mixedDART showed better protection against the inclusion of noise variables, leading to more accurate CATE estimation and coverage closer to the nominal level in the higher-dimensional settings. These gains were accompanied by somewhat wider interval lengths, especially when the number of covariates was large. Overall, these findings support the use of sparsity-aware priors, such as the Dirichlet prior implemented in mxbart , to improve the robustness of mixed-effects BART methods for high-dimensional CATE estimation in CRTs. 35 A PREPRINT - A PRIL 16, 2026 20 covariates 50 covariates 100 covariates 
+
+> Absolute Bias PEHE Coverage Regret Interval Length
+> mixedBART mixedDART
+> mixedBART mixedDART
+> mixedBART mixedDART
+> 0.0 0.3 0.6 0.9
+> 0.0 0.4 0.8 1.2
+> 0.00 0.25 0.50 0.75 1.00
+> 0.0 0.1 0.2 0.3
+> 0123
+
+Figure 14: Comparison of mixedBART and mixedDART in the high-dimensional sensitivity analysis. Columns correspond to 20, 50, and 100 covariates. Rows show absolute bias (top), PEHE (second), empirical coverage of nominal 95% intervals (third), expected regret (fourth), and average interval length (bottom). Boxplots summarize Monte Carlo replicates, and the red dashed line marks the nominal 0.95 frequentist coverage level. 36 A PREPRINT - A PRIL 16, 2026 
+
+## 4 Additional heterogeneous treatment effect analysis in TASSH 
+
+This section provides supplementary results for the TASSH application using three additional BART-based methods, namely stan4bart, mixedBART, and riBART. For each method, we report the distribution of the estimated individual-level CATEs for 12-month DBP together with the corresponding leave-one-out TE-VIM results. We then compare the four BART-based methods, including MBCF, in terms of the distribution and agreement of their posterior mean CATE estimates. The estimation and analysis procedure was the same as that used for MBCF in the main text. Specifically, each method was fitted using 200 trees, 5,000 burn-in iterations, and 5,000 posterior draws. After estimating the CATEs, we computed the TE-VIM values and selected the six most important covariates according to TE-VIM to fit a classification and regression tree for exploring potential effect modifiers. 
+
+4.1 Three-level CART for MBCF 
+
+As an additional exploratory analysis, we fitted a three-level classification and regression tree (CART) to the posterior mean CATE estimates from the MBCF model. Compared with the two-level tree reported in the main text, the three-level tree allows a more detailed subgroup structure. In this expanded tree, employment status enters as an additional splitting variable, although the resulting terminal-node summaries should still be interpreted cautiously as exploratory subgroup descriptions rather than confirmatory findings. Any Education Never Smoker       
+
+> Fitted Mean:−2.03 n=392 Fitted Mean:−3.06 n=61 Fitted Mean:−2.2 n=138 Fitted Mean:−1.58 n=193 Fitted Mean:0.628 n=249 Fitted Mean:−0.279 n=59 Fitted Mean:0.433 n=138 Fitted Mean:2.17 n=52
+> yes no 2895312 13 7
+> 1
+> Fitted Mean:− 1.00
+> n=641
+> Female
+> 6
+> Fitted Mean:0.22
+> n=197
+> Unemployed
+> 4
+> Fitted Mean:−2.47
+> n=199
+> Unemployed
+> yes yes yes yes no no no no
+
+Figure 15: Three-level CART for posterior mean CATE on DBP at 12 months based on the MBCF model. The tree regresses participant-specific posterior mean CATE estimates on selected baseline covariates to provide a more detailed exploratory summary of treatment effect heterogeneity between TASSH plus HIC and HIC alone. Internal nodes show splitting variables and cut points, and terminal nodes report the node-specific mean CATE and sample size. Negative values indicate lower 12-month DBP under TASSH plus HIC relative to HIC alone. Compared with the two-level tree in the main text, this more elaborate tree additionally includes employment status as a splitting variable. 
+
+4.2 Results using stan4bart 
+
+37 A PREPRINT - A PRIL 16, 2026 0.0 0.1 0.2 0.3 0.4            
+
+> −6 −5 −4 −3 −2 −1 012345
+
+(a) Distribution of CATE for treatment versus control      
+
+> −10 −5 0510
+> 0128 256 385 513 641
+
+(b) CATE of treatment versus control in ascending order 
+
+Figure 16: Estimated CATEs for DBP at 12 months using stan4bart. Panel (a) shows the posterior distribution of individual CATEs; values below zero indicate lower DBP under the intervention. Panel (b) plots participant-specific CATEs in ascending order; the solid line is the posterior mean and the shaded band is the corresponding 95% credible interval. Number of doctors on staff Number of nurses on staff Patients seen annually Rural vs urban setting Literacy status All activity (MET−min/week) at baseline Baseline diastolic BP (mmHg) Employment status Baseline systolic BP (mmHg) Age at baseline (years) Smoking status Education level Sex      
+
+> 0.0 0.5 1.0 1.5 2.0 2.5
+> LOO TE−VIM estimate
+> Covariate
+
+Leave−one−out TE−VIM distribution across covariates 
+
+Figure 17: Leave-one-out TE-VIM across baseline covariates using stan4bart. For each covariate p, we first obtained the full-model posterior mean CATE estimates bτ (x, v), and then regressed these estimates on the reduced covariate set excluding p using a BART projection model to obtain eτ−p(z−p). Individual-level contributions to the TE-VIM were computed as {bτ (x, v) − eτ−p(z−p)}2, and the boxplots summarize their distribution across participants. Larger values indicate that omitting the covariate leads to poorer prediction of the full-model CATEs and therefore greater importance for treatment-effect heterogeneity. Sex, education level, smoking status and age show the largest TE-VIM values, whereas most other covariates display comparatively small contributions. 38 A PREPRINT - A PRIL 16, 2026 Female Never Smoker Any Education           
+
+> yes no yes yes no no
+> 1
+> Fitted Mean:−1.09 95% C rI: (− 3.52 ,1.36 )
+> n=641
+> 2
+> Fitted Mean:−2.4 0
+> 95% C rI: (− 5.40 ,0.56 )
+> n=392
+> 4
+> Fitted Mean:−2.74 95% C rI: (− 6.00 ,0.41 )
+> n=199
+> 5
+> Fitted Mean:−2.05 95% C rI: (− 5.22 ,1.19 )
+> n=193
+> 3
+> Fitted Mean:0.9 8
+> 95% C rI: ( −2.52 ,4.45 )
+> n=249
+> 6
+> Fitted Mean:0.6 5
+> 95% C rI: ( −3.03 ,4.25 )
+> n=197
+> 7
+> Fitted Mean:2.24
+> 95% CI: ( −2.14 ,7.60 )
+> n=52
+
+Figure 18: Two-level CART for posterior mean CATE on DBP at 12 months based on the stan4bart model. The tree regresses participant-specific posterior mean CATE estimates on selected baseline covariates to provide a more detailed exploratory summary of treatment effect heterogeneity between TASSH plus HIC and HIC alone. 
+
+4.3 Results using mixedBART 0.0 0.1 0.2 0.3 0.4            
+
+> −6 −5 −4 −3 −2 −1 012345
+
+(a) Distribution of CATE for treatment versus control      
+
+> −5 05
+> 0128 256 385 513 641
+
+(b) CATE of treatment versus control in ascending order 
+
+Figure 19: Estimated CATEs for DBP at 12 months using mixedBART. Panel (a) shows the posterior distribution of individual CATEs; values below zero indicate lower DBP under the intervention. Panel (b) plots participant-specific CATEs in ascending order; the solid line is the posterior mean and the shaded band is the corresponding 95% credible interval. 39 A PREPRINT - A PRIL 16, 2026 Number of doctors on staff Rural vs urban setting Number of nurses on staff Baseline diastolic BP (mmHg) Patients seen annually All activity (MET−min/week) at baseline Literacy status Baseline systolic BP (mmHg) Age at baseline (years) Employment status Smoking status Education level Sex      
+
+> 0.0 0.5 1.0 1.5 2.0 2.5
+
+LOO TE−VIM estimate 
+
+> Covariate
+
+Leave−one−out TE−VIM distribution across covariates 
+
+Figure 20: Leave-one-out TE-VIM across baseline covariates using mixedBART. For each covariate p, we first obtained the full-model posterior mean CATE estimates bτ (x, v), and then regressed these estimates on the reduced covariate set excluding p using a BART projection model to obtain eτ−p(z−p). Individual-level contributions to the TE-VIM were computed as {bτ (x, v) − eτ−p(z−p)}2, and the boxplots summarize their distribution across participants. Larger values indicate that omitting the covariate leads to poorer prediction of the full-model CATEs and therefore greater importance for treatment-effect heterogeneity. Sex, education level, smoking status and employment status show the largest TE-VIM values, whereas most other covariates display comparatively small contributions. Female Never Smoker Any Education     
+
+> yes no yes no yes no
+> 1
+
+Fitted Mean:−1.36 95% C rI: (− 3.63 , 0.93 )
+
+n=641 
+
+> 2
+
+Fitted Mean:−2.32 95% C rI: (− 4.95 , 0.34 )
+
+n=392 
+
+> 4
+
+Fitted Mean:−2.61 
+
+95% C rI: (− 5.46 , 0.22 )
+
+n=199 
+
+> 5
+
+Fitted Mean:−2.01 95% C rI: (− 4.89 , 0.95 )
+
+n=193 
+
+> 3
+
+Fitted Mean:0.14 
+
+95% C rI: (− 2.86 , 3.17 )
+
+n=249 
+
+> 6
+
+Fitted Mean:−0. 10 
+
+95% C rI: (− 3.12 , 3.02 )
+
+n=197 
+
+> 7
+
+Fitted Mean:1.05 
+
+95% C rI: ( −2.57 , 5.32 )
+
+n=52 
+
+Figure 21: Two-level CART for posterior mean CATE on DBP at 12 months based on the mixedBART model. The tree regresses participant-specific posterior mean CATE estimates on selected baseline covariates to provide a more detailed exploratory summary of treatment effect heterogeneity between TASSH plus HIC and HIC alone. 40 A PREPRINT - A PRIL 16, 2026 
+
+4.4 Results using riBART 0.0 0.1 0.2 0.3 0.4            
+
+> −6 −5 −4 −3 −2 −1 012345
+
+(a) Distribution of CATE for treatment versus control      
+
+> −5 0510
+> 0128 256 385 513 641
+
+(b) CATE of treatment versus control in ascending order 
+
+Figure 22: Estimated CATEs for DBP at 12 months using riBART. Panel (a) shows the posterior distribution of individual CATEs; values below zero indicate lower DBP under the intervention. Panel (b) plots participant-specific CATEs in ascending order; the solid line is the posterior mean and the shaded band is the corresponding 95% credible interval. Number of nurses on staff Number of doctors on staff Rural vs urban setting Patients seen annually Baseline diastolic BP (mmHg) All activity (MET−min/week) at baseline Literacy status Baseline systolic BP (mmHg) Age at baseline (years) Employment status Smoking status Education level Sex      
+
+> 0.0 0.5 1.0 1.5 2.0 2.5
+> LOO TE−VIM estimate
+> Covariate
+
+Leave−one−out TE−VIM distribution across covariates 
+
+Figure 23: Leave-one-out TE-VIM across baseline covariates using riBART. For each covariate p, we first obtained the full-model posterior mean CATE estimates bτ (x, v), and then regressed these estimates on the reduced covariate set excluding p using a BART projection model to obtain eτ−p(z−p). Individual-level contributions to the TE-VIM were computed as {bτ (x, v) − eτ−p(z−p)}2, and the boxplots summarize their distribution across participants. Larger values indicate that omitting the covariate leads to poorer prediction of the full-model CATEs and therefore greater importance for treatment-effect heterogeneity. Sex, education level, smoking status and employment status show the largest TE-VIM values, whereas most other covariates display comparatively small contributions. 41 A PREPRINT - A PRIL 16, 2026 Female Never Smoker Any Education           
+
+> yes no yes yes no no
+> 1
+> Fitted Mean:−1.05 95% C rI: (− 3.38 ,1.38 )
+> n=641
+> 2
+> Fitted Mean:−2.12 95% C rI: (− 4.82 ,0.44 )
+> n=392
+> 4
+> Fitted Mean:−2.48 95% C rI: (− 5.44 ,0.31 )
+> n=199
+> 5
+> Fitted Mean:−1.75 95% C rI: (− 4.67 ,0.97 )
+> n=193
+> 3
+> Fitted Mean:0.63
+> 95% C rI: ( −2.59 ,3.97 )
+> n=249
+> 6
+> Fitted Mean:0.33
+> 95% C rI: ( −2.90 ,3.72
+> n=197
+> 7
+> Fitted Mean:1.76
+> 95% C rI: ( −2.33 ,6.64 )
+> n=52
+
+Figure 24: Two-level CART for posterior mean CATE on DBP at 12 months based on the riBART model. The tree regresses participant-specific posterior mean CATE estimates on selected baseline covariates to provide a more detailed exploratory summary of treatment effect heterogeneity between TASSH plus HIC and HIC alone. 
+
+4.5 Comparison across the four BART-based methods 
+
+Table 2 and Figure 25 summarize the agreement of posterior mean CATE estimates across the four BART-based methods. The correlations quantify pairwise agreement, and the overlaid density plot compares the marginal distributions of the participant-specific posterior mean CATEs across methods. Overall, the four BART-based methods yielded very similar posterior mean CATE estimates in the TASSH analysis. As shown in Table 2, all pairwise Pearson and Spearman correlations exceeded 0.95, indicating strong agreement in both the magnitudes and rankings of the participant-specific posterior mean CATEs across methods. A notable pattern is that the three mixed-effects BART methods, namely stan4bart, mixedBART, and riBART, were even more similar to one another, with pairwise correlations around 0.99. By comparison, their correlations with MBCF were slightly lower, although still very high. Figure 25 further shows that the marginal distributions of the estimated posterior mean CATEs were highly similar across the four methods. Taken together, these results suggest that the substantive conclusions from the TASSH application are highly robust across the four BART-based approaches. Table 2: Pairwise Pearson and Spearman correlations of participant-specific posterior mean CATE estimates across four BART-based methods in the TASSH analysis for 12-month DBP Panel A. Pearson correlation MBCF stan4bart mixedBART riBART MBCF 1.000 0.951 0.967 0.979 stan4bart 0.951 1.000 0.991 0.992 mixedBART 0.967 0.991 1.000 0.993 riBART 0.979 0.992 0.993 1.000 Panel B. Spearman correlation MBCF stan4bart mixedBART riBART MBCF 1.000 0.955 0.967 0.977 stan4bart 0.955 1.000 0.985 0.992 mixedBART 0.967 0.985 1.000 0.991 riBART 0.977 0.992 0.991 1.000 42 A PREPRINT - A PRIL 16, 2026 0.0 0.1 0.2 0.3 0.4   
+
+> −2.5 0.0 2.5
+
+Posterior mean CATE 
+
+> Density
+
+Method 
+
+> MBCF
+> stan4bart
+> mixedBART
+> riBART
+
+Figure 25: Distribution of participant-specific posterior mean CATE estimates across the four BART-based methods in the TASSH analysis for 12-month DBP. The overlaid density curves show that the marginal distributions of estimated CATEs are highly similar across methods. 43 Appendix B 
+
+## Overview 
+
+This appendix provides reproducible R code and a worked data example for estimating conditional average treatment effects (CATEs) and the average treatment effect (ATE) in cluster-randomized trials (CRTs), along with associated uncertainty quantification (credible or confidence intervals, depending on the method). We implement the machine-learning approaches considered in our simulation study: stan4bart, mixedBART, riBART, MBCF, causal forest (CF), MERF, GPBoost, MEGB, mermboost, and GAMM. For the full simulation design and evaluation metrics, see the main text. The complete codebase is available at https://github.com/changjun-li/crt-hte-ml-continuous. 
+
+1. stan4bart 
+
+Reference paper: https://www.mdpi.com/1099-4300/24/12/1782 R package: stan4bart 
+
+Function inputs 
+
+• df 
+
+A data.frame containing all variables used by the function. 
+
+– Required columns: ∗ Outcome (continuous) ∗ Treatment indicator (0/1) ∗ All covariates for the BART term ∗ Cluster/group ID • outcome 
+
+(character) Name of the numeric outcome column in df (e.g. "Y" ). • treatment 
+
+(character) Name of the binary treatment column in df (0/1, e.g. "A" ). Included inside bart(...) so BART can learn heterogeneous treatment interactions. • covariates 
+
+(character vector) Names of the predictor columns to feed into bart(...) , e.g. c("X1","X2",…,"X9") .• id 
+
+(character) Name of the cluster/group identifier column in df (e.g. "id" ). Used to fit a random intercept (1 | id) .• iter 
+
+(integer, default 5000) Positive integer indicating the number of posterior samples to draw and return 
+
+per chain . Includes warmup samples. 1• chains 
+
+(integer, default 1) Positive integer giving the number of Markov Chains to sample.. • adapt_delta 
+
+(numeric, default 0.95) Target acceptance probability for Stan’s HMC sampler. • max_treedepth 
+
+(integer, default 10) Maximum tree depth for the No‐U‐Turn sampler. • ntree 
+
+(integer, default 200) Number of trees in the BART ensemble. 
+
+stan4bart_HTE <- function (df, outcome, # e.g. "Y" 
+
+treatment, # e.g. "A" 
+
+covariates, # e.g. c("X1","X2",...) list of covariates 
+
+id, # e.g. "id" 
+
+iter = 5000L, chains = 1L, adapt_delta = 0.95, max_treedepth = 10, ntree = 200L) { 
+
+stopifnot (all (c(outcome, treatment, id, covariates) %in% names (df))) df[[id]] <- factor (df[[id]]) df[[treatment]] <- as.integer (df[[treatment]]) all_terms <- paste (c(treatment, covariates), collapse = " + ") fmla_text <- sprintf ("%s ~ bart(%s) + (1 | %s)", outcome, all_terms, id )fmla <- as.formula (fmla_text) 
+
+environment (fmla) <- globalenv () args <- list (formula = fmla, data = df, test = NULL, weights = NULL, treatment = treatment, iter = iter, warmup = iter %/% 2L, chains = chains, verbose = -1, stan_args = list (adapt_delta = adapt_delta, max_treedepth = max_treedepth ), bart_args = list (
+
+2ntree = ntree, keepTrees = TRUE ))fit <- do.call (stan4bart, args) df0 <- df; df0[[treatment]] <- 0L df1 <- df; df1[[treatment]] <- 1L y0_post <- predict (fit, newdata = df0, type = "ev") y1_post <- predict (fit, newdata = df1, type = "ev") ite_post <- y1_post - y0_post iCATE <- rowMeans (ite_post) CrI_i <- t(apply (ite_post, 1, quantile, probs = c(0.025, 0.975))) ate_post <- colMeans (ite_post) ATE <- mean (ate_post) CrI_ATE <- quantile (ate_post, probs = c(0.025, 0.975)) 
+
+list (iCATE = iCATE, iCATE_CrI = CrI_i, ATE = ATE, ATE_CrI = CrI_ATE, fit_object = fit, ite_post = ite_post )}
+
+#### Example usage 
+
+library (stan4bart) 
+
+set.seed (20251229) start <- Sys.time () res <- stan4bart_HTE (df = dat_bpi_output, outcome = "Y", treatment = "A", covariates = paste0 ("X", 1 :9), id = "id", iter = 10000L, chains = 1L, adapt_delta = 0.95, max_treedepth = 50, ntree = 200L )end <- Sys.time () 
+
+cat ("Elapsed time:", as.numeric (end - start), "seconds \n ") res $ATE res $ATE_CrI iCATE_CrI_stan4bart <- cbind (
+
+3iCATE = res $iCATE, Lower_CrI = res $iCATE_CrI[,1], Upper_CrI = res $iCATE_CrI[,2]) 
+
+head (iCATE_CrI_stan4bart) 
+
+2. mixedBART 
+
+Reference paper: https://pubmed.ncbi.nlm.nih.gov/33751659/ R package: mxbart, bart3, github:https://github.com/rsparapa/bnptools 
+
+Function inputs 
+
+• df 
+
+A data.frame containing in CRT data. Must include at least: 
+
+– The outcome column (named by outcome )
+
+– The treatment indicator (named by treatment , values 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by id )• outcome 
+
+(character) 
+
+Name of the numeric continuous outcome column in df .• treatment 
+
+(character) 
+
+Name of the binary treatment column in df (must be encoded as 0/1). • covariates 
+
+(character vector) 
+
+Names of the predictor columns to feed into the nonparametric BART term. • id 
+
+(character) 
+
+Name of the cluster/group identifier column in df .Used to fit a random intercept for each cluster. • ntree 
+
+(integer, default 200) 
+
+Number of trees in the BART ensemble. • nskip 
+
+(integer, default 5000) 
+
+Number of “burn‐in” MCMC iterations to discard before collecting samples. • ndpost 
+
+(integer, default 5000) 
+
+Number of posterior samples to collect after burn‐in. 4• keepevery 
+
+(integer, default 1) 
+
+Thinning interval: keep every keepevery ‐th draw (1 = no thinning). 
+
+mxbart_HTE <- function (df, outcome, # outcome Y 
+
+treatment, # treatment (character, 0/1) 
+
+covariates, #covariates (character vector) 
+
+id, # cluster ID column names (character) 
+
+ntree = 200L, # BART trees 
+
+nskip = 5000L, # MCMC burn‐in 
+
+ndpost = 5000L, # MCMC posterior sample 
+
+keepevery = 1L ) { 
+
+stopifnot (all (c(outcome, treatment, id, covariates) %in% names (df))) df <- df[ order (df[[id]]), ] y.train <- df[[outcome]] x.train <- as.matrix (df[, c(treatment, covariates)]) id.train <- as.integer (df[[id]]) n <- nrow (df) df0 <- df; df0[[treatment]] <- 0L df1 <- df; df1[[treatment]] <- 1L x0 <- as.matrix (df0[, c(treatment, covariates)]) x1 <- as.matrix (df1[, c(treatment, covariates)]) x.test <- rbind (x0, x1) fit <- mxbart (x.train = x.train, y.train = y.train, id.train = id.train, x.test = x.test, ntree = ntree, nskip = nskip, ndpost = ndpost, keepevery = keepevery )posterior <- fit $fhat.test y0_post <- posterior[, 1:n] y1_post <- posterior[, (n +1) :(2 *n)] ite_post <- y1_post - y0_post iCATE <- colMeans (ite_post) CrI_i <- t(apply (ite_post, 2, quantile, probs = c(0.025, 0.975))) ate_post <- rowMeans (ite_post) ATE <- mean (ate_post) CrI_ATE <- quantile (ate_post, probs = c(0.025, 0.975)) 
+
+list (iCATE = iCATE, 
+
+5iCATE_CrI = CrI_i, ATE = ATE, ATE_CrI = CrI_ATE, fit_object = fit, ite_post = ite_post )}
+
+#### Example usage 
+
+library (mxBART) 
+
+set.seed (20251229) start <- Sys.time () res <- mxbart_HTE (df = dat_bpi_output, outcome = "Y", treatment = "A", covariates = paste0 ("X", 1 :9), id = "id", ntree = 200L, nskip = 5000L, ndpost = 5000L, keepevery = 1L )end <- Sys.time () 
+
+cat ("Elapsed time:", as.numeric (end - start), "seconds \n ") 
+
+print (res $ATE) 
+
+print (res $ATE_CrI) 
+
+head (
+
+data.frame (iCATE = res $iCATE, lower_CrI = res $iCATE_CrI[,1], upper_CrI = res $iCATE_CrI[,2] ))
+
+3. riBART 
+
+Reference paper: https://intlpress.com/site/pub/files/_fulltext/journals/sii/2018/0011/0004/SII-2018-0011-0004-a001.pdf R package: dbarts 
+
+Function inputs 
+
+• df 
+
+A data.frame containing CRT data. Must include at least: 
+
+– The outcome column (named by outcome )6– The treatment indicator (named by treatment , values 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by id )• outcome 
+
+(character) 
+
+Name of the numeric continuous outcome column in df .• treatment 
+
+(character) 
+
+Name of the binary treatment column in df (must be encoded as 0/1). • covariates 
+
+(character vector) 
+
+Names of the predictor columns to feed into the nonparametric BART term. • id 
+
+(character) 
+
+Name of the cluster/group identifier column in df .Used to fit a random intercept for each cluster via group.by .• n.trees 
+
+(integer, default 200L) 
+
+Number of trees in the BART ensemble. • n.burn 
+
+(integer, default 5000L) 
+
+Number of “burn-in” MCMC iterations to discard before collecting samples. • n.samples 
+
+(integer, default 5000L) 
+
+Number of posterior samples to collect after burn-in. • n.chains 
+
+(integer, default 1L) 
+
+Number of MCMC chains. • keepTrees 
+
+(logical, default TRUE) 
+
+Whether to keep the fitted tree structures in the returned model object. • verbose 
+
+(logical, default FALSE) 
+
+Whether to print progress messages during MCMC. 
+
+rbart_HTE <- function (df, outcome, treatment, covariates, id, n.burn = 5000L, n.samples = 5000L, n.trees = 200L, n.chains = 1L, keepTrees = TRUE, 
+
+7verbose = FALSE) { 
+
+stopifnot (all (c(outcome, treatment, id, covariates) %in% names (df))) Y <- df[[outcome]] A <- df[[treatment]] X <- df[, covariates, drop = FALSE] 
+
+if (!all (na.omit (unique (A)) %in% c (0, 1))) stop ("Treatment must be coded as 0/1.") dat <- data.frame (Y = Y, A = A, X) start_time <- Sys.time () fit <- rbart_vi (formula = Y ~ A + ., data = dat, group.by = df[[id]], n.burn = n.burn, n.samples = n.samples, n.trees = n.trees, n.chains = n.chains, keepTrees = keepTrees, verbose = verbose )end_time <- Sys.time () new1 <- data.frame (A = 1, X) new0 <- data.frame (A = 0, X) mu1_draws <- predict (fit, newdata = new1, group.by = df[[id]]) mu0_draws <- predict (fit, newdata = new0, group.by = df[[id]]) ite_post <- mu1_draws - mu0_draws iCATE <- colMeans (ite_post) CrI_i <- t(apply (ite_post, 2, quantile, probs = c(0.025, 0.975))) ate_draws <- rowMeans (ite_post) ATE <- mean (ate_draws) CrI_ATE <- as.numeric (quantile (ate_draws, probs = c(0.025, 0.975))) 
+
+list (iCATE = iCATE, iCATE_CrI = CrI_i, ATE = ATE, ATE_CrI = CrI_ATE, fit_object = fit, ite_post = ite_post )}
+
+8#### Example usage 
+
+library (dbarts) 
+
+set.seed (20251229) start <- Sys.time () res <- rbart_HTE (df = dat_bpi_output, outcome = "Y", treatment = "A", covariates = paste0 ("X", 1 :9), id = "id" )end <- Sys.time () 
+
+cat ("Elapsed time:", as.numeric (end - start), "seconds \n ") 
+
+print (res $ATE) 
+
+print (res $ATE_CrI) 
+
+head (
+
+data.frame (iCATE = res $iCATE, lower_CrI = res $iCATE_CrI[,1], upper_CrI = res $iCATE_CrI[,2] ))
+
+4. MBCF 
+
+Reference paper: https://www.nature.com/articles/s41586-022-04907-7 https://journals.sagepub.com/doi/full/10.1177/09567976211028984 https://link.springer.com/chapter/10.1007/978-3-031-55548-0_25 Source: R package multibart OSF: https://osf.io/3zmqc/ 
+
+Function inputs 
+
+• df 
+
+data.frame containing all variables used by the function. 
+
+– Required columns: ∗ Outcome : continuous numeric column (referenced by outcome ). ∗ Treatment : binary 0/1 indicator (referenced by treatment ). ∗ Covariates : all predictor columns (referenced by covariates ). ∗ Cluster/Group ID : integer or factor column (referenced by id ). 9• id 
+
+character 
+
+Name of the cluster/group ID column in df . Used to construct the random-intercept design matrix. • treatment 
+
+character 
+
+Name of the binary treatment column in df (0/1). • outcome 
+
+character 
+
+Name of the continuous outcome column in df .• covariates 
+
+character vector 
+
+Names of the predictor columns to include in both the prognostic ( 𝜇(𝑥) ) and moderation ( 𝜏 (𝑥) ) forests, e.g. c("X1","X2",…,"X9") .• nburn 
+
+integer, default = 5000 
+
+Number of burn-in MCMC iterations to discard before saving. • nsim 
+
+integer, default = 5000 
+
+Number of post-burn-in MCMC draws to retain. • nthin 
+
+integer, default = 1 
+
+Thinning interval: save every 𝑛 thin -th draw (total iterations = nburn + nsim * nthin ). • ntree_control 
+
+integer, default = 200 
+
+Number of trees in the prognostic forest 𝜇(𝑥) .• ntree_moderate 
+
+integer, default = 200 
+
+Number of trees in the moderation forest 𝜏(𝑥) .• base_control 
+
+numeric, default = 0.95 
+
+Base hyperparameter 𝛼 in the tree‐splitting prior for 𝜇(𝑥) .• power_control 
+
+numeric, default = 2 
+
+Power hyperparameter 𝛽 in the tree‐splitting prior for 𝜇(𝑥) .• base_moderate 
+
+numeric, default = 0.25 
+
+Base hyperparameter 𝛼 in the tree‐splitting prior for 𝜏(𝑥) .• power_moderate 
+
+numeric, default = 3 
+
+Power hyperparameter 𝛽 in the tree‐splitting prior for 𝜏(𝑥) .• nu 
+
+integer, default = 3 
+
+Degrees of freedom of the chi‐square prior on the residual variance 𝜎 2.• sigq 
+
+numeric, default = 0.9 
+
+Calibration quantile for the chisq prior on 𝜎 2.10 • include_zhat 
+
+character, default = "none" 
+
+Whether to include an estimated propensity ̂ 𝑧 in 
+
+– "none" (no inclusion, typical for RCTs), 
+
+– "control" (in 𝜇(𝑥) ), 
+
+– "moderate" (in 𝜏(𝑥) ), 
+
+– "both" .
+
+MBCF_HTE <- function (df, id, treatment, outcome, covariates, nburn = 5000, nsim = 5000, nthin = 1, ntree_control = 200, ntree_moderate = 200, base_control = 0.95, power_control = 2, base_moderate = 0.25, power_moderate = 3, nu = 3, sigq = 0.9, include_zhat = "none" ) { y <- df[[outcome]] z <- df[[treatment]] Xc_df <- df %>% select (all_of (covariates)) is_fac_or_char <- vapply (Xc_df, function (x) is.factor (x) || is.character (x), logical (1)) 
+
+if (any (is_fac_or_char)) { Xc_df[is_fac_or_char] <- lapply (Xc_df[is_fac_or_char], factor) }Xm_df <- Xc_df Xc <- dbarts ::makeModelMatrixFromDataFrame (Xc_df) Xm <- dbarts ::makeModelMatrixFromDataFrame (Xm_df) random_intercepts = function (groups, original_colnames = TRUE) { dummies = get_dummies (groups, original_colnames = original_colnames) random_des = cbind (dummies) Q = matrix (1, nrow= ncol (random_des), ncol=1) dummies = get_dummies (groups, original_colnames) intercept_ix = get_group_indices (dummies) 
+
+return (list (randeff_design = random_des, randeff_variance_component_design = as.matrix (Q), 
+
+11 group_dummies = dummies, intercept_ix = intercept_ix )) }ri <- random_intercepts (groups = df[[id]]) fit <- suppressWarnings (bcf_continuous_linear (y = y, z = z, x_control = Xc, x_moderate = Xm, zhat = rep (0.5, length (y)), ##for CRT 
+
+# MCMC 
+
+nburn = nburn, nsim = nsim, nthin = nthin, 
+
+# mu(x) forest prior 
+
+ntree_control = ntree_control, base_control = base_control, power_control = power_control, 
+
+# tau(x) forest prior 
+
+ntree_moderate = ntree_moderate, base_moderate = base_moderate, power_moderate = power_moderate, 
+
+# sigma^2 prior 
+
+nu = nu, sigq = sigq, 
+
+# random intercepts 
+
+randeff_design = ri $randeff_design, randeff_variance_component_design = ri $randeff_variance_component_design, randeff_scales = 1, randeff_df = nu, include_zhat = include_zhat )) tau_fitted <- fit $moderate_fit tau_samps <- get_forest_fit (tau_fitted, Xm) iCATE <- colMeans (tau_samps) iCATE_CrI <- t(apply (tau_samps, 2, quantile, probs = c(0.025, 0.975))) ATE_samps <- rowMeans (tau_samps) ATE <- mean (ATE_samps) ATE_CrI <- quantile (ATE_samps, probs = c(0.025, 0.975)) 
+
+list (iCATE = iCATE, iCATE_CrI = iCATE_CrI, ATE = ATE, ATE_CrI = ATE_CrI, ite_post = tau_samps, fit = fit 
+
+12 )}
+
+#### Example usage 
+
+library (multibart) 
+
+library (dplyr) 
+
+set.seed (20251229) start <- Sys.time () res <- MBCF_HTE (df = dat_bpi_output, id = "id", treatment = "A", outcome = "Y", covariates = paste0 ("X", 1 :9), nburn = 5000, nsim = 5000, nthin = 1, ntree_control = 200, ntree_moderate = 200 )end <- Sys.time () 
+
+cat ("Elapsed time:", as.numeric (end - start), "minutes \n ") 
+
+cat (sprintf ("ATE = %.3f (95%% CrI: [%.3f, %.3f]) \n ", res $ATE, res $ATE_CrI[1], res $ATE_CrI[2])) iCATE_mat <- cbind (iCATE = res $iCATE, Lower_CrI = res $iCATE_CrI[,1], Upper_CrI = res $iCATE_CrI[,2] )
+
+head (iCATE_mat, 6) 
+
+5. CF 
+
+Reference paper: https://projecteuclid.org/journals/annals-of-statistics/volume-47/issue-2/Generalized-random-forests/10. 1214/18-AOS1709.full https://www.tandfonline.com/doi/full/10.1080/01621459.2017.1319839 https://academic.oup.com/biomet/article/108/2/299/5911092 R package: grf 
+
+Function inputs 
+
+• df 
+
+A data.frame containing CRT data. Must include at least: 
+
+– The outcome column (named by outcome )13 – The treatment indicator (named by treatment , values 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by id )• outcome 
+
+(character) 
+
+Name of the numeric continuous outcome column in df .• treatment 
+
+(character) 
+
+Name of the binary treatment column in df (must be encoded as 0/1). • covariates 
+
+(character vector) 
+
+Names of the predictor columns used as features in the causal forest. • id 
+
+(character) 
+
+Name of the cluster/group identifier column in df .Used to specify clustered sampling/variance estimation via clusters in grf::causal_forest() .• num.trees 
+
+(integer, default 2000) 
+
+Number of trees in the causal forest. • W.hat 
+
+(numeric, default 0.5) 
+
+Propensity score used by the forest. Use 0.5 when treatment is randomized with equal assignment probability; otherwise provide an esti-mated propensity score. • estimate.variance 
+
+(logical, default TRUE) 
+
+Whether to estimate prediction variance for individual treatment effects. If TRUE , the function returns 95% Wald confidence intervals for CATEs. 
+
+CF_HTE <- function (df, outcome, treatment, covariates, id, num.trees = 2000L, W.hat = 0.5, estimate.variance = TRUE) { 
+
+stopifnot (all (c(outcome, treatment, covariates, id) %in% names (df))) Y <- as.numeric (df[[outcome]]) W <- as.numeric (df[[treatment]]) 
+
+if (!all (na.omit (unique (W)) %in% c (0, 1))) stop ("Treatment must be coded as 0/1.") X <- as.matrix (df[, covariates, drop = FALSE]) clusters <- as.vector (df[[id]]) 
+
+14 fit <- grf ::causal_forest (X = X, Y = Y, W = W, W.hat = W.hat, num.trees = num.trees, clusters = clusters )pred <- stats ::predict (fit, estimate.variance = estimate.variance) tau_hat <- as.numeric (pred $predictions) 
+
+if (estimate.variance) { var_hat <- as.numeric (pred $variance.estimates) se_hat <- sqrt (var_hat) iCATE_CI <- cbind (lower_95 = tau_hat - 1.96 * se_hat, upper_95 = tau_hat + 1.96 * se_hat )} else {iCATE_CI <- NULL }ate_res <- grf ::average_treatment_effect (fit) ate_hat <- as.numeric (ate_res[["estimate"]]) ate_se <- as.numeric (ate_res[["std.err"]]) ATE_CI <- c(lower_95 = ate_hat - 1.96 * ate_se, upper_95 = ate_hat + 1.96 * ate_se )
+
+list (iCATE = tau_hat, iCATE_CI = iCATE_CI, ATE = ate_hat, ATE_CI = ATE_CI, fit_object = fit )}
+
+#### Example usage 
+
+library (grf) 
+
+set.seed (20251229) res <- CF_HTE (df = dat_bpi_output, id = "id", treatment = "A", outcome = "Y", covariates = paste0 ("X", 1 :9) )
+
+15 cat (sprintf ("ATE = %.3f (95%% CI: [%.3f, %.3f]) \n ", res $ATE, res $ATE_CI["lower_95"], res $ATE_CI["upper_95"])) iCATE_mat <- cbind (iCATE = res $iCATE, Lower_CI = res $iCATE_CI[, "lower_95"], Upper_CI = res $iCATE_CI[, "upper_95"] )
+
+head (iCATE_mat, 6) 
+
+Function inputs 6. MERF 
+
+Reference paper: https://journals.sagepub.com/doi/full/10.1177/0962280220946080 R package: LogituRF 
+
+Function inputs 
+
+• df 
+
+A data.frame containing CRT data. Must include at least: 
+
+– The outcome column (named by outcome , numeric) 
+
+– The treatment indicator (named by treatment , values 0/1 or coercible to 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by id )• id 
+
+(character) 
+
+Name of the cluster/group identifier column in df .Used for cluster-level resampling in the bootstrap and as the grouping variable in LongituRF::MERF() .• treatment 
+
+(character) 
+
+Name of the binary treatment column in df .• outcome 
+
+(character) 
+
+Name of the numeric continuous outcome column in df .• covariates 
+
+(character vector) 
+
+Names of the predictor columns used as features in the mixed-effect random forest mean function. • B
+
+(integer, default 200) 
+
+Number of cluster bootstrap replicates used to obtain uncertainty intervals for CATE and ATE. 16 • ntree 
+
+(integer, default 500) 
+
+Number of trees in the random forest component of LongituRF::MERF() .• mtry 
+
+(integer, default 3) 
+
+Number of variables randomly sampled as candidates at each split. 𝑝/3 is recommended. • sto 
+
+(character, default "none" )
+
+Defines the covariance function of the stochastic process in LongituRF::MERF() .Can be one of: 
+
+– "none" : no stochastic process 
+
+– "BM" : Brownian motion 
+
+– "OrnUhl" : standard Ornstein–Uhlenbeck process 
+
+– "BBridge" : Brownian bridge 
+
+– "fbm" : fractional Brownian motion It can also be a user-defined covariance function. 
+
+LogituRF_HTE <- function (df, id, treatment, outcome, covariates, B = 200, ntree = 500, mtry = 3, sto = "none") { 
+
+if (!requireNamespace ("LongituRF", quietly = TRUE)) { 
+
+stop ("Package 'LongituRF' is required. Please install it first.") }MERF <- LongituRF :: MERF clusters <- unique (df[[id]]) n_obs <- nrow (df) X_main_global <- as.matrix (df[, covariates, drop = FALSE]) Z_global <- matrix (1, n_obs, 1) time_global <- rep (1, n_obs) trt_by_cl <- tapply (df[[treatment]], df[[id]], function (x) { ux <- unique (x) 
+
+if (length (ux) > 1L) { 
+
+warning ("Cluster has multiple treatment values; using the first.") }ux[1] }) as01 <- function (x) { 
+
+if (is.logical (x)) return (as.integer (x)) 
+
+17 if (is.factor (x)) x <- as.character (x) 
+
+if (is.character (x)) return (ifelse (x %in% c ("1","TRUE","T","true","t"), 1L, 0L)) 
+
+as.integer (x) }cluster_trt <- as01 (trt_by_cl) cl_levels <- names (trt_by_cl) 
+
+if (length (unique (cluster_trt[ !is.na (cluster_trt)])) < 2L) { 
+
+stop ("Original data appears to have only one treatment arm across clusters.") }.all_finite_rows <- function (M) { 
+
+apply (M, 1L, function (r) all (is.finite (r))) }bootstrap_rep <- function (b) { max_tries <- 1000L tries <- 0L 
+
+repeat {sampled <- sample (clusters, length (clusters), replace = TRUE) trt_vec <- cluster_trt[ match (sampled, cl_levels)] 
+
+if (length (unique (trt_vec)) < 2L) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("Failed to get both arms after 1000 resamples.") 
+
+next 
+
+}boot_df <- do.call (rbind, 
+
+lapply (sampled, function (cl) df[df[[id]] == cl, , drop = FALSE]) )keep <- is.finite (boot_df[[outcome]]) &.all_finite_rows (as.matrix (boot_df[, covariates, drop = FALSE])) 
+
+if (!all (keep)) boot_df <- boot_df[keep, , drop = FALSE] 
+
+if (nrow (boot_df) == 0L) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("All rows non-finite after 1000 resamples.") 
+
+next 
+
+}x_mat <- as.matrix (boot_df[, covariates, drop = FALSE]) A_vec <- as01 (boot_df[[treatment]]) y_vec <- as.numeric (boot_df[[outcome]]) 
+
+if (length (unique (A_vec)) < 2L || isTRUE (all.equal (stats ::var (y_vec), 0))) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("Both arms/var(Y) failed after 1000 resamples.") 
+
+next 
+
+}Xb_main <- x_mat Xb <- cbind (A = A_vec, Xb_main) 
+
+18 Zb <- matrix (1, nrow (boot_df), 1) time_b <- rep (1, nrow (boot_df)) id_b <- boot_df[[id]] mtry_use <- min (mtry, ncol (Xb)) fit_b <- try (
+
+MERF (X = Xb, Y = y_vec, Z = Zb, id = id_b, time = time_b, ntree = ntree, mtry = mtry_use, sto = sto ), silent = TRUE )
+
+if (inherits (fit_b, "try-error")) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("MERF failed repeatedly on bootstrap samples.") 
+
+next 
+
+}new0 <- cbind (A = 0, X_main_global) new1 <- cbind (A = 1, X_main_global) dummy_id <- boot_df[[id]][1] id_pred <- rep (dummy_id, n_obs) pred0 <- try (predict (fit_b, X = new0, Z = Z_global, id = id_pred, time = time_global), silent = TRUE) 
+
+if (inherits (pred0, "try-error") || any (!is.finite (pred0))) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("Prediction (A=0) failed repeatedly.") 
+
+next 
+
+}pred1 <- try (predict (fit_b, X = new1, Z = Z_global, id = id_pred, time = time_global), silent = TRUE) 
+
+if (inherits (pred1, "try-error") || any (!is.finite (pred1))) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("Prediction (A=1) failed repeatedly.") 
+
+next 
+
+}
+
+return (drop (pred1 - pred0)) }}tau_mat <- matrix (NA_real_, nrow = B, ncol = n_obs) 
+
+19 pb <- utils ::txtProgressBar (min = 0, max = B, style = 3) 
+
+on.exit (try (close (pb), silent = TRUE), add = TRUE) 
+
+for (b in seq_len (B)) { tau_mat[b, ] <- bootstrap_rep (b) utils ::setTxtProgressBar (pb, b) }iCATE_hat <- colMeans (tau_mat) iCATE_ci <- t(apply (tau_mat, 2, stats :: quantile, probs = c(0.025, 0.975))) 
+
+colnames (iCATE_ci) <- c("lower", "upper") ATE_boot <- rowMeans (tau_mat) ATE_hat <- mean (ATE_boot) ATE_ci <- stats ::quantile (ATE_boot, probs = c(0.025, 0.975)) 
+
+list (iCATE = iCATE_hat, iCATE_CI = iCATE_ci, ATE = ATE_hat, ATE_CI = setNames (as.numeric (ATE_ci), c("lower", "upper")), raw_boot = tau_mat )}
+
+#### Example usage 
+
+library (LongituRF) 
+
+set.seed (20251229) start <- Sys.time () res <- LogituRF_HTE (df = dat_bpi_output, id = "id", treatment = "A", outcome = "Y", covariates = paste0 ("X", 1 :9), B = 5, ntree = 500, mtry = 3, sto = "none" )end <- Sys.time () 
+
+cat ("Elapsed time:", as.numeric (end - start), "minutes \n ") 
+
+head (res $iCATE) 
+
+head (res $iCATE_CI) res $ATE res $ATE_CI 
+
+7. GPBoost 
+
+Reference paper: https://www.jmlr.org/papers/v23/20-322.html 20 https://ieeexplore.ieee.org/abstract/document/9759834 R package: gpboost 
+
+Function inputs 
+
+• df 
+
+A data.frame containing CRT data. Must include at least: 
+
+– The outcome column (named by outcome , numeric) 
+
+– The treatment indicator (named by treatment , values 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by id )• id 
+
+(character) 
+
+Name of the cluster/group identifier column in df .• treatment 
+
+(character) 
+
+Name of the binary treatment column in df (must be encoded as 0/1). • outcome 
+
+(character) 
+
+Name of the numeric continuous outcome column in df .• covariates 
+
+(character vector) 
+
+Names of the predictor columns used as fixed-effect features in GPBoost. • B
+
+(integer, default 200) 
+
+Number of cluster bootstrap replicates used to obtain uncertainty intervals for CATE and ATE. • params 
+
+(list) 
+
+A list of LightGBM hyperparameters passed to gpb.train() .Common entries include: 
+
+– objective (default "regression_l2" )
+
+– learning_rate (default 0.1 )
+
+– max_depth (default 4)
+
+– min_data_in_leaf (default 100 )
+
+– lambda_l2 (default 1)
+
+– num_threads (default 1)21 • nrounds 
+
+(integer, default 2000) 
+
+Number of boosting iterations (trees) used in gpb.train() .
+
+GPBoost_HTE <- function (df, id, treatment, outcome, covariates, B = 200, params = list (objective = "regression_l2", learning_rate = 0.1, max_depth = 4, min_data_in_leaf = 100, lambda_l2 = 1, num_threads = 1), nrounds = 2000) { clusters <- unique (df[[id]]) n <- nrow (df) gid_o_num <- as.integer (factor (df[[id]], levels = unique (df[[id]]))) 
+
+if (is.null (params $force_col_wise)) params $force_col_wise <- TRUE tau_boot <- matrix (NA_real_, nrow = B, ncol = n) bootstrap_rep <- function (b) { samp_cl <- sample (clusters, size = length (clusters), replace = TRUE) boot_list <- lapply (seq_along (samp_cl), function (i) { cl <- samp_cl[i] tmp <- df[df[[id]] == cl, , drop = FALSE] tmp $boot_gid_chr <- paste0 (tmp[[id]], "__", i) tmp }) boot_df <- do.call (rbind, boot_list) boot_df $boot_gid <- as.integer (factor (boot_df $boot_gid_chr, levels = unique (boot_df $boot_gid_chr))) boot_df $boot_gid_chr <- NULL Xb <- boot_df[, covariates, drop = FALSE] Ab <- boot_df[[treatment]] 
+
+if (!is.numeric (Ab)) Ab <- as.numeric (Ab) Db <- cbind (Xb, A = Ab) 
+
+stopifnot (all (Ab %in% c (0, 1))) 
+
+stopifnot (!anyNA (Db)) 
+
+stopifnot (all (is.finite (as.matrix (Db)))) 
+
+stopifnot (all (is.finite (boot_df[[outcome]]))) dtrain <- gpb.Dataset (data = as.matrix (Db), label = boot_df[[outcome]]) gp_mod <- GPModel (group_data = boot_df $boot_gid, likelihood = "gaussian") bst <- gpb.train (data = dtrain, gp_model = gp_mod, params = params, nrounds = nrounds, verbose = 0) Xo <- df[, covariates, drop = FALSE] 
+
+22 D0 <- cbind (Xo, A = 0) D1 <- cbind (Xo, A = 1) p0 <- predict (bst, data = as.matrix (D0), group_data_pred = gid_o_num, pred_latent = TRUE) p1 <- predict (bst, data = as.matrix (D1), group_data_pred = gid_o_num, pred_latent = TRUE) ic <- as.numeric (p1 $fixed_effect - p0 $fixed_effect) 
+
+rm (dtrain, gp_mod, bst); gc (FALSE) ic }
+
+for (b in seq_len (B)) { tau_boot[b, ] <- bootstrap_rep (b) }iCATE_hat <- colMeans (tau_boot) iCATE_lb <- apply (tau_boot, 2, quantile, probs = 0.025) iCATE_ub <- apply (tau_boot, 2, quantile, probs = 0.975) ATE_boot <- rowMeans (tau_boot) ATE_hat <- mean (ATE_boot) ATE_lb <- quantile (ATE_boot, 0.025) ATE_ub <- quantile (ATE_boot, 0.975) 
+
+list (iCATE = iCATE_hat, iCATE_CI = cbind (lower = iCATE_lb, upper = iCATE_ub), ATE = ATE_hat, ATE_CI = c(lower = ATE_lb, upper = ATE_ub), tau_boot = tau_boot, ATE_boot = ATE_boot )}
+
+#### Example usage 
+
+library (gpboost) start <- Sys.time () 
+
+set.seed (20251229) result <- GPBoost_HTE (df = dat_bpi_output, id = "id", treatment = "A", outcome = "Y", covariates = paste0 ("X", 1 :9), B = 200, nrounds = 2000 )end <- Sys.time () 
+
+cat ("Elapsed time:", as.numeric (end - start), "minutes \n ") 
+
+23 cat (sprintf ("ATE = %.3f (95%% CrI: [%.3f, %.3f]) \n ", result $ATE, result $ATE_CI[1], result $ATE_CI[2] )) iCATE_mat <- cbind (iCATE = result $iCATE, Lower_CrI = result $iCATE_CI[, 1], Upper_CrI = result $iCATE_CI[, 2] )
+
+head (iCATE_mat, 6) 
+
+8. MEGB 
+
+Reference paper: https://www.nature.com/articles/s41598-025-16526-z R package: MEGB 
+
+Function inputs 
+
+• df 
+
+A data.frame containing CRT data. Must include at least: 
+
+– The outcome column (named by outcome , numeric) 
+
+– The treatment indicator (named by treatment , values 0/1 or coercible to 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by id )• id 
+
+(character) 
+
+Name of the cluster/group identifier column in df .Used as the trajectory identifier ( id ) in MEGB::MEGB() and for cluster-level resampling in the bootstrap. • treatment 
+
+(character) 
+
+Name of the binary treatment column in df .• outcome 
+
+(character) 
+
+Name of the numeric continuous outcome column in df .• covariates 
+
+(character vector) 
+
+Names of the predictor columns used as fixed-effect features in MEGB. • B
+
+(integer, default 200) 
+
+Number of cluster bootstrap replicates used to construct uncertainty intervals for CATE and ATE. 24 • ntree 
+
+(integer, default 500) 
+
+Number of trees to grow in the boosting expansion in MEGB. • shrinkage 
+
+(numeric, default 0.05) 
+
+Learning rate / step-size reduction applied to each tree in the boosting expansion. • interaction.depth 
+
+(integer, default 2) 
+
+Maximum depth of variable interactions in the boosting model. 
+
+– 1 fits an additive model 
+
+– 2 allows up to two-way interactions, etc. • n.minobsinnode 
+
+(integer, default 5) 
+
+Minimum number of observations allowed in a terminal node of each tree. 
+
+MEGB_HTE <- function (df, id, treatment, outcome, covariates, B = 200, ntree = 500, shrinkage = 0.05, interaction.depth = 2, n.minobsinnode = 5) { 
+
+if (!requireNamespace ("MEGB", quietly = TRUE)) { 
+
+stop ("Package 'MEGB' is required. Please install it first.") }MEGB_fit <- MEGB :: MEGB clusters <- unique (df[[id]]) n_obs <- nrow (df) X_main <- as.matrix (df[, covariates, drop = FALSE]) time <- rep (1, n_obs) as01 <- function (x) { 
+
+if (is.logical (x)) return (as.integer (x)) 
+
+if (is.factor (x)) x <- as.character (x) 
+
+if (is.character (x)) return (ifelse (x %in% c ("1","TRUE","T","true","t"), 1L, 0L)) 
+
+as.integer (x) }trt_by_cl <- tapply (df[[treatment]], df[[id]], function (x) { ux <- unique (x) 
+
+if (length (ux) > 1L) { 
+
+warning ("Cluster has multiple treatment values; using the first.") }ux[1] }) 
+
+25 cluster_trt <- as01 (trt_by_cl) cl_levels <- names (trt_by_cl) 
+
+if (length (unique (cluster_trt[ !is.na (cluster_trt)])) < 2L) { 
+
+stop ("Original data appears to have only one treatment arm across clusters.") }bootstrap_rep <- function (b) { max_tries <- 1000L tries <- 0L 
+
+repeat {sampled <- sample (clusters, length (clusters), replace = TRUE) trt_vec <- cluster_trt[ match (sampled, cl_levels)] 
+
+if (length (unique (trt_vec)) < 2L) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("Failed to get both arms after 1000 resamples.") 
+
+next 
+
+}boot_df <- do.call (rbind, 
+
+lapply (sampled, function (cl) df[df[[id]] == cl, , drop = FALSE]) )Xb_main <- as.matrix (boot_df[, covariates, drop = FALSE]) Ab <- as01 (boot_df[[treatment]]) id_b <- boot_df[[id]] Zb <- matrix (1, nrow (boot_df), 1) time_b <- rep (1, nrow (boot_df)) Xb_simple <- cbind (A = Ab, Xb_main) fit_b <- try (
+
+MEGB_fit (X = Xb_simple, Y = boot_df[[outcome]], id = id_b, Z = Zb, time = time_b, ntree = ntree, shrinkage = shrinkage, interaction.depth = interaction.depth, n.minobsinnode = n.minobsinnode ), silent = TRUE )
+
+if (inherits (fit_b, "try-error")) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("MEGB failed repeatedly on bootstrap samples.") 
+
+next 
+
+}new0 <- cbind (A = 0, X_main) new1 <- cbind (A = 1, X_main) 
+
+26 Z0 <- matrix (1, n_obs, 1) dummy_id <- sampled[1] id_pred <- rep (dummy_id, n_obs) pred0 <- try (predict (fit_b, X = new0, Z = Z0, id = id_pred, time = time), silent = TRUE) 
+
+if (inherits (pred0, "try-error") || any (!is.finite (pred0))) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("Prediction (A=0) failed repeatedly.") 
+
+next 
+
+}pred1 <- try (predict (fit_b, X = new1, Z = Z0, id = id_pred, time = time), silent = TRUE) 
+
+if (inherits (pred1, "try-error") || any (!is.finite (pred1))) { tries <- tries + 1L 
+
+if (tries >= max_tries) stop ("Prediction (A=1) failed repeatedly.") 
+
+next 
+
+}
+
+return (drop (pred1 - pred0)) }}tau_mat <- matrix (NA_real_, nrow = B, ncol = n_obs) pb <- utils ::txtProgressBar (min = 0, max = B, style = 3) 
+
+on.exit (try (close (pb), silent = TRUE), add = TRUE) 
+
+for (b in seq_len (B)) { tau_mat[b, ] <- bootstrap_rep (b) utils ::setTxtProgressBar (pb, b) }iCATE_hat <- colMeans (tau_mat) iCATE_ci <- t(apply (tau_mat, 2, stats :: quantile, probs = c(0.025, 0.975))) 
+
+colnames (iCATE_ci) <- c("lower", "upper") ATE_boot <- rowMeans (tau_mat) ATE_hat <- mean (ATE_boot) ATE_ci <- stats ::quantile (ATE_boot, probs = c(0.025, 0.975)) 
+
+list (iCATE = iCATE_hat, iCATE_CI = iCATE_ci, ATE = ATE_hat, ATE_CI = setNames (as.numeric (ATE_ci), c("lower", "upper")), raw_boot = tau_mat )}
+
+#### Example usage 
+
+library (MEGB) 
+
+set.seed (20251229) start <- Sys.time () res <- MEGB_HTE (
+
+27 df = dat_bpi_output, id = "id", treatment = "A", outcome = "Y", covariates = paste0 ("X", 1 :9), B = 200, ntree = 500, shrinkage = 0.05, interaction.depth = 2, n.minobsinnode = 100 )end <- Sys.time () 
+
+cat ("Elapsed time:", as.numeric (end - start), "minutes \n ") 
+
+head (res $iCATE) 
+
+head (res $iCATE_CI) res $ATE res $ATE_CI 
+
+9. mermboost 
+
+Reference paper: https://link.springer.com/article/10.1007/s11222-025-10612-y package: mermboost 
+
+Function inputs 
+
+• data 
+
+A data.frame containing CRT data. Must include at least: 
+
+– The outcome column (named by outcome , numeric) 
+
+– The treatment indicator (named by treatment , values 0/1 or coercible to 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by id )• outcome 
+
+(character) 
+
+Name of the numeric continuous outcome column in data .• treatment 
+
+(character) 
+
+Name of the binary treatment column in data .• id 
+
+(character) 
+
+Name of the cluster/group identifier column in data .Converted to a factor and used as the random-intercept grouping term (1 | id) in the mixed-effects boosting model. Also used for cluster-level bootstrap resampling .28 • covariates 
+
+(character vector) 
+
+Names of candidate baseline covariates. The function builds main-effect terms and treatment interaction terms using bols() / bbs() depending on the number of unique values and whether the covariate varies within both treatment arms. • mstop_max 
+
+(integer, default 2000) 
+
+Maximum number of boosting iterations considered for the initial model fit. The function fits an initial mermboost model with mstop = mstop_max , then selects an optimal stop-ping iteration best_m via cross-validation. • folds 
+
+(integer, default 5) 
+
+Number of cross-validation folds used in mer_cvrisk() to select the optimal boosting stopping iteration 
+
+best_m .• B
+
+(integer, default 200) 
+
+Number of cluster bootstrap replicates used to obtain uncertainty intervals for CATE and ATE. • mc.cores 
+
+(integer, default detectCores() - 1 )
+
+Number of CPU cores used for the bootstrap. 
+
+mermboost_HTE <- function (data, outcome, treatment, id, covariates, mstop_max = 2000, folds = 5, B = 200, mc.cores = detectCores () - 1) { df <- data MIN_UNIQUES_FOR_SPLINE <- 10L .to_num <- function (x) { 
+
+if (is.logical (x)) return (as.integer (x)) 
+
+if (is.factor (x)) x <- as.character (x) 
+
+suppressWarnings (as.numeric (x)) }as01 <- function (x) { 
+
+if (is.logical (x)) return (as.integer (x)) 
+
+if (is.factor (x)) x <- as.character (x) 
+
+if (is.character (x)) return (ifelse (x %in% c ("1","TRUE","T","true","t"), 1L, 0L)) 
+
+as.integer (x) }covariates <- intersect (covariates, colnames (df)) covariates <- setdiff (covariates, c(id, treatment)) 
+
+if (!length (covariates)) stop ("No valid covariates after filtering id/treatment.") 
+
+29 A01 <- as01 (df[[treatment]]) is_dup_of_A <- function (v) { xv <- .to_num (df[[v]]); ok <- is.finite (xv) & is.finite (A01) u <- unique (xv[ok]); if (length (u) != 2L) return (FALSE) mapped <- ifelse (xv == max (u, na.rm=TRUE), 1L, 0L) 
+
+all (mapped[ok] == A01[ok]) }
+
+if (length (covariates)) { dup_mask <- vapply (covariates, is_dup_of_A, logical (1)) 
+
+if (any (dup_mask)) covariates <- covariates[ !dup_mask] }
+
+if (!length (covariates)) stop ("No valid covariates after filtering equivalence to treatment.") cont <- covariates[ sapply (covariates, 
+
+function (v) is.numeric (df[[v]]) && length (unique (df[[v]])) > 2)] binary <- covariates[ sapply (covariates, 
+
+function (v) length (unique (df[[v]])) == 2)] others <- covariates[ sapply (covariates, 
+
+function (v) is.factor (df[[v]]) && length (unique (df[[v]])) > 2)] 
+
+#if (length(cont) > 0) df[cont] <- scale(df[cont], center = TRUE, scale = FALSE) 
+
+df[[id]] <- factor (df[[id]]) df $A_num <- A01 has_var_both <- function (v, dat=df) { xv <- .to_num (dat[[v]]) s0 <- stats ::sd (xv[dat $A_num == 0], na.rm = TRUE) s1 <- stats ::sd (xv[dat $A_num == 1], na.rm = TRUE) 
+
+is.finite (s0) && is.finite (s1) && s0 > 0 && s1 > 0}ok_by_cont <- if (length (cont)) cont[ sapply (cont, 
+
+function (v) has_var_both (v, df)) ] 
+
+else character (0) ok_by_binary <- if (length (binary)) binary[ sapply (binary, 
+
+function (v) has_var_both (v, df)) ] 
+
+else character (0) ok_by_others <- if (length (others)) { keep <- vapply (others, function (v) { tb0 <- length (unique (df[df $A_num == 0, v, drop=TRUE])) tb1 <- length (unique (df[df $A_num == 1, v, drop=TRUE])) tb0 >= 2 && tb1 >= 2}, logical (1)) others[keep] } else character (0) nuniq <- setNames (sapply (cont, function (v) length (unique (df[[v]]))), cont) mk_bbs_main <- function (v) { u <- nuniq[[v]] 
+
+if (is.na (u) || u < MIN_UNIQUES_FOR_SPLINE) { 
+
+sprintf ("bols(%s, intercept=FALSE, lambda=1e-4)", v) } else {df_use <- min (5L, u - 1L) k_use <- min (8L, max (6L, u - 2L)) 
+
+30 sprintf ("bbs(%s)", v) }}mk_bbs_by <- function (v) { u <- nuniq[[v]] 
+
+if (is.na (u) || u < MIN_UNIQUES_FOR_SPLINE) { 
+
+sprintf ("bols(%s, by=A_num, lambda=1e-4)", v) } else {df_use <- min (5L, u - 1L) k_use <- min (8L, max (6L, u - 2L)) 
+
+sprintf ("bbs(%s, by=A_num)", v) }}main <- c("bols(A_num, intercept=FALSE, lambda=1e-4)", 
+
+if (length (cont)) sapply (cont, mk_bbs_main), 
+
+if (length (binary)) sapply (binary, 
+
+function (v) sprintf ("bols(%s, intercept=FALSE, lambda=1e-4)", v)), 
+
+if (length (others)) sapply (others, 
+
+function (v) sprintf ("bols(%s, intercept=FALSE, lambda=1e-4)", v)) )inter <- c(
+
+if (length (ok_by_cont)) sapply (ok_by_cont, mk_bbs_by), 
+
+if (length (ok_by_binary)) sapply (ok_by_binary, 
+
+function (v) sprintf ("bols(%s, by=A_num, lambda=1e-4)", v)), 
+
+if (length (ok_by_others)) sapply (ok_by_others, 
+
+function (v) sprintf ("bols(%s, by=A_num, lambda=1e-4)", v)) )rand <- sprintf ("(1 | %s)", id) fmla <- as.formula (paste0 (outcome, " ~ ", paste (c(main, inter, rand), collapse = " + "))) best_m <- tryCatch ({ fit0 <- suppressWarnings (suppressMessages (
+
+mermboost (fmla, data = df, family = gaussian (), control = boost_control (mstop = mstop_max)) )) cv <- suppressWarnings (suppressMessages (mer_cvrisk (fit0, no_of_folds = folds))) 
+
+mstop (cv) }, error = function (e) { 
+
+warning ("initial CV choose mstop fail, use mstop_max = ", mstop_max, "￿reason￿", e $message) mstop_max }) 
+
+## Bootstrap 
+
+new0 <- df; new0 $A_num <- 0 new1 <- df; new1 $A_num <- 1 clusters <- unique (df[[id]]) one_boot <- function (i) { 
+
+tryCatch ({ 
+
+suppressWarnings (suppressMessages ({ tries <- 0L 
+
+31 repeat {tries <- tries + 1L samp_cl <- sample (clusters, length (clusters), replace = TRUE) df_b <- do.call (rbind, lapply (seq_along (samp_cl), function (k) { tmp <- df[df[[id]] == samp_cl[k], , drop = FALSE] tmp[[id]] <- factor (sprintf ("%s__boot%04d", as.character (tmp[[id]]), k)) tmp })) df_b[[id]] <- droplevels (df_b[[id]]) keep <- is.finite (.to_num (df_b[[outcome]])) num_cols <- names (which (vapply (df_b[, covariates, drop = FALSE], is.numeric, logical (1)))) 
+
+if (length (num_cols)) { keep <- keep & apply (is.finite (as.matrix (df_b[, num_cols, drop = FALSE])), 1L, all) }
+
+if (!all (keep)) df_b <- df_b[keep, , drop = FALSE] 
+
+if (nrow (df_b) == 0L) { if (tries >= 1000L) 
+
+return (list (iCATE= rep (NA_real_, nrow (df)), ATE=NA_real_)); next }
+
+if (length (unique (df_b $A_num)) == 2L && !isTRUE (all.equal (stats ::var (.to_num (df_b[[outcome]])), 0))) break if (tries >= 1000L) return (list (iCATE= rep (NA_real_, nrow (df)), ATE=NA_real_)) }has_var_both_b <- function (v) has_var_both (v, dat = df_b) ok_by_cont_b <- if (length (cont)) cont[ sapply (cont, has_var_both_b) ] else character (0) ok_by_binary_b <- if (length (binary)) binary[ sapply (binary, has_var_both_b) ] else character (0) ok_by_others_b <- if (length (others)) { keep2 <- vapply (others, function (v) { tb0 <- length (unique (df_b[df_b $A_num == 0, v, drop=TRUE])) tb1 <- length (unique (df_b[df_b $A_num == 1, v, drop=TRUE])) tb0 >= 2 && tb1 >= 2}, logical (1)) others[keep2] } else character (0) nuniq_b <- setNames (sapply (cont, function (v) length (unique (df_b[[v]]))), cont) mk_bbs_main_b <- function (v) { u <- nuniq_b[[v]] 
+
+if (is.na (u) || u < MIN_UNIQUES_FOR_SPLINE) { 
+
+sprintf ("bols(%s, intercept=FALSE, lambda=1e-4)", v) } else {df_use <- min (5L, u - 1L) k_use <- min (8L, max (6L, u - 2L)) 
+
+sprintf ("bbs(%s)", v) }}mk_bbs_by_b <- function (v) { u <- nuniq_b[[v]] 
+
+if (is.na (u) || u < MIN_UNIQUES_FOR_SPLINE) { 
+
+sprintf ("bols(%s, by=A_num, lambda=1e-4)", v) } else {df_use <- min (5L, u - 1L) 
+
+32 k_use <- min (8L, max (6L, u - 2L)) 
+
+sprintf ("bbs(%s, by=A_num)", v) }}main_b <- c("bols(A_num, intercept=FALSE, lambda=1e-4)", 
+
+if (length (cont)) sapply (cont, mk_bbs_main_b), 
+
+if (length (binary)) sapply (binary, 
+
+function (v) 
+
+sprintf ("bols(%s, intercept=FALSE, lambda=1e-4)", v)), 
+
+if (length (others)) sapply (others, 
+
+function (v) 
+
+sprintf ("bols(%s, intercept=FALSE, lambda=1e-4)", v)) )inter_b <- c(
+
+if (length (ok_by_cont_b)) sapply (ok_by_cont_b, mk_bbs_by_b), 
+
+if (length (ok_by_binary_b)) sapply (ok_by_binary_b, 
+
+function (v) 
+
+sprintf ("bols(%s, by=A_num, lambda=1e-4)", v)), 
+
+if (length (ok_by_others_b)) sapply (ok_by_others_b, 
+
+function (v) 
+
+sprintf ("bols(%s, by=A_num, lambda=1e-4)", v)) )fmla_b <- as.formula (paste0 (outcome, " ~ ", paste (c(main_b, inter_b, rand), collapse = " + "))) fit_b <- mermboost (fmla_b, data = df_b, family = gaussian (), control = boost_control (mstop = best_m) )mu0_b <- predict (fit_b, newdata = new0, type = "response", RE = FALSE) mu1_b <- predict (fit_b, newdata = new1, type = "response", RE = FALSE) iC_b <- mu1_b - mu0_b 
+
+list (iCATE = iC_b, ATE = mean (iC_b)) })) }, error = function (e) { 
+
+warning ("bootstrap ", i, " fail: ", e $message) 
+
+list (iCATE = rep (NA_real_, nrow (df)), ATE = NA_real_) }) }
+
+if (mc.cores <= 1L) { boot_list <- lapply (seq_len (B), one_boot) } else if (.Platform $OS.type == "unix") { boot_list <- parallel ::mclapply (seq_len (B), one_boot, mc.cores = mc.cores, mc.set.seed = TRUE) } else {cl <- parallel ::makeCluster (mc.cores) parallel ::clusterEvalQ (cl, library (mermboost)) parallel ::clusterExport (cl, 
+
+c("df","fmla","new0","new1","id","treatment","best_m", 
+
+33 "covariates","clusters","outcome","one_boot",".to_num","as01", "MIN_UNIQUES_FOR_SPLINE","cont","binary","others"), envir = environment () )boot_list <- parallel ::parLapply (cl, seq_len (B), one_boot) parallel ::stopCluster (cl) }ite_mat <- do.call (cbind, lapply (boot_list, `[[`, "iCATE")) ate_vec <- sapply (boot_list, `[[`, "ATE") iCATE_point <- rowMeans (ite_mat, na.rm = TRUE) iCATE_CI <- t(apply (ite_mat, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE)) ATE_point <- mean (ate_vec, na.rm = TRUE) ATE_CI <- quantile (ate_vec, c(0.025, 0.975), na.rm = TRUE) 
+
+list (best_m = best_m, ATE = ATE_point, ATE_CI = ATE_CI, iCATE = iCATE_point, iCATE_CI = iCATE_CI, ate_vec = ate_vec, ite_mat = ite_mat )}
+
+#### Example usage 
+
+library (mermboost) res <- mermboost_HTE (data = dat_bpi_output, outcome = "Y", treatment = "A", id = "id", covariates = paste0 ("X", 1 :9), mstop_max = 5000, folds = 5, B = 5, mc.cores = detectCores () - 1)res $ATE res $ATE_CI 
+
+head (res $iCATE) 
+
+head (res $iCATE_CI) 
+
+10. GAMM 
+
+Reference paper: https://academic.oup.com/jrsssb/article/73/1/3/7034726 R package: mgcv 
+
+Function inputs 
+
+34 • df 
+
+A data.frame containing CRT data. Must include at least: 
+
+– The outcome column (named by outcome )
+
+– The treatment indicator (named by treatment , values 0/1) 
+
+– All covariate columns (named in covariates )
+
+– The cluster ID column (named by cluster )• outcome 
+
+(character) 
+
+Name of the outcome column in df .• treatment 
+
+(character) 
+
+Name of the binary treatment column in df (must be encoded as 0/1). • covariates 
+
+(character vector) 
+
+Names of baseline covariates to include in the model. The function automatically: 
+
+– keeps only valid column names in df 
+
+– classifies covariates into continuous / binary (0/1) / multi-level factors 
+
+– chooses smooth vs linear terms for continuous covariates depending on support within both treat-ment arms • cluster 
+
+(character) 
+
+Name of the cluster/group identifier column in df .• family 
+
+(family object, default gaussian() )
+
+Outcome distribution and link function used for model fitting (e.g., gaussian() , binomial() ). • nsim 
+
+(integer, default 2000) 
+
+Number of coefficient draws used to simulate uncertainty intervals. • use_bam 
+
+(logical, default FALSE) 
+
+If TRUE , fits the model using mgcv::bam() with a penalized random effect term s(cluster, bs="re") .If FALSE , attempts mgcv::gamm() first; if gamm() fails, falls back to mgcv::gam() with s(cluster, bs="re") .• select 
+
+(logical, default TRUE) 
+
+Passed to mgcv to enable additional smoothness/term selection penalization. • min_unique 
+
+(integer, default 5) 
+
+Minimum number of unique values within each treatment arm required to allow a continuous covariate to be modeled with smooth terms. If the support is insufficient, the covariate is included as a linear main effect plus a linear treatment interaction instead. 35 GAMM_HTE <- function (df, outcome, treatment, covariates, cluster, family = gaussian (), nsim = 2000, use_bam = FALSE, select = TRUE, min_unique = 5) { 
+
+stopifnot (requireNamespace ("mgcv", quietly = TRUE)) 
+
+stopifnot (requireNamespace ("MASS", quietly = TRUE)) df[[cluster]] <- factor (df[[cluster]]) df[[cluster]] <- droplevels (df[[cluster]]) 
+
+if (!all (df[[treatment]] %in% c (0, 1))) stop ("`treatment` must be coded 0/1.") df $A_num <- as.integer (df[[treatment]]) covariates <- unique (as.character (covariates)) covariates <- intersect (covariates, colnames (df)) 
+
+if (!length (covariates)) stop ("No valid covariates.") is_binary01 <- function (x) { 
+
+if (is.logical (x)) return (TRUE) u <- unique (x[ !is.na (x)]) 
+
+if (is.factor (u) || is.character (u)) u <- suppressWarnings (as.numeric (as.character (u))) 
+
+is.numeric (u) && length (u) <= 2 && all (u %in% c (0, 1)) }allow_smooth <- function (x, A, min_unique = 5) { 
+
+if (!is.numeric (x)) return (FALSE) ok <- is.finite (x) x0 <- unique (x[ ok & A == 0 ]) x1 <- unique (x[ ok & A == 1 ]) nu <- length (unique (x[ok])) 
+
+length (x0) >= min_unique && length (x1) >= min_unique && nu >= 4}A <- df[[treatment]] cov_bin <- covariates[ vapply (covariates, function (v) is_binary01 (df[[v]]), logical (1))] cov_cont <- covariates[ vapply (covariates, 
+
+function (v) is.numeric (df[[v]]) && !is_binary01 (df[[v]]), 
+
+logical (1) )] used <- union (cov_bin, cov_cont) cov_fac <- setdiff (covariates, used) 
+
+if (length (cov_fac)) { cov_fac <- cov_fac[ vapply (cov_fac, function (v) is.factor (df[[v]]), logical (1))] 
+
+if (length (cov_fac)) { df[cov_fac] <- lapply (df[cov_fac], droplevels) cov_fac <- cov_fac[ vapply (cov_fac, function (v) nlevels (df[[v]]) >= 2, logical (1))] }}
+
+36 ## build formula: A + X + A_num:X 
+
+terms <- c("A_num") 
+
+if (length (cov_cont)) { 
+
+for (m in cov_cont) { 
+
+if (allow_smooth (df[[m]], A, min_unique)) { terms <- c(terms, 
+
+sprintf ("s(%s, bs='cr')", m), 
+
+sprintf ("s(%s, by=A_num, bs='cr')", m)) } else {terms <- c(terms, m, sprintf ("A_num:%s", m)) }}}
+
+if (length (cov_bin)) { terms <- c(terms, cov_bin, paste0 ("A_num:", cov_bin)) }
+
+if (length (cov_fac)) { terms <- c(terms, cov_fac, paste0 ("A_num:", cov_fac)) }
+
+if (!length (terms)) stop ("No terms left for the model.") fmla <- as.formula (sprintf ("%s ~ %s", outcome, paste (terms, collapse = " + "))) fit_source <- "gamm" fit_lme <- NULL 
+
+if (use_bam) { re_term <- sprintf ("s(%s, bs='re')", cluster) fmla_bam <- as.formula (paste (paste (deparse (fmla), collapse = " "), "+", re_term)) fit_gam <- mgcv ::bam (fmla_bam, data = df, family = family, method = "fREML", discrete = TRUE, select = select) fmla_final <- fmla_bam fit_source <- "bam" } else {ctrl <- nlme ::lmeControl (apVar = FALSE, returnObject = TRUE, msMaxIter = 200, msMaxEval = 400, niterEM = 0, tolerance = 1e-6, msVerbose = FALSE )gamm_fit_try <- try (mgcv ::gamm (fmla, data = df, family = family, random = stats ::setNames (list (~1), cluster), method = "REML", control = ctrl), silent = TRUE )
+
+if (inherits (gamm_fit_try, "try-error")) { re_term <- sprintf ("s(%s, bs='re')", cluster) 
+
+37 fmla_gam <- as.formula (paste (paste (deparse (fmla), collapse = " "), "+", re_term)) fit_gam <- mgcv ::gam (fmla_gam, data = df, family = family, method = "REML", select = select) fit_lme <- NULL fit_source<- "gam_fallback" fmla_final<- fmla_gam } else {fit_gam <- gamm_fit_try $gam fit_lme <- gamm_fit_try $lme fmla_final<- fmla fit_source<- "gamm" }}df0 <- df; df0[[treatment]] <- 0; df0 $A_num <- 0L df1 <- df; df1[[treatment]] <- 1; df1 $A_num <- 1L mu0_hat <- as.numeric (predict (fit_gam, newdata = df0, type = "response")) mu1_hat <- as.numeric (predict (fit_gam, newdata = df1, type = "response")) iCATE <- mu1_hat - mu0_hat ATE <- mean (iCATE, na.rm = TRUE) X0 <- predict (fit_gam, newdata = df0, type = "lpmatrix") X1 <- predict (fit_gam, newdata = df1, type = "lpmatrix") beta_hat <- stats ::coef (fit_gam) V <- mgcv ::vcov.gam (fit_gam, unconditional = TRUE) beta_sims <- MASS ::mvrnorm (n = nsim, mu = beta_hat, Sigma = V) eta0 <- X0 %*% t (beta_sims) eta1 <- X1 %*% t (beta_sims) linkinv <- family $linkinv; if (is.null (linkinv)) linkinv <- function (z) z mu0_sim <- linkinv (eta0) mu1_sim <- linkinv (eta1) iCATE_sim_mat <- mu1_sim - mu0_sim ATE_sim <- colMeans (iCATE_sim_mat, na.rm = TRUE) iCATE_CI <- t(apply (iCATE_sim_mat, 1, stats :: quantile, probs = c(0.025, 0.975), na.rm = TRUE)) ATE_CI <- as.numeric (stats ::quantile (ATE_sim, probs = c(0.025, 0.975), na.rm = TRUE)) 
+
+list (iCATE = iCATE, iCATE_CI = iCATE_CI, ATE = ATE, ATE_CI = ATE_CI, fit_gam = fit_gam, fit_lme = fit_lme, pieces = list (cov_cont = cov_cont, cov_bin = cov_bin, cov_fac = cov_fac, formula = fmla_final, 
+
+38 fit_source= fit_source ))}
+
+#### Example usage 
+
+library (mgcv) res <- GAMM_HTE (df = dat_bpi_output, outcome = "Y", treatment = "A", cluster = "id", covariates = paste0 ("X", 1 :9), min_unique = 6 )res $ATE res $ATE_CI 
+
+head (res $iCATE) 
+
+head (res $iCATE_CI) 
+
+39

@@ -1,0 +1,654 @@
+Title: MedRCube: A Multidimensional Framework for Fine-Grained and In-Depth Evaluation of MLLMs in Medical Imaging
+
+URL Source: https://arxiv.org/pdf/2604.13756v1
+
+Published Time: Thu, 16 Apr 2026 01:01:11 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# MedRCube: A Multidimensional Framework for Fine-Grained and In-Depth Evaluation of MLLMs in Medical Imaging 
+
+Zhijie Bao 1, 2† , Fangke Chen 2, 3† , Licheng Bao 1, Chenhui Zhang 1,Wei Chen 4, Jiajie Peng 5* , Zhongyu Wei 1, 2* 1School of Data Science, Fudan University, China, 
+
+> 2
+
+Shanghai Innovation Institute, China, 
+
+> 3
+
+School of Integrated Circuits, Zhejiang University, China, 
+
+> 4
+
+School of Software Engineering, Huazhong University of Science and Technology, China, 
+
+> 5
+
+School of Computer Science, Northwestern Polytechnical University, China, 
+
+zjbao24@m.fudan.edu.cn, fkchen@zju.edu.cn jiajiepeng@nwpu.edu.cn, zywei@fudan.edu.cn 
+
+Abstract 
+
+The potential of Multimodal Large Language Models (MLLMs) in domain of medical imag-ing raise the demands of systematic and rig-orous evaluation frameworks that are aligned with the real-world medical imaging practice. Existing practices that report single or coarse-grained metrics are lack the granularity re-quired for specialized clinical support and fail to assess the reliability of reasoning mecha-nisms. To address this, we propose a paradigm shift toward multidimensional, fine-grained and in-depth evaluation. Based on a two-stage systematic construction pipeline designed for this paradigm, we instantiate it with MedR-Cube. We benchmark 33 MLLMs, Lingshu-32B achieve top-tier performance. Crucially, MedRCube exposes a series of pronounced insights inaccessible under prior evaluation settings. Furthermore, we introduce a cred-ibility evaluation subset to quantify reason-ing credibility, uncover a highly significant positive association between shortcut behav-ior and diagnostic task performance, raising concerns for clinically trustworthy deployment. The resources of this work can be found at 
+
+https://github.com/F1mc/MedRCube .
+
+1 Introduction 
+
+Multimodal large language models (MLLMs) have recently demonstrated strong performance in med-ical imaging tasks, indicating their potential for a wide range of radiology-related applications (Fang et al., 2025; Chen et al., 2024a; Bluethgen et al., 2025; Yang et al., 2024). At the same time, emerging studies and reports suggest that clini-cians are beginning to use MLLMs as decision-
+
+> †The two authors contribute equal to this work.
+> *Corresponding authors.
+
+Figure 1: Paradigm shift required for evaluating multi-modal large language models in medical imaging. 
+
+support tools and to incorporate them into radiol-ogy workflows (Hou et al., 2025; Wada et al., 2025). Given the safety-critical nature of clinical decision-making, this development highlights the need for systematic and rigorous evaluation frameworks that are aligned with the requirements and constraints of real-world medical imaging practice. To evaluate the capabilities of multimodal large language models (MLLMs) in medical imaging tasks, several medical visual question answering (VQA) benchmarks have been introduced, such as VQA-RAD and SLAKE (Lau et al., 2018; Liu et al., 2021). These benchmarks provide a stan-dardized setting for model evaluation and compari-son. In practice, existing evaluation protocols com-monly report model performance using a single aggregate score, or adopt coarse-grained metrics defined along dimensions such as imaging modal-ity or anatomical region (Lau et al., 2018; Hu et al., 2024; Ye et al., 2024). While valuable, current evaluations (i) lack the granularity required for specialized clinical sup-
+
+> arXiv:2604.13756v1 [cs.CL] 15 Apr 2026
+
+port . Since healthcare is strictly compartmental-ized, aggregate scores (e.g., general magnetic reso-nance imaging performance) offer little assurance to specialists like cardiologists, who need valida-tion on specific pathologies rather than broad met-rics. More critically, existing protocols (ii) fail to assess the reliability of reasoning mechanisms . As clinical diagnosis follows a strict logical hierarchy, current metrics cannot distinguish valid reasoning from "hallucinated correctness", where a model out-puts the right diagnosis without correctly perceiv-ing the target organ. Such evidence-free decisions are inadmissible in rigorous clinical practice. These two limitations reveal the gap between the current evaluation framework and the need in clinical sce-narios and require a paradigm shift. We therefore argue for a multidimensional evaluation framework that reflects the inherent complexity of medical imaging by transforming assessment from a linear list of metrics into a dense, fine-grained compe-tency space. This structure enables granular anal-ysis, allowing researchers to disaggregate perfor-mance data to identify specific capability profiles and verify the validity of reasoning mechanisms—a prerequisite for trustworthy clinical deployment. However, implementing this framework presents significant challenges. Such fine-grained analysis requires comprehensive coverage of the structured competency space, yet available resources remain loosely organized and unevenly distributed (Project Imaging-X Contributors, 2025). Furthermore, the requirement for clinical reliability demands a stan-dard of item rigor and quality that significantly exceeds previous benchmarks (VYDARENY et al., 1986; Gunabushanam et al., 2019). To address these challenges, we developed a two-stage frame-work to transform fragmented data into a structured competency space, enabling the large-scale genera-tion of rigorous items. Throughout the framework, we ground complementary clinical knowledge re-sources (e.g., HPO, RadLex, ICD-11) and clini-cian verification to ensure clinical rigor and consis-tency (Köhler et al., 2021; Radiological Society of North America, 2024; World Health Organization, 2022). Building on this framework, we present MedR-Cube , a multidimensional medical imaging bench-mark designed for the fine-grained and in-depth evaluation of MLLMs. It organizes evaluation across three dimensions: Anatomical Region (5 types), Imaging Modality (4 types) and Task Type 
+
+(8 tasks). Notably, we structure the task dimension into a cognitive hierarchy covering perception, se-mantics, and cognition to align with clinical rea-soning processes. In total, MedRCube comprises 7,626 samples curated from 36 datasets. Beyond coarse ranking, MedRCube enables anal-yses addressing the following three research ques-tions: • RQ0 (Overall capability profiling). How do MLLMs perform across the competency axes of anatomy, modality, and task hierarchy? • RQ1 (Skill factors and relationships). What underlying capability factors or relationship patterns emerge across the structured compe-tency space from a cross-model perspective? • RQ2 (Credibility and shortcut behavior). 
+
+Do models exhibit grounded reasoning or rely on shortcuts? Specifically, do they produce correct high-level answers despite failing pre-requisite tasks, and how can this behavior be quantified? Using MedRCube, we benchmark 33 MLLMs .Beyond overall ranking, MedRCube yields insight largely inaccessible to flat metrics, including a "foundational blindness" that reveals models lack robust mastery of basic but rare perceptual prim-itive, a pronounced "brain island" effect reveal-ing the isolation of brain-related capabilities, and a highly significant positive association between shortcut behavior and high-level performance. This indicates that stronger models show more oppor-tunistic reliance on shortcuts in high-level tasks. 
+
+2 The MedRCube Framework: Concept and Design 
+
+2.1 Overview 
+
+To address the limitations of flat metrics, we in-troduce a multidimensional evaluation framework designed for fine-grained capability profiling and in-depth analysis. This framework organizes eval-uation units into a dense competency space de-fined by anatomical regions, imaging modalities, and a cognitive task hierarchy. This structured de-sign moves beyond aggregate scoring, enabling a 
+
+three-level in-depth evaluation that assesses both granular capability and reasoning credibility. 
+
+2.2 Competency Space 
+
+The core of MedRCube is its multi-dimensional taxonomy. We conceptually model the benchmark as a structured space, named as the Competency Figure 2: Overview of MedRCube. The framework evaluates models along Anatomical, Modality, and Task Hierarchy axes. The pipeline (right) aligns datasets via Stage I and generates rigorous items via Stage II with expert verification. 
+
+Space along three orthogonal axes: 
+
+Anatomical & Modality Axes. To ensure broad clinical coverage, we encompass five anatomical regions, including the Heart, Chest, Breast, Lung, and Brain, along with four imaging modalities, namely X-ray, Computed Tomography (CT), Mag-netic Resonance Imaging (MRI), and Ultrasound. 
+
+Task Hierarchy Axis. Crucially, we structure tasks not as a flat list, but as a cognitive hierarchy 
+
+mirroring the radiological logic. This allows us to trace model failures from basic perception to complex reasoning: • Low-level (Perception): Modality recognition, view/plane recognition and imaging protocols recognition. • Mid-level (Semantics): Organ recognition and Region-of-Interest (ROI) grounding. • High-level (Cognition): Abnormality diagno-sis, disease diagnosis, and severity grading. Detailed definitions and illustrative examples for each task are provided in Appendix C. 
+
+Competency Voxel. Within this competency space, samples sharing the same intersection of co-ordinates (Anatomy, Modality, Task) constitute a fundamental evaluation unit, which we term a Com-petency Voxel. This granular aggregation allows for precise localization of model capabilities and deficits. 
+
+2.3 In-depth Evaluation Paradigm 
+
+Based on the proposed multidimensional and fine-grained framework, MedRCube enables a com-prehensive diagnostic paradigm that progresses from holistic ranking to fine-grained capability min-ing and cognitive consistency verification. This paradigm is structured into three levels: 
+
+Holistic Benchmarking. First and foremost, MedRCube serves as a rigorous standard for mea-suring the overall competence of MLLMs. MedR-Cube leverages a balanced distribution across anatomical regions and imaging modalities to en-sure the validity of assessment. 
+
+Capability Profiling. Going beyond global rank-ings, the multidimensional design allows for multi-dimensional performance analysis. We can slice model capabilities along specific axes or zoom into specific competency voxels to mine granular fail-ure modes, which are typically obscured in flat evaluation metrics. 
+
+Credibility and Consistency. The proposed cognitive hierarchy provides a novel perspective to define and quantify the credibility of model rea-soning. By verifying whether high-level diagnoses are supported by prerequisite perceptual success on the same image, we expose "correct-by-accident" shortcuts—where models reach right answers de-spite failing basic recognition (e.g. give the correct diagnosis but cannot even tell it is an MRI image)— thereby distinguishing grounded reasoning from spurious guessing. 
+
+3 Systematic Construction Pipeline 
+
+Unlike conventional VQA datasets prioritizing maximizing scale or task diversity in isolation, MedRCube must densely populate a structured competency space while preserving clinical de-terminism, terminological consistency, and hier-archical validity across tasks. To this end, we implement a systematic pipeline consisting of two stages: metadata-driven competency map-ping (Stage I) to align fragmented sources, and knowledge-augmented item production (Stage II) to generate rigorous items, underpinned by a ded-icated quality assurance procedure. Design and iteration of pipeline is completed under the deep involvement and strict supervision of radiologists. An overview of the pipeline is illustrated in Fig. 2. What’s more, for details regarding this chapter, please refer to Appendix E. 
+
+3.1 Stage I: Data Curation and Competency Mapping Data Collection. We curate 35 datasets (detailed in Table 2) spanning diverse acquisition protocols. To mitigate heterogeneity, we apply a unified pro-cessing pipeline for image and spatial annotations (masks/boxes) and disregard the original dataset-specific task labels. Instead, we treat all samples as raw clinical evidence, re-interpreting them strictly under MedRCube’s standardized taxonomy to en-sure consistent evaluation. 
+
+Metadata-Driven Task Derivation. Most datasets are not explicitly annotated for the full spectrum of perceptual, semantic, and cognitive tasks required by the competency cube. To address this, we adopt a metadata-driven task derivation strategy. For each image, we therefore derive task support from available metadata (e.g., modality/acquisition tags for perceptual tasks, segmentation masks for semantic tasks, and diagnostic annotations for cog-nitive tasks) and assign each sample to one or more Competency Voxels, ensuring that task as-signments are grounded in available evidence rather than heuristic dataset labels. 
+
+3.2 Stage II: Knowledge-Augmented Production 
+
+While Stage I aligns images to the dense compe-tency space, Stage II focuses on producing clini-cally rigorous and diagnostically meaningful items at scale. From question formulation to option con-struction, the entire production process is explicitly guided by National Board of Medical Examiner (NBME) (National Board of Medical Examiners, 2024) item-writing principles, which we adopt as a unified design specification throughout the bench-mark. 
+
+Expert-verified Question Design. For each task type, we design a pool of question templates aligned with item-writing principles. Templates are crafted to ensure that: (i) the question can be answered solely based on the image and prompt, (ii) the question targets a single, well-defined com-petency, and (iii) the correct answer is clinically deterministic. All templates undergo clinician re-view to verify clinical relevance, clarity, and task alignment. All question designs are verified by experts to ensure they are well-formed and answer-able. 
+
+Knowledge-Augmented Distractor Generation. 
+
+We stratify questions into three distinct answer-space types: disease-oriented, abnormality-oriented, and closed-set. For each type, we employ task-aware, knowledge-augmented strategies to en-sure distractors are clinically plausible and strictly difficulty-controlled. Disease-oriented questions leverage ontology-guided retrieval (e.g., HPO) fol-lowed by controlled LLM generation, while other types employ constrained LLM generation or pre-defined and verified candidate pools. 
+
+Terminology Standardization. To ensure termi-nological consistency across datasets and tasks, all medical terms appearing in questions and options are normalized to authoritative clinical vocabular-ies. Radiological findings and anatomical struc-tures are standardized using RadLex, while disease entities are mapped to ICD-11 names. 
+
+3.3 Quality Assurance 
+
+To ensure clinical validity, all items undergo a rig-orous NBME-guided review. Question Review en-sures items are unambiguous and clinically deter-ministic, meaning the correct answer is derivable solely from the image without relying on options. Table 1: Performance comparison on MedRCube. The best scores are highlighted in bold, and the second-best are underlined. All scores are reported in percentage (%). Abbreviations for subtasks and corresponding full terminology are detailed in the Table 6. 
+
+Model Overall Task Type Modality Type Part Type 
+
+MR VR IPR OR RG DD AD SG CT X-Ray MRI US Brain Chest Heart Lungs Breast Random 25.64 24.22 23.67 24.57 24.37 23.00 28.63 21.40 28.52 24.65 27.48 24.61 22.96 26.41 26.49 22.62 24.55 29.13 
+
+Proprietary MLLMs 
+
+Qwen3-VL-Plus 51.14 82.66 50.00 23.14 70.01 42.06 47.03 30.74 44.72 60.54 59.81 37.63 40.45 38.81 62.70 45.71 54.79 46.32 GPT-5.1 53.36 85.66 61.00 33.71 74.70 35.20 52.84 21.79 37.50 69.61 58.86 43.29 34.62 41.33 62.01 53.33 62.18 38.42 Claude Opus 4.5 53.38 85.37 64.33 33.29 73.76 54.30 44.05 20.23 44.54 61.86 61.34 43.42 35.34 38.49 63.79 59.05 54.79 42.16 Gemini-3-Pro 59.35 83.53 71.33 37.86 84.25 45.30 57.91 42.02 35.39 71.94 62.21 64.21 42.87 51.59 64.70 88.81 66.26 37.45 
+
+Open-Source MLLMs 
+
+InternVL3.5-2B 51.20 88.86 49.67 26.71 61.95 38.40 50.51 32.10 36.44 68.53 54.00 61.45 31.30 45.81 57.04 49.76 69.95 32.32 LLaVa-v1.5-7B 39.22 68.99 6.00 7.43 69.79 31.80 36.56 19.26 28.87 47.52 43.28 60.13 31.66 39.38 44.39 45.95 55.54 32.87 Phi-3.5-Vision 36.14 74.32 9.00 24.43 49.77 27.90 31.00 13.23 27.29 42.25 43.25 25.53 28.88 26.36 43.27 18.57 44.93 41.19 Janus-Pro-7B 40.63 79.84 22.67 32.29 63.07 39.40 26.99 18.87 27.64 44.26 47.96 41.45 23.23 24.43 49.70 56.19 48.53 24.69 Qwen2.5-VL-7B 46.34 90.41 1.67 9.86 66.17 42.00 45.11 14.79 39.08 58.91 53.22 49.61 43.14 39.38 54.86 52.86 56.97 55.06 
+
+Qwen3-VL-8B 55.12 91.09 43.33 29.86 73.95 40.40 55.50 24.51 43.66 69.15 59.09 56.97 44.30 49.15 61.86 61.67 65.31 46.05 InternVL3-8B 49.43 85.17 53.33 32.00 70.48 52.60 35.50 28.21 38.03 53.02 55.82 46.18 37.58 37.84 58.29 55.00 49.29 42.16 InternVL3.5-8B 55.87 85.66 55.00 28.00 74.60 52.10 51.86 39.30 40.32 58.76 60.94 61.97 50.40 54.60 63.89 61.43 56.97 45.08 MiniCPM-o 2.6 41.12 78.10 32.67 31.14 51.64 38.80 29.16 37.74 29.58 46.90 43.17 35.66 40.36 40.03 45.36 42.14 43.89 32.73 
+
+—— 10B Level Boundary —— 
+
+InternVL3-14B 49.95 79.26 40.67 29.14 66.64 54.50 42.86 31.91 34.68 56.51 59.32 43.68 33.09 44.99 62.29 37.38 50.90 33.56 Llama-3.2-11B-Vision 40.56 66.86 49.33 32.71 57.92 39.20 31.21 11.09 34.51 39.07 46.40 38.29 28.25 29.21 48.02 41.67 37.06 35.23 Qwen2.5-VL-32B 53.06 85.85 26.33 32.86 74.88 53.80 47.20 26.46 39.44 70.00 60.01 45.13 37.13 44.51 62.73 49.29 66.45 38.00 Qwen3-VL-32B 54.43 88.47 56.00 33.71 78.44 43.30 48.38 29.96 39.96 60.93 60.73 49.74 43.14 42.72 63.67 64.52 54.98 46.19 InternVL3.5-14B 57.28 89.05 53.33 31.43 72.82 51.80 57.83 25.10 39.61 71.16 63.77 56.71 38.21 44.51 66.57 55.00 71.84 43.69 InternVL3.5-38B 58.14 87.02 58.00 31.43 74.88 55.90 59.39 21.21 39.26 75.58 64.20 59.87 34.80 42.72 67.60 69.05 74.88 37.59 
+
+Medical-specific MLLMs 
+
+MedVLM-R1 43.61 86.92 25.67 27.86 67.67 41.50 29.53 20.62 33.80 48.14 50.36 48.68 28.70 26.53 52.39 62.86 50.71 34.95 HealthGPT-M3 42.02 49.52 42.33 34.29 63.64 33.90 38.77 36.38 30.46 57.91 42.04 27.11 38.48 40.85 44.08 27.38 60.00 24.41 LLaVA-Med-7B 24.51 22.00 31.33 23.71 21.65 31.20 23.56 20.04 28.17 19.61 31.72 18.95 10.22 20.02 31.37 17.14 15.73 16.78 HuatuoGPT-Vision-7B 47.11 89.73 40.33 12.86 74.79 42.00 39.02 13.81 37.50 62.48 54.29 48.29 29.60 32.79 56.89 60.48 60.57 36.75 Lingshu-7B 59.86 91.38 53.33 30.57 82.29 42.40 65.69 26.26 36.09 74.26 58.94 72.76 57.40 63.79 62.26 68.33 70.62 52.98 Hulu-Med-4B 48.95 79.55 50.67 31.57 63.73 30.80 44.62 43.77 41.37 60.16 51.40 42.24 43.41 38.24 53.58 55.71 57.44 46.46 Hulu-Med-7B 42.14 61.24 54.33 34.00 55.30 30.10 39.06 26.65 34.86 48.76 48.43 34.61 21.97 27.91 50.52 43.10 46.92 24.55 
+
+—— 10B Level Boundary —— 
+
+HealthGPT-L14 44.43 76.07 45.33 25.00 60.07 37.60 38.73 20.43 34.68 56.74 53.34 32.11 20.54 27.91 56.73 42.14 50.71 24.97 HealthGPT-XL32 47.13 72.67 43.67 32.71 68.32 38.60 39.75 35.60 37.68 54.88 55.71 28.42 34.26 37.99 58.79 36.90 49.19 29.26 HuatuoGPT-Vision-34B 54.02 89.15 56.33 31.00 78.44 33.40 53.66 21.40 38.91 63.10 56.14 62.63 44.93 47.19 58.70 60.00 63.32 49.24 MedDr-40B 28.44 29.17 27.67 27.29 28.11 25.80 30.55 27.43 26.06 27.13 30.25 24.74 27.80 25.79 30.18 27.14 26.45 30.37 Lingshu-32B 62.55 90.31 53.67 37.00 84.72 49.90 65.77 40.47 35.03 77.83 63.68 70.00 54.71 65.42 67.73 69.76 73.27 43.27 Hulu-Med-14B 50.28 72.29 59.00 36.57 68.88 39.20 47.53 28.40 38.73 62.79 56.43 46.71 25.38 37.02 60.07 54.76 58.29 24.69 Hulu-Med-32B 55.27 82.56 62.00 40.71 69.35 45.90 52.88 31.71 41.73 67.36 61.20 57.76 28.52 43.37 64.67 59.29 64.36 29.54 
+
+Option Review validates that distractors are con-ceptually homogeneous, mutually exclusive, and clinically plausible within the context. We use the LLM-based method to take this review and review its reliability, the consistency of annotations from LLM and experts is above 90% on all rules we used, E.5 reports details. 
+
+4 Experiments 
+
+4.1 Settings 
+
+We evaluate 33 models on MedRCube, compris-ing 4 proprietary models, 14 Medical MLLMs, and 15 General-purpose MLLMs. For detailed infor-mation on the evaluation process and the models being evaluated, please refer to the Appendix D. We additionally report a text-only baseline (ques-tions/options without images) to quantify potential prior leakage; most models drop to near random-guessing performance (Appendix D.4). 
+
+4.2 Results 
+
+Table 1 reports the evaluation results of 33 models on MedRCube. 
+
+Overall performance and ranking. Lingshu-32B achieves the best performance (62.55), fol-lowed by Lingshu-7B (59.86), Gemini-3-Pro 
+
+(59.35), and InternVL3.5-38B (58.14). Notably, the top-performing models span both proprietary and open-source paradigms, as well as general-purpose and medically specialized training regimes. At the same time, a large fraction of models—including several medically fine-tuned systems—cluster in a relatively narrow performance band (approximately 45 - 55), indicating that flat aggregate metrics com-press substantial underlying heterogeneity. 
+
+Task hierarchy. Performance across task types follows the intended cognitive gradient, inversely correlating with cognitive complexity. Crucially, the advantage of specialized MLLMs peaks in high-level reasoning tasks, while gaps remain marginal in saturated perceptual tasks. Modalities. CT and X-ray tasks are generally the strongest, whereas Ultrasound remains consis-tently challenging even for top-performing models. MRI exhibits high variance across models, reflect-ing sensitivity to training exposure or model design. 
+
+Anatomical regions. Performance also varies by anatomical region. The Chest, lung, and heart tasks are generally better handled than the remains. We observe that medical specialization is most likely to translate into gains on brain and breast imaging. 
+
+4.3 Key Findings and Analysis Correlation with Data Distribution. Cross-referencing model performance with a medical imaging datasets survey (Project Imaging-X Con-tributors, 2025), we observe a strong alignment between open-source data availability and model proficiency . Well-optimized models (e.g., Ling-shu , InternVL ) consistently excel in high-resource domains such as CT, X-ray, and Brain imaging (ranked among the top five in data availability), while performance degrades in lower-resource modalities like Ultrasound. A notable exception is Breast imaging : despite substantial dataset representation ( ∼14.9%), per-formance remains disproportionately low across models, likely due to inherent task difficulty or data quality. 
+
+Weakened Scaling Effect. Analyzing maxi-mum scores within both general-purpose and med-ical MLLMs, we find that large models ( >10B) fail to establish a decisive advantage over smaller counterparts ( <10B), with performance gaps nar-rowing to under 2.5%. This indicates that current data scales may not fully activate scaling laws in medical imaging VQA. In contrast, domain adaptation proves criti-cal: the lightweight medical model Lingshu-7B 
+
+(63 .25% ) outperforms the much larger, top-ranked generalist InternVL3.5-38B (60 .97% ), suggest-ing that targeted medical training outweighs raw parameter expansion. 
+
+Blind Spots in Basic Perceptual Skills. De-spite being fundamental competencies for hu-man radiologists, low-level perceptual tasks that are rarely emphasized in existing datasets exhibit surprisingly weak performance . In particular, imaging protocol recognition (e.g., distinguishing T1 vs. T2 MRI, rather than MRI vs. other modal-ities) remains extremely challenging, with most models scoring only in the 20 - 40% range. 
+
+> Figure 3: Correlation Analysis. (a) Hierarchical cluster-ing reveals three functional blocks. (b) Anatomical or-dering highlights the brain isolated island effect, where brain tasks show minimal correlation with other regions, reflecting high task heterogeneity.
+
+Similarly, while the view recognition task is triv-ial for radiologists and specialized discriminative models (near-perfect accuracy) (Rajkomar et al., 2017), current benchmarks reveal a significant gap: even the strongest open-source models reach only 
+
+62% . These results reveal a critical blind spot — models lack robust mastery of basic but rare perceptual primitives , which is typically assumed as prerequisites for higher-level clinical reasoning. 
+
+5 Correlation Analysis 
+
+5.1 Settings 
+
+To answer RQ1 , we analyze pairwise correlations between competency voxels using Spearman’s ρ,based on the evaluation results of 33 benchmarked MLLMs. We visualize these relationships using correlation heatmaps and organize them via hierar-chical clustering. 
+
+5.2 Potential Skills Factors 
+
+Upon clustering the performance correlation ma-trix, three distinct functional blocks emerge, as shown in Fig. 3a. We annotate these groups as Clusters A, B, and C. 
+
+Capability-Stratified Clusters. We observe a clear capability stratification in the correlation structure. Cluster A is dominated by foundational perception tasks (Organ Recognition, Modality Recognition) with high internal coherence ( ¯ρ =0.405 ), whereas Cluster B groups high-order rea-soning tasks (Diagnosis, Grading). Cross-cluster correlations are substantially lower ( ¯ρ = 0 .253 ), indicating a persistent gap between perception and reasoning behaviors across models. 
+
+Resource-Conditioned Sub-Structure. Within this capability scaffold, we observe two salient sub-clustering patterns. First, tasks from specialized niches—such as Breast, as well as specific sub-tasks for Lungs and Brain—form a distinctly sepa-rated group ( Cluster C ). Second, the most coherent portions of both major clusters are dominated by X-ray and CT modalities. This alignment suggests that model consistency is heavily contingent on training signals: stable behaviors develop primarily in resource-rich or readily optimizable domains. 
+
+5.3 The "Isolated Island" of the Brain 
+
+A striking finding is the profound isolation of brain-related tasks: they show low (and occa-sionally negative) correlations not only with tasks from other anatomical regions ( ¯ρ = 0 .219 ), but even more surprisingly, with one another within the brain domain ( ¯ρ = 0 .089 ). This fragmen-tation may stem from the intrinsic heterogeneity and complexity of brain-related tasks, or alterna-tively from brain-focused “score-chasing” mod-els that fail to translate into broader capability gains. To probe these possibilities, we perform additional analyses and find that the effect largely disappears—and sometimes reverses—when brain tasks are stratified by modality, while model-level performance on brain and non-brain tasks remains strongly correlated ( ρ = 0 .845 ). Together, these results favor the former explanation, sug-gesting that brain-related tasks impose particularly heterogeneous and modality-dependent capability demands that are difficult to generalize. 
+
+6 Credibility Analysis 
+
+6.1 Settings 
+
+To answer RQ2 and operationalize the Credibility and Consistency paradigm proposed in §2.3, we construct a dedicated subset containing 300 images .For each image, we ensure the presence of at least one lower-level or mid-level question (perception or semantic) and one higher-level cognition ques-tion, so that prerequisite skills and high-level rea-soning can be explicitly linked on the same visual evidence. This yields 900 items in total, enabling us to directly verify whether a model’s diagnostic success is grounded in visual understanding under identical image contexts. 
+
+6.2 Metrics 
+
+We quantify reasoning consistency by paired out-comes (L, H ) on the same image, where L denotes the prerequisite task (low/mid-level) and H denotes the cognitive task ( L, H ∈ { 0, 1}, with 1/0 indicat-ing correct/incorrect). This yields a 2 × 2 partition: 
+
+Group A (1 , 1) coherent correct; Group B (1 , 0) 
+
+broken reasoning; Group C (0 , 0) both incorrect; 
+
+Group D (0 , 1) shortcut/incoherent correct .Based on the counts N (·), we define two diag-nostic metrics: 
+
+Luck Rate & Rationality measures, among instances where the model answers the cognition-level task correctly, the fraction that are not supported by prerequisite correctness. 
+
+RationalityScore equal to 1 − LuckRate :
+
+LuckRate = N (D)
+
+N (A) + N (D) . (1) 
+
+Shortcut Probability measures how often a model answers the cognition-level task correctly 
+
+given that it fails the paired lower-level prerequi-site, capturing the tendency to “jump” to high-level answers without a consistent foundation: 
+
+ShortcutProb = N (D)
+
+N (C) + N (D) . (2) 
+
+6.3 Overall Results 
+
+The Rationality metric reveals a distinct stratifica-tion in reasoning reliability (scores ranging 24.1%– 99.3%). Leading models (e.g., Lingshu , GPT-5.1 ,
+
+Qwen , HuatuoGPT ) demonstrate superior consis-tency, achieving Rationality scores above 90%. In stark contrast, some models specifically fine-tuned for medical domains (e.g., llava-med-v1.5 , MedDr-40B ) exhibited alarming behaviors with Luck Rates exceeding 60%, suggesting their "correct" diag-noses are largely ungrounded guesses or overfits. Notably, Hulu series exhibits "hollow" accuracy with suppressed rationality. Crucially, high shortcut dependence persists even in top tiers (e.g., Gemini-3-pro , 57.9%), forming the empirical basis for the 
+
+"Paradox of Specialization" discussed next. Figure 4: The left panel shows the distribution of models with a quadrant of Rationality score and accuracy. The right panel reveals a strong positive correlation ( r = 0 .693 , p < 10 −5) between Shortcut Probability and accuracy. 
+
+6.4 The Paradox of Specialization. 
+
+Intuitively, one would hypothesize an Ideal Evo-lution : as models achieve higher cognitive accu-racy, their reliance on shortcuts should diminish, reflecting a transition from guessing to grounded reasoning. However, MedRCube exposes a striking contradiction. We observe a strong positive corre-lation (r = 0 .693 , p < 10 −5) between high-level accuracy and Shortcut Probability. This supports an alternative Opportunistic Evolution hypothesis: stronger MLLMs are not strictly becoming better observers; rather, they are also becoming better gamblers . This implies that performance gains are partly fueled by ungrounded shortcuts, leading to 
+
+evidence-free diagnoses that are strictly unaccept-able in clinical practice. Appendix H. provides a clearer elaboration of this discussion. 
+
+7 Related Work 
+
+Text-based benchmarks like MedQA (Jin et al., 2021), MedMCQA (Pal et al., 2022), and Pub-MedQA (Jin et al., 2019) evaluate knowledge re-tention but inherently lack the radiological con-text critical for real-world diagnosis. To bridge this gap, Radiology VQA emerged, evolving from foundational protocols in VQA-RAD (Lau et al., 2018), VQA-Med (Ben Abacha et al., 2021), and SLAKE (Liu et al., 2021) to large-scale automated datasets like PMC-VQA (Zhang et al., 2023) and MIMIC-CXR-VQA (Bae et al., 2024). However, these efforts largely remain single-dimensional, of-ten constrained by noisy alignments or rigid tem-plates that fail to rigorously cover the complexity and seriousness required for high-stakes clinical applications. Benchmarks have recently transitioned to large-scale, granular evaluation to meet more detailed needs. OmniMedVQA (Hu et al., 2024) provides a evaluation from modality perspective, while GMAI-MMBench (Ye et al., 2024) leverages lexical trees for fine-grained perception. MedXpertQA (Zuo et al., 2025) enhances clinical realism via electronic health records, and ReXVQA (Pal et al., 2025) provides a deep dissection of chest X-ray reasoning skills. Collectively, these works expand landscape of assessment breadth and granularity. These works still overlook the clinical need to assess fine-grained capabilities and measure the credibility of model reasoning. To address this, MedRCube introduces a multidimensinal architec-ture to enable in-depth evaluation of MLLMs. 
+
+8 Conclusion 
+
+In this paper, we propose a multidimensional eval-uation paradigm to enable fine-grained, in-depth evaluation for medical imaging VQA, and instanti-ate it with MedRCube . By organizing evaluation in a dense competency space, MedRCube enables a three-level in-depth assessment. We benchmark 33 
+
+MLLMs on this benchmark, where Lingshu-32B 
+
+achieves the best overall performance, while mod-els from different families and training paradigms exhibit diverse capability profiles across the compe-tency space. Beyond ranking, our analyses expose multiple weaknesses and blind spots of current models and correlation patterns that suggest po-tential underlying factors that shape model perfor-mance. We further quantify the credibility of high-level reasoning, revealing large disparities across the models. Notably, we observe a highly signifi-cant positive correlation between shortcut behavior and high-level performance, indicating opportunis-tic evolution and raising concerns about clinically acceptable model development and deployment. 
+
+Limitations 
+
+Our study has following limitations. First, MedR-Cube is currently confined to the radiological spec-trum (e.g., CT, MRI, X-ray), leaving optical imag-ing domains—such as histopathology and derma-tology—unexplored, which restricts the general-ization of our findings across the full breadth of medical AI. Second, as a data-driven evaluation, it remains challenging to fully decouple intrinsic model capabilities from performance gains driven by dataset-specific priors or distribution artifacts, potentially introducing confounding factors into our reliability analysis. Third, our credibility met-ric proxies rationality via hierarchical task consis-tency rather than explicit visual grounding; we do not currently verify whether high-level diagnoses are supported by pixel-level attention to the correct regions. Finally, despite our systematic construc-tion pipeline and quality assurance, the reliance on automated generation inevitably inherits potential noise or inaccuracies from the original dataset an-notations, preventing a complete guarantee of item quality. 
+
+References 
+
+Marah Abdin and 1 others. 2024. Phi-3 technical re-port: A highly capable language model locally on your phone. Preprint , arXiv:2404.14219. Updated version covers Phi-3.5 Vision. Walid Al-Dhabyani, Mohammed Gomaa, Hussien Khaled, and Aly Fahmy. 2020. Dataset of breast ultrasound images. Data in Brief , 28:104863. Anthropic. 2025. Claude opus 4.5. Amanullah Asraf and Zabirul Islam. 2021. COVID19, pneumonia and normal chest X-ray PA dataset. 
+
+https://doi.org/10.17632/jctsfj2sfn.1 .Seongsu Bae, Daeun Kyung, Jaehee Ryu, Eunbyeol Cho, Gyubok Lee, Sunjun Kweon, Jungwoo Oh, Lei Ji, Eric Chang, Tackeun Kim, and 1 others. 2024. Ehrxqa: A multi-modal question answering dataset for electronic health records with chest x-ray images. 
+
+Advances in Neural Information Processing Systems ,36. Spyridon Bakas, Hamed Akbari, Aristeidis Sotiras, Michel Bilello, Martin Rozycki, Justin S Kirby, John B Freymann, Keyvan Farahani, and Christos Davatzikos. 2017. Advancing the cancer genome atlas glioma mri collections with expert segmenta-tion labels and radiomic features. Scientific data ,4(1):1–13. Spyridon Bakas, Mauricio Reyes, Andras Jakab, Stefan Bauer, Markus Rempfler, Alessandro Crimi, Rus-sell Takeshi Shinohara, Christoph Berger, Sung Min Ha, Martin Rozycki, and 1 others. 2018. Identifying the best machine learning algorithms for brain tu-mor segmentation, progression assessment, and over-all survival prediction in the brats challenge. arXiv preprint arXiv:1811.02629 .Asma Ben Abacha, Mourad Sarrouti, Dina Demner-Fushman, Sadid A. Hasan, and Henning Müller. 2021. Overview of the vqa-med task at imageclef 2021: Vi-sual question answering and generation in the med-ical domain. In CLEF 2021 Working Notes , CEUR Workshop Proceedings, Bucharest, Romania. CEUR-WS.org. Christian Bluethgen, Dave Van Veen, Cyril Zakka, Katherine E Link, Aaron Hunter Fanous, Roxana Daneshjou, Thomas Frauenfelder, Curtis P Langlotz, Sergios Gatidis, and Akshay Chaudhari. 2025. Best practices for large language models in radiology. Ra-diology , 315(1):e240528. Victor M Campello, Polyxeni Gkontra, Cristian Izquierdo, Carlos Martin-Isla, Alireza Sojoudi, Pe-ter M Full, Klaus Maier-Hein, Yao Zhang, Zhiqiang He, Jun Ma, and 1 others. 2021. Multi-centre, multi-vendor and multi-disease cardiac segmentation: the m&ms challenge. IEEE Transactions on Medical Imaging , 40(12):3543–3554. Sema Candemir, Stefan Jaeger, Kannappan Palaniap-pan, Jonathan P Musco, Rahul K Singh, Zhiyun Xue, Alexandros Karargyris, Sameer Antani, George Thoma, and Clement J McDonald. 2013. Lung seg-mentation in chest radiographs using anatomical at-lases with nonrigid registration. IEEE transactions on medical imaging , 33(2):577–590. Junying Chen, Chi Gui, Ruyi Ouyang, Anningzhe Gao, Shunian Chen, Guiming Hardy Chen, Xidong Wang, Zhenyang Cai, Ke Ji, Xiang Wan, and 1 others. 2024a. Towards injecting medical visual knowledge into mul-timodal llms at scale. In Proceedings of the 2024 conference on empirical methods in natural language processing , pages 7346–7370. Junying Chen, Ruyi Ouyang, Anningzhe Gao, and 1 others. 2024b. Huatuogpt-vision, towards injecting medical visual knowledge into multimodal llms at scale. Preprint , arXiv:2406.19280. Muhammad EH Chowdhury, Tawsifur Rahman, Amith Khandakar, Rashid Mazhar, Muhammad Abdul Kadir, Zaid Bin Mahbub, Khandakar Reajul Is-lam, Muhammad Salman Khan, Atif Iqbal, Nasser Al Emadi, and 1 others. 2020. Can ai help in screen-ing viral and covid-19 pneumonia? Ieee Access ,8:132665–132676. Joseph Paul Cohen, Paul Morrison, and Lan Dao. 2020. Covid-19 image data collection. arXiv preprint arXiv:2003.11597 .Google Deepmind. 2025. Gemini 3 pro. Aysen Degerli, Mete Ahishali, Mehmet Yamac, Serkan Kiranyaz, Muhammad EH Chowdhury, Khalid Hameed, Tahir Hamid, Rashid Mazhar, and Moncef Gabbouj. 2021. Covid-19 infection map generation and detection from chest x-ray images. Health infor-mation science and systems , 9(1):15. Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, and 1 others. 2024. The llama 3 herd of models. 
+
+Preprint , arXiv:2407.21783. Mengjie Fang, Zipei Wang, Sitian Pan, Xin Feng, Yun-peng Zhao, Dongzhi Hou, Ling Wu, Xuebin Xie, Xu-Yao Zhang, Jie Tian, and 1 others. 2025. Large models in medical imaging: Advances and prospects. 
+
+Chinese Medical Journal , pages 10–1097. Praveen Govi. 2020. CoronaHack-chest X-ray-dataset. https://www.kaggle.com/datasets/ praveengovi/coronahack-chest-xraydataset .Gowthaman Gunabushanam, Caroline R Taylor, Mahan Mathur, Jamal Bokhari, and Leslie M Scoutt. 2019. Automated test-item generation system for retrieval practice in radiology education. Academic Radiology ,26(6):851–859. Alessa Hering, Lasse Hansen, Tony CW Mok, Albert CS Chung, Hanna Siebert, Stephanie Häger, Annkristin Lange, Sven Kuckertz, Stefan Heldmann, Wei Shao, and 1 others. 2022. Learn2reg: comprehensive multi-task medical image registration challenge, dataset and evaluation in the era of deep learning. IEEE Transactions on Medical Imaging , 42(3):697–712. Benjamin Hou, Pritam Mukherjee, Vivek Batheja, Ken-neth C Wang, Ronald M Summers, and Zhiyong Lu. 2025. One year on: assessing progress of multimodal large language model performance on rsna 2024 case of the day questions. Radiology , 316(2):e250617. Murtadha Hssayeni, M Croock, A Salman, H Al-khafaji, Z Yahya, and B Ghoraani. 2020. Computed tomogra-phy images for intracranial hemorrhage detection and segmentation. Intracranial hemorrhage segmenta-tion using a deep convolutional model. Data , 5(1):14. Yutao Hu, Tianbin Li, Quanfeng Lu, Wenqi Shao, Jun-jun He, Yu Qiao, and Ping Luo. 2024. Omnimed-vqa: A new large-scale comprehensive evaluation benchmark for medical lvlm. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition , pages 22170–22183. Stefan Jaeger, Sema Candemir, Sameer Antani, Yì-Xiáng J Wáng, Pu-Xuan Lu, and George Thoma. 2014. Two public chest x-ray datasets for computer-aided screening of pulmonary diseases. Quantitative imaging in medicine and surgery , 4(6):475. Stefan Jaeger, Alexandros Karargyris, Sema Candemir, Les Folio, Jenifer Siegelman, Fiona Callaghan, Zhiyun Xue, Kannappan Palaniappan, Rahul K Singh, Sameer Antani, and 1 others. 2013. Automatic tu-berculosis screening using chest radiographs. IEEE transactions on medical imaging , 33(2):233–245. Di Jin, Eileen Pan, Nassim Oufattole, Wei-Hung Weng, Hanyi Fang, and Peter Szolovits. 2021. What disease does this patient have? a large-scale open domain question answering dataset from medical exams. Ap-plied Sciences , 11(14):6421. Qiao Jin, Bhuwan Dhingra, Zhengping Liu, William Co-hen, and Xinghua Lu. 2019. Pubmedqa: A dataset for biomedical research question answering. In Proceed-ings of the 2019 conference on empirical methods in natural language processing and the 9th interna-tional joint conference on natural language process-ing (EMNLP-IJCNLP) , pages 2567–2577. Daniel Kermany. 2018. Labeled optical coherence to-mography (oct) and chest x-ray images for classifica-tion. Mendeley data .Daniel S Kermany, Michael Goldbaum, Wenjia Cai, Car-olina CS Valentim, Huiying Liang, Sally L Baxter, Alex McKeown, Ge Yang, Xiaokang Wu, Fangbing Yan, and 1 others. 2018. Identifying medical diag-noses and treatable diseases by image-based deep learning. cell , 172(5):1122–1131. Sebastian Köhler, Michael Gargano, Nicolas Ma-tentzoglu, Leigh C Carmody, David Lewis-Smith, Nicole A Vasilevsky, Daniel Danis, Ganna Balagura, Gareth Baynam, Amy M Brower, and 1 others. 2021. The human phenotype ontology in 2021. Nucleic acids research , 49(D1):D1207–D1217. Zoé Lambert, Caroline Petitjean, Bernard Dubray, and Su Kuan. 2020. Segthor: Segmentation of thoracic organs at risk in ct images. In 2020 Tenth Interna-tional Conference on Image Processing Theory, Tools and Applications (IPTA) , pages 1–6. Ieee. Jason J Lau, Soumya Gayen, Asma Ben Abacha, and Dina Demner-Fushman. 2018. A dataset of clini-cally generated visual questions and answers about radiology images. Scientific data , 5(1):1–10. Chunyuan Li, Cliff Wong, Sheng Zhang, Naoto Usuyama, Haotian Liu, Jianwei Yang, Tristan Nau-mann, Hoifung Poon, and Jianfeng Gao. 2024. Llava-med: Training a large language-and-vision assistant for biomedicine in one day. In Advances in Neural Information Processing Systems (NeurIPS) .Tianwei Lin, Wenqiao Zhang, Sijing Li, and 1 others. 2025. Healthgpt: A medical large vision-language model for unifying comprehension and generation via heterogeneous knowledge adaptation. Preprint ,arXiv:2502.09838. Bo Liu, Li-Ming Zhan, Li Xu, Lin Ma, Yan Fang Yang, and Xiao-Ming Wu. 2021. Slake: A semantically-labeled knowledge-enhanced dataset for medical vi-sual question answering. 2021 IEEE 18th Interna-tional Symposium on Biomedical Imaging (ISBI) ,pages 1650–1654. Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee. 2024. Improved baselines with visual instruc-tion tuning. In CVPR . LLaVA-v1.5. Jingyu Liu, Jie Lian, and Yizhou Yu. 2020. Chestx-det10: chest x-ray dataset on detection of thoracic abnormalities. arXiv preprint arXiv:2006.10550 .Kevin Mader. 2017. Finding and measuring lungs in CT data. https://www.kaggle.com/datasets/ kmader/finding-lungs-in-ct-data .Carlos Martín-Isla, Víctor M Campello, Cristian Izquierdo, Kaisar Kushibar, Carla Sendra-Balcells, Polyxeni Gkontra, Alireza Sojoudi, Mitchell J Ful-ton, Tewodros Weldebirhan Arega, Kumaradevan Punithakumar, and 1 others. 2023. Deep learning segmentation of the right ventricle in cardiac mri: the m&ms challenge. IEEE Journal of Biomedical and Health Informatics , 27(7):3302–3313. Bjoern H Menze, Andras Jakab, Stefan Bauer, Jayashree Kalpathy-Cramer, Keyvan Farahani, Justin Kirby, Yuliya Burren, Nicole Porz, Johannes Slotboom, Roland Wiest, and 1 others. 2014. The multimodal brain tumor image segmentation benchmark (brats). 
+
+IEEE transactions on medical imaging , 34(10):1993– 2024. National Board of Medical Examiners. 2024. Construct-ing Written Test Questions for the Basic and Clinical Sciences . Philadelphia, PA. Accessed: 2025-10-08. OpenAI. 2025. Gpt-5.1. OpenGVLab. 2025. Internvl3.5: Advancing open-source multimodal models in versatility, reasoning, and efficiency. Preprint , arXiv:2508.18265. Ankit Pal, Jung-Oh Lee, Xiaoman Zhang, Malaikan-nan Sankarasubbu, Seunghyeon Roh, Won Jung Kim, Meesun Lee, and Pranav Rajpurkar. 2025. Rexvqa: A large-scale visual question answering benchmark for generalist chest x-ray understanding. arXiv preprint arXiv:2506.04353 .Ankit Pal, Logesh Kumar Umapathi, and Malaikan-nan Sankarasubbu. 2022. Medmcqa: A large-scale multi-subject multi-choice dataset for medical do-main question answering. In Conference on health, inference, and learning , pages 248–260. PMLR. Jiazhen Pan, Che Liu, Junde Wu, Fenglin Liu, and 1 oth-ers. 2025. Medvlm-r1: Incentivizing medical reason-ing capability of vision-language models (vlms) via reinforcement learning. Preprint , arXiv:2502.19634. Hieu H Pham, Ngoc H Nguyen, Thanh T Tran, Tuan NM Nguyen, and Ha Q Nguyen. 2023. Pedicxr: an open, large-scale chest radiograph dataset for in-terpretation of common thoracic diseases in children. 
+
+Scientific Data , 10(1):240. Project Imaging-X Contributors. 2025. Project imaging-x: A survey of 1000+ open-access medical imaging datasets for foundation model development. Radiological Society of North America. 2018. RSNA pneumonia detection chal-lenge. https://www.kaggle.com/c/ rsna-pneumonia-detection-challenge .Radiological Society of North America. 2024. Radlex radiology lexicon. Accessed: 2025-10-08. Tawsifur Rahman, Amith Khandakar, Yazan Qiblawey, Anas Tahir, Serkan Kiranyaz, Saad Bin Abul Kashem, Mohammad Tariqul Islam, Somaya Al Maadeed, Susu M Zughaier, Muhammad Salman Khan, and 1 others. 2021. Exploring the effect of image enhance-ment techniques on covid-19 detection using chest x-ray images. Computers in biology and medicine ,132:104319. Pranav Raikokte. 2020. Covid-19 image dataset, 3 way classification- covid-19, viral pneumonia, normal. https://www.kaggle.com/datasets/ pranavraikokte/covid19-image-dataset .Alvin Rajkomar, Sneha Lingam, Andrew G Taylor, Michael Blum, and John Mongan. 2017. High-throughput classification of radiographs using deep convolutional neural networks. Journal of digital imaging , 30(1):95–101. Holger R Roth, Ziyue Xu, Carlos Tor-Díez, Ra-mon Sanchez Jacob, Jonathan Zember, Jose Molto, Wenqi Li, Sheng Xu, Baris Turkbey, Evrim Turkbey, and 1 others. 2022. Rapid artificial intelligence solu-tions in a pandemic—the covid-19-20 lung ct lesion segmentation challenge. Medical image analysis ,82:102605. Johannes Rückert, Louise Bloch, Raphael Brüngel, Ahmad Idrissi-Yaghir, Henning Schäfer, Cynthia S Schmidt, Sven Koitka, Obioma Pelka, Asma Ben Abacha, Alba G. Seco de Herrera, and 1 others. 2024. Rocov2: Radiology objects in context version 2, an updated multimodal image dataset. Scientific Data ,11(1):688. Rebecca Sawyer-Lee, Francisco Gimenez, Assaf Hoogi, and Daniel Rubin. 2016. Curated breast imaging sub-set of digital database for screening mammography (cbis-ddsm). (No Title) .German Gonzalez Serrano. 2019. Cad-pe. Junji Shiraishi, Shigehiko Katsuragawa, Junpei Ikezoe, Tsuneo Matsumoto, Takeshi Kobayashi, Ken-ichi Ko-matsu, Mitate Matsui, Hiroshi Fujita, Yoshie Kodera, and Kunio Doi. 2000. Development of a digital im-age database for chest radiographs with and without a lung nodule: receiver operating characteristic anal-ysis of radiologists’ detection of pulmonary nodules. 
+
+American journal of roentgenology , 174(1):71–74. Amber L Simpson, Michela Antonelli, Spyridon Bakas, Michel Bilello, Keyvan Farahani, Bram Van Gin-neken, Annette Kopp-Schneider, Bennett A Land-man, Geert Litjens, Bjoern Menze, and 1 others. 2019. A large annotated medical image dataset for the devel-opment and evaluation of segmentation algorithms. 
+
+arXiv preprint arXiv:1902.09063 .John Suckling, J Parker, D Dance, S Astley, I Hutt, C Boggis, I Ricketts, E Stamatakis, N Cerneaz, S Kok, and 1 others. 2015. Mammographic image analysis society (mias) database v1. 21. (No Title) .He Sun and 1 others. 2024. Meddr: Diagnosis-guided bootstrapping for large-scale medical vision-language learning. arXiv preprint arXiv:2404.15127 .Siham Tabik, Anabel Gómez-Ríos, José Luis Martín-Rodríguez, Iván Sevillano-García, Manuel Rey-Area, David Charte, Emilio Guirado, Juan-Luis Suárez, Julián Luengo, MA Valero-González, and 1 others. 2020. Covidgr dataset and covid-sdnet methodology for predicting covid-19 based on chest x-ray images. 
+
+IEEE journal of biomedical and health informatics ,24(12):3595–3605. Anas M. Tahir, Muhammad E. H. Chowdhury, Yazan Qi-blawey, Amith Khandakar, Tawsifur Rahman, Serkan Kiranyaz, Uzair Khurshid, Nabil Ibtehaz, Sakib Mah-mud, and Maymouna Ezeddin. 2021a. COVID-QU-Ex dataset. https://www.kaggle.com/datasets/ anasmohammedtahir/covidqu .Anas M Tahir, Muhammad EH Chowdhury, Amith Khandakar, Tawsifur Rahman, Yazan Qiblawey, Uzair Khurshid, Serkan Kiranyaz, Nabil Ibtehaz, M Sohel Rahman, Somaya Al-Maadeed, and 1 others. 2021b. Covid-19 infection localization and severity grading from chest x-ray images. Computers in biol-ogy and medicine , 139:105002. Hulu-Med Team. 2025a. Hulu-med: A trans-parent generalist model towards holistic med-ical vision-language understanding. Preprint ,arXiv:2510.08668. LASA Team and 1 others. 2025. Lingshu: A gen-eralist foundation model for unified multimodal medical understanding and reasoning. Preprint ,arXiv:2506.07044. Qwen Team. 2024. Qwen2.5-vl: To see the world more clearly. Preprint , arXiv:2409.12191. Qwen Team. 2025b. Qwen3-vl technical report. Techni-cal Report. See also Qwen2.5-VL arXiv:2409.12191 if Qwen3 specific paper is unavailable. Catalina Tobon-Gomez, Arjan J Geers, Jochen Peters, Jürgen Weese, Karen Pinto, Rashed Karim, Mo-hammed Ammar, Abdelaziz Daoudi, Jan Margeta, Zulma Sandoval, and 1 others. 2015. Benchmark for algorithms segmenting the left atrium from 3d ct and mri datasets. IEEE transactions on medical imaging ,34(7):1460–1473. KAY H VYDARENY, CAROLINE E BLANE, and JU-DITH G CALHOUN. 1986. Guidelines for writing multiple-choice questions in radiology courses. In-vestigative Radiology , 21(11):871–876. Akihiko Wada, Yuya Tanaka, Mitsuo Nishizawa, Akira Yamamoto, Toshiaki Akashi, Akifumi Hagiwara, Yayoi Hayakawa, Junko Kikuta, Keigo Shimoji, Katsuhiro Sano, and 1 others. 2025. Retrieval-augmented generation elevates local llm quality in radiology contrast media consultation. npj Digital Medicine , 8(1):395. Xiaosong Wang, Yifan Peng, Le Lu, Zhiyong Lu, Mo-hammadhadi Bagheri, and Ronald M Summers. 2017. Chestx-ray8: Hospital-scale chest x-ray database and benchmarks on weakly-supervised classification and localization of common thorax diseases. In Proceed-ings of the IEEE conference on computer vision and pattern recognition , pages 2097–2106. World Health Organization. 2022. International Statis-tical Classification of Diseases and Related Health Problems (11th ed.) . World Health Organization. Re-leased in 2018; officially in effect as of January 2022. Chengyue Wu and 1 others. 2024. Janus: Decoupling visual encoding for unified multimodal understanding and generation. Preprint , arXiv:2410.13848. Cite DeepSeek-AI for Janus-Pro updates. Yifan Wu, Hayden Gunraj, Chi-en Amy Tai, and Alexan-der Wong. 2023. Covidx cxr-4: An expanded multi-institutional open-source benchmark dataset for chest x-ray image-based computer-aided covid-19 diagnos-tics. arXiv preprint arXiv:2311.17677 .Yiming Xiao, Hassan Rivaz, Matthieu Chabanas, Maryse Fortin, Ines Machado, Yangming Ou, Mat-tias P Heinrich, Julia A Schnabel, Xia Zhong, An-dreas Maier, and 1 others. 2019. Evaluation of mri to ultrasound registration methods for brain shift correc-tion: the curious2018 challenge. IEEE transactions on medical imaging , 39(3):777–786. Lin Yang, Shawn Xu, Andrew Sellergren, Timo Kohlberger, Yuchen Zhou, Ira Ktena, Atilla Kiraly, Faruk Ahmed, Farhad Hormozdiari, Tiam Jaroen-sri, and 1 others. 2024. Advancing multimodal medical capabilities of gemini. arXiv preprint arXiv:2405.03162 .Xingyi Yang, Xuehai He, Jinyu Zhao, Yichen Zhang, Shanghang Zhang, and Pengtao Xie. 2020. Covid-ct-dataset: a ct scan dataset about covid-19. arXiv preprint arXiv:2003.13865 .Yuan Yao, Tianyu Yu, Ao Zhang, and 1 others. 2024. Minicpm-v: A gpt-4v level mllm on your phone. 
+
+Preprint , arXiv:2408.01800. Covers MiniCPM-V 2.6 and MiniCPM-o series. Jin Ye, Guoan Wang, Yanjun Li, Zhongying Deng, Wei Li, Tianbin Li, Haodong Duan, Ziyan Huang, Yanzhou Su, Benyou Wang, and 1 others. 2024. Gmai-mmbench: A comprehensive multimodal eval-uation benchmark towards general medical ai. Ad-vances in Neural Information Processing Systems ,37:94327–94427. Anna Zawacki, Carol Wu, George Shih, Julia Elliott, Mikhail Fomitchev, Mohannad Hussain, Paras Lakhani, Phil Culliton, and Shunxing Bao. 2019. SIIM-ACR pneumothorax segmenta-tion. https://www.kaggle.com/competitions/ siim-acr-pneumothorax-segmentation .Xiaoman Zhang, Chaoyi Wu, Ziheng Zhao, Weix-iong Lin, Ya Zhang, Yanfeng Wang, and Weidi Xie. 2023. Pmc-vqa: Visual instruction tuning for medical visual question answering. arXiv preprint arXiv:2305.10415 .Yuxin Zuo, Shang Qu, Yifei Li, Zhangren Chen, Xuekai Zhu, Ermo Hua, Kaiyan Zhang, Ning Ding, and Bowen Zhou. 2025. Medxpertqa: Benchmarking expert-level medical reasoning and understanding. 
+
+arXiv preprint arXiv:2501.18362 .Figure 5: Statistical representation of samples in MedRCube. 
+
+A Large Language Model Usage Declaration 
+
+We utilized Large Language Models (LLMs) exclu-sively for code optimization and linguistic refine-ment. All core scientific contributions—including conceptualization, dataset curation, experimental design, and theoretical framework—were executed solely by the authors. 
+
+B Data Sources and Statistics 
+
+To construct a comprehensive holistic benchmark, we curated a total of 35 high-quality datasets span-ning four primary imaging modalities. Specifically, the collection consists of 21 X-ray, 6 CT, 6 MRI, and 2 Ultrasound datasets. Recognizing that medi-cal diagnosis is inherently anatomical, we organize these datasets into four distinct anatomical regions: Brain, Heart, Breast, and Chest and Lungs. Table 2 details the sources of these datasets categorized by their respective anatomical targets, while Ta-ble 3 reports the per-dataset sample counts. In total, MedRCube comprises 7,626 samples curated from over 30 diverse datasets, providing broad coverage of imaging protocols, clinical contexts, and disease conditions across the above axes. Of these, 1,000 samples are derived from the ROCOv2 dataset (Rückert et al., 2024). Due to the intrinsic characteristics of this dataset, these samples are incompatible with the voxel system and are thus excluded from it. Consequently, Fig. 5 illustrates the statistical feature distribution of the remaining samples. 
+
+C Task Definition and Examples 
+
+In this study, we investigate eight distinct tasks, each designed to evaluate a specific dimension of radiological interpretation capabilities: • Modality Recognition: Classifies the funda-mental imaging modality of a given scan (e.g., CT, MRI, X-ray), establishing the prerequisite context for subsequent analysis. • View Recognition: Determines the anatom-ical imaging plane or projection angle (e.g., axial, coronal, sagittal), assessing the model’s spatial orientation capabilities. • Imaging Protocols Recognition: Identifies specific image acquisition protocols and tech-nical parameters (e.g., MRI sequences like T1/T2), probing the model’s depth of percep-tion regarding medical imaging physics. • Organ Recognition: Identifies and names salient anatomical structures or specific or-gans within the image, evaluating fine-grained anatomical knowledge. • Region of Interest (ROI) Grounding: Per-forms spatial localization of pathological lesions or anomalous regions, testing the model’s ability to ground semantic concepts onto visual coordinates. • Disease Diagnosis: Synthesizes visual evi-dence to deduce a definitive clinical diagnosis for the observed pathology. • Abnormality Diagnosis: Discerns specific radiological signs or phenotypic abnormalities (e.g., nodules, effusion) distinct from high-level disease labels, focusing on semiological interpretation. Table 2: List of collected medical imaging datasets across different parts used for the benchmark. Total 36 datasets including ROCOv2 used for supplementary analysis, see Appendix B. 
+
+Part Collected Datasets 
+
+Brain Curious 2022 (Xiao et al., 2019), CT-ICH (Hssayeni et al., 2020), BraTS 2020 (Menze et al., 2014; Bakas et al., 2017, 2018) Chest and Lungs COVIDxCXR-4 (Wu et al., 2023), NIH Chest X-ray (Wang et al., 2017), SegTHOR (Lambert et al., 2020), COVID-19 Xray Dataset (Cohen et al., 2020; Kermany, 2018), JSRT (Shiraishi et al., 2000), Covid-19 Image Dataset (Raikokte, 2020), SIIM-ACR Pneumothorax Segmentation (Zawacki et al., 2019), VinDr-PCXR (Pham et al., 2023), COVID-QU-Ex (Tahir et al., 2021b,a; Rahman et al., 2021; Degerli et al., 2021; Chowdhury et al., 2020), Pulmonary Chest X-Ray Abnormal-ities (Jaeger et al., 2013; Candemir et al., 2013), COVIDGR (Tabik et al., 2020), Chest X-Ray Images (Pneumonia) (Kermany et al., 2018), COVID-19 Radiography Database (Rahman et al., 2021; Chowdhury et al., 2020), Chest X-Ray Images with Pneumothorax Masks (Zawacki et al., 2019), CoronaHack (Govi, 2020), RSNA Pneumonia Detection Challenge (Radiological Society of North America, 2018), COVID19 Pneumonia and Normal Chest X-ray PA Dataset (Asraf and Islam, 2021), Shenzhen Chest X-ray Set (Jaeger et al., 2014), Montgomery County CXR Set (Jaeger et al., 2014), ChestX-Det (Liu et al., 2020), COVID-CT (Yang et al., 2020), COVID-19-20 (Roth et al., 2022), Learn2Reg2022 (Hering et al., 2022), Finding and Measuring Lungs in CT Data (Mader, 2017), CAD-PE (Serrano, 2019) Breast BUSI (Al-Dhabyani et al., 2020), MIAS Mammography (Suckling et al., 2015), CBIS-DDSM (Sawyer-Lee et al., 2016) Heart MSD-Heart (Simpson et al., 2019), M&Ms (Campello et al., 2021; Martín-Isla et al., 2023), HeartSegMRI (Tobon-Gomez et al., 2015), M&Ms-2 (Martín-Isla et al., 2023) 
+
+Table 3: Detailed sample statistics of data sources in MedRCube (total: 7,626 samples).                                                          
+
+> Name # Samples Name # Samples
+> Curious 2022 759 RSNA Pneumonia Detection Challenge 79 CT-ICH 235 COVID19 Pneumonia and Normal Chest X-ray PA Dataset 67 BraTS 2020 235 Shenzhen Chest X-ray Set 79 COVIDxCXR-4 79 Montgomery County CXR Set 46 NIH Chest X-Ray 324 ChestX-Det 750 SegTHOR 105 COVID-CT 305 COVID-19 Xray Dataset 43 COVID-19-20 235 JSRT 56 Learn2Reg2022 105 Covid-19-Image Dataset 67 Finding and Measuring Lungs in CT Data 105 SIIM ACR Pneumothorax Segmentation 48 CAD-PE 305 VinDr-PCXR 413 BUSI 356 COVID-QU-Ex 56 MIAS Mammography 63 Pulmonary Chest X-Ray Abnormalities 56 CBIS-DDSM 302 COVIDGR 602 MSD-Heart 105 Chest X-Ray Images (Pneumonia) 56 M&Ms 105 COVID-19 Radiography Database 67 HeartSegMRI 105 Chest X-Ray Images with Pneumothorax Masks 79 M&Ms-2 105 CoronaHack 129 ROCOv2 1000
+
+• Severity Grading: Assesses the progression stage or severity level of a pathological condi-tion, requiring precise quantification or ordi-nal ranking of the disease state. To facilitate a qualitative understanding of the benchmark, we present representative examples for all evaluated tasks. Fig. 6 illustrates samples for perceptual and semantic recognition, while Fig. 7 displays samples for semantic grounding and cog-nitive reasoning. (b) Task Type: View Recognition 
+
+< Question > 
+
+Based on the visual appearance, what is the image 
+
+view? 
+
+< Options > 
+
+A. Axial 
+
+B. Coronal 
+
+C.  Postero -Anterior 
+
+D. Sagittal 
+
+< Correct Answer > 
+
+A. Axial 
+
+(a) Task Type: Modality Recognition 
+
+< Question > 
+
+Which imaging technique was used for this scan? 
+
+< Options > 
+
+A. DWI 
+
+B. CT 
+
+C. T1/T2 MRI 
+
+D. Cone -beam CT 
+
+< Correct Answer > 
+
+B. CT 
+
+(c) Task Type: Imaging Protocols  Recognition 
+
+< Question > 
+
+Recognize the detailed imaging modality from the 
+
+visual features. 
+
+< Options > 
+
+A.  T2 -weighted MRI 
+
+B.  MR Angiography 
+
+C.  FLAIR MRI 
+
+D.  STIR MRI 
+
+< Correct Answer > 
+
+D. STIR MRI 
+
+(d) Task Type: Organ Recognition 
+
+< Question > 
+
+Can you identify the organ that has been marked? 
+
+< Options > 
+
+A. Aorta 
+
+B. Right ventricle 
+
+C. Myocardium of left ventricle 
+
+D. Esophagus 
+
+< Correct Answer > 
+
+C. Myocardium of left ventricle Figure 6: Illustrative examples of perceptual and semantic tasks in MedRCube. (a) Modality Recognition: Classifies the fundamental imaging modality of a given scan (e.g., CT, MRI) to establish the prerequisite context. (b) View Recognition: Determines the anatomical imaging plane or projection angle (e.g., axial, sagittal). (c) Imaging Protocols Recognition: Identifies specific image acquisition protocols and technical parameters, probing the depth of physical perception. (d) Organ Recognition: Identifies and names salient anatomical structures or specific organs within the image. (a) Task Type: Region of Interest Grounding 
+
+< Question > 
+
+Provide the [x, y, w, h] coordinates for the 
+
+atelectasis, ensuring the box fits the lesion tightly. 
+
+< Options > 
+
+A. [175.05, 580.46, 265.75, 109.58] 
+
+B. [185.87, 580.46, 244.62, 103.54] 
+
+C. [175.05, 580.46, 244.62, 103.54] 
+
+D. [191.74, 618.5, 267.77, 111.5] 
+
+< Correct Answer > 
+
+C. [175.05, 580.46, 244.62, 103.54] 
+
+(b) Task Type: Disease Diagnosis 
+
+< Question > 
+
+Which illness is visually evident in this image ?
+
+< Options > 
+
+A.  Sarcoidosis 
+
+B.  Pneumothorax 
+
+C.  COVID -19 
+
+D. Pleural effusion 
+
+< Correct Answer > 
+
+C. COVID -19 
+
+(c) Task Type: Abnormality Diagnosis  (d) Task Type: Severity Grading 
+
+< Question > 
+
+What types of abnormalities are visible in this 
+
+chest radiograph? 
+
+< Options > 
+
+A. Ground -glass opacity 
+
+B. Reticulonodular opacity 
+
+C. Infiltrate 
+
+D. Interstitial emphysema 
+
+< Correct Answer > 
+
+B. Reticulonodular opacity 
+
+< Question > 
+
+What is the clinical severity of this COVID -19 case 
+
+as seen in the image? 
+
+< Options > 
+
+A. MILD 
+
+B. NORMAL -PCR+ 
+
+C. MODERATE 
+
+D. SEVERE 
+
+< Correct Answer > 
+
+C. MODERATE 
+
+Figure 7: Illustrative examples of semantic and cognitive reasoning tasks in MedRCube. (a) Region of Interest Grounding: Performs spatial localization of lesions or anomalies to ground semantic concepts onto visual coordinates. (b) Disease Diagnosis: Synthesizes visual evidence to deduce a definitive clinical diagnosis for the observed pathology. (c) Abnormality Diagnosis: Discerns specific radiological signs or phenotypic abnormalities distinct from high-level disease labels. (d) Severity Grading: Assesses the progression stage or severity level of a pathology, requiring precise quantification or ordinal ranking. D Evaluation Details 
+
+Evaluations were conducted via MedEvalKit *. Un-less otherwise specified, all experimental settings follow the default configuration provided by MedE-valKit. This section details the metrics and stan-dardized prompts employed to ensure fair evalua-tion across models. 
+
+D.1 Evaluation Metrics 
+
+We employ Accuracy (ACC) as the primary eval-uation metric. The calculation involves two levels of granularity: the overall performance across the entire benchmark and the fine-grained performance across specific dimensions. The Overall Accuracy (ACC overall ) is calculated using the entire dataset sample set Dall :
+
+ACC overall = Ncorrect (Dall )
+
+Ntotal (Dall ) × 100% , (3) where Ncorrect denotes the number of samples cor-rectly answered by the model, and Ntotal is the total number of samples. To analyze model capabilities in specific domains, we calculate the Type-Specific Accuracy ( ACC type ) for a given subset Dtype :
+
+ACC type = Ncorrect (Dtype )
+
+Ntotal (Dtype ) × 100% , (4) where type denotes the specific evaluation category across different axes. 
+
+D.2 Evaluation Models 
+
+A comprehensive roster of all models employed in this assessment is detailed as follows: 
+
+Proprietary Models: We select the most ad-vanced proprietary models representing the state-of-the-art capabilities, including GPT-5.1 (Ope-nAI, 2025), Claude Opus 4.5 (Anthropic, 2025), Gemini-3-Pro (Deepmind, 2025), and Qwen3-VL-Plus (Team, 2025b). 
+
+Medical MLLMs: We evaluate a comprehen-sive suite of medical-specific models across differ-ent scales. This includes MedVLM-R1 (Pan et al., 2025), the HealthGPT series (M3, L14, XL32) (Lin et al., 2025), LLaVA-Med-7B (Li et al., 2024), HuatuoGPT-Vision (7B, 34B) (Chen et al., 2024b), Lingshu (7B, 32B) (Team et al., 2025), Hulu-Med (4B, 7B, 14B, 32B) (Team, 2025a), and MedDr-40B (Sun et al., 2024). 
+
+> *https://github.com/alibaba-damo-academy/ MedEvalKit
+
+General-purpose MLLMs: We encompass a wide range of general domain models. This includes the InternVL series (InternVL3 and InternVL3.5, covering 2B, 8B, 14B, and 38B variants) (OpenGVLab, 2025), the Qwen series 
+
+(Qwen2.5-VL and Qwen3-VL, covering 7B, 8B, and 32B variants) (Team, 2024, 2025b), Llama-3.2-11B-Vision (Dubey et al., 2024), Phi-3.5-Vision (Abdin et al., 2024), Janus-Pro-7B (Wu et al., 2024), MiniCPM-o 2.6 (Yao et al., 2024), and LLaVA-v1.5-7B (Liu et al., 2024). 
+
+D.3 Evaluation Implementation 
+
+To ensure the exact reproducibility of our bench-mark results, we standardize the evaluation pipeline across all model classes. Our implementation is derived from the MedEvalKit framework, and the specific configurations are detailed below. 
+
+Open-source models. This category includes the InternVL3.5 series, Qwen3-VL series, Lingshu series, Hulu-Med series, and other open-weight models evaluated in this work. • Image preprocessing. We strictly follow the official inference examples provided in each model’s original repository to preprocess in-put images, ensuring that resolution, normal-ization, and tokenization match the intended deployment of each model. • Decoding strategy. We adopt greedy decod-ing across all models to minimize sampling variance. The decoding parameters are fixed at temperature = 0 , top _p = 0 .0001 , and 
+
+max _tokens = 8192 . For models that sup-port an explicit reasoning or thinking mode (e.g., Qwen3-VL), these features are disabled to maintain a standard benchmarking environ-ment. • Inference framework. We use vLLM for all supported models to ensure consistent sam-pling behavior and efficient throughput. For models not yet supported by vLLM (e.g., MedGemma, MedDr), inference is imple-mented via PyTorch or HuggingFace Trans-formers, strictly adhering to their official code-bases. 
+
+Closed-source models. This category includes the proprietary models listed in §D.2 (e.g., GPT-5.1, Claude Opus 4.5, Gemini-3-Pro, Qwen3-VL-Plus). Table 4: Text-only baseline results (no images). Scores are accuracy (%), and the value in parentheses denotes the absolute drop in Overall accuracy relative to the standard multimodal evaluation.                                                                                                                                 
+
+> Model Overall Task Type Modality Type Part Type
+> MR VR IPR OR RG DD AD SG CT X-Ray MRI US Brain Chest Heart Lungs Breast GPT-5.1 31.52 (21.84 ↓)37.98 17.33 14.00 47.20 40.10 31.34 18.12 25.43 40.70 38.41 21.58 22.33 30.57 40.14 22.14 35.55 24.13 Gemini-3-Pro 30.36 (28.99 ↓)17.76 19.00 19.14 39.63 60.00 25.71 17.63 30.13 25.81 44.29 15.66 16.20 18.41 46.44 18.10 22.84 21.50 InternVL3.5-38B 34.15 (23.99 ↓)24.45 27.67 24.86 41.85 51.40 35.39 10.14 32.91 38.45 41.24 27.50 19.02 18.84 42.18 31.43 40.57 28.85 Qwen3-VL-32B 29.77 (24.66 ↓)31.15 14.00 17.71 41.33 40.60 28.27 18.36 31.20 32.02 37.89 22.24 20.86 26.26 37.72 28.33 28.63 26.35 HuatuoGPT-Vision-34B 28.49 (25.53 ↓)20.90 8.67 13.29 45.24 33.00 34.58 4.83 29.06 34.96 30.23 36.32 25.15 30.14 30.37 28.10 32.42 37.03 Hulu-Med-32B 27.28 (27.99 ↓)28.42 28.00 27.71 25.29 25.00 28.19 27.54 27.78 24.26 29.22 25.00 26.75 24.22 28.95 26.43 24.45 29.13
+
+• Execution. All evaluations are performed via API calls, wrapped with the OpenAI SDK for a unified interface. • Decoding strategy. Consistent with the open-source setting, we set temperature = 0,
+
+top _p = 0 .0001 , and max _tokens = 8192 .Any additional reasoning or optimization tog-gles exposed by the APIs are disabled to en-sure comparability. The specific execution configuration for each model is fully contained within our evaluation code and will be released together with the dataset. 
+
+D.4 Text-only Baseline 
+
+To estimate how much performance can be ob-tained from textual priors alone, we run an addi-tional text-only setting where models are given the question and options but no image . We evaluate a set of representative models spanning proprietary MLLMs, general-purpose open-source LVLMs, and medical LVLMs. Table 4 shows details. 
+
+E Construction Details 
+
+This section provides further details regarding §3, which were omitted due to space limitations. 
+
+E.1 Image Processing 
+
+Image preprocessing is applied to ensure consistent visualization and input formatting across heteroge-neous source datasets. 
+
+Image protocol. For raw medical images that are not provided as pre-rendered slices, image load-ing and processing are performed using SimpleITK and NiBabel. Modality-specific intensity normal-ization and color mapping follow the default config-urations of the respective libraries. If the original dataset already provides processed slice images, these images are used directly without further mod-ification. 
+
+Slicing of volumetric images. For three-dimensional imaging data, a representative slice is selected for downstream tasks. If pixel-level or region-level annotation masks are available, the slice with the largest annotated area is selected. Otherwise, the central slice of the volume is used. The slice orientation is preserved to remain consis-tent with the original acquisition direction. 
+
+Mask visualization. Mask annotations are in-corporated for visualization when available. Pixel-level segmentation masks are overlaid on the pro-cessed image using a semi-transparent red color. For samples annotated with bounding boxes, box coordinates are converted into red rectangular out-lines. In cases involving multiple organs or mul-tiple annotation instances, distinct and visually separable colors are used to differentiate different anatomical structures or regions of interest. 
+
+E.2 Question Generation 
+
+To ensure question diversity, we constructed task-specific candidate pools containing a series of ques-tion templates. These candidates were rigorously vetted by medical experts to verify their rationality and clinical appropriateness. During dataset con-struction, the final question for each sample was randomly sampled from this expert-validated pool. 
+
+E.3 Options Design 
+
+We analyze the different question types covered by the dataset and design three systematic and stan-dardized option generation pipelines. Each ques-tion is assigned to an appropriate pipeline accord-ing to its semantic category and task characteristics, ensuring that all options are accurate, high-quality, and suitable for controlled evaluation. 
+
+Disease-oriented Questions For questions whose answers correspond to disease entities, candidate distractors are constructed using atwo-stage process. Diseases with similar pheno-typic characteristics are first identified through similarity matching in the Human Phenotype Ontology (HPO) database. A large language model–based pipeline then generates two groups of candidate diseases or conditions: similar distractors , which share overlapping clinical manifestations with the ground-truth answer, and 
+
+normal distractors , which represent clinically plausible but non-matching alternatives to control difficulty. Generated candidates are filtered to remove hierarchical conflicts (e.g., subtypes or parent concepts) and semantic overlap. Final options are obtained through stratified sampling from the pooled candidates. 
+
+Abnormality-oriented Questions For tasks in-volving image interpretation or anomaly detection, distractors are derived from abnormal radiological findings observed in the corresponding image. A large language model–based pipeline generates ra-diological findings with similar imaging character-istics, including similar distractors and normal dis-tractors corresponding to different difficulty levels. Generated candidates are filtered to avoid hierarchi-cal conflicts (e.g., closely related sub-findings) and semantic redundancy. Final options are selected via stratified sampling to ensure balanced difficulty and diversity. 
+
+Predefined Answer Spaces For question types with a closed and well-defined answer space, such as binary judgments or limited categorical deci-sions, options are drawn directly from predefined candidate sets. These candidates are manually ver-ified to ensure completeness, mutual exclusivity, and consistency across samples. This structured option generation strategy sup-ports diverse question types while maintaining clin-ical plausibility and controlled difficulty across the benchmark. 
+
+E.4 Standardization and Post-processing 
+
+To ensure terminological consistency and reduce lexical variability in the answer options, a stan-dardized post-processing pipeline is applied. This process focuses on normalizing medical concepts, particularly disease names and radiological terms, to authoritative clinical terminologies. 
+
+Standardization pipeline. All reference termi-nology entries are encoded and stored in a vector database. For each candidate string to be normal-ized, a vector similarity search retrieves the top 20 most semantically relevant standardized terms. A large language model then selects the most accurate mapping from these candidates based on semantic and clinical relevance. 
+
+Terminology sources. The pipeline leverages established medical terminologies. RadLex, a ra-diology lexicon developed by the Radiological So-ciety of North America (RSNA), is used to stan-dardize radiological findings, imaging modalities, and anatomical structures. Disease entities are nor-malized using ICD-10 and ICD-11 codes, which provide a structured and uniform representation of clinical diagnoses. This standardization procedure is applied uni-formly across all answer options to improve consis-tency, comparability, and robustness in subsequent benchmarking. 
+
+E.5 Quality Review 
+
+To ensure the clinical validity and reliability of the benchmark, all question–answer pairs undergo a structured quality review process adapted from the National Board of Medical Examiners (NBME) item-writing guidelines and tailored to multimodal medical imaging tasks. 
+
+Question integrity. Each question is reviewed independently of its answer options. Clinical ac-curacy requires that all anatomical, pathological, and radiological terminology be correct, standard-ized, and error-free. Logical coherence ensures internal consistency without factual or semantic contradictions. Unambiguous phrasing requires concise, grammatically sound, and clearly inter-pretable wording. Clinical determinism, as a criti-cal criterion, requires that an expert clinician can derive a single definitive answer from the image and question alone, without relying on the answer options. 
+
+Option set effectiveness. Answer options are jointly evaluated with the ground-truth label. Con-ceptual and grammatical homogeneity requires all options to belong to the same category and share a parallel structure. Mutual exclusivity ensures that options do not overlap semantically. Plausible dis-tractors require incorrect options to be clinically reasonable given the imaging modality and context, while the ground-truth answer remains clearly and uniquely correct. 
+
+E.6 Expert Agreement on LLM-based Quality Review 
+
+To verify that the LLM-based quality review yields judgments consistent with human experts, we con-ducted an agreement study. A Ph.D. candidate in clinical medicine independently annotated 50 ran-domly sampled question–answer pairs following Table 5: Consistency between GPT-5.1 and a clinical expert on 50 randomly sampled question–answer pairs. Principle 1 covers question integrity (1.1 Clinical & Anatomical Accuracy, 1.2 Logical Coherence, 1.3 Unambiguous Phrasing, 1.4 VQA Suitability); Principle 2 covers option set effectiveness (2.1 Conceptual & Grammatical Homogeneity, 2.2 Mutual Exclusivity, 2.3 Plausibility of Distractors). Sample-level consistency requires the all judgments on a sample to match. 
+
+Principle Sample-level 1 1.1 1.2 1.3 1.4 2 2.1 2.2 2.3 
+
+Consistency 0.84 0.94 0.98 0.98 0.94 0.98 0.90 0.94 0.96 0.96 exactly the same rubric used by the model (see Table 10, adapted from the NBME item-writing guidelines). We then compared these expert anno-tations against the judgments produced by GPT-5.1 under the same rubric, and report agreement at two granularities: sample-level consistency, which re-quires the expert and the model to agree on all sub-principles of a sample, and rule-level consistency, which measures agreement on each individual prin-ciple and sub-principle. As shown in Table 5, rule-level agreement exceeds 90% on every rule, and sample-level agreement reaches 0.84. These re-sults indicate that the LLM-based quality review is highly aligned with expert judgment, support-ing the reliability of using it for large-scale quality control in MedRCube. 
+
+F Explanation of Abbreviations 
+
+Table 6 outlines the abbreviations and correspond-ing full designations for the specific medical tasks integrated into MedRCube. 
+
+> Table 6: Abbreviations and Full Names of Tasks
+
+Abbreviation Full Name DD Disease Diagnosis MR Modality Recognition AD Abnormality Diagnosis SG Severity Grading OR Organ Recognition RG Region of Interest Grounding IPR Imaging Protocols Recognition VR View Recognition 
+
+G Prompts Template 
+
+G.1 Prompt Templates for Options Generation 
+
+We detail the prompt engineering strategy for distractor generation. Strictly adhering to Na-tional Board of Medical Examiners (NBME) guide-lines, we categorize generation tasks into Disease-Oriented and Abnormality-Oriented types. For both categories, our templates are designed to miti-gate elimination shortcuts by constructing two dis-tinct classes of distractors: similar distractors and normal distractors. Table 7 and Table 8 report on the prompt design and purpose for two tasks. 
+
+G.2 Evaluation Prompt 
+
+To ensure a standardized assessment, we utilize a unified zero-shot prompt template for all participat-ing models. As illustrated in Table 9, the prompt is strictly structured to guide the model to answer medical question. 
+
+G.3 Quality Review Prompt 
+
+The prompts used for question-and-answer pair checking are shown in Table 10. 
+
+H Evolutionary Hypotheses and Diagnostic Predictions 
+
+H.1 Preliminaries and Notation 
+
+High-level (cognition-level) accuracy and Shortcut Probability are defined as: 
+
+Acc H = N (A) + N (D)
+
+N (A) + N (B) + N (C) + N (D) , (5) 
+
+PSC = N (D)
+
+N (C) + N (D) . (6) Importantly, Acc H conflates two qualitatively distinct sources of correct cognition-level answers: grounded correctness ( N (A)) and shortcut-based correctness ( N (D)). In contrast, PSC isolates un-grounded success by conditioning on prerequisite failure ( L = 0 ). 
+
+H.2 Hypothesis H0: Ideal Evolution. As models scale, improve-ments in cognition-level accuracy are primarily driven by stronger perceptual and semantic ground-ing, yielding more causally valid reasoning chains. Reliance on shortcut-based guessing diminishes as ambiguity is resolved. Table 7: Prompt templates for disease-oriented task. Braced placeholders are dynamic variables instantiated based on sample metadata: {disease} denote the ground-truth diagnosis; and {num_distractors} controls the required number of options. 
+
+Prompt Templates for Disease-Oriented Task Type Prompt Content Similar Distractors Prompt: Generate {num_distractors} diseases similar to ‘{disease}’ but distinct and incorrect. Focus on diseases with similar symptoms or pathophysiology. 
+
+Purpose: Leverage the Human Phenotype Ontology (HPO) to generate difficult, clinically confusing options requiring fine-grained differentiation. 
+
+Normal Distractors Prompt: Generate {num_distractors} diseases from the same anatomical region as ’{disease}’ with similar disease category. 
+
+Purpose: Serve as a control group using cross-region diseases to regulate difficulty and validate basic anatomical alignment.         
+
+> Table 8: Prompt templates for abnormality-oriented task. Braced placeholders represent dynamic variables instantiated from sample metadata: {finding} denote the specific radiological finding; {region} specify the anatomical location; {modality} provides the necessary imaging modality context; and {num_distractors}
+> governs the required quantity of generated options.
+
+Prompt Templates for Abnormality-Oriented Task Type Prompt Content Similar Distractors Prompt: Generate {num_distractors} imaging findings that could be confused with ‘{finding}’ in {modality} of {region}. 
+
+Purpose: Generate region-specific, plausible abnormalities to provide high-difficulty confounders for the target finding. 
+
+Normal Distractors Prompt: Generate {num_distractors} common imaging findings from {region} that could appear in differential diagnosis. 
+
+Purpose: Serve as a control group using cross-region or cross-modality findings to regulate difficulty and test context awareness.     
+
+> Table 9: The unified prompt template used for model evaluation. The placeholder {question} represents the clinical query of the test sample, and {options} denotes the candidate choices provided for that sample.
+
+Prompt Templates for Model Evaluation 
+
+Question: {question} Options: {options} Answer with the option’s letter from the given choices directly. 
+
+Expected dynamics. 
+
+∆N (A) > 0, ∆N (D) ≤ 0. (7) 
+
+Expected Prediction: Since PSC is monotonically increasing in N (D), and H0 requires ∆N (D) ≤ 0,improvements in Acc H should not be accompanied by higher shortcut reliance. Thus, H0 predicts a non-positive or weak association: 
+
+Corr( Acc H , P SC ) ≤ 0. (8) 
+
+H1: Opportunistic Evolution (Pattern Exploita-tion). As models scale, cognition-level accuracy improves through both enhanced grounding and in-creasingly effective exploitation of statistical short-cuts that bypass prerequisite understanding. 
+
+Expected dynamics. 
+
+∆N (A) > 0, ∆N (D) > 0. (9) 
+
+Expected Prediction: Under H1, growth in shortcut-based correctness ( ∆N (D) > 0) directly increases PSC . As a result, models with higher cognition-level accuracy are expected to exhibit higher Shortcut Probability, yielding: 
+
+Corr( Acc H , P SC ) > 0. (10) Table 10: Prompt of Quality Review. This prompt is adapted from the National Board of Medical Examinations (NBME) guidelines for item writing and has been tailored for multimodal medical imaging tasks to provide rigorous review of question items and options. 
+
+Prompt Templates for Quality Review 
+
+SYSTEM_PROMPT = """ You are a Senior Medical Content Analyst. You are performing a **TEXT-ONLY pre-validation** of a medical VQA dataset. You will **NOT** be provided with any images. Your evaluation must be based solely on the textual content (question, options, etc.) provided. Your objective is to ensure the clinical integrity and educational value of the VQA samples by performing a critical review of their textual components. You will evaluate each sample based on two stringent principles. You MUST evaluate and provide a 0 (Fail) or 1 (Pass) for EACH individual sub-principle (e.g., 1.1, 1.2, ... 2.3). **Principle 1: Question Integrity (Text-Only Focus)** * **1.1. Clinical & Anatomical Accuracy:** All terminology (e.g., anatomical structures, pathologies, findings) in the question must be accurate, standard, and free of error. * **1.2. Logical Coherence:** The question must be internally consistent and free of factual or logical self-contradictions. * **1.3. Unambiguous Phrasing:** The question must be concise, grammatically sound, and semantically unambiguous. * **1.4. CRITICAL - VQA Suitability (Image-Dependence & Objectivity):** The question’s phrasing must be structured as a valid VQA query. This means it must satisfy TWO conditions: * **a) Image-Dependent:** The question MUST require visual information (from the hypothetical image) to be answered. (FAIL if the question is general knowledge, e.g., "What is pneumonia?" or "Define lung."). * **b) Objective & Factual:** The question must seek a factual, objective answer based on visual content. (FAIL if the question is subjective, e.g., "Is this a high-quality image?", "What do you think of this finding?"). * **ALLOWED:** Questions that directly reference the (hypothetical) image or its parts are valid, even if they seem open-ended. (PASS example: "Please observe this ultrasound image, what problem is shown in the area marked by the red box?") (PASS example: "What abnormality is present in the lower right quadrant?") **Principle 2: Option Set Effectiveness (Text-Only Focus)** * **2.1. Conceptual & Grammatical Homogeneity:** All options (A, B, C, D) must belong to the same category (e.g., all diagnoses, all anatomical parts, all ’yes/no’ judgments) and share a parallel grammatical structure. * **2.2. Mutual Exclusivity:** Options must be distinct and not overlap (e.g., "Pneumonia" and "Bacterial Pneumonia" as separate options constitutes a failure). * **2.3. Plausibility of Distractors:** All incorrect options (distractors) must be plausible, reasonable "foils" given the clinical context (modality, anatomical regions). The ‘gt_answer‘ must be unequivocally the *best* and most correct answer among the choices. You MUST return your evaluation as a single, minified, valid JSON object. NO explanatory text, markdown (“json ... ”), or any other characters outside the JSON structure are permitted. """
