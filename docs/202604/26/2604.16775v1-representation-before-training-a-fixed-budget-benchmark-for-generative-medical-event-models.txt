@@ -1,0 +1,1454 @@
+Title: Representation Before Training: A Fixed-Budget Benchmark for Generative Medical Event Models
+
+URL Source: https://arxiv.org/pdf/2604.16775v1
+
+Published Time: Tue, 21 Apr 2026 00:28:50 GMT
+
+Number of Pages: 39
+
+Markdown Content:
+## Representation Before Training: A Fixed-Budget Benchmark for Generative Medical Event Models 
+
+Inhyeok Lee ihlee@uchicago.edu 
+
+Luke Solo lsolo@uchicago.edu 
+
+Michael C. Burkhart burkh4rt@uchicago.edu 
+
+Bashar Ramadan basharramadan@uchicago.edu 
+
+William F. Parker wparker@uchicago.edu 
+
+Brett K. Beaulieu-Jones beaulieujones@uchicago.edu 
+
+University of Chicago 
+
+Abstract 
+
+Every prediction from a generative medical event model is bounded by how clinical events are tokenized, yet input representation is rarely isolated from other system and architectural choices. We evaluate how representation decisions affect downstream prediction after a shared one-epoch pretraining budget. We train 28 matched transformers on MIMIC-IV and evaluate them on 30 clinical outcomes in three experiments: (1) quantization granularity, reference-range anchoring, and code-value fusion; (2) value encoding (hard bins, soft discretization, code-normalized xVal) crossed with temporal encoding (event order, time tokens, admission-relative RoPE); and (3) native MIMIC laboratory/vital codes versus the Common Longitudinal ICU Format (CLIF)-remapped laboratory/vital codes with compression-preserving perturbation arms. In Experiment 1, fused code-value tokenization improves mortality AUROC from 0.891 to 0.915 (BH-adjusted p < 0.001), hospital length-of-stay AUROC from 0.763 to 0.788 (BH-adjusted p < 0.001), and, for the decile fused-vs-unfused comparison, mean regression Spearman ρ across the 13 regression outcomes from 0.414 to 0.494. Across the three temporal encodings, event order only and admission-relative RoPE match or exceed inserting time tokens on average while shortening sequences by 11%. CLIF remapping preserves downstream performance in our single-site setting while yielding a smaller, clinically interpretable token set compatible with multi-site use. Finer-than-decile quantization, reference-range anchoring, and soft discretization help in selective outcomes, while code-normalized xVal remains well below the discrete and soft families, consistent with near-median suppression that persists after the affine variant. 
+
+Keywords: Electronic health records, Generative medical event models, Input representa-tion, Clinical decision support, Quantization, Transformer architectures 
+
+Data and Code Availability We use the MIMIC-IV dataset (Johnson et al., 2023), version 3.1, distributed through PhysioNet (Johnson et al., 2024), subject to standard credentialing and data use requirements. For MIMIC to CLIF remapping, we use MIMIC-IV-Ext-CLIF version 1.1.0 (Liao et al., 2026). Benchmark orchestration, metric calculation, and figure-generation code are available at bbj-lab/input-representation-benchmark .Model tokenization and training code are available at bbj-lab/fms-ehrs .
+
+Institutional Review Board (IRB) We used the de-identified MIMIC-IV database (Johnson et al., 2023); no additional IRB approval was required for this secondary analysis (accessed via PhysioNet credentialing).  
+
+> ©2026 I. Lee, L. Solo, M.C. Burkhart, B. Ramadan, W.F. Parker & B.K. Beaulieu-Jones.
+> arXiv:2604.16775v1 [cs.LG] 18 Apr 2026 Representation Before Training
+
+1. Introduction 
+
+Generative medical event models learn patient representations through self-supervised next-token prediction. Critically, precision lost at tokenization cannot be recovered downstream. However, most benchmarks and model comparisons fix tokenization choices while ablating other parts of the pipeline. Structured health care records mix numeric and categorical attributes. Tokenization determines how numeric magnitude, elapsed time, and event-code vocabulary reach the model. For example, potassium values of 5.0 and 6.5 mEq/L could fall into separate bins or be collapsed into the same coarse category. We ask how such upstream decisions influence downstream performance. We compare performance after a fixed single full pass through the training data, with early stopping disabled and training exposure matched across all configurations. Prior benchmarks stan-dardized tasks or model families rather than the representation layer itself (Fries et al., 2023; Y` eche et al., 2022; Yang et al., 2025). Concurrent work by Guo et al. (2026) studies three binary representation choices in a pediatric setting; we expand the benchmark to quanti-zation granularity, reference-range anchoring, continuous value encoders, and vocabulary perturbation, and evaluate on adult ICU data. A common, standardized vocabulary is one example input representation choice. The Common Longitudinal ICU Format (CLIF: Rojas et al., 2025) is a community-developed schema that harmonizes critical care data across institutions by mapping site-specific laboratory and vital codes to a minimum set of Common ICU data Elements (e.g., LAB/ /50931//mg/dl becomes LAB//glucose_serum ). CLIF was designed for multi-site research; we test whether remapping covered laboratory and vital codes to the smaller shared CLIF vocabulary changes single-site performance, while noting that the same mapping could later support multi-site training through data centralization or federated learning. We organize the benchmark into three experiments with a corresponding question: 1. Experiment 1 Quantization: How should numeric values be quantized, and should code and value share a token? 2. Experiment 2 Value and temporal encoding: How should numeric magnitude and elapsed time be encoded? 3. Experiment 3 Vocabulary semantic grouping: How does remapping laboratory and vital codes to a standardized clinical vocabulary affect model performance? The benchmark defines 30 unique outcomes, with each experiment evaluating 29 because the ICU endpoint differs: Experiments 1–2 use ICU admission, whereas Experiment 3 uses ICU length of stay > 48h. 
+
+Generalizable Insights about Machine Learning in the Context of Healthcare 
+
+Tokenization is a low-overhead design choice in a clinical ML pipeline, but it is often fixed early and never revisited. Our results show that it can shift downstream AUROC substantially. Under the shared one-epoch budget, the benchmark yields four practical findings: First , fuse code and value into a single token . Fused tokenization gives the largest and most consistent gains in our sweep, so it is the strongest default under this budget. 
+
+Second , start with deciles . Finer bins fracture each measurement across more embedding slots, leaving many undertrained under one epoch likely due to the standard loss (cross-entropy) erasing the expected benefit of higher numeric resolution. Third , start without 
+
+> 2Representation Before Training
+
+time tokens . Event order alone and admission-relative RoPE shorten sequences by ∼11%, fit more clinical content within the same context window, and perform on par with inserting time tokens on the mean summaries. Fourth , CLIF remapping preserves performance in our single-site, partial-coverage setting . Replacing covered native MIMIC laboratory and vital codes with CLIF’s expert-curated vocabulary yields a smaller, clinically interpretable token set that remains compatible with the multi-site use case CLIF was designed to support. 
+
+2. Related Work 
+
+2.1. From Recurrent Event Models to Generative Medical Event Models 
+
+In this paper, generative medical event models are self-supervised transformer models trained with next-token prediction over structured clinical event sequences. Before transformer pretraining, longitudinal medical event modeling was often recurrent: Doctor AI (Choi et al., 2016) jointly predicted next-visit diagnoses, medications, and visit timing with recurrent neural networks; RETAIN (Choi et al., 2017) introduced reverse-time recurrent attention for interpretable visit-sequence prediction; and Dipole (Ma et al., 2017) used bidirectional recurrent attention for next-visit diagnosis prediction. Transformer pretraining then expanded to BEHRT (Li et al., 2020) and Med-BERT (Rasmy et al., 2021), which established that self-supervised pretraining on EHR sequences transfers to downstream tasks. More recent studies work with multi-modal event streams: ETHOS-ARES (Renc et al., 2025) pretrains on full MEDS-formatted timelines; EHRMamba (Fallahpour et al., 2024) explores state-space architectures; MOTOR (Steinberg et al., 2023) adds time-to-event pretraining objectives; and Hegselmann et al. (2025) serialize clinical events as text for large language model (LLM) encoding. EHRSHOT (Fries et al., 2023) releases longitudinal structured EHRs, pretrained clinical foundation-model weights, and a shared few-shot evaluation protocol. Despite this breadth, few studies isolate input representation as its own modeling problem. 
+
+2.2. Clinical Data Standards and Interoperability 
+
+Competing clinical coding systems motivate our vocabulary-remapping experiment. The Medical Event Data Standard (MEDS: Medical Event Data Standard Community, 2024) provides the event schema used throughout this study, while the Common Longitudinal ICU Format (CLIF: Rojas et al., 2025) provides a clinically standardized ICU vocabulary. Callahan et al. (2023) show how ontology alignment can be carried out at health-system scale. More directly relevant to model input representation, prior work has tried three main strategies for handling medical codes: text-based code embedding (Hur et al., 2022), subword tokenization adapted to alphanumeric codes such as ICD-10 and SNOMED-CT within multimodal medical foundation models (Dwivedi et al., 2024), and multimodal code tokenization that combines code descriptions with graph context (Su et al., 2025). Whether a standardized vocabulary helps beyond the frequency regularization that comes from collapsing many source codes into fewer shared codes remains open; Experiment 3 tests that question directly ( §4.3). 
+
+> 3Representation Before Training
+
+2.3. Numeric Representation in Transformers 
+
+Encoding continuous values inside discrete-token transformer architectures is an open problem in natural language processing (NLP) (Thawani et al., 2021) and is even more pronounced in clinical data, where numeric precision has direct clinical meaning (e.g., a serum potassium of 5.0 vs. 6.5 mEq/L). Equal-frequency quantile binning is a common starting choice in EHR pipelines because balanced bin frequencies yield uniform token distributions (Renc et al., 2025), but quantile-bin boundaries do not necessarily fall at clinically meaningful thresholds. xVal (Golkar et al., 2024) proposes continuous number tokenization for scientific language models: a placeholder token ( [NUM] ) whose embedding is scaled multiplicatively by a normalized scalar, coupled with an auxiliary numeric regression head. Norouzi et al. (2014) introduced ConSE (Convex Combination of Semantic Embeddings) for zero-shot classification, representing inputs as probability-weighted combinations of category embeddings. We borrow the convex-combination idea and repurpose it for local interpolation between adjacent quantile-bin embeddings, which is distinct from its original setting. Shao et al. (2025) propose continuous autoregressive language models that bypass tokenization entirely. DuETT (Labach et al., 2023) introduces a dual event-time transformer that processes continuous-valued clinical events with a specialized temporal architecture, and Ma et al. (2024) propose temporal cross-attention for dynamic embedding of multimodal EHR data. Our benchmark evaluates hard quantization, soft discretization, and continuous encoders under matched conditions to isolate the effect of numeric precision on downstream performance. 
+
+2.4. Temporal Modeling for Longitudinal Data 
+
+Prior EHR transformers reperesent time in several ways. CEHR-BERT inserts artificial time tokens and combines them with time and age embeddings inside a hybrid structured-EHR transformer (Pang et al., 2021). Time2Vec (Kazemi et al., 2019) learns continuous time features, while MOTOR (Steinberg et al., 2023) uses rotary time embeddings keyed to days since birth inside a time-to-event pretraining objective. More generally, Rotary Position Embeddings encode relative positions through tensor rotations (RoPE: Su et al., 2024). But a recent controlled MIMIC-IV study found no consistent statistically significant benefit from explicit time features across four prediction tasks: in the Triplet representation, each event is encoded as the sum of a code embedding, a time embedding, and a value embedding, and removing the time term ( CVE time ) did not hurt performance consistently; replacing that same time term with Time2Vec or LeTE also did not improve results (Attrach et al., 2025). This result motivates our direct comparison among inserting time tokens, event order alone, and admission-relative rotary position embeddings (admission-relative RoPE) indexed by elapsed time since admission at 1-minute resolution. 
+
+2.5. Benchmarking Efforts 
+
+Existing EHR foundation model benchmarks usually standardize downstream tasks, modal-ities, or model families rather than the tokenization layer itself. EHRSHOT (Fries et al., 2023) evaluates frozen representations on 15 clinical prediction tasks under a shared few-shot protocol. CLMBR (Steinberg et al., 2021) learns patient representations from sequences of daily diagnosis, procedure, medication, and laboratory-order codes, but does not directly model quantitative laboratory values or vitals. HiRID-ICU-Benchmark (Y` eche et al., 2022) 
+
+> 4Representation Before Training
+
+packages nearly 34,000 ICU admissions and 681 high-resolution physiologic variables into a reproducible pipeline for clinically defined time-series prediction tasks. Yu et al. (2025) construct a multimodal MIMIC-IV benchmark at the ICU-stay level that harmonizes hospi-tal, ICU, chest X-ray, and note data, compares eight unimodal and multimodal foundation models, and reports predictive performance, fairness, and interpretability. CLIMB (Dai et al., 2025) expands the benchmark view to 44 datasets and 15 modalities, emphasizing large-scale multimodal pretraining and transfer. EHRStruct (Yang et al., 2025) evaluates 20 LLMs on 11 structured-EHR tasks and analyzes how input format, few-shot prompting, and fine-tuning strategy affect performance. Comparable to our study, Guo et al. (2026) study the representation layer itself. They pretrain eight models that cross three binary choices: whether each clinical event is generated as one fused code-plus-attribute token or as separate code and attribute tokens, whether time is encoded by inserted interval tokens or by RoPE positions derived from patient age, and whether multi-step workflows such as order, collection, and result times are kept as separate events. Across 74 pediatric prediction tasks, fused tokenization consistently outperforms unfused tokenization. Our benchmark further expands the representation choices to quantization granularity, reference-range anchored laboratory binning, continuous value encoders, and vocabulary remapping with compression-preserving perturbations. 
+
+3. Methods 
+
+Overview. Each hospital admission ( hadm id ) is represented as a time-ordered sequence of clinical events. Some events are purely categorical (e.g., transfers or procedures), while others include a numeric measurement (e.g., laboratory or vitals). We focus on the input representation , the pretraining-time procedure that converts heterogeneous time-stamped events into a token sequence that a transformer can consume. 1 The subsequent evaluation uses the first 24 hours of each admission to predict 30 clinical outcomes (17 binary, 13 regression), defined in Table 3. 
+
+3.1. Data Format 
+
+We use MEDS (Medical Event Data Standard Community, 2024)-formatted event streams: each event has subject id , time , code , and optional numeric value . Tokenization produces full-length and first-24h timelines. For soft discretization and code-normalized xVal, the tokenized sequences also retain the underlying numeric values so the model can interpolate between bins or scale the [NUM] token by a code-normalized value. 
+
+3.2. Representation Choices Reference-Range Anchored Laboratory Binning. For each laboratory code with reference range [ Lc, U c], values are partitioned into below/within/above-normal regions and equal-frequency quantile binning is applied within each region (e.g., 5-10-5 for ventiles), with 
+
+Lc and Uc as explicit boundaries. In MIMIC-IV, ref range lower and ref range upper 
+
+record the normal range reported on the original hospital laboratory result (Johnson et al.,     
+
+> 1. Throughout, an event is treated as numeric if and only if the extracted MEDS row has a non-null
+> numeric value field (Section I).
+> 5Representation Before Training
+
+Figure 1: Representation benchmark axes and evaluations. Left: the three represen-tation axes varied across Experiments 1–3. Right: the 30 clinical outcomes (17 binary, 13 regression). Binary outcomes are scored with AUROC, AUPRC, Brier score, and ECE-15; regression outcomes with Spearman ρ.2023). These cutoffs mark the boundary between normal and abnormal, not the severe thresholds used for many of our binary outcome labels (e.g., potassium <2.5 or ≥6.5 mEq/L, hemoglobin <7 g/dL, sodium <120 or ≥160 mEq/L). 
+
+ConSE-variant Soft Discretization. Numeric values are represented by interpolating between the two adjacent quantile-bin embeddings whose boundary interval contains the value, retaining within-bin position information. We repurpose ConSE’s convex-combination idea (Norouzi et al., 2014) as a local interpolation rule for numeric values rather than as a zero-shot classifier. Values below the first breakpoint or above the last breakpoint use the first or last bin embedding, respectively. Full definitions are shown in Section H. 
+
+Continuous Encoder (code-normalized xVal). Numeric events are encoded as code tokens followed by a [NUM] placeholder token. Following xVal (Golkar et al., 2024), we inject magnitude by multiplicatively scaling the [NUM] embedding by a scalar. Because the shared 
+
+[NUM] direction is reused across measurements with heterogeneous units and dynamic ranges, raw-value scaling would cause high-range codes to dominate. We replace the scalar with a robust per-code normalization: a clipped z-score z = ( v − median c)/scale c with scale c
+
+> 6Representation Before Training
+
+derived from the IQR. 2 We evaluate the multiplicative parameterization ( ze[NUM] ) and an affine-shifted variant ( ze[NUM] + b), which avoids vanishing injection at z≈0. Full definitions appear in Section H. 
+
+Temporal Encoding. Three strategies are compared: (i) time tokens between events; (ii) admission-relative RoPE, which removes time tokens and instead uses admission-relative elapsed time converted to 1-minute position IDs to drive rotary position embeddings (Su et al., 2024; Steinberg et al., 2023); and (iii) event order only, which removes time tokens and does not supply admission-relative position IDs, leaving the model to use its default sequential position order. MOTOR (Steinberg et al., 2023) is not considered for the experiments because it changes the pretraining objective, breaking the matched comparison. 
+
+3.3. Vocabulary Semantic Grouping with Compression-Preserving Perturbations 
+
+Experiment 3 isolates the effect of the event-code vocabulary scheme by holding the ICU cohort, model architecture, and training objective fixed across all four arms. All four arms use the discrete value encoder with admission-relative RoPE from Experiment 2. The reported Experiment 3 tokenizer reads only the LAB and VITAL event blocks. The realized input sequence also keeps shared prefix/suffix scaffold tokens for race, language, sex, age, insurance, marital status, admission type, and discharge type; it does not include medication, infusion, transfer, ICU in/out, diagnosis, or procedure tokens (Section J). For all arms, the MEDS event rows, timestamps, and numeric values are held fixed; only the code string changes within the mapped domains. The main comparison is Native MIMIC codes versus CLIF-mapped codes, but that contrast mixes two effects: clinically meaningful regrouping of codes and simpler, more compressed vocabularies. We include two perturbation arms that reuse the mapped-arm target code set: a randomized arm that permutes source-to-target assignments within domain, and a frequency-matched arm that greedily matches mapped-code training frequencies within domain. The full logic is in Section C. 
+
+Vocabulary arms. Native MIMIC leaves all MIMIC code strings unchanged. CLIF-mapped rewrites covered LAB and VITAL codes to CLIF categories while keeping timestamps and numeric values fixed. Because the MEDS code string preserves the unit suffix, one CLIF category can still yield multiple realized token strings (e.g., LAB//albumin//g/dL and 
+
+LAB//albumin//mg/dL ). Randomized mapped codes shuffle the mapped train-split target code list within each code domain and then assign native source codes in sorted order while cycling through that shuffled list as needed. Frequency-matched mapped codes sort native source codes by train-split frequency and greedily assign each one to the mapped target code with the largest remaining train-split count. 
+
+3.4. Training and Evaluation Protocol Training Configuration. We train transformer models under a fixed one-epoch budget: each configuration sees one full pass over its training data. Experiment 1 uses packed collation    
+
+> 2. Under this normalization, z= 0 corresponds to a code’s typical value, so the injected magnitude reflects clinical deviation rather than absolute magnitude or arbitrary unit choice.
+> 7Representation Before Training
+
+and a small learning-rate sweep (3 trials) to choose shared settings, and Experiments 2–3 reuse those settings without hyperparameter re-optimization. Across all experiments, gradient accumulation is fixed at 2 and early stopping is disabled. Discrete models use standard next-token cross-entropy; for soft discretization, quantile-token prediction positions use a two-bin soft target defined by the same interpolation weight used in the input embedding, while all other positions retain standard cross-entropy; and xVal adds its auxiliary numeric regression loss at [NUM] positions. Experiments 2–3 use Muon (Bernstein and Newhouse, 2024) for 2D hidden-layer matrices with AdamW for embeddings, heads, and 1D parameters, and train on non-overlapping 4096-token windows cut from each admission. This protocol enforces equal data exposure under the fixed budget instead of each representation’s asymptotic optimum. 
+
+Model architecture. The 28 reported configurations use a scaled-down Llama 3.2 causal decoder (Grattafiori et al., 2024) with 8 layers, 8 attention heads, and hidden size 1024. Exact parameter count varies with tokenizer vocabulary and with whether the numeric wrapper keeps the input and output embedding matrices tied. Across the reported models, counts range from 76,118,016 to 153,067,520 parameters. The xVal-affine variants untie those matrices, so they are larger than the otherwise matched xVal variants even when vocabulary sizes are close. Table 6 lists the exact vocabulary size and parameter count for all 28 trained models; compute details appear in Section F. 
+
+Tasks and metrics. Binary outcomes are scored with AUROC, AUPRC, Brier score, and expected calibration error with 15 bins (ECE-15); regression outcomes are scored with Spear-man ρ. Uncertainty is quantified with 95% bootstrap confidence intervals (2000 resamples, seed 123). For inference comparisons, each experiment uses paired permutation tests against its reference arm (Experiment 1: deciles with unfused tokenization, deciles unfused ; Ex-periment 2: the discrete value encoder with event order only, discrete none ; Experiment 3: the native MIMIC-code arm, meds ) with Benjamini-Hochberg (BH) correction within each experiment ×metric family. The primary downstream probe is logistic regression on z-scored last hidden states; for regression outcomes we instead fit Ridge regression on the same hidden states and select the L2 penalty on the validation set. Each configuration is trained with a single fixed random seed (42). Outcome source fields are in Table 3; outcome-specific eligible sample sizes and leakage-safe exclusions are in Tables 4 and 5. 
+
+4. Results 
+
+4.1. Experiment 1: Granularity and Reference-Range Anchored Laboratory Binning 
+
+Fused tokenization gave the most consistent improvement across the benchmark tasks. Against the Experiment 1 reference arm ( deciles unfused ), deciles fused improved mortality AUROC from 0 .891 [0 .882, 0 .899] to 0 .915 [0 .908, 0 .922] (∆ = 0 .0242 [0 .0194, 0.0294], BH-adjusted p < 0.001) and hospital length-of-stay AUROC from 0 .763 [0 .759, 0.768] to 0 .788 [0 .784, 0 .792] (∆ = 0 .0248 [0 .0223, 0 .0275], BH-adjusted p < 0.001). ICU admission and invasive mechanical ventilation (IMV) moved in the same direction, and similar fused-over-unfused gains recurred for ventiles and centiles. This pattern is consistent with what Guo et al. (2026) call the local binding problem: without fusion, a shared quantile token (e.g., Q7 ) carries context-dependent clinical meaning that the model must otherwise 
+
+> 8
+
+Representation Before Training 
+
+Table 1: Binary outcome sweep across experiments. Each cell lists the best configu-ration in that experiment, followed by AUROC and its 95% bootstrap CI. ICU admission appears only in Experiments 1–2, ICU LOS > 48h appears only in Experiment 3, and cells shown as — are not applicable. 
+
+Outcome Exp1 Exp2 Exp3 
+
+Hospital 
+
+Hospital mortality Deciles, fused; 0.915 [0.908, 0.922] Discrete + order; 0.913 [0.905, 0.919] Randomized mapped; 0.835 [0.809, 0.859] Hospital LOS > 7 d Deciles, fused; 0.788 [0.784, 0.792] Discrete + order; 0.789 [0.785, 0.792] Native MIMIC; 0.775 [0.756, 0.793] 
+
+ICU endpoints 
+
+ICU admission Deciles, fused; 0.814 [0.805, 0.822] Discrete + order; 0.816 [0.808, 0.824] —ICU LOS > 48 h — —CLIF-mapped; 0.779 [0.761, 0.796] 
+
+Interventions 
+
+Invasive mechanical ventilation Deciles, fused; 0.918 [0.912, 0.924] Discrete + order; 0.917 [0.911, 0.924] Randomized mapped; 0.903 [0.889, 0.917] Vasopressor initiation Deciles, fused; 0.867 [0.858, 0.876] Discrete + order; 0.869 [0.859, 0.878] Native MIMIC; 0.862 [0.842, 0.882] CRRT initiation Trentiles, fused; 0.937 [0.924, 0.949] Soft + RoPE; 0.935 [0.920, 0.948] Native MIMIC; 0.833 [0.764, 0.891] Hemodialysis initiation Trentiles, fused; 0.950 [0.940, 0.959] Discrete + order; 0.945 [0.934, 0.955] Randomized mapped; 0.852 [0.811, 0.892] 
+
+Post-24h physiologic thresholds 
+
+Hyperkalemia Ventiles (clin.), fused; 0.745 [0.726, 0.764] Discrete + RoPE; 0.739 [0.719, 0.758] Randomized mapped; 0.708 [0.653, 0.761] Severe hypokalemia Ventiles (clin.), unfused; 0.750 [0.709, 0.790] Soft + order; 0.748 [0.710, 0.784] CLIF-mapped; 0.694 [0.570, 0.808] Severe anemia Deciles, fused; 0.848 [0.841, 0.856] Discrete + order; 0.838 [0.831, 0.845] Native MIMIC; 0.795 [0.771, 0.818] Hypoglycemia Centiles, fused; 0.783 [0.769, 0.798] Discrete + order; 0.768 [0.752, 0.783] Native MIMIC; 0.749 [0.693, 0.800] Profound hyponatremia Ventiles (clin.), fused; 0.780 [0.735, 0.820] Discrete + order; 0.753 [0.706, 0.794] Native MIMIC; 0.684 [0.524, 0.823] Severe hypernatremia Trentiles, unfused; 0.905 [0.870, 0.933] Soft + order; 0.871 [0.826, 0.909] CLIF-mapped; 0.938 [0.869, 0.988] Tachycardia Trentiles, fused; 0.732 [0.719, 0.744] Discrete + tokens; 0.714 [0.700, 0.727] Randomized mapped; 0.727 [0.697, 0.757] Severe hypertension Ventiles, fused; 0.712 [0.701, 0.725] Discrete + order; 0.703 [0.691, 0.716] Freq-matched mapped; 0.688 [0.658, 0.717] Hypotension Deciles, fused; 0.799 [0.787, 0.812] Soft + order; 0.801 [0.789, 0.813] Freq-matched mapped; 0.782 [0.755, 0.809] 
+
+Abbreviations. ICU = intensive care unit; LOS = length of stay; IMV = invasive mechanical ventilation; CRRT = continuous renal replacement therapy; SBP = systolic blood pressure; DBP = diastolic blood pressure; BNP = B-type natriuretic peptide / NT-proBNP; clin. = reference-range anchored clinical bins; order = event order only; tokens = inserted time tokens; RoPE = admission-relative rotary position embeddings; Freq-matched = frequency-matched mapped codes. 
+
+infer from limited data. The comparison was not parameter-matched: deciles increased from 
+
+|V |= 19 ,363 unfused to |V |= 30 ,535 fused, adding roughly 11 .4M embedding parameters at 
+
+d=1024. Second, finer granularity did not produce a monotonic gain. Deciles (population, fused) gave the strongest broad performance and the best point estimates on the four primary 
+
+9Representation Before Training 
+
+Table 2: Regression outcome sweep across experiments. Each cell lists the best configuration in that experiment, followed by Spearman ρ and 95% bootstrap CI. 
+
+Outcome Exp1 Exp2 Exp3 
+
+Hospital 
+
+Hospital LOS (h) Deciles, fused; 0.545 [0.539, 0.551] Discrete + RoPE; 0.543 [0.537, 0.548] Randomized mapped; 0.498 [0.467, 0.531] 
+
+Laboratory extrema 
+
+Peak creatinine Deciles, fused; 0.570 [0.563, 0.577] Discrete + order; 0.586 [0.579, 0.592] Native MIMIC; 0.437 [0.401, 0.471] Minimum hemoglobin Deciles, fused; 0.762 [0.758, 0.766] Discrete + order; 0.733 [0.728, 0.738] Native MIMIC; 0.593 [0.565, 0.616] Peak potassium Centiles, fused; 0.477 [0.470, 0.485] Soft + RoPE; 0.470 [0.463, 0.477] Native MIMIC; 0.467 [0.435, 0.498] Minimum potassium Deciles, fused; 0.504 [0.497, 0.511] Soft + RoPE; 0.489 [0.482, 0.497] Freq-matched mapped; 0.370 [0.334, 0.406] Minimum glucose Ventiles (clin.), fused; 0.383 [0.374, 0.391] Discrete + order; 0.371 [0.362, 0.379] CLIF-mapped; 0.265 [0.227, 0.303] Minimum sodium Deciles, fused; 0.512 [0.505, 0.519] Discrete + order; 0.502 [0.495, 0.509] Freq-matched mapped; 0.415 [0.380, 0.449] Maximum sodium Deciles, fused; 0.480 [0.472, 0.487] Discrete + order; 0.454 [0.447, 0.462] CLIF-mapped; 0.351 [0.316, 0.387] Peak troponin Centiles, fused; 0.407 [0.377, 0.437] Discrete + RoPE; 0.405 [0.377, 0.433] Freq-matched mapped; 0.308 [0.205, 0.405] Peak BNP Deciles, fused; 0.383 [0.352, 0.414] Soft + order; 0.387 [0.358, 0.417] Native MIMIC; 0.177 [0.072, 0.281] 
+
+Vital extrema 
+
+Maximum heart rate Ventiles, fused; 0.575 [0.561, 0.589] Discrete + tokens; 0.512 [0.497, 0.527] Randomized mapped; 0.473 [0.437, 0.504] Maximum SBP Ventiles (clin.), fused; 0.519 [0.504, 0.533] Discrete + tokens; 0.488 [0.472, 0.502] Freq-matched mapped; 0.427 [0.394, 0.462] Maximum DBP Ventiles, fused; 0.393 [0.377, 0.409] Discrete + RoPE; 0.383 [0.366, 0.400] Native MIMIC; 0.369 [0.332, 0.405] 
+
+Abbreviations. ICU = intensive care unit; LOS = length of stay; IMV = invasive mechanical ventilation; CRRT = continuous renal replacement therapy; SBP = systolic blood pressure; DBP = diastolic blood pressure; BNP = B-type natriuretic peptide / NT-proBNP; clin. = reference-range anchored clinical bins; order = event order only; tokens = inserted time tokens; RoPE = admission-relative rotary position embeddings; Freq-matched = frequency-matched mapped codes. 
+
+binary outcomes: mortality, ICU admission, long hospital length of stay, and invasive mechanical ventilation. Improvements from finer bins were selective. The clearest BH-supported gain from a non-decile alternative was reference-range anchored ventiles on profound hyponatremia (∆ = 0 .073 over the reference arm, BH-adjusted p = 0 .002). Other outcomes defined by extreme post-24h minima or maxima sometimes reached their highest point estimates with finer bins, including hypoglycemia (AUROC = 0 .783), peak potassium (Spearman ρ = 0 .477), peak troponin (Spearman ρ = 0 .407), continuous renal replacement therapy initiation (AUROC = 0 .937), and hemodialysis initiation (AUROC = 0 .950). The mean summaries showed the same ordering: fused matched or outperformed unfused tokenization at every tested granularity, deciles and ventiles remained the strongest average-performing bins, and plain population trentiles underperformed the matched alternatives. Reference-range anchored laboratory binning did not show a uniform advantage but did produce selective gains on electrolyte extremes, and expected calibration error remained uniformly low (ECE 15 ≤ 0.011) across all configurations. 
+
+10 Representation Before Training 0.70 0.75 0.80 0.85 0.90 0.95 
+
+> AUROC
+
+Hospital mortality 
+
+Long length of stay 
+
+ICU admission 
+
+Invasive mechanical ventilation 
+
+Hyperkalemia 
+
+Severe hypokalemia 
+
+Severe anemia 
+
+Hypoglycemia 
+
+Profound hyponatremia 
+
+Severe hypernatremia 
+
+Tachycardia 
+
+Severe hypertension 
+
+Vasopressor initiation 
+
+Hypotension 
+
+Continuous renal replacement therapy 
+
+Hemodialysis initiation      
+
+> Binary outcomes
+> 0.3 0.4 0.5 0.6 0.7 0.8
+> Spearman
+
+Length of stay (hours) 
+
+Peak creatinine 
+
+Minimum hemoglobin 
+
+Peak potassium 
+
+Minimum potassium 
+
+Minimum glucose 
+
+Minimum sodium 
+
+Maximum sodium 
+
+Peak troponin 
+
+Peak natriuretic peptide 
+
+Maximum heart rate 
+
+Maximum systolic blood pressure 
+
+Maximum diastolic blood pressure 
+
+> Regression outcomes
+> Deciles (pop.), unfused
+> Ventiles (pop.), unfused
+> Ventiles (clin.), unfused
+> Trentiles (pop.), unfused
+> Trentiles (clin.), unfused
+> Centiles (pop.), unfused
+> Deciles (pop.), fused
+> Ventiles (pop.), fused
+> Ventiles (clin.), fused
+> Trentiles (pop.), fused
+> Trentiles (clin.), fused
+> Centiles (pop.), fused
+
+Figure 2: Experiment 1 full outcome sweep. Left: AUROC for all 16 binary outcomes across the 12 granularity/tokenization settings. Right: Spearman ρ for all 13 regression outcomes with the same settings. Circles denote unfused tokenization and squares denote fused tokenization; points are test-set estimates and whiskers are 95% bootstrap confidence intervals. 
+
+4.2. Experiment 2: Representation Mechanics 
+
+Experiment 2 tested 12 configurations spanning four value encoders and three temporal settings, all using deciles (population) with unfused tokenization so that soft discretization and xVal, which require separate code and value slots, could be compared fairly (Tables 1 and 2). 
+
+Temporal encoding: event order, time tokens, and admission-relative RoPE. 
+
+Across the three tested temporal encodings, inserting time tokens was the weakest option on average. Within the discrete family, the event-order-only configuration ( discrete none )outperformed the time token configuration ( discrete tt ) on ICU admission (AUROC 0.816 [0 .808, 0 .824] vs. 0 .806 [0 .797, 0 .814], ∆ = −0.0106 [ −0.0163, −0.0048], BH-adjusted 
+
+p = 0 .0015) and hospital length of stay > 7 days (0 .789 [0 .785, 0 .792] vs. 0 .785 [0 .781, 0.789], ∆ = −0.0038 [ −0.0063, −0.0016], BH-adjusted p = 0 .0029). On mortality and IMV, the three discrete temporal settings were nearly tied: discrete none / discrete tt 
+
+/ discrete rope score 0 .913 / 0 .912 / 0 .911 on mortality and 0 .917 / 0 .915 / 0 .916 on IMV, with overlapping bootstrap intervals. For those four binary outcomes, the paired 
+
+11 Representation Before Training 0.60 0.65 0.70 0.75 0.80 0.85 0.90 0.95 
+
+> AUROC
+
+Hospital mortality 
+
+Long length of stay 
+
+ICU admission 
+
+Invasive mechanical ventilation 
+
+Hyperkalemia 
+
+Severe hypokalemia 
+
+Severe anemia 
+
+Hypoglycemia 
+
+Profound hyponatremia 
+
+Severe hypernatremia 
+
+Tachycardia 
+
+Severe hypertension 
+
+Vasopressor initiation 
+
+Hypotension 
+
+Continuous renal replacement therapy 
+
+Hemodialysis initiation      
+
+> Binary outcomes
+> 0.2 0.3 0.4 0.5 0.6 0.7
+> Spearman
+
+Length of stay (hours) 
+
+Peak creatinine 
+
+Minimum hemoglobin 
+
+Peak potassium 
+
+Minimum potassium 
+
+Minimum glucose 
+
+Minimum sodium 
+
+Maximum sodium 
+
+Peak troponin 
+
+Peak natriuretic peptide 
+
+Maximum heart rate 
+
+Maximum systolic blood pressure 
+
+Maximum diastolic blood pressure 
+
+> Regression outcomes
+> Discrete + event order only
+> Soft discretization + event order
+> only
+> xVal (code-normalized) + event
+> order only
+> xVal-affine (code-normalized +
+> affine shift) + event order only
+> Discrete + time tokens
+> Soft discretization + time tokens
+> xVal (code-normalized) + time
+> tokens
+> xVal-affine (code-normalized +
+> affine shift) + time tokens
+> Discrete + admission-relative RoPE
+> Soft discretization + admission-
+> relative RoPE
+> xVal (code-normalized) +
+> admission-relative RoPE
+> xVal-affine (code-normalized +
+> affine shift) + admission-relative
+> RoPE
+
+Figure 3: Experiment 2 full outcome sweep. Left: AUROC for all 16 binary outcomes across the 12 Experiment 2 configurations. Right: Spearman ρ for all 13 regression outcomes. Marker shape distinguishes event order only, time tokens, and admission-relative RoPE. Color encodes the value encoder. Points and whiskers are test-set estimates with 95% bootstrap confidence intervals. intervals between discrete none and discrete rope all included zero. Averaged across all four value encoders, mean binary AUROC was 0 .7822 [0 .7634, 0 .8003] for event order only, 0.7794 [0 .7606, 0 .7973] for admission-relative RoPE, and 0 .7786 [0 .7596, 0 .7969] for time tokens; mean regression Spearman ρ was 0 .4210 [0 .4079, 0 .4341], 0 .4161 [0 .4030, 0 .4291], and 0 .4143 [0 .4011, 0 .4273], respectively. Within the discrete family, event order alone led 15 of the 22 discrete-family outcome wins; admission-relative RoPE led four (hyperkalemia, maximum diastolic blood pressure, peak troponin, and length of stay); and time tokens led three (tachycardia, maximum heart rate, and maximum systolic blood pressure)—a pattern consistent with heart rate and blood pressure measurements being more tightly coupled to the admission timeline than laboratory extrema. 3
+
+3. All admission-relative RoPE experiments use a fixed scaling factor s = 60 (i.e., 1 position-ID unit = 1 minute). Sensitivity to s was not evaluated; different choices may matter for longer observation windows or irregular-interval cohorts. 
+
+12 Representation Before Training 
+
+Discrete Value Encoder vs. Soft Discretization vs. Code-Normalized xVal. Com-paring the three value encoders across the full 29-outcome sweep, the discrete value encoder remained the best broad default. Mean binary AUROC was 0 .8157 [0 .7982, 0 .8322] for the discrete family versus 0 .8116 [0 .7943, 0 .8281] for soft discretization, while mean regression Spearman ρ was 0 .4790 [0 .4664, 0 .4913] versus 0 .4658 [0 .4529, 0 .4784]. Soft discretization did not lead the average ranking, but it was best for 7 of the 29 outcomes by point esti-mate: four binary outcomes (severe hypokalemia, CRRT initiation, severe hypernatremia, and hypotension) and three regression outcomes (peak B-type natriuretic peptide, peak potassium, and minimum potassium). These results suggest that soft discretization is most useful when discrete quantization loses precision on a limited subset of outcomes, not as a broad replacement. We implemented xVal with a robust per-code z-score (median/IQR-derived, clipped to |z| ≤ 5) and also evaluated an affine-shifted variant to reduce near-zero attenuation (Section H). Both code-normalized xVal variants remained well below the discrete and soft families on the mean summaries: mean binary AUROC was 0 .7517 [0 .7317, 0 .7711] for code-normalized xVal and 0 .7411 [0 .7205, 0 .7612] for the affine-shifted variant, while mean regression Spearman ρ was 0 .3867 [0 .3734, 0 .4000] and 0 .3372 [0 .3234, 0 .3509], respectively. The affine shift did not close that gap; neither variant had the highest point estimate for any of the 29 outcomes, and the post-hoc analyses still show suppression near z ≈ 0 (Section D). 
+
+4.3. Experiment 3: Vocabulary Semantic Grouping 
+
+Experiment 3 framed data harmonization as the central question: could covered laboratory and vital codes be remapped to a curated shared vocabulary without sacrificing downstream performance? Native MIMIC and CLIF-remapped tokenization performed comparably. On mortality, long hospital length of stay, prolonged ICU stay, and invasive mechanical ventilation, AUROCs were tightly clustered across arms. The mean summaries in Figure 7 were similarly tight: mean binary AUROC was 0 .7751 [0 .7227, 0 .8223] for Native MIMIC codes, 0 .7730 [0 .7237, 0 .8180] for CLIF-mapped, 0 .7728 [0 .7220, 0 .8180] for Frequency-matched mapped codes, and 0 .7688 [0 .7170, 0 .8185] for Randomized mapped codes. Mean regression Spearman ρ was 0 .3855 [0 .3401, 0 .4294], 0 .3812 [0 .3355, 0 .4256], 0 .3864 [0 .3407, 0.4316], and 0 .3710 [0 .3246, 0 .4167], respectively. Across the three mapped arms, the realized vocabulary averaged 11 643 tokens versus 13 394 for native MIMIC, a reduction of 1751 tokens. Compared with native MIMIC codes, the baseline-centered paired AUROC tests were not statistically significant after correction. In contrast, four secondary-metric contrasts were statistically significant: randomized mapped codes showed higher AUPRC on hyperkalemia (∆ = +0 .033, BH-adjusted p = 0 .018) and on invasive mechanical ventilation (∆ = +0 .035, BH-adjusted p = 0 .036), while randomized and CLIF-mapped also showed lower Brier scores than native codes on hyperkalemia (both BH-adjusted p ≤ 0.018). Because the perturbation arms also used the mapped CLIF code set, the paired tests do not cleanly separate semantic grouping from compression and code-frequency effects. Mapping coverage and vocabulary sizes are reported in Section J. 
+
+> 13 Representation Before Training
+
+5. Discussion 
+
+Re-evaluating reference-range anchored laboratory binning. Reference-range an-chored laboratory binning places bin boundaries at laboratory normal/abnormal thresholds. Population-based quantization places bin boundaries at population percentiles; a boundary between the 40th and 50th percentile of serum potassium may group normal and critically abnormal values into the same token. Experiment 1 results show no consistent advantage for reference-range anchored laboratory binning over population-quantile binning at matched granularity. At least two factors help explain the null result. First, in laboratory medicine a reference interval is the central 95% of values from a healthy population; it marks normal versus abnormal, not normal versus life-threatening. The binary outcome thresholds in our bench-mark (Table 3) are more extreme than those normal-range cutoffs. Anchoring bins at the normal/abnormal boundary adds resolution around that boundary, but it does not guarantee extra resolution at the severe tails where the binary labels are defined. Centile binning, by contrast, can place bins deeper into the tails simply because each centile covers 1% of the training distribution, so the most extreme 1–2% of values get their own bins regardless of where the normal-range boundary falls. Second, the representation analyses in Section D show that even population-defined bin-token embeddings at high granularity are linearly separable into normal versus abnormal groups: a leave-one-out logistic probe achieves 93–98% accuracy on centile embeddings. Un-der frozen representations, the downstream classifier learns clinically defined thresholds even when bins are population-defined. The probe result supports decodability, not unsupervised recovery of the clinical boundary during pretraining. 
+
+Vocabulary sparsity and the granularity paradox. Quantization granularities finer than deciles yield diminishing or negative returns relative to deciles (Tables 1 and 2 and fig. 4). Finer granularities may converge with additional training data or epochs; we therefore inter-pret the result narrowly: deciles are the best broad starting configuration in the current benchmark, not an intrinsic representational optimum. Fine-grained binning fractures com-mon measurements across hundreds of distinct tokens, leaving individual token embeddings under-trained (e.g., stepping from deciles to centiles under fused tokenization introduces nearly 25,000 zero-frequency tokens into the 83,927-token embedding matrix). For rounded laboratory values, granularity can also exceed effective granularity: potassium centiles collapse to only 27 unique train-split thresholds, so the fused centile tokenizer realizes 28 potassium bins instead of the full 100. Fused settings pay this sparsity penalty more sharply because each code carries its own value-token set. Sequence-length savings are unlikely to be the main explanation for the fused-token advantage, because > 99 .95% of first-24h admissions fit within the 4096-token context window under both fused and unfused decile tokenizations (Figure 10). 
+
+Value encoding. Why does soft discretization win on only 7 of 29 outcomes? One possible explanation is that the convex-combination mechanism still injects a continuous, out-of-vocabulary input vector into a discrete autoregressive prediction problem: the model conditions on an interpolated embedding that has no exact match in the embedding table, and the output side can only approximate that continuity with a local two-bin soft target at 
+
+> 14 Representation Before Training
+
+quantile-token positions (Section D). For xVal, near-median suppression further limits the injected signal because z ≈ 0 collapses the multiplicative scaling term; the affine shift does not recover performance. Natural follow-ups include fused soft discretization, richer local mixtures of nearby bin embeddings, and code-conditioned continuous injections, but those extensions increase model size and may confound representation comparisons. 
+
+Temporal encoding. Both the event-order-only and admission-relative-RoPE arms omit inserting time tokens, which shortens sequences by about 11% (median 83 vs. 93 tokens per 24h admission for unfused deciles; Figure 11). The remaining difference between those two arms is whether position IDs carry admission-relative minute-resolution timestamps. The inserted-time-token arm discretizes elapsed gaps into 13 coarse spacing bins (from 5 minutes to 6 months or more) and uses extra sequence slots for those tokens. Within the discrete family, the largest outcome-level gaps between event order only and inserted time tokens appear on electrolyte and chemistry outcomes such as minimum sodium Spearman ρ (0 .502 vs. 0 .467), maximum sodium (0 .454 vs. 0 .426), and peak creatinine (0 .586 vs. 0 .564). A concurrent MIMIC-IV ablation (Attrach et al., 2025) likewise found no statistically significant benefit from explicit time features, consistent with our results. A plausible explanation is that inserted time tokens both consume token budget and represent elapsed time more coarsely than admission-relative RoPE, which preserves minute-resolution relative timing without lengthening the sequence. 
+
+Limitations. Single-site evaluation (MIMIC-IV), one model family, one training seed, and a fixed model scale are the primary constraints on scope. The 4096-token cap reduces truncation to < 0.05% of first-24h admissions but cannot accommodate long-tail timelines entirely. The one-epoch budget enforces equal data exposure across configurations, but it does not characterize late-stage convergence; some representation choices may separate differently under larger compute budgets. The last-hidden-state probe may also disadvantage representations that distribute information across multiple tokens, and we do not evaluate alternative pooling strategies or fine-tuned downstream heads. Multi-site validation and scaling experiments remain open. 
+
+6. Conclusion 
+
+Input representation is typically treated as fixed plumbing in generative medical event models. ETHOS (Renc et al., 2025), CLMBR-T-base (Fries et al., 2023), and Curiosity (Waxler et al., 2025) all discretized numeric laboratory values into ten population quantiles without comprehensive justification. Under a matched one-epoch pretraining budget on MIMIC-IV, we show that those choices shift downstream performance substantially. Four results are practical: fusing code and value into a single token produced the largest and most consistent gains (e.g., mortality AUROC 0.891 to 0.915); deciles outperformed finer granularities, which fracture measurements across undertrained embedding slots; temporal encodings that omit explicit time tokens (event order, admission-relative RoPE) matched or exceeded time-token insertion while shortening sequences by roughly 11%; and remapping covered laboratory and vital codes to the CLIF vocabulary preserved single-site performance while yielding a smaller, cross-site-compatible token set. These findings are bound by a single site, one model family, one seed, and one training epoch. Multi-site validation, larger compute budgets, 
+
+> 15 Representation Before Training
+
+and extensions such as fused soft discretization or code-conditioned continuous injection remain open. Upstream representation is not a simple preprocessing detail: it sets a ceiling on what the model can learn from EHR sequences, and revisiting it is among the cheapest meaningful interventions available before scaling the model or data. 
+
+Acknowledgments 
+
+Compute resources for this study were provided by the Randi HPC Cluster maintained by the Center for Research Informatics (CRI) at the University of Chicago. The Center for Research Informatics is funded by the Biological Sciences Division and the Institute for Translational Medicine/CTSA (NIH UL1TR002389) at the University of Chicago. 
+
+References 
+
+Rafi Al Attrach, Rajna Fani, David Restrepo, Yugang Jia, and Peter Sch¨ uffler. Rethinking tokenization for clinical time series: When less is more, 2025. URL https://arxiv.org/ abs/2512.05217 .Jeremy Bernstein and Laker Newhouse. Old optimizer, new norm: An anthology, 2024. URL https://arxiv.org/abs/2409.20325 . Theoretical basis for the Muon optimizer (https://github.com/KellerJordan/Muon ). Michael C. Burkhart, Bashar Ramadan, Zewei Liao, Kaveri Chhikara, Juan C. Rojas, William F. Parker, and Brett K. Beaulieu-Jones. Foundation models for electronic health records: representation dynamics and transferability, 2025. URL https://arxiv.org/ abs/2504.10422 .Michael C. Burkhart, Bashar Ramadan, Luke Solo, William F. Parker, and Brett K. Beaulieu-Jones. Quantifying surprise in clinical care: Detecting highly informative events in electronic health records with foundation models. In Pacific Symposium on Biocomputing ,volume 31, pages 173–188, 2026. doi: 10.1142/9789819824755 0013. URL https://doi. org/10.1142/9789819824755_0013 .Tiffany J. Callahan, Adrianne L. Stefanski, Jordan M. Wyrwa, Chenjie Zeng, Anna Ostropo-lets, Juan M. Banda, William A. Baumgartner, Richard D. Boyce, Elena Casiraghi, Ben D. Coleman, Janine H. Collins, Sara J. Deakyne Davies, James A. Feinstein, Asiyah Y. Lin, Blake Martin, Nicolas A. Matentzoglu, Daniella Meeker, Justin Reese, Jessica Sinclair, Sanya B. Taneja, Katy E. Trinkley, Nicole A. Vasilevsky, Andrew E. Williams, Xingmin A. Zhang, Joshua C. Denny, Patrick B. Ryan, George Hripcsak, Tellen D. Bennett, Melissa A. Haendel, Peter N. Robinson, Lawrence E. Hunter, and Michael G. Kahn. Ontologiz-ing health systems data at scale: making translational discovery a reality. npj Digital Medicine , 6(1), May 2023. ISSN 2398-6352. doi: 10.1038/s41746-023-00830-x. URL 
+
+https://doi.org/10.1038/s41746-023-00830-x .Edward Choi, Mohammad Taha Bahadori, Andy Schuetz, Walter F. Stewart, and Jimeng Sun. Doctor AI: Predicting clinical events via recurrent neural networks, 2016. URL 
+
+https://arxiv.org/abs/1511.05942 .
+
+> 16 Representation Before Training
+
+Edward Choi, Mohammad Taha Bahadori, Joshua A. Kulas, Andy Schuetz, Walter F. Stewart, and Jimeng Sun. RETAIN: An interpretable predictive model for healthcare using reverse time attention mechanism, 2017. URL https://arxiv.org/abs/1608.05745 .Wei Dai, Peilin Chen, Malinda Lu, Daniel Li, Haowen Wei, Hejie Cui, and Paul Pu Liang. CLIMB: Data foundations for large scale multimodal clinical foundation models, 2025. URL https://arxiv.org/abs/2503.07667 .Tri Dao. FlashAttention-2: Faster attention with better parallelism and work partitioning, 2023. URL https://arxiv.org/abs/2307.08691 . Published at ICLR 2024. Vijay Prakash Dwivedi, Viktor Schlegel, Andy T. Liu, Thanh-Tung Nguyen, Abhinav Ramesh Kashyap, Jeng Wei, Wei-Hsian Yin, Stefan Winkler, and Robby T. Tan. Representation learning of structured data for medical foundation models, 2024. URL https://arxiv. org/abs/2410.13351 .Adibvafa Fallahpour, Mahshid Alinoori, Wenqian Ye, Xu Cao, Arash Afkanpour, and Amrit Krishnan. EHRMamba: Towards generalizable and scalable foundation models for electronic health records, 2024. URL https://arxiv.org/abs/2405.14567 .Jason Fries, Nigam Shah, Ethan Steinberg, Rahul Thapa, and Michael Wornow. EHRSHOT: An EHR benchmark for few-shot evaluation of foundation models. In Advances in Neural Information Processing Systems , volume 36, pages 67125–67137. Neural Information Processing Systems Foundation, Inc. (NeurIPS), 2023. doi: 10.52202/075280-2933. URL 
+
+https://doi.org/10.52202/075280-2933 .Zewei Liao, Shan Guleria, Kevin Smith, Rachel Baccile, Kaveri Chhikara, Dema Therese, Vaishvik Chaudhari, Michael Craig Burkhart, Brett Beaulieu-Jones, Snigdha Jain, Kathryn Connell, Kevin Buell, Juan Rojas, Patrick Lyons, Siva Bhavani, Catherine A. Gao, Chad Hochberg, Nick Ingraham, William Parker, and CLIF Consortium. MIMIC-IV-Ext-CLIF: MIMIC-IV in the common longitudinal ICU data format (CLIF). PhysioNet , March 2026. doi: 10.13026/j481-g420. URL https://physionet.org/content/mimic-iv-ext-clif/ 1.1.0/ .Siavash Golkar, Mariel Pettee, Michael Eickenberg, Alberto Bietti, Miles Cranmer, Geraud Krawezik, Francois Lanusse, Michael McCabe, Ruben Ohana, Liam Parker, Bruno R´ egaldo-Saint Blancard, Tiberiu Tesileanu, Kyunghyun Cho, and Shirley Ho. xVal: A continuous numerical tokenization for scientific language models, 2024. URL https://arxiv.org/ abs/2310.02989 .Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek Kadian, et al. The llama 3 herd of models, 2024. URL https://arxiv.org/abs/2407.21783 .Lin Lawrence Guo, Santiago Eduardo Arciniegas, Joseph Jihyung Lee, Adam Paul Yan, George Tomlinson, Jason Fries, and Lillian Sung. Tokenization tradeoffs in structured EHR foundation models, 2026. URL https://arxiv.org/abs/2603.15644 .Stefan Hegselmann, Georg von Arnim, Tillmann Rheude, Noel Kronenberg, David Sontag, Gerhard Hindricks, Roland Eils, and Benjamin Wild. Large language models are powerful electronic health record encoders, 2025. URL https://arxiv.org/abs/2502.17403 .
+
+> 17 Representation Before Training
+
+Kyunghoon Hur, Jiyoung Lee, Jungwoo Oh, Wesley Price, Young-Hak Kim, and Edward Choi. Unifying heterogeneous electronic health records systems via text-based code embedding, 2022. URL https://arxiv.org/abs/2108.03625 .Alistair Johnson, Lucas Bulgarelli, Tom Pollard, Brian Gow, Benjamin Moody, Steven Horng, Leo Anthony Celi, and Roger Mark. MIMIC-IV. PhysioNet , 2024. doi: 10.13026/ KPB9-MT58. URL https://physionet.org/content/mimiciv/3.1/ .Alistair E. W. Johnson, Lucas Bulgarelli, Lu Shen, Alvin Gayles, Ayad Shammout, Steven Horng, Tom J. Pollard, Sicheng Hao, Benjamin Moody, Brian Gow, Li-wei H. Lehman, Leo A. Celi, and Roger G. Mark. MIMIC-IV, a freely accessible electronic health record dataset. Scientific Data , 10(1), January 2023. ISSN 2052-4463. doi: 10.1038/s41597-022-01899-x. URL https://doi.org/10.1038/s41597-022-01899-x .Seyed Mehran Kazemi, Rishab Goel, Sepehr Eghbali, Janahan Ramanan, Jaspreet Sa-hota, Sanjay Thakur, Stella Wu, Cathal Smyth, Pascal Poupart, and Marcus Brubaker. Time2Vec: Learning a vector representation of time, 2019. URL https://arxiv.org/ abs/1907.05321 .Alex Labach, Aslesha Pokhrel, Xiao Shi Huang, Saba Zuberi, Seung Eun Yi, Maksims Volkovs, Tomi Poutanen, and Rahul G. Krishnan. DuETT: Dual event time transformer for electronic health records, 2023. URL https://arxiv.org/abs/2304.13017 .Yikuan Li, Shishir Rao, Jos´ e Roberto Ayala Solares, Abdelaali Hassaine, Rema Ramakr-ishnan, Dexter Canoy, Yajie Zhu, Kazem Rahimi, and Gholamreza Salimi-Khorshidi. BEHRT: Transformer for electronic health records. Scientific Reports , 10(1), April 2020. ISSN 2045-2322. doi: 10.1038/s41598-020-62922-y. URL https://doi.org/10.1038/ s41598-020-62922-y .Fenglong Ma, Radha Chitta, Jing Zhou, Quanzeng You, Tong Sun, and Jing Gao. Dipole: Diagnosis prediction in healthcare via attention-based bidirectional recurrent neural networks, 2017. URL https://arxiv.org/abs/1706.05764 .Yingbo Ma, Suraj Kolla, Dhruv Kaliraman, Victoria Nolan, Zhenhong Hu, Ziyuan Guan, Yuanfang Ren, Brooke Armfield, Tezcan Ozrazgat-Baslanti, Tyler J. Loftus, Parisa Rashidi, Azra Bihorac, and Benjamin Shickel. Temporal cross-attention for dynamic embedding and tokenization of multimodal electronic health records, 2024. URL https: //arxiv.org/abs/2403.04012 .Medical Event Data Standard Community. Medical event data standard (meds), 2024. URL https://medical-event-data-standard.github.io/docs/intro_pages/what_ is_MEDS .Mohammad Norouzi, Tomas Mikolov, Samy Bengio, Yoram Singer, Jonathon Shlens, Andrea Frome, Greg S. Corrado, and Jeffrey Dean. Zero-shot learning by convex combination of semantic embeddings, 2014. URL https://arxiv.org/abs/1312.5650 .Chao Pang, Xinzhuo Jiang, Krishna S. Kalluri, Matthew Spotnitz, RuiJun Chen, Adler Perotte, and Karthik Natarajan. CEHR-BERT: Incorporating temporal information from 
+
+> 18 Representation Before Training
+
+structured EHR data to improve prediction tasks. In Proceedings of Machine Learning for Health , volume 158 of Proceedings of Machine Learning Research , pages 239–260, 2021. Bashar Ramadan, Ming-Chieh Liu, Michael C. Burkhart, William F. Parker, and Brett K. Beaulieu-Jones. Diagnostic codes in ai prediction models and label leakage of same-admission clinical outcomes. JAMA Network Open , 8(12):e2550454, December 2025. ISSN 2574-3805. doi: 10.1001/jamanetworkopen.2025.50454. URL https://doi.org/10.1001/ jamanetworkopen.2025.50454 .Laila Rasmy, Yang Xiang, Ziqian Xie, Cui Tao, and Degui Zhi. Med-BERT: pretrained contextualized embeddings on large-scale structured electronic health records for disease prediction. npj Digital Medicine , 4(1), May 2021. ISSN 2398-6352. doi: 10.1038/ s41746-021-00455-y. URL https://doi.org/10.1038/s41746-021-00455-y .Pawel Renc, Michal K Grzeszczyk, Nassim Oufattole, Deirdre Goode, Yugang Jia, Szymon Bieganski, Matthew B A McDermott, Jaroslaw Was, Anthony E Samir, Jonathan W Cunningham, David W Bates, and Arkadiusz Sitek. Foundation model of electronic medical records for adaptive risk estimation. GigaScience , 14, 2025. ISSN 2047-217X. doi: 10.1093/gigascience/giaf107. URL https://doi.org/10.1093/gigascience/giaf107 .Juan C. Rojas, Patrick G. Lyons, Kaveri Chhikara, Vaishvik Chaudhari, Sivasubramanium V. Bhavani, Muna Nour, Kevin G. Buell, Kevin D. Smith, Catherine A. Gao, Saki Amagai, Chengsheng Mao, Yuan Luo, Anna K. Barker, Mark Nuppnau, Michael Hermsen, Jay L. Koyner, Haley Beck, Rachel Baccile, Zewei Liao, Kyle A. Carey, Brenna Park-Egan, Xuan Han, Alexander C. Ortiz, Benjamin E. Schmid, Gary E. Weissman, Chad H. Hochberg, Nicholas E. Ingraham, and William F. Parker. A common longitudinal intensive care unit data format (clif) for critical illness research. Intensive Care Medicine , 51 (3):556–569, March 2025. ISSN 1432-1238. doi: 10.1007/s00134-025-07848-7. URL 
+
+https://doi.org/10.1007/s00134-025-07848-7 .Chenze Shao, Darren Li, Fandong Meng, and Jie Zhou. Continuous autoregressive language models, 2025. URL https://arxiv.org/abs/2510.27688 .Ethan Steinberg, Ken Jung, Jason A. Fries, Conor K. Corbin, Stephen R. Pfohl, and Nigam H. Shah. Language models are an effective representation learning technique for electronic health record data. Journal of Biomedical Informatics , 113:103637, January 2021. ISSN 1532-0464. doi: 10.1016/j.jbi.2020.103637. URL https://doi.org/10.1016/ j.jbi.2020.103637 .Ethan Steinberg, Jason Fries, Yizhe Xu, and Nigam Shah. MOTOR: A time-to-event foundation model for structured medical records, 2023. URL https://arxiv.org/abs/ 2301.03150 .Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen Bo, and Yunfeng Liu. RoFormer: Enhanced transformer with rotary position embedding. Neurocomputing , 568:127063, February 2024. ISSN 0925-2312. doi: 10.1016/j.neucom.2023.127063. URL https: //doi.org/10.1016/j.neucom.2023.127063 .
+
+> 19
+
+Representation Before Training 
+
+Xiaorui Su, Shvat Messica, Yepeng Huang, Ruth Johnson, Lukas Fesser, Shanghua Gao, Faryad Sahneh, and Marinka Zitnik. Multimodal medical code tokenizer, 2025. URL 
+
+https://arxiv.org/abs/2502.04397 .Shane Waxler, Paul Blazek, Davis White, Daniel Sneider, Kevin Chung, Mani Nagarathnam, Patrick Williams, Hank Voeller, Karen Wong, Matthew Swanhorst, Sheng Zhang, Naoto Usuyama, Cliff Wong, Tristan Naumann, Hoifung Poon, Andrew Loza, Daniella Meeker, Seth Hain, and Rahul Shah. Generative medical event models improve with scale, 2025. URL https://arxiv.org/abs/2508.12104 .Avijit Thawani, Jay Pujara, Filip Ilievski, and Pedro Szekely. Representing numbers in nlp: a survey and a vision. In Proceedings of the 2021 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies ,pages 644–656. Association for Computational Linguistics, 2021. doi: 10.18653/v1/2021. naacl-main.53. URL https://doi.org/10.18653/v1/2021.naacl-main.53 .Xiao Yang, Xuejiao Zhao, and Zhiqi Shen. EHRStruct: A comprehensive benchmark framework for evaluating large language models on structured electronic health record tasks, 2025. URL https://arxiv.org/abs/2511.08206 .Hugo Y` eche, Rita Kuznetsova, Marc Zimmermann, Matthias H¨ user, Xinrui Lyu, Martin Faltys, and Gunnar R¨ atsch. HiRID-ICU-Benchmark – a comprehensive machine learning benchmark on high-resolution ICU data, 2022. URL https://arxiv.org/abs/2111. 08536 .Kunyu Yu, Rui Yang, Jingchi Liao, Siqi Li, Huitao Li, Irene Li, Yifan Peng, Rishikesan Kamaleswaran, and Nan Liu. Benchmarking foundation models with multimodal public electronic health records. IEEE Journal of Biomedical and Health Informatics , pages 1–12, 2025. ISSN 2168-2208. doi: 10.1109/jbhi.2025.3645076. URL https://doi.org/10. 1109/jbhi.2025.3645076 .
+
+Appendix A. Outcome definitions and descriptive tables                
+
+> Table 3: Clinical prediction outcomes and definitions. Definitions for all 30 benchmark outcomes, grouped to match Figure 1. ICU admission and ICU length of stay >48h are counted separately but each experiment uses only one. Outcome Definition and source field(s)
+> Binary outcomes (17 total) Hospital
+> Hospital mortality (same-admission death) Derived binary label: hosp/admissions.discharge_location contains “died” or “expired” (or equals “dead” / “death”), or a MEDS DEATH timestamp falls between admission and discharge. Hospital length of stay >7days ( hosp/admissions. admittime/dischtime )Derived binary label: ( dischtime −admittime )>7 days.
+> ICU endpoints
+> Continued on next page
+
+20 Representation Before Training 
+
+Table 3 continued from previous page 
+
+Outcome Definition and source field(s) ICU admission (Experiments 1–2; 
+
+icu/icustays )Derived binary label: at least one linked icustays row for the admission. ICU length of stay > 48h (Experiment 3; icu/ icustays.intime/outtime )Derived binary label for the ICU-only cohort: total ICU stay duration summed across linked icustays segments exceeds 48 hours. 
+
+Interventions 
+
+Invasive mechanical ventilation (IMV; icu/ procedureevents.itemid )Any IMV procedure event from icu/procedureevents.itemid 224385 or 225792 (orotracheal or nasotracheal intubation). Vasopressor initiation Any post-24h vasopressor infusion from icu/inputevents.itemid 221906, 221289, 222315, 221749, 229617, 221662, or 221653. Continuous renal replacement therapy initiation Any post-24h CRRT event from icu/chartevents.itemid 227290 or 
+
+icu/procedureevents.itemid 225802. Hemodialysis initiation Any post-24h hemodialysis event from icu/chartevents.itemid 226499 or 
+
+icu/procedureevents.itemid 225441. 
+
+Post-24h physiologic thresholds 
+
+Hyperkalemia Maximum post-24h potassium across hosp/labevents.itemid 50971 or 50822 is 
+
+≥ 6.5 mEq/L. Severe hypokalemia Minimum post-24h potassium across hosp/labevents.itemid 50971 or 50822 is 
+
+<2.5 mEq/L. Severe anemia Minimum post-24h hemoglobin across hosp/labevents.itemid 51222 or 50811 is 
+
+<7.0 g/dL. Hypoglycemia Minimum post-24h glucose across hosp/labevents.itemid 50931 or 50809 is 
+
+<54 mg/dL. Profound hyponatremia Minimum post-24h sodium across hosp/labevents.itemid 50983, 50824, or 52623 is <120 mEq/L. Severe hypernatremia Maximum post-24h sodium across hosp/labevents.itemid 50983, 50824, or 52623 is ≥ 160 mEq/L. Tachycardia Maximum post-24h heart rate from icu/chartevents.itemid 220045 is 
+
+≥ 130 bpm. Severe hypertension Maximum post-24h systolic blood pressure from icu/chartevents.itemid 
+
+220050, 220179, or 225309 is ≥ 180 mmHg, or maximum post-24h diastolic blood pressure from icu/chartevents.itemid 220180, 220051, 225310, 224643, or 227242 is ≥ 120 mmHg. Hypotension Minimum post-24h mean arterial pressure from icu/chartevents.itemid 220052 or 220181 is <65 mmHg, or minimum post-24h systolic blood pressure from 
+
+icu/chartevents.itemid 220050, 220179, or 225309 is <90 mmHg. 
+
+Regression outcomes (13 total) Hospital 
+
+Hospital length of stay (hours; hosp/admissions. admittime/dischtime )Continuous length of stay: dischtime − admittime (hours); continuous analogue of the long-stay classification. 
+
+Laboratory extrema 
+
+Peak creatinine (mg/dL; 
+
+hosp/labevents.valuenum )Maximum post-24h creatinine from hosp/labevents.itemid 50912. Minimum hemoglobin (g/dL; 
+
+hosp/labevents.valuenum )Minimum post-24h hemoglobin across hosp/labevents.itemid 51222 or 50811. Peak potassium (mEq/L; 
+
+hosp/labevents.valuenum )Maximum post-24h potassium across hosp/labevents.itemid 50971 or 50822. Minimum potassium (mEq/L; 
+
+hosp/labevents.valuenum )Minimum post-24h potassium across hosp/labevents.itemid 50971 or 50822. Minimum glucose (mg/dL; 
+
+hosp/labevents.valuenum )Minimum post-24h glucose across hosp/labevents.itemid 50931 or 50809. Minimum sodium (mEq/L; 
+
+hosp/labevents.valuenum )Minimum post-24h sodium across hosp/labevents.itemid 50983, 50824, or 52623. 
+
+Continued on next page 
+
+21 Representation Before Training 
+
+Table 3 continued from previous page 
+
+Outcome Definition and source field(s) Maximum sodium (mEq/L; 
+
+hosp/labevents.valuenum )Maximum post-24h sodium across hosp/labevents.itemid 50983, 50824, or 52623. Peak troponin T/I (ng/mL; 
+
+hosp/labevents.valuenum )Maximum post-24h troponin across hosp/labevents.itemid 51003 or 51002. Peak B-type natriuretic peptide / NT-proBNP (pg/mL; 
+
+hosp/labevents.valuenum )Maximum post-24h natriuretic peptide across hosp/labevents.itemid 50963 or 50964. 
+
+Vital extrema 
+
+Maximum heart rate (bpm; 
+
+icu/chartevents. valuenum )Maximum post-24h heart rate from icu/chartevents.itemid 220045. Maximum systolic blood pressure (mmHg; icu/ chartevents.valuenum )Maximum post-24h systolic blood pressure across icu/chartevents.itemid 
+
+220050, 220179, or 225309. Maximum diastolic blood pressure (mmHg; icu/ chartevents.valuenum )Maximum post-24h diastolic blood pressure across icu/chartevents.itemid 
+
+220180, 220051, 225310, 224643, or 227242. 
+
+Outcome timing and leakage safety. Each post-24h binary outcome has a matching 
+
+* 24h flag; admissions that already met the endpoint within 24 hours are excluded so that performance reflects future-event prediction, not detection. For post-24h physiologic thresholds, admissions without a qualifying post-24h measurement are also excluded. Post-24h intervention absence is treated as negative. Regression outcomes use post-24h extrema only. LOS regression uses the total hospital stay in hours. Outcome-specific sample sizes (N ) appear in Tables 4 and 5. 
+
+22 Representation Before Training 
+
+Table 4: Held-out binary outcome counts by evaluation cohort. Each row reports the eligible test-set denominator and the positive/negative counts used by the binary Stage 3 probes. Whenever a parallel 24-hour exclusion flag exists, admissions that already met the outcome during the first 24 hours are excluded from the eligible denominator to match the benchmark evaluation protocol. Exp1–2 use the all-admission cohort; Exp3 uses the ICU-only cohort, so ICU admission is left blank for Exp3 and ICU LOS > 48h is left blank for Exp1–2. 
+
+Outcome Exp1-2 eligible N Exp1-2 pos / neg Exp3 eligible N Exp3 pos / neg Hospital mortality 63750 1503 / 62247 2440 226 / 2214 Hospital LOS > 7 d 63750 14491 / 49259 2440 1255 / 1185 ICU admission 53978 2420 / 51558 — —ICU LOS > 48 h — — 2440 1279 / 1161 IMV 62438 2801 / 59637 2189 587 / 1602 Hyperkalemia 47454 611 / 46843 2291 85 / 2206 Severe hypokalemia 47948 146 / 47802 2342 26 / 2316 Severe anemia 46844 2852 / 43992 2230 319 / 1911 Hypoglycemia 47348 877 / 46471 2333 78 / 2255 Profound hyponatremia 47773 129 / 47644 2331 14 / 2317 Severe hypernatremia 47890 84 / 47806 2342 5 / 2337 Tachycardia 9933 1504 / 8429 1951 311 / 1640 Severe hypertension 9647 2024 / 7623 1930 410 / 1520 Vasopressor initiation 61647 1525 / 60122 2030 310 / 1720 Hypotension 5490 3480 / 2010 1088 688 / 400 CRRT initiation 63669 263 / 63406 2424 45 / 2379 Hemodialysis initiation 63617 340 / 63277 2401 64 / 2337 
+
+Table 5: Held-out regression outcome summaries by evaluation cohort. Each row reports the eligible test-set denominator and the mean with standard deviation for the raw regression labels used by the Stage 3 Ridge probes. Eligibility matches the evaluation tasks: rows with missing targets are excluded. Exp1–2 use the all-admission cohort; Exp3 uses the ICU-only cohort. 
+
+Outcome Exp1-2 eligible N Exp1-2 mean (SD) Exp3 eligible N Exp3 mean (SD) Hospital LOS (h) 63750 141.24 (177.25) 2440 251.20 (266.49) Peak creatinine 48407 1.47 (1.68) 2350 1.70 (2.00) Minimum hemoglobin 48401 10.14 (2.20) 2346 9.26 (2.18) Peak potassium 48074 4.46 (0.88) 2354 4.73 (0.86) Minimum potassium 48074 3.80 (0.48) 2354 3.57 (0.47) Minimum glucose 47659 101.13 (33.72) 2349 95.15 (28.69) Minimum sodium 47942 136.47 (4.48) 2353 134.87 (5.83) Maximum sodium 47942 140.55 (4.07) 2353 142.10 (4.95) Peak troponin 3545 0.64 (1.84) 381 0.83 (2.07) Peak BNP 2864 3287.98 (7475.96) 292 3568.58 (8147.81) Maximum heart rate 10735 107.99 (24.44) 2135 108.82 (24.73) Maximum SBP 10701 153.64 (26.35) 2133 153.70 (26.49) Maximum DBP 10701 96.76 (25.18) 2133 96.95 (24.75) 
+
+23 Representation Before Training 
+
+Table 6: Trained model configurations. Vocabulary size and parameter count for each of the 28 reported models (8-layer, 8-head, 1024-hidden decoder). xVal-affine configurations untie embedding matrices, so they are larger than otherwise matched xVal variants. 
+
+Configuration Vocab size Parameters 
+
+Experiment 1: Granularity and reference-range anchored laboratory binning 
+
+Deciles, population, unfused 19 363 86 953 984 Deciles, population, fused 30 535 98 394 112 Ventiles, population, unfused 19 373 86 964 224 Ventiles, population, fused 39 811 107 892 736 Ventiles, reference-range anchored (5-10-5), unfused 19 373 86 964 224 Ventiles, reference-range anchored (5-10-5), fused 38 788 106 845 184 Trentiles, population, unfused 19 383 86 974 464 Trentiles, population, fused 47 519 115 785 728 Trentiles, reference-range anchored (10-10-10), unfused 19 383 86 974 464 Trentiles, reference-range anchored (10-10-10), fused 46 201 114 436 096 Centiles, population, unfused 19 453 87 046 144 Centiles, population, fused 83 927 153 067 520 
+
+Experiment 2: Value and temporal encoding mechanics 
+
+Discrete value encoder + event order only 19 351 86 941 696 Discrete value encoder + time tokens 19 363 86 953 984 Discrete value encoder + admission-relative RoPE 19 351 86 941 696 Soft discretization + event order only 19 351 86 951 936 Soft discretization + time tokens 19 363 86 964 224 Soft discretization + admission-relative RoPE 19 351 86 951 936 xVal + event order only 19 342 86 933 505 xVal + time tokens 19 355 86 946 817 xVal + admission-relative RoPE 19 342 86 933 505 xVal-affine + event order only 19 342 123 517 953 xVal-affine + time tokens 19 355 123 544 577 xVal-affine + admission-relative RoPE 19 342 123 517 953 
+
+Experiment 3: Vocabulary semantic grouping 
+
+Native MIMIC codes 13 394 80 841 728 CLIF-mapped 13 074 80 514 048 Randomized mapped codes 13 074 80 514 048 Frequency-matched mapped codes 8781 76 118 016 
+
+Appendix B. Additional outcome comparisons and trained model configurations 
+
+24 Representation Before Training Unfused Fused 
+
+0.60 
+
+0.65 
+
+0.70 
+
+0.75 
+
+0.80 
+
+0.85  
+
+> Mean AUROC across outcomes  0.806 0.818
+
+Fusion 
+
+Deciles Ventiles Trentiles Centiles 
+
+0.60 
+
+0.65 
+
+0.70 
+
+0.75 
+
+0.80 
+
+0.85 0.806 0.816 0.809 0.814 
+
+Granularity 
+
+Population 
+
+bins 
+
+Clinical 
+
+bins 
+
+0.60 
+
+0.65 
+
+0.70 
+
+0.75 
+
+0.80 
+
+0.85 0.816 0.810 
+
+Anchoring 
+
+Unfused Fused 
+
+0.0 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4 
+
+0.5 
+
+> Mean Spearman  across outcomes
+> 0.437
+> 0.484
+
+Fusion 
+
+Deciles Ventiles Trentiles Centiles 
+
+0.0 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4 
+
+0.5 0.454 0.470 0.451 0.468 
+
+Granularity 
+
+Population 
+
+bins 
+
+Clinical 
+
+bins 
+
+0.0 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4 
+
+0.5 0.469 0.452 
+
+Anchoring 
+
+Figure 4: Experiment 1 axis comparisons. Mean test-set AUROC (top row) and Spearman ρ (bottom row) across the full 29-outcome sweep, aggregated one representation axis at a time. Left-to-right: fusion, granularity, and reference-range anchored laboratory binning. Bars show the mean point estimate with mean lower/upper 95% bootstrap confidence bounds. 
+
+25 Representation Before Training Discrete 
+
+Soft 
+
+xVal 
+
+(code-norm.) xVal-affine 
+
+0.60 
+
+0.65 
+
+0.70 
+
+0.75 
+
+0.80 
+
+0.85   
+
+> Mean AUROC across outcomes  0.816 0.812
+> 0.752 0.741
+
+Value encoder 
+
+Event 
+
+order 
+
+only 
+
+Time 
+
+tokens 
+
+Admission-
+
+relative 
+
+RoPE 
+
+0.60 
+
+0.65 
+
+0.70 
+
+0.75 
+
+0.80   
+
+> 0.782 0.779 0.779
+
+Temporal encoding 
+
+Discrete 
+
+Soft 
+
+xVal 
+
+(code-norm.) xVal-affine 
+
+0.0 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4 
+
+0.5  
+
+> Mean Spearman  across outcomes
+> 0.479 0.466
+> 0.387
+> 0.337
+
+Value encoder 
+
+Event 
+
+order 
+
+only 
+
+Time 
+
+tokens 
+
+Admission-
+
+relative 
+
+RoPE 
+
+0.0 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4   
+
+> 0.421 0.414 0.416
+
+Temporal encoding 
+
+Figure 5: Experiment 2 axis comparisons. Mean AUROC (top row) and Spearman ρ
+
+(bottom row) across the full 29-outcome sweep, aggregated by value encoder (left column) and temporal encoding (right column). Bars show mean point estimates with mean lower/upper 95% bootstrap confidence bounds. 
+
+26 Representation Before Training 0.60 0.65 0.70 0.75 0.80 0.85 0.90 0.95 
+
+> AUROC
+
+Hospital mortality 
+
+Long length of stay 
+
+ICU stay >48h 
+
+Invasive mechanical ventilation 
+
+Hyperkalemia 
+
+Severe hypokalemia 
+
+Severe anemia 
+
+Hypoglycemia 
+
+Profound hyponatremia 
+
+Severe hypernatremia 
+
+Tachycardia 
+
+Severe hypertension 
+
+Vasopressor initiation 
+
+Hypotension 
+
+Continuous renal replacement therapy 
+
+Hemodialysis initiation 
+
+Binary outcomes      
+
+> 0.1 0.2 0.3 0.4 0.5 0.6
+> Spearman
+
+Length of stay (hours) 
+
+Peak creatinine 
+
+Minimum hemoglobin 
+
+Peak potassium 
+
+Minimum potassium 
+
+Minimum glucose 
+
+Minimum sodium 
+
+Maximum sodium 
+
+Peak troponin 
+
+Peak natriuretic peptide 
+
+Maximum heart rate 
+
+Maximum systolic blood pressure 
+
+Maximum diastolic blood pressure 
+
+Regression outcomes 
+
+Native MIMIC codes CLIF-mapped Randomized mapped codes Frequency-matched mapped codes 
+
+Figure 6: Experiment 3 outcome comparisons. Left: AUROC for all 16 binary outcomes across the four vocabulary arms. Right: Spearman ρ for all 13 regression outcomes. Points and whiskers are test-set estimates with 95% bootstrap confidence intervals. 
+
+27 Representation Before Training Native 
+
+MIMIC 
+
+codes 
+
+CLIF-
+
+mapped 
+
+Randomized 
+
+mapped 
+
+codes 
+
+Frequency-
+
+matched 
+
+mapped codes 
+
+0.60 
+
+0.65 
+
+0.70 
+
+0.75 
+
+0.80    
+
+> Mean AUROC across outcomes  0.775 0.773 0.769 0.773
+
+Vocabulary arm 
+
+Native 
+
+MIMIC 
+
+codes 
+
+CLIF-
+
+mapped 
+
+Randomized 
+
+mapped 
+
+codes 
+
+Frequency-
+
+matched 
+
+mapped codes 
+
+0.0 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4    
+
+> Mean Spearman  across outcomes  0.386 0.381 0.371 0.386
+
+Vocabulary arm 
+
+Figure 7: Experiment 3 arm comparisons. Mean AUROC (top) and Spearman ρ
+
+(bottom) across the full 29-outcome sweep for the four vocabulary arms. Bars show mean point estimates with mean lower/upper 95% bootstrap confidence bounds. 
+
+28 Representation Before Training 
+
+Appendix C. Experiment 3 Perturbation Logic 
+
+The main-text comparison between Native MIMIC codes and CLIF-mapped codes mixes at least two mechanisms: semantic grouping , where clinically related MIMIC codes are reassigned to the same mapped concept (e.g., LAB//50931//mg/dl → LAB//glucose_serum ); and vocabulary compression , where multiple MIMIC codes collapse into fewer mapped identifiers so each learned token appears more often during the fixed single training pass. The randomized and frequency-matched perturbation arms reuse the same mapped train-split target code set; codes without a CLIF mapping retain their native MIMIC strings. 
+
+Nested-set definition. To separate those mechanisms conceptually, we define three nested classes of mappings: 
+
+• A: clinically principled mappings, i.e., the CLIF semantic groupings encoded by the CLIF-MIMIC tables; 
+
+• B: mappings over the mapped code set that match how often each mapped code appears in the training split but need not preserve the original clinical groupings; 
+
+• C: mappings over the mapped code set that match a comparable level of vocabulary compression, regardless of exactly how often each mapped code appears. Conceptually, A ⊂ B ⊂ C. A direct comparison between native MIMIC codes and CLIF-mapped codes only tells us whether moving from outside C to a point in A changes performance; it does not identify which part of that move matters. 
+
+Interpretation logic. The nested sets imply a qualitative decision rule. If a perturbation arm from C \ B matches the mapped arm, coarse vocabulary compression is sufficient. If such a perturbation arm falls short but a perturbation arm from B \ A matches the mapped arm, then matching mapped-code frequencies is sufficient. Only if both perturbations fall short do we attribute residual gains to the specific semantic grouping encoded by A. In the implementation, the randomized arm shuffles the mapped target code list once within each domain and assigns sorted native source codes while cycling through that shuffled list as needed, whereas the frequency-matched arm sorts native source codes by descending train-split frequency and greedily assigns each one to the mapped target code with the largest remaining train-split count. Because those perturbations only approximate the hierarchy, we apply this logic qualitatively, not as an exact set-membership test. 
+
+Appendix D. Representation Analyses 
+
+D.1. Embedding Geometry: Shared vs. Code-Specific Centile Encoders 
+
+To visualize the effect of code-value fusion on the numeric embedding manifold, we project the centile-token embeddings to two dimensions with PCA (Figure 8). Under unfused tokenization, every measurement reuses the same shared quantile-token embeddings rather than owning code-specific value tokens. Under fusion, each variable owns a distinct arc of code-specific centile tokens, and the realized bin counts are typically well below the nominal granularity for rounded laboratory values (e.g., potassium collapses to 28 of the nominal 100 centiles). 
+
+> 29 Representation Before Training
+
+Figure 8: Embedding geometry: shared vs. code-specific centile encoders. Left: PCA of the shared unfused centile manifold. Right panels: fused (code-specific) centile embeddings for six measurements. Under fusion, each variable’s tokens form a distinct arc; panel labels show the realized bin count (e.g., potassium collapses to 28 of the nominal 100 centiles). 
+
+D.2. Linear Decodability of Clinical Boundaries 
+
+We test whether clinically defined normal/abnormal labels are linearly decodable from learned bin-token embeddings. We use the population-quantile, unfused discrete models from Experiment 1 (time tokens) across four granularities (deciles/ventiles/trentiles/centiles). For seven lab tests, we label each bin as normal or abnormal based on whether the bin midpoint falls within the MIMIC-IV reference interval for that test, then fit a leave-one-out logistic regression probe using the corresponding static token embeddings (one example per bin). Centile embeddings achieve 93–98% accuracy across all seven tests (Figure 9a). Decile and ventile embeddings score lower (70–90%), consistent with coarser bins spanning both sides of the threshold. Because the probe is supervised on reference-range labels, this accuracy should be interpreted as separability : pretraining induces bin embeddings that a linear classifier can use to fit a clinically defined boundary. It does not imply that the transformer inferred the clinical threshold during pretraining. 
+
+D.3. Representational Suppression in Continuous Encoders 
+
+xVal scales the [NUM] embedding by z = ( v − median )/scale , so values near the code-specific median receive little multiplicative signal. Panel (b) compares the Experiment 2 decile, unfused, time-token configurations xVal-TimeTokens and xVal-Affine-TimeTokens .  
+
+> 30 Representation Before Training
+> (a) Clinical boundary probe accuracy
+> (b) xVal (top) and xVal-affine (bottom), layers 0 (left) and 7 (right)
+
+Figure 9: Post-hoc analyses. (a) Clinical-boundary probe accuracy from leave-one-out logistic regression on bin-token embeddings. BG denotes the blood-gas assay of glucose and potassium. (b) Hidden-state L2 norms at [NUM] positions for the 
+
+xVal-TimeTokens and xVal-Affine-TimeTokens models, shown for layers 0 and 7. Red points mark positions with |z| < 0.5, blue points mark the remaining numeric positions, and the black line shows the mean norm within successive |z|
+
+bins. 
+
+> 31 Representation Before Training
+
+We measure hidden-state L2 norms at every [NUM] position in the first 500 held-out test sequences. The pile-up near |z| = 0 comes from measurements close to their code-specific medians. Vertical bands arise from rounded values that map to repeated z-scores, and the stripe at 
+
+|z| = 5 is the configured xVal clipping bound. Both rows show the same 2570 near-zero positions because both models are evaluated on the same held-out sequences and use the same z computation before numeric injection. The only change is the embedding update. Standard xVal injects ze[NUM] , whereas xVal-affine injects ze[NUM] + b. The bias vector b is a learned parameter, initialized near zero and fit jointly during pretraining, so the model determines how large the additive offset should be. The learned bias does not remove the later-layer near-zero trench. For the time-token models shown in Figure 9b, positions with |z| < 0.5 remain close to far-from-zero positions at layer 0 for standard xVal (ratio 0 .973), but are suppressed by layer 7 (ratio 0 .798). For xVal-affine, the near-zero trench persists at layer 7 as well (ratio 0 .902). Approximately 9.1% of all [NUM] positions fall in this range. In clinical medicine, a near-median lab value often signals physiological stability; suppression of near-median representations may attenuate this cue. 
+
+D.4. Impact of Out-of-Vocabulary Encodings 
+
+Soft discretization creates interpolated embedding vectors that lie between the vocabulary’s discrete token embeddings. When next-token prediction is evaluated using a one-hot cross-entropy loss, the model conditions on a continuous input vector with no exact match in the embedding table. Because Experiment 3 evaluates a categorical vocabulary intervention, we use the discrete value encoder with admission-relative RoPE ( §4.2) rather than soft discretization as the baseline. 
+
+Appendix E. Cohort and Data Extraction 
+
+We use MIMIC-IV v3.1 (Johnson et al., 2023, 2024). Dataset statistics are summarized in Table 7. 
+
+E.1. Cohort Selection 
+
+We define two cohorts: 
+
+• Experiments 1 & 2: all hospital admissions with LOS ≥ 24 hours. The benchmark evaluates quantization and encoding of numeric value , primarily 
+
+labevents.valuenum , using hospital and ICU modules from MIMIC-IV. Reference-range anchored laboratory binning uses lab reference ranges. 
+
+• Experiment 3 : ICU admissions, defined as hospital admissions with hospital LOS 
+
+≥ 24h and at least one linked ICU stay in icu/icustays for the same hadm id . In the reported Experiment 3 runs, the tokenizer keeps only the LAB and VITAL event blocks from those ICU-cohort arms. 
+
+> 32 Representation Before Training
+
+Table 7: MIMIC-IV v3.1 dataset summary (after MEDS extraction). Patient, admission, and ICU stay counts reflect the full database; laboratory counts reflect the MEDS-extracted event set restricted to rows with both a valid hadm id and storetime 
+
+(the time column used for laboratory results in our extraction). Analysis cohorts (LOS ≥ 24h, N=422,918 admissions) are subsets. Statistic Value Patients 364,627 Hospital admissions 546,028 ICU stays 94,458 Laboratory events (MEDS) 84,133,368 Unique laboratory codes 895 Codes with reference ranges 334 (37.3%) Events with reference ranges 71,326,729 (84.8%) Train/val/test split 70/10/20 We use a 70/10/20 split by patient, with all hospital admissions from a given patient assigned to the same split. MIMIC-IV dates are shifted per patient (Johnson et al., 2023); relative time is preserved. 
+
+E.2. Data Extraction 
+
+We use the MEDS extraction pipeline adopted from the ETHOS-ARES repository (Renc et al., 2025) with modifications: (i) 70/10/20 train/validation/test split ratios vs. original 90/10; (ii) custom event configuration with per-table timestamp semantics (see below); and (iii) extended MEDS fields ( ref range lower , ref range upper ) for reference-range anchored laboratory binning. To prevent temporal leakage, we exclude administrative and billing code tables (ICD diagnosis/procedure, HCPCS/CPT, and DRG) that may be added or revised after dis-charge (Ramadan et al., 2025). We include real-time clinical data from hosp/admissions ,
+
+hosp/labevents , hosp/emar , hosp/transfers , hosp/patients , and ICU module tables. 
+
+Timestamp semantics. For the six clinical-event tables that record storetime (the time the data was entered into the EHR), we use storetime so that event order reflects when information became available to care providers, not when the underlying measurement or procedure occurred: hosp/labevents , hosp/emar , icu/chartevents , icu/inputevents ,
+
+icu/outputevents , and icu/procedureevents . Tables without storetime use their na-tive event-time fields: hosp/admissions (admittime /dischtime /edregtime /edouttime ), 
+
+hosp/transfers (intime ), icu/icustays (intime /outtime ), and hosp/patients 
+
+(year of birth /dod ). The pipeline does not retain separate timelines for lab orders, specimen collection, and lab results; each laboratory result is represented only at the time of result availability ( storetime ). The quantization discretization in Experiment 1 is applied to all tokenized MEDS events that carry a scalar numeric value . The primary numeric stream under test is 
+
+hosp/labevents , where MEDS numeric value is sourced from labevents.valuenum and 
+
+> 33 Representation Before Training
+
+lab reference ranges are provided by ref range lower /ref range upper . Tokenized time-lines also include numeric ICU streams, such as vitals, infusion start rates, subject weight at infusion, and fluid outputs. Each of those ICU streams is discretized with population quantiles. Reference-range anchored laboratory binning applies only to laboratory events with available reference ranges. INFUSION END is treated as categorical, encoding rates instead of cumulative totals. 
+
+Appendix F. Compute Environment by Stage 
+
+All reported jobs were single-node runs. Tokenization, evaluation retokenization, and downstream probes ran on CPU nodes (8 CPUs, 80–300 GB RAM). Stage 1 training used 1 A100 GPU per configuration (4 CPUs, 128 GB RAM). Stage 2 hidden-state extraction used 1 A100 GPU per configuration (4 CPUs, 32 GB RAM). A fuller stage-by-stage allocation summary is documented in the repository README. All Stage1 runs use FlashAttention-2 (Dao, 2023) on A100 nodes; precision and kernel choices affect runtime but not the model objective. 
+
+Appendix G. Tokenized Sequence Length Distributions 
+
+Packed training boundary marker (Poisson PAD gaps). In packed training, we concatenate tokenized admissions into fixed-length blocks for efficient use. To reduce accidental cross-admission continuity, we insert a short run of PAD tokens between admissions, with the number of PAD tokens drawn from a Poisson distribution with mean ≈ 7 (Burkhart et al., 2025, 2026). 
+
+Appendix H. Formal Definitions of Value Encoders 
+
+The following definitions formalize the soft and continuous value encoders used in Experi-ment 2 (the discrete encoder is the standard next-token cross-entropy setup). 
+
+ConSE-variant soft discretization. Let v be a numeric value and let bi ≤ v < b i+1 be the adjacent quantile boundaries that surround it. We compute an interpolation weight 
+
+α = ( v − bi)/(bi+1 − bi) (with the convention that α = 0 if bi+1 = bi) and represent the value by interpolating between the two adjacent shared quantile-bin embeddings whose boundary interval contains v:
+
+e(v) = (1 − α) Ei + α Ei+1 .
+
+At quantile-token prediction positions, we use the same α to replace the one-hot next-token target with a two-point distribution over the adjacent quantile tokens Qi and Qi+1 :
+
+Lsoft (v) = −(1 − α) log p(Qi | · ) − α log p(Qi+1 | · ) .
+
+All non-quantile targets retain the standard causal language-model cross-entropy. For values below the first stored breakpoint or above the last stored breakpoint, we use the first or last quantile-bin embedding rather than extrapolating beyond the boundary range. 
+
+> 34
+
+Representation Before Training 0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.00 
+
+0.02 
+
+0.04 
+
+0.06 
+
+0.08 
+
+0.10 
+
+0.12 
+
+> Probability mass
+> n=297,817
+> P(L 1024)=0.759
+> P(L 2048)=0.826
+> P(L 4096)=0.895812
+> P(L>4096)=0.104188
+> P(L>6000)=0.072162
+> max=569,422
+
+A. unfused - full timeline 
+
+0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.000 
+
+0.025 
+
+0.050 
+
+0.075 
+
+0.100 
+
+0.125 
+
+0.150 
+
+0.175 
+
+> Probability mass
+> n=297,817
+> P(L 1024)=0.796
+> P(L 2048)=0.861
+> P(L 4096)=0.926183
+> P(L>4096)=0.073817
+> P(L>6000)=0.049349
+> max=418,179
+
+B. fused - full timeline 
+
+0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.00 
+
+0.05 
+
+0.10 
+
+0.15 
+
+0.20 
+
+0.25 
+
+0.30 
+
+0.35 
+
+> Probability mass
+> n=296,209
+> P(L 1024)=0.876
+> P(L 2048)=0.965
+> P(L 4096)=0.999592
+> P(L>4096)=0.000408
+> P(L>6000)=0.000000
+> max=5,990
+
+C. unfused - first 24h 
+
+0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.0 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4 
+
+0.5 
+
+> Probability mass
+> n=296,209
+> P(L 1024)=0.924
+> P(L 2048)=0.993
+> P(L 4096)=1.000000
+> P(L>4096)=0.000000
+> P(L>6000)=0.000000
+> max=3,893
+
+D. fused - first 24h 
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+Token-length distributions (tokens column) 
+
+Figure 10: Token-length distributions (untruncated token lists). Length histograms computed from the Parquet tokens column (per admission), shown for unfused vs. fused tokenization and for both full timelines and first-24h cuts. Dashed vertical lines mark 1024/2048/4096 tokens. For readability under heavy tails, the x-axis is capped at 6000 tokens and all mass beyond 6000 is aggregated into an overflow bin; a CDF overlay is shown on the right y-axis. In the first-24h cut (deciles), the fraction of admissions exceeding 4096 tokens is 0.036–0.041% (unfused) and 0% (fused) across splits. 
+
+xVal continuous encoding. For each numeric event, we write a code token followed by [NUM] . For each code c, we compute training-split summary statistics (median c and IQR c). We define an interquartile-derived scale scale c = IQR c/1.35 (the factor 1 /1.35 ≈ 0.74 converts the IQR to an approximately unit-normal standard deviation, giving a robust alternative to the sample standard deviation that is resistant to outliers) and compute a 
+
+35 Representation Before Training 0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.00 
+
+0.02 
+
+0.04 
+
+0.06 
+
+0.08 
+
+0.10 
+
+0.12 
+
+> Probability mass
+> n=297,817
+> P(L 1024)=0.759
+> P(L 2048)=0.826
+> P(L 4096)=0.895812
+> P(L>4096)=0.104188
+> P(L>6000)=0.072162
+> max=569,422
+
+A. time tokens full timeline 
+
+0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.00 
+
+0.02 
+
+0.04 
+
+0.06 
+
+0.08 
+
+0.10 
+
+0.12 
+
+0.14 
+
+> Probability mass
+> n=297,817
+> P(L 1024)=0.770
+> P(L 2048)=0.832
+> P(L 4096)=0.899680
+> P(L>4096)=0.100320
+> P(L>6000)=0.069358
+> max=558,626
+
+B. no time tokens (event order / admission-relative RoPE) full timeline 
+
+0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.00 
+
+0.05 
+
+0.10 
+
+0.15 
+
+0.20 
+
+0.25 
+
+0.30 
+
+0.35 
+
+> Probability mass
+> n=296,209
+> P(L 1024)=0.876
+> P(L 2048)=0.965
+> P(L 4096)=0.999592
+> P(L>4096)=0.000408
+> P(L>6000)=0.000000
+> max=5,990
+
+C. time tokens first 24h 
+
+0 1000 2000 3000 4000 5000 6000 
+
+Tokenized length (tokens per admission) 
+
+0.00 
+
+0.05 
+
+0.10 
+
+0.15 
+
+0.20 
+
+0.25 
+
+0.30 
+
+0.35 
+
+> Probability mass
+> n=296,209
+> P(L 1024)=0.879
+> P(L 2048)=0.967
+> P(L 4096)=0.999679
+> P(L>4096)=0.000321
+> P(L>6000)=0.000000
+> max=5,901
+
+D. no time tokens (event order / admission-relative RoPE) first 24h 
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+0.0 
+
+0.5 
+
+1.0 
+
+> CDF
+
+Token-length distributions (tokens column) 
+
+Figure 11: Token-length distributions: inserting time tokens vs. no-time-token to-kenization. Same layout as Figure 10 but comparing unfused decile tokenization with time tokens (left column) and without time tokens (right column), for both full timelines and first-24h cuts. The no-time-token tokenization is reused by both the admission-relative RoPE and event-order-only Experiment 2 arms; the difference between those two settings appears only at training time. Removing time tokens shortens sequences by approximately 11%, but both tokenizations fit within 4096 tokens for > 99 .95% of first-24h admissions. normalized value 
+
+z = v − median c
+
+scale c
+
+.
+
+We clip z to [ −5, 5] before injection and use it as the numeric regression label. The main adaptation relative to original xVal is that the multiplicative scalar is code-normalized, not raw: using v directly would make the shared [NUM] direction sensitive to arbitrary unit 
+
+36 Representation Before Training 
+
+choice and cross-code dynamic range, whereas z places different laboratory and vital channels on a comparable within-code deviation scale. Following xVal’s core multiplicative injection scheme (Golkar et al., 2024), we inject the scalar via multiplicative scaling: e(v) = ze[NUM] ,and train an auxiliary numeric regression head at [NUM] positions to predict z. In the affine-shifted variant, we instead use e(v) = ze[NUM] + b with a learnable bias vector b, so that z≈0 does not collapse the numeric representation to zero. If summary statistics are unavailable for a given code (e.g., unseen at train time), we leave the [NUM] embedding unchanged and omit the numeric regression loss for that position. 
+
+Appendix I. Numeric Values and Event-Family Coverage 
+
+The following notes specify which events are encoded numerically. 
+
+Definition of numeric values. An event is treated as numeric if and only if the extracted MEDS row has a non-null numeric value .
+
+Event families that carry numeric value (Experiments 1–2). The primary tokenization treats five families as numeric: LAB , VITAL , INFUSION_START , SUBJECT_ WEIGHT_AT_INFUSION , and FLUID_OUTPUT . Their corresponding numeric sources are hosp/labevents.valuenum , icu/chartevents.valuenum , icu/inputevents.rate ,
+
+icu/inputevents.patientweight , and icu/outputevents.value , respectively. All five use storetime as the event timestamp. 
+
+Event families treated as categorical. In Experiments 1–2, the following families remain categorical because they do not carry numeric value : MEDICATION (hosp/emar ,
+
+storetime ), INFUSION_END (icu/inputevents , storetime ), TRANSFER (hosp/transfers ,
+
+intime ), ICU_ADMISSION and ICU_DISCHARGE (icu/icustays , intime /outtime ), and 
+
+PROCEDURE /PROCEDURE_END (icu/procedureevents , storetime ). 
+
+Appendix J. Experiment 3 CLIF Mapping Scope 
+
+The tokenizer used for the reported Experiment 3 runs reads the LAB and VITAL event blocks, together with shared admission/discharge and demographic scaffold tokens for race, language, sex, age, insurance, marital status, admission type, and discharge type. The reported Experiment 3 models should therefore be interpreted as a LAB/VITAL-only vocabulary-remapping study, not as a full MEDS or full-CLIF harmonization experiment. The arm builder rewrites CLIF-covered LAB, VITAL, MEDICATION, and INFUSION code families upstream, but the reported tokenizer excludes medication, infusion, transfer, ICU in/out, diagnosis, procedure, and respiratory-support-like event families from the model input. Within that realized scope, the CLIF mapping reaches the model through: 
+
+• LAB : the train vocabulary rewrites 100 distinct native LAB code strings spanning 95 MIMIC itemid s into 62 CLIF-style LAB token strings across 46 lab category values; the train split maps 11 344 725/19 075 800 LAB events (59.5%). 
+
+• VITAL : the train vocabulary rewrites 26 distinct native VITAL code strings spanning 26 MIMIC itemid s into 13 CLIF-style VITAL token strings across 10 vital category 
+
+values; the train split maps 28 283 881/202 102 025 VITAL events (14.0%). 
+
+> 37 Representation Before Training
+
+The source itemids and category labels come from the CLIF-MIMIC mapping tables (mimic-to-clif-mappings-labs.csv and mimic-to-clif-mappings-vitals.csv ) that intersect our realized Experiment 3 train vocabulary. Numeric values and timestamps are un-changed across all domains; only the categorical code field is rewritten for mapped codes, and codes without a CLIF mapping remain native MIMIC code strings. No dosage conversions or unit normalizations are applied before pooling values into mapped codes. Because units re-main in the MEDS code suffix, one mapped category can yield multiple realized token strings, such as LAB//albumin//g/dL and LAB//albumin//mg/dL , or VITAL//weight_kg//kg and 
+
+VITAL//weight_kg//UNK . The randomized and frequency-matched perturbation arms oper-ate over the same mapped CLIF target code set derived from the mapped train split. The randomized arm shuffles that target list within domain and assigns native source codes to the shuffled targets; the frequency-matched arm greedily matches mapped-code train frequencies as closely as possible. The full realized itemid-to-category inventories are listed in Tables 8 and 9. The realized Experiment 3 vocabularies are 13 394 tokens for Native MIMIC codes, 13 074 for CLIF-mapped, 13 074 for Randomized mapped codes, and 8781 for Frequency-matched mapped codes.                        
+
+> Table 8: Realized Experiment 3 LAB mapping inventory.
+> Grouped by CLIF lab category for readability. Each row lists the MIMIC itemid s from the reported Experiment 3 train vocabulary that rewrite to that category under the CLIF-MIMIC LAB table.
+> CLIF lab category Realized MIMIC itemids
+> albumin 50835,50862,51025,51046,51069,51070,51776,51927 alkaline_ phosphatase 50863,51241 alt 50861 ast 50878 basophil 51112,51367,51387,51442,52225 basophils_absolute 51145,52069 basophils_percent 51146 bicarbonate 50803,50804,50882 bilirubin_ conjugated 50883 bilirubin_total 50838,50885,51028,51049,51464,51465,51783 bilirubin_ unconjugated 50884 bun 50851,51006,51045,51104 calcium_ionized 50808 calcium_total 50893,51029,51066,51077 chloride 50806,50839,50902,51030,51062,51078 creatinine 50912,52024 crp 50889,51652 eosinophils_ absolute 51199,52073 eosinophils_percent 51200 esr 51288 ferritin 50924
+> 38
+
+Representation Before Training 
+
+CLIF lab category Realized MIMIC itemids 
+
+glucose_serum 50809,50931 hemoglobin 50811,50852,51222 inr 51237 lactate 50813 ldh 50954 lymphocytes_ absolute 51133,52769 lymphocytes_percent 51143,51244,51245 magnesium 50960 monocytes_absolute 52074 monocytes_percent 51254 neutrophils_ absolute 52075 neutrophils_percent 50872,51232,51256 pco2_arterial 50818 ph_arterial 50820 phosphate 50970 platelet_count 51240,51264,51265,51266 po2_arterial 50821 potassium 50822,50971 pt 51274 ptt 51275 so2_arterial 50817 sodium 50824,50983 total_protein 50976 troponin_t 51003 wbc 51300,51301 
+
+Table 9: Realized Experiment 3 VITAL mapping inventory. 
+
+Grouped by CLIF vital category , each row lists the MIMIC 
+
+itemid s from the reported Experiment 3 train vocabulary that rewrite to that category under the CLIF-MIMIC VITAL table. 
+
+CLIF vital category Realized MIMIC itemids 
+
+MAPPED ELSEWHERE 224688,224689,224690 dbp 220051,220180,224643,225310,227242 heart_rate 220045 height_cm 226730 map 220052,220181,225312 respiratory_rate 220210 sbp 220050,220179,224167,225309,227243 spo2 220277 temp_c 223761,223762,224642 weight_kg 224639,226512,226531 
+
+39

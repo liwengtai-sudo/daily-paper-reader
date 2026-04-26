@@ -1,0 +1,788 @@
+Title: Drug Synergy Prediction via Residual Graph Isomorphism Networks and Attention Mechanisms
+
+URL Source: https://arxiv.org/pdf/2604.21473v1
+
+Published Time: Fri, 24 Apr 2026 00:45:36 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Drug Synergy Prediction via Residual Graph Isomorphism Networks and Attention Mechanisms 
+
+Jiyan Song a,1 , Wenyang Wang a,1 , Chengcheng Yan b, Zhiquan Han a, Feifei Zhao a,b, ∗
+
+> aCollege of Sciences, Shihezi University, 221 North 4th Road, Shihezi, 832003, Xinjiang, China
+> bSchool of Mathematics and Computational Science, Xiangtan University, North 2nd Ring Road, Xiangtan, 411105, Hunan, China
+
+Abstract 
+
+In the treatment of complex diseases, treatment regimens using a single drug often yield limited e ffi cacy and can lead to drug resistance. In contrast, combination drug therapies can significantly improve therapeutic outcomes through synergistic e ff ects. However, experimentally validating all possible drug combinations is prohibitively expensive, underscoring the critical need for effi cient computational prediction methods. Although existing approaches based on deep learning and graph neural networks (GNNs) have made considerable progress, challenges remain in reducing structural bias, improving generalization capability, and enhancing model interpretability. To address these limitations, this paper proposes a collaborative prediction graph neural network that integrates molecular structural features and cell-line genomic profiles with drug-drug interactions to enhance the prediction of synergistic e ff ects. We introduce a novel model named the Residual Graph Isomorphism Network integrated with an Attention mechanism (ResGIN-Att). The model first extracts multi scale topological features of drug molecules using a residual graph isomorphism network, where residual connections help mitigate over-smoothing in deep layers. Subsequently, an adaptive Long Short-Term Memory (LSTM) module fuses structural information from local to global scales. Finally, a cross-attention module is designed to explicitly model drug-drug interactions and identify key chemical substructures. Extensive experiments on five public benchmark datasets demonstrate that ResGIN-Att achieves competitive performance, comparing favorably against key baseline methods while exhibiting promising generalization capability and robustness. 
+
+Keywords: Drug combination prediction, Synergistic e ff ects, Graph Isomorphism Network, Residual Connection, Cross-Attention Mechanism 
+
+1. Introduction 
+
+The treatment of complex diseases such as cancer and infec-tious diseases often faces challenges, including limited e ffi cacy of single-drug therapies and the tendency to develop drug resis-tance [1, 2]. In cancer, multiple mechanisms within cells often undergo changes. Therefore, the traditional treatment model of a single drug targeting a single disease and a single target is often ine ff ective [3]. In contrast, combination drug therapy significantly improves e ffi cacy, reduces toxicity that is depen-dent on drug dosage, and delays the development of drug resis-tance by using two or more drugs simultaneously [4]. However, drugs may exhibit synergistic, additive, or antagonistic e ff ects in themselves. Using a purely experimental approach to verify all possible combinations is impractical in terms of manpower, time, and resources. This makes computational prediction of drug combinations an essential approach to accelerate the de-velopment of combination therapies.        
+
+> ∗Corresponding author.
+> Email addresses: 20221018262@stu.shzu.edu.cn (Jiyan Song ),
+> wwyang1213@163.com (Wenyang Wang ), ycc956176796@gmail.com
+> (Chengcheng Yan), hanzhiquan@shzu.edu.cn (Zhiquan Han),
+> zhaofeifei@shzu.edu.cn (Feifei Zhao)
+> 1The two authors contribute equally to this work.
+
+Computational models are widely used to predict and prior-itize drug combinations exhibiting synergistic e ff ects. This ap-proach overcomes the limitations of single-agent therapy [5, 6]. The research trajectory in this field is closely intertwined with the development of computational biology and artificial intelli-gence. It profoundly reflects a paradigm shift from reliance on prior knowledge to data driven approaches, and from shallow statistical learning to deep representational learning [7]. Early studies primarily relied on prior biological knowledge, includ-ing pathway-based rational design [8], network pharmacology [9], and dynamical systems modeling [10, 11]. While these approaches established valuable conceptual foundations, their strong dependency on complete and accurate pathway informa-tion limited their ability to discover novel interaction patterns beyond known biology. This reliance on predefined biological knowledge restricts model generalization and scalability. Our ResGIN-Att addresses this by learning molecular representa-tions directly from graph structures, requiring no prior pathway knowledge. The development of high-throughput drug combination screening databases has facilitated the application of data-driven machine learning approaches. Early studies demon-strated the feasibility of computational synergy prediction us-ing artificial neural networks [12] and probabilistic ensemble frameworks [13]. Subsequent work employed gradient boost-
+
+> arXiv:2604.21473v1 [cs.LG] 23 Apr 2026
+
+ing [14], network embedding [15], support vector machines [16], and matrix factorization [17] to further improve predic-tive performance. Among these, comboFM [17] introduced dose–response surface modeling, representing a notable ad-vance in leveraging multi-way interactions. Despite these pro-gresses, traditional machine learning methods remain heavily reliant on handcrafted molecular descriptors and pathway fea-tures [18], and models such as SVM and random forests strug-gle to e ff ectively process complex unstructured data like molec-ular graphs [19]. This manual feature engineering process is not only labor-intensive but also risks omitting critical structural in-formation. In contrast, our ResGIN-Att performs end-to-end feature learning directly from raw molecular graphs, capturing fine-grained topological patterns without human intervention. Recent advances in deep learning, combined with the in-creasing availability of large-scale, high-quality drug combi-nation datasets, have substantially enhanced the accuracy and reliability of computational methods for predicting synergistic drug pairs. Early deep learning models such as DeepSynergy [20] demonstrated the feasibility of synergy prediction using feedforward networks, but relied on predefined molecular de-scriptors. Subsequent studies introduced graph convolutional networks [21] and attention mechanisms [22] to better cap-ture structural information and long-range dependencies. More recently, end-to-end architectures [23] and ranking-oriented frameworks [24], and advanced feature extraction methods [25] have further improved performance. Despite these advances, most existing models still lack explicit modeling of drug–drug interactions and o ff er limited interpretability [26, 27, 28]. This absence of explicit interaction modeling makes it di ffi cult to understand which substructures contribute to synergy. Our ResGIN-Att addresses this through a cross-attention mecha-nism that explicitly models mutual influence between drug pairs and identifies key chemical substructures, enhancing both pre-dictive performance and interpretability. Building upon the widespread adoption of deep learning techniques, research paradigms in computational biomedicine have increasingly shifted toward graph neural networks. Graph-Synergy [29] pioneered this direction by constructing drug-pair subnets in PPI networks. Subsequent work integrated attention mechanisms [27], multi-head attention [29], knowledge graphs [30], and cancer-specific heterogeneous data [31] to further im-prove predictive performance. Despite these advances, existing graph neural network (GNN)-based methods still face critical challenges, including reliance on predefined biological network structures, limited cross-dataset generalization, and insu ffi cient interpretability [26, 27, 29, 30, 31]. These structural depen-dencies hinder model transferability across di ff erent biological contexts. Our ResGIN-Att mitigates structural bias via resid-ual connections, enhances cross-dataset generalization through LSTM-based multi-scale feature fusion, and improves inter-pretability with cross-attention, o ff ering a more generalizable solution. To address the aforementioned challenges, we propose ResGIN-Att, a deep graph neural network architecture de-signed to enhance representation learning for drug combi-nation synergy prediction. This model integrates residual graph isomorphism networks, sequential LSTMs, and a cross-attention mechanism to overcome the limitations of existing ap-proaches, including reliance on predefined biological network structures, limited cross-dataset generalization, and insu ffi cient interpretability. The main contributions of this paper are three-fold: 
+
+• We propose a deep residual graph isomorphism network framework for drug synergy prediction, named ResGIN. Its core module integrates residual connections with graph isomorphism networks (GIN) for drug feature learning. 
+
+• We present a collaborative prediction model that inte-grates multimodal features and drug interactions. The model employs a novel hierarchical architecture, combin-ing three core modules: ResGIN, sequence LSTM fusion, and cross-attention interaction. 
+
+• Through comprehensive experiments on five public bench-mark datasets, we demonstrate that our ResGIN-Att model demonstrates competitive performance against existing mainstream methods in terms of prediction accuracy, gen-eralization capability, and over-smoothing analysis. 
+
+2. Related Work 
+
+As noted in the Introduction, computationally driven drug combination prediction plays a pivotal role in mitigating the in-herent limitations of monotherapy. The research paradigm in this field has evolved from reasoning that is driven by theoret-ical principles, to traditional machine learning based on hand-crafted features, and finally to deep learning capable of auto-matically learning features. The following sections will review three closely related research strands: deep learning for drug combination prediction, applications of GNNs in drug discov-ery, and the residual connections in GNNs and their applica-tions. This review aims to clarify the technical context and the-oretical foundation of this work. 
+
+2.1. Deep Learning for Drug Combination Prediction 
+
+Over the past decade, deep learning methodologies have achieved substantial advances in the computational prediction of anticancer drug combinations [20, 22, 24]. Since DeepSyn-ergy [20] pioneered the use of feedforward neural networks to integrate chemical descriptors and gene expression profiles in 2018, subsequent deep learning models [21, 22, 32] have progressively shifted towards architectures capable of captur-ing more complex structured biological data. Studies indicate that prediction performance based on deep learning models has surpassed traditional machine learning approaches [14, 20, 22]. Furthermore, the deep learning paradigm significantly reduces reliance on manual feature engineering [18, 19, 33], enabling end-to-end learning from raw or only minimally processed data. This data-driven approach not only enhances predictive perfor-mance, but also demonstrates superior modeling capabilities for nonlinear, high dimensional interactions within pharmacologi-cal data. However, despite their strong performance, these deep 2learning methods typically rely on predefined features such as molecular descriptors as inputs, failing to learn directly from the native representation of a molecule’s graph structure. 
+
+2.2. Applications of GNNs in Drug Discovery 
+
+GNNs have been increasingly adopted for drug combination prediction, leveraging their capacity to model complex molecu-lar and pharmacological interactions. This enables fuller uti-lization of molecular structural information and better mod-eling of drug interactions. Their integration has driven fur-ther advancements in this domain. In recent years, the appli-cation of GNNs in drug discovery has achieved remarkable success [21, 29, 30]. Among these, GraphSynergy [29] in-novatively proposed the concept of constructing drug subnet-works on protein-protein interaction networks, utilizing biolog-ical networks as the core graph structure for synergistic drug combination prediction, thereby advancing GNN applications in this domain. Subsequent studies [23, 30, 31, 34] have in-creasingly shifted toward leveraging graph structures to charac-terize drugs or biological systems with greater precision. Among numerous GNN architectures, GIN exhibits distinc-tive representational power. Its design is grounded in the We-isfeiler–Lehman graph isomorphism test, and its learned rep-resentations have been theoretically and empirically shown to possess greater discriminative capacity than those of conven-tional GCN, thereby enabling more precise di ff erentiation of structurally distinct molecular topologies [35]. However, most existing GNN-based drug combination prediction methods still predominantly rely on foundational architectures like GCN or GAT, failing to fully leverage GIN’s potential to accurately cap-ture subtle di ff erences in molecular structures. Therefore, in this work, we adopt GIN as the core backbone network, aim-ing to learn more precise molecular representations through its enhanced expressive power. 
+
+2.3. Residual Connections in GNNs and Applications 
+
+In recent years, residual connections have emerged as a foun-dational architectural principle in deep neural network design [32]. Since residual networks achieved breakthrough success in image recognition, subsequent deep models including GNNs [36] have widely adopted them as core components for con-structing deeper, more powerful networks. Research indicates that incorporating residual connections into GNNs e ff ectively mitigates gradient vanishing and over-smoothing issues that arise with increasing network depth [26, 37]. This enables mod-els to aggregate information from broader neighborhoods while preserving detailed features from shallow layers. Furthermore, the residual mechanism significantly reduces the dependency on complex initialization and normalization techniques [38], thereby stabilizing the training process and enhancing model convergence. This architecture not only strengthens the net-work’s representational capabilities but also provides critical assurance for its successful application in complex graph learn-ing tasks such as drug combination prediction. In summary, deep learning particularly graph convolutional networks (GCNs) has become a pivotal tool for drug combi-nation prediction. However, most existing methods rely on GCN-based architectures. These architectures exhibit limited representational capacity. Consequently, they fail to fully ex-ploit the superior representational advantages o ff ered by graph isomorphism networks. Similarly, when deep networks are con-structed to capture more complex dependencies, they have not systematically incorporated key stabilization techniques, such as residual connections. Furthermore, how to explicitly guide models to focus on information on drug-drug interaction during learning remains an open question. These limitations motivate us to propose a novel model framework. 
+
+3. Methods 
+
+3.1. Model Architecture 
+
+This paper introduces ResGIN-Att, a deep graph neural net-work architecture that integrates attention mechanisms to en-hance the accuracy of drug synergy prediction. The overall ar-chitecture of the model is shown in Fig.1 , primarily consisting of three core modules: (1) Molecular Feature Learning Mod-ule based on Residual GIN and Sequence LSTM: This mod-ule introduces residual connections between GIN layers and combines LSTM networks to extract multiscale features from molecular graphs. (2) Attention-based interaction information learning module: This module calculates importance weights for each atomic substructure within drug molecules. It com-putes attention scores mutually between feature pairs of drug molecules to better learn interaction information between drug pairs and enhance model interpretability. (3) Prediction Mod-ule: This module concatenates drug pair representations with cell line features. The fused features are then fed into a MLP to predict the synergistic e ff ects of the drug combination on a specific cell line. 
+
+3.2. Molecular Feature Learning Based on Residual GIN and Sequence LSTM 
+
+Accurate prediction of drug synergistic e ff ects critically de-pends on learning highly discriminative, multiscale feature rep-resentations from molecular structures of candidate drugs. To overcome the limitations of traditional GCNs in distinguishing complex molecular topologies and to e ff ectively capture infor-mation at multiple levels, ranging from details at the atomic level to patterns at the molecular level, this work designs a molecular feature learning module that integrates ResGIN with sequence LSTM networks. 
+
+3.2.1. Molecular Graph Construction and Feature Initializa-tion 
+
+Given the SMILES representation of a drug compound, we employ the open-source cheminformatics toolkit RDKit [39] to construct its corresponding molecular graph G = (V, E), where 
+
+V denotes the set of atomic nodes and E denotes the set of co-valent bonds. For each node vi ∈ V, we extract its fundamen-tal feature vector xi ∈ Rda using the feature encoding function 
+
+ϕatom :
+
+xi = ϕatom (vi), (1) 3Drug A       
+
+> Drug B
+> Cell Line
+> Normalization
+> 954 2048 512 78
+> Dim Reduction
+> 954 2048 512 256
+> Expand
+
++ Cov1 ReLU Cov2   
+
+> ⊕
+> ···
+> ···  ··· LSTM
+> 𝐀 𝐀
+> 𝐀 𝐀
+
++ Cov1 ReLU Cov2   
+
+> ⊕
+> ···
+> ···  ··· LSTM
+> 𝐀 𝐀
+> 𝐀 𝐀
+> MHA-Pool
+> MHA-Pool
+> 𝐀 𝐀
+> 𝐀𫠀𝐀
+> 𝐀 𝐀
+> 𝐀𫠀𝐀
+> 𝐀 𝐀
+> 𝐀𝐀𝐀
+> 𝐀 𝐀
+> 𝐀𝐀𝐀
+> 𝐀 𝐀
+
++
+
+𝐀 MLP  
+
+> Sigmoid
+
+𝐀     
+
+> (a) Drug A Processing Flow
+> (b) Drug B Processing Flow (d) Graph Attention Pooling
+> (c) Cell Line Processing Flow
+> (e) Prediction
+> 𝐀 Synergy Probability
+> MHA-Pool Multi-head Attention Pooling
+> 𝐀 𝐀
+> 𝐀 𝐀
+> 𝐀 𝐀
+> ···  ···
+> 𝐀 𝐀
+> Feature Fusion
+> MLP
+> 𝐀 𝐀
+> GIN Layer Internal Structure (Cov1 or Cov2)
+
+Σ   
+
+> ···Cell Line Features
+
+Fig. 1. The overall architecture of ResGIN-Att. Given two drugs and their corresponding cell line types, we first convert the SMILES representations of both drugs into molecular graphs featuring initial node attributes and graph structures. Concurrently, cell line attributes obtained from CCLE are added to each node attribute of the drug molecular graph. Next, ResGIN extracts multimodal topological features from the drug molecules. Subsequently, LSTM-based adaptive fusion integrates structural information from local to global levels. A cross-attention module is then designed to explicitly model interactions between drug pairs and identify key chemical substructures. Finally, the prediction module integrates the representations of both drugs with cell line features to forecast synergistic drug combinations. 
+
+where Rda denotes a real vector space of dimension da. This vector xi is the feature representation of node vi, comprising da
+
+real-valued features describing the node’s attributes. For each cancer cell line, we extract its gene expression pro-file xcl ∈ Rdg from the Cancer Cell Line Encyclopedia (CCLE), where Rdg denotes a real vector space of dimension dg, and dg
+
+represents the feature dimension of the gene expression pro-file. To integrate these profiles with atomic-level features, we employ a dedicated MLP for dimensionality reduction and non-linear transformation to adapt it to the atomic feature space: 
+
+c = MLP c(rcl ), c ∈ Rda . (2) Through additive operations, we fuse the transformed cell line feature vectors with the basis feature vectors of each atom, ultimately forming the initial representation of the final node 
+
+h0 
+
+> i
+
+:
+
+h0 
+
+> i
+
+= xi + c. (3) 
+
+3.2.2. Residual Graph Isomorphism Network 
+
+In molecular graph representation learning, the core of GNNs lies in updating node representations through neighborhood ag-gregation. However, many common GNN variants are bound in their representational power, which limits their ability to distin-guish between certain distinct topological structures. In other words, they are not robust to the “graph isomorphism test". To address this, we adopt the Graph Isomorphism Network. Its de-sign strictly follows the Weisfeiler-Lehman graph isomorphism test framework. This proves that it is one of the most represen-tational architectures within the GNN paradigm. The standard GIN layer updates node representations via a learnable, injective aggregation function, thereby guaranteeing strong structural discriminability. For a node v, its embedding vector h(k) 
+
+> v
+
+in layer k is defined as: 
+
+h(k) 
+
+> v
+
+= MLP (k)
+
+(1 + ϵ(k)) · h(k−1)  
+
+> v
+
++
+
+X
+
+> u∈N(v)
+
+h(k−1) 
+
+> u
+
+ , (4) 
+
+where N(v) denotes the set of direct neighbors of node v, ϵ(k)
+
+is a learnable scalar parameter used to adjust the importance of a node’s own features in the aggregation process. u is a neigh-bor node of N(v). MLP (k) is a multilayer perceptron applied to each node, endowing the model with powerful nonlinear feature transformation capabilities. Despite the strong representational capacity of GINs, deep GNNs remain susceptible to over-smoothing and vanishing gra-dient phenomena. As the number of network layers increases, the receptive fields of nodes continuously expand, causing fea-tures from di ff erent nodes to converge toward the same value and thereby losing their unique structural information. To ad-dress this issue and build deeper, more powerful molecular rep-resentation networks, we introduce residual connections into GNNs, constructing ResGIN modules. First, compute the raw output ˜ h(k) 
+
+> v
+
+of the GIN layer: 
+
+˜h(k) 
+
+> v
+
+= MLP (k)
+
+(1 + ϵ(k)) · h(k−1)  
+
+> v
+
++
+
+X
+
+> u∈N (v)
+
+h(k−1) 
+
+> u
+
+ . (5) 
+
+Subsequently, through a skip connection, the input h(k−1)  
+
+> v
+
+from the previous layer is added to the original output of this layer to obtain the final output of this layer h(k) 
+
+> v
+
+:
+
+h(k) 
+
+> v
+
+= h(k−1)  
+
+> v
+
++ ˜h(k) 
+
+> v
+
+. (6) After stacking k layers of the ResGIN architecture, we obtain the final node representation h(k) 
+
+> i
+
+. To facilitate e ffi cient tensor computations in subsequent attention pooling modules, we or-ganize the embeddings of all nodes into a node feature matrix 4as the final output of this module. Specifically, we stack the fea-ture vectors of all nodes row-wise to form the graph-level node feature matrix H ∈ RN×dh for this drug: 
+
+H = [h(k)1 , h(k)2 , ..., h(k) 
+
+> N
+
+]T , (7) where N denotes the total number of nodes in the molecular graph, and dh represents the embedding dimension of the node. Each row H[i, :] of matrix H corresponds to the transposed eigenvector ( h(k) 
+
+> i
+
+)T of node i.
+
+3.2.3. Multimodal Feature Fusion Based on LSTM 
+
+The ResGIN module outputs node representations that en-code multi-level structural information. Among these, shal-low features H(1) encode the local chemical environment, while deep features H(k) integrate more global molecular topological information. To adaptively fuse these multi-resolution features that span from local to global scales, inspired by MR-GNN [40], we introduce a LSTM network to model this sequence of feature. For each node vi in the graph, we treat its features [h(1)  
+
+> i
+
+, h(2)  
+
+> i
+
+, ..., h(K) 
+
+> i
+
+] across all GIN levels as a time series of length 
+
+K. The LSTM processes this sequence sequentially, with the update process as follows: 
+
+s(l) 
+
+> i
+
+= LSTM( s(l−1)  
+
+> i
+
+, h(l) 
+
+> i
+
+), l = 1, 2, . . . , K, (8) where h(l) 
+
+> i
+
+is the output of node vi at layer l of ResGIN, serving as the input to the LSTM at time step l. s(l) 
+
+> i
+
+is the hidden state of the LSTM after processing the features at layer l, which inte-grates feature information from layers 1 to l. The initial hidden state s(0)  
+
+> i
+
+of the LSTM is initialized as the zero vector. Upon completion of sequence processing, the final hidden state s(K) 
+
+> i
+
+serves as an enhanced node representation for vi, en-coding multi-resolution structural information. Performing this operation on all nodes produces the LSTM-fused node feature matrix S = [s(K)1 , s(K)2 , ..., s(K) 
+
+> N
+
+]T ∈ RN×ds throughout the graph, where ds denotes the dimension of the LSTM hidden layer and 
+
+N represents the total number of nodes in the molecular graph. 
+
+3.3. Cross-Attention Mechanism 
+
+The aforementioned module yields rich intrinsic character-izations of drug molecules. However, accurate prediction of drug synergistic e ff ects depends not only on the intrinsic prop-erties of individual drugs but also on the pairwise molecular interactions between them. To capture this complex pairwise interaction information while simultaneously identifying key chemical substructures that significantly contribute to synergis-tic e ff ects, interpretability, we designed an interaction informa-tion learning module based on an attention mechanism. At its core lies a cross-attention pooling mechanism that generates a set of importance weights reflecting the mutual influence be-tween drug pairs (Drug A, Drug B). This process yields an en-hanced graph-level representation. We first process the features from both paths separately. For the ResGIN path, we use the characteristic matrices of the nodes H(K) 
+
+> x
+
+and H(K) 
+
+> y
+
+of the final layer. For the LSTM path, we use the fused node feature ma-trices S x and S y. Next, we will illustrate the process using the features Hx and Hy of the ResGIN path as an example. The specific calculation steps are as follows: First, compute the pairwise interaction attention score matri-ces Ax and Ay for the drug pair: 
+
+Ax = tanh( HxWq · (HyWk)T ), (9) 
+
+Ay = tanh( HyWq · (HxWk)T ), (10) where Hx ∈ RNx ×dh and Hy ∈ RNy×dh represent the characteristic matrices of the nodes for drug A and drug B. Wq, Wk ∈ Rdh×da
+
+are trainable weight matrices used to project node features onto a common da dimensional attention space. Ax ∈ RNx ×Ny , whose elements ( Ax)i, j quantify the interaction strength between the 
+
+ith substructure in drug A and the jth substructure in drug B, Ay
+
+follows similarly. Next, the attention scores are aggregated along the dimension corresponding to the partner drug and subsequently normalized to yield importance weights for each drug node: 
+
+ax = softmax 
+
+
+
+> Ny
+
+X
+
+> j=1
+
+(Ax)i, j
+
+ , (11) 
+
+ay = softmax 
+
+
+
+> Nx
+
+X
+
+> i=1
+
+(Ay) j,i
+
+ , (12) where ax ∈ RN x and ay ∈ RNy represent the node importance vectors for drug A and drug B, respectively. Each element within these vectors indicates the relative importance of the cor-responding node within the drug combination. Finally, the weights of importance computed are applied to derive the graph-level representations enhanced by interaction 
+
+gx and gy:
+
+gx =
+
+> Nx
+
+X
+
+> i=1
+
+a(i) 
+
+> x
+
+· (HxWv)(i), (13) 
+
+gy =
+
+> Ny
+
+X
+
+> i=1
+
+a(i) 
+
+> y
+
+· (HyWv)(i), (14) where Wv represents the shared weight. By performing the exact same processing steps on the S x and 
+
+S y features of the LSTM path, another pair of layer-level repre-sentations gLS T M x and gLS T M y can be obtained: 
+
+gLSTM  
+
+> x
+
+, gLSTM  
+
+> y
+
+= AP( S x, S y), (15) where AP denotes the aforementioned attention-based pooling operation. The final output of this module is the concatenation of four graph-level representations: two derived from the graph path-way and two from the sequence (LSTM) pathway. Assuming each graph-level representation vector g ∈ Rd, the concatenated final vector g f is as follows: 
+
+g f = gGIN  
+
+> x
+
+∥ gGIN  
+
+> y
+
+∥ gLSTM  
+
+> x
+
+∥ gLSTM  
+
+> y
+
+∈ R4×d, (16) where the symbol ∥ denotes the concatenation operation of vec-tors along the dimension of the feature. 53.4. Prediction Module 
+
+The prediction module receives the fused representation g f
+
+from the attention interaction module, concatenates it with the projected cell-line features, and constructs the final feature vec-tor z:
+
+z = g f ∥ MLP c(rcl ). (17) Subsequently, z is input into a multi-layer perceptron to ob-tain the final prediction output p:
+
+p = σ MLP pred (z) , (18) for binary classification tasks, σ represents the sigmoid func-tion, where the output p ∈ (0 , 1) indicates the predicted fre-quency of synergistic e ff ects in drug combinations. For binary classification tasks, the sigmoid function is em-ployed instead of the softmax function to improve computa-tional e ffi ciency. Sigmoid directly outputs the probability of the positive class p ∈ (0 , 1), whereas Softmax requires comput-ing probabilities for both classes and normalizing them to sum to 1. Furthermore, it is inherently compatible with the binary cross-entropy loss function, resulting in stable gradient descent and facilitating model optimization. This makes it the standard approach for such tasks. Our model training optimizes all parameters by minimizing the cross-entropy loss function L, defined as: 
+
+L = − 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+yi log ( pi) + (1 − yi) log (1 − pi) , (19) where N denotes the total number of training samples, yi ∈
+
+(0 , 1) represents the true label of the sample i, and pi is the probability predicted by the model that sample i is collabora-tive. 
+
+4. Experiments and Results 
+
+To comprehensively evaluate the e ff ectiveness, generaliza-tion capability, and robustness of our proposed residual GIN-based model with integrated attention mechanisms, we conduct systematic experiments. These experiments aim to address the following key questions: (1) Does the model maintain excellent performance across diverse datasets of varying scales and ori-gins? (2) How does the model perform in predicting synergis-tic e ff ects of anticancer drugs compared to existing mainstream methods? (3) How do the key components within the model individually contribute to its overall performance? To this end, we perform comprehensive evaluations on five widely adopted public benchmark datasets, comparing our method against a diverse set of baseline approaches. We also performed ablation studies to validate the rationality of our model architecture, analyzed parameter sensitivity to assess model robustness, and further investigated the over-smoothing phenomenon through layer-wise sensitivity analysis. This sec-tion details the experimental setup, analyzes the comparative results, and discusses the key research findings. 
+
+> Table 1: Dataset Statistics
+
+Dataset Drugs Cell Lines Samples O’Neil 38 39 23,062 ALMANAC 118 118 296,503 Oncology Screen 21 29 4,176 DrugCombDB 600 68 60,932 DrugComb 354 170 330,917 
+
+4.1. Experimental Setup 4.1.1. Datasets 
+
+We evaluate our method on five publicly available benchmark datasets. Table 1 shows the statistics of these datasets. 
+
+4.1.2. Baseline Methods 
+
+To comprehensively evaluate the performance of our model, we compare it against a representative set of state-of-the-art methods spanning diverse technical paradigms, including graph neural networks, multimodal learning, and conventional ma-chine learning approaches: AttenSyn [3] employs a hierarchical attention mechanism to learn deep interactions between drugs and gene expression pro-files of cell lines. Its core lies in aggregating cell line features through attention that is aware of the drugs and aggregating drug features through attention that is aware of the cell lines, thereby e ff ectively capturing key signals within multimodal in-formation. DTSyn [21] delves into the mechanisms of drug synergism within specific cell line contexts. It constructs a heterogeneous network comprising relationships between drugs and targets and those between diseases and genes, learns representations in a low dimensional space of drugs and cell lines through network embedding techniques, and ultimately employs deep neural net-works to predict synergistic probabilities. Its strength lies in integrating the prior knowledge of the rich biological network. MR-GNN [41] employs a multi-relational GNN to model drug chemical structures. MR-GNN treats molecular graphs as multi-relational graphs, leveraging graph convolutional net-works to learn information conveyed by di ff erent chemical bond types between atoms. This approach extracts more ex-pressive drug representations that are then combined with cell line features for synergistic prediction. DeepSynergy [20] is one of the earliest and classic ap-proaches to applying deep learning in this field. DeepSyn-ergy employs a simple perceptron with multiple layers, directly concatenating drug chemical descriptors with cell line gene ex-pression profiles as input. Despite its relatively straightforward model architecture, it laid the foundation for drug synergy pre-diction using deep learning and remains a crucial comparative benchmark to this day. 
+
+4.1.3. Evaluation Metrics 
+
+To comprehensively evaluate model performance, we adopt a multidimensional evaluation metric suite. All metrics are de-fined based on four core statistics in the binary classification confusion matrix: True Positive (TP) represents the number of 6positive cases correctly predicted by the model. True Nega-tive (TN) represents the number of negative cases correctly pre-dicted by the model. False Positive (FP) represents the number of cases that are actually negative but are incorrectly classified as positive by the model. False Negative (FN) represents the number of cases that are actually positive but incorrectly clas-sified as negative by the model. Based on the above statisti-cal quantities, Accuracy (ACC) measures the overall classifi-cation precision. Precision (PREC) and Recall (RECALL) re-spectively, assess the accuracy of predicting positive instances and the coverage of true positives. True Positive Rate (TPR) and True Negative Rate (TNR) reflect the model’s ability to identify positive and negative instances, respectively. Further-more, to mitigate evaluation bias caused by class imbalance, we specifically employ balanced accuracy (BACC) as a key metric to assess model equilibrium performance, which is defined as the arithmetic mean of TPR and TNR. The calculation formulas for each metric are as follows: 
+
+
+
+ACC = TP + TN TP + TN + FP + FN ,
+
+PREC = TP TP + FP ,
+
+RECALL = TP TP + FN ,
+
+TPR = TP TP + FN ,
+
+TNR = TN TN + FN ,
+
+BACC = TPR + TNR 
+
+2 .
+
+(20) 
+
+4.1.4. Implementation Details 
+
+Data Partitioning Strategy: To comprehensively evaluate the model’s generalization capability and mitigate bias intro-duced by random data partitioning, we employ five-fold cross-validation in all experiments. Specifically, the entire dataset is randomly divided into five mutually exclusive subsets. In each experimental iteration, one subset is designated as the test set, while the remaining four serve as the training set. The final performance metric is calculated as the average and standard deviation of the five test results. This strategy ensures that all samples participate in testing exactly once, yielding a more ro-bust estimate of model performance. 
+
+Hyperparameter Tuning: The model hyperparameters were determined via a systematic procedure combining prelim-inary empirical analysis and grid search. Table 2 shows the the hyperparameter settings. 
+
+Training Environment: All experiments were conducted in a standardized hardware and software environment to ensure result reproducibility. This experiment was conducted on a computing platform configured with an Intel (R) Core (TM) i5-1240P processor, an NVIDIA RTX 3060 graphics card (12GB VRAM), and 70GB of memory. The system operated in a CUDA 11.2 environment, with a 20GB system disk and a 50GB data disk. The software environment utilized Python 3.9 and the PyTorch 2.2.0 framework.                         
+
+> Table 2: Hyperparameter Settings.
+> Model Architecture Parameters Parameters Value Instruction molecule_channels 78 Molecular feature dimension hidden_channels 128 Hidden layer dimension middle_channels 64 Intermediate layer dimension layer_count 2Number of GIN layer out_channels 2Number of output classes num_heads 4Number of attention heads train_batch_size 128 Training batch size test_batch_size 128 Testing batch size lr 0.0005 Learning rate num_epochs 200 Number of training epochs n_folds 5Number of cross-validation folds
+
+4.2. Main Results 4.2.1. Evaluation of Generalization Performance Across Mul-tiple Datasets 
+
+To validate the generalization capability and robustness of our proposed model, we conduct a systematic evaluation across five widely adopted public benchmark datasets. Our model achieves the best performance on the widely adopted O’Neil benchmark dataset, attaining top-rank results across all six evaluation metrics. In particular, it achieved an AUC of 0.921 for the comprehensive discriminative capacity metric, while also achieving an ACC and BACC of 0.840. This fully demonstrates the e ff ectiveness of the model architecture in capturing key features of drug synergistic interactions. The model maintained high performance across the remaining four datasets, with AUC values consistently ranging between 0.873 and 0.912. This outcome indicates that the feature representa-tions and prediction mechanisms learned by our model are not overfitted to a single data distribution. Instead, they demon-strate robust cross data set generalization capabilities, adapt-ing e ff ectively to variations arising from di ff erent experimental conditions and data sources. Across all benchmark datasets, our model demonstrates bal-anced performance in PREC and RECALL (two metrics crit-ical to model utility). Taking the O’Neil dataset as an exam-ple, both PREC and Recall reach 0.829. This indicates that the model identifies as many genuine synergistic drug combi-nations as possible while ensuring high confidence in the pre-dicted synergistic pairs. This equilibrium is vital for guiding real biomedical experiments and preventing resource wastage. The standard deviation of all reported results remains low, re-flecting minimal performance fluctuation across di ff erent data partitions. This demonstrates the high robustness and repro-ducibility of the model. In summary, the experiments presented in this section pro-vide systematic empirical evidence of the strengths of our pro-posed model. It not only achieves competitive performance on specific datasets but also o ff ers a reliable solution with promis-ing generalization capabilities, contributing to the computa-tional prediction of drug synergistic e ff ects. 74.2.2. In-Depth Analysis on a Primary Dataset 
+
+To rigorously assess the performance advantages of our model over existing state-of-the-art methods, we conduct an in-depth comparative analysis. The evaluation was performed on five authoritative benchmark datasets. It included comparisons with multiple representative approaches, such as AttenSyn, DT-Syn, MR-GNN, and DeepSynergy. The comparison results are detailed in Tables 3 to 7. Our model achieves top-rank performance across all six eval-uation metrics on each of the five benchmark datasets. This fully demonstrates the compehensive superiority of our pro-posed architecture. Our model demonstrates consistently strong performance across a diverse set of benchmark datasets. For example, its AUC scores across five datasets are as follows: 0.921 (O’Neil), 0.873 (ALMANAC), 0.906 (Oncology-Screen), 0.912 (Drug-CombDB) and 0.895 (DrugComb). The small fluctuation range and consistently high values confirm the model’s adaptability to diverse data sources and distributions, demonstrating strong generalization capabilities. Additionally, our model generally exhibits low standard deviations in metrics. For instance, on the DrugCombDB dataset, the standard deviation of our model’s AUC is 0.004, lower than AttenSyn’s 0.005. This demonstrates superior robustness and reproducibility in our model’s predic-tions. In terms of PREC and RECALL, a pair of metrics that typ-ically require trade-o ff s, this model demonstrates superior bal-ance. Taking the Oncology-Screen dataset as an example, our model achieves PREC and Recall of 0.821 and 0.820, respec-tively, while the next-best performer, AttenSyn, achieves 0.806 and 0.801. This indicates that our model ensures the relia-bility of predicted synergistic combinations (high precision) while minimizing the omission of genuine synergistic combi-nations (high recall), thereby o ff ering greater guidance value for biomedical experiments. A comprehensive comparison of F1 scores further corroborates this, with our model achieving the highest F1 score across all datasets. Compared to graph-based learning methods, including MR-GNN and DTSyn, our model demonstrates higher accuracy in representing molecular structures and drug-drug interactions, a advantage confirmed by improvements in several key evalua-tion metrics, such as AUC, ACC, and F1 score. Compared to the AttenSyn model, which similarly integrates attention mechanisms with sequence modeling, this work innovatively introduces a residual connection mechanism based on the GIN architecture. This design e ff ectively mitigates the excessive smoothing issue commonly found in deep graph neural net-works and enhances the ability to preserve critical local fea-tures of nodes, thereby achieving more stable and consistent performance across datasets of varying scales and distributions. Overall, this study further confirms that deep learning, par-ticularly methods based on graph neural networks, possesses strong modeling capabilities and application potential in drug synergy prediction tasks, and provides a more reliable compu-tational tool for drug combination screening aimed at precision medicine. The comparative analysis presented in this section provides empirical support for the e ff ectiveness of our proposed model. It demonstrates competitive performance not only on individ-ual datasets but also across multiple benchmark datasets with diverse characteristics. The model achieves favorable results in terms of general discriminative capability (AUC), classifica-tion accuracy (ACC, BACC), and precision-recall balance (F1). These findings suggest that the proposed approach o ff ers a reli-able option for predicting drug synergistic e ff ects. 
+
+4.3. Ablation Study 
+
+To validate the contribution of each key component in the ResGIN-Att architecture, we conduct an ablation study across five benchmark datasets. These experiments investigate the contributions of the residual connection and the GIN architec-ture to the model’s performance. We designed two variants of the ResGIN-Att as follows: 
+
+• w/o GIN: ResGIN-Att replaces the GIN with a normal GCN. 
+
+• w/o residual connection: ResGIN-Att removes the resid-ual connection module. The results of the ablation experiments are shown in Fig.2.After replacing the original GNN architecture with GIN, the model performance showed a steady upward trend. GIN’s design is based on the Weisfeiler-Lehman graph isomorphism test. This endows it with enhanced structural discriminative capabilities. It can make finer distinctions between di ff erent molecular topological structures, thereby learning more dis-criminative molecular representations. Experimental data show that adding residual connections to the AttenSyn model signifi-cantly improves all metrics. More importantly, Recall increases from 0.818 to 0.828, indicating that residual connections sig-nificantly enhanced the model’s ability to identify positive ex-amples. This result validates the critical role of residual con-nections in mitigating gradient vanishing and preserving fine-grained features in shallow layers within deep graph neural networks. When both GIN and residual connection were in-troduced simultaneously, the model achieved a peak AUC of 0.921 on the core metric while maintaining a favorable bal-ance between PREC and Recall. Although the ablation experi-ments validated the e ff ectiveness of key components, the analy-sis results also revealed several limitations warranting attention: Data analysis indicates that di ff erent components yield varying degrees of improvement across various metrics. Residual con-nections showed the most significant improvement in Recall, but their impact on PREC was relatively limited, whereas the GIN architecture performed better on the PREC metric. This ablation study primarily focuses on optimizing the feature ex-traction component, without conducting an in-depth analysis of the core attention interaction module. Future research should explore more sophisticated attention designs, such as multi-head attention and hierarchical attention, to further enhance model performance. 8Table 3: Performance Comparison of Our Model and Existing Models on O’Neil Dataset. 
+
+Models AUC ACC F1 PREC Recall BACC 
+
+AttenSyn 0.915 ± 0.007 0.836 ± 0.008 0.823 ± 0.011 0.829 ± 0.007 0.818 ± 0.019 0.835 ± 0.008 DTSyn 0.885 ± 0.008 0.806 ± 0.007 0.785 ± 0.006 0.834 ± 0.015 0.795 ± 0.015 0.806 ± 0.006 MR-GNN 0.894 ± 0.010 0.813 ± 0.009 0.806 ± 0.009 0.810 ± 0.020 0.807 ± 0.013 0.815 ± 0.009 DeepSynergy 0.715 ± 0.006 0.722 ± 0.006 0.703 ± 0.008 0.731 ± 0.022 0.702 ± 0.011 0.721 ± 0.005 
+
+ResGIN-Att 0.921 ± 0.005 0.840 ± 0.009 0.829 ± 0.009 0.829 ± 0.020 0.829 ± 0.016 0.840 ± 0.008 
+
+> Table 4: Performance Comparison of Our Model and Existing Models on ALMANAC Dataset.
+
+Models AUC ACC F1 PREC Recall BACC 
+
+AttenSyn 0.853 ± 0.008 0.794 ± 0.006 0.787 ± 0.011 0.784 ± 0.009 0.773 ± 0.015 0.791 ± 0.009 DTSyn 0.811 ± 0.006 0.765 ± 0.007 0.759 ± 0.005 0.742 ± 0.013 0.756 ± 0.013 0.733 ± 0.005 MR-GNN 0.834 ± 0.009 0.783 ± 0.008 0.771 ± 0.007 0.767 ± 0.012 0.733 ± 0.011 0.767 ± 0.010 DeepSynergy 0.711 ± 0.005 0.705 ± 0.005 0.701 ± 0.009 0.722 ± 0.018 0.700 ± 0.009 0.709 ± 0.007 
+
+ResGIN-Att 0.873 ± 0.006 0.801 ± 0.007 0.795 ± 0.013 0.803 ± 0.015 0.784 ± 0.019 0.794 ± 0.010 
+
+> Table 5: Performance Comparison of Our Model and Existing Models on Oncology Screen Dataset.
+
+Models AUC ACC F1 PREC Recall BACC 
+
+AttenSyn 0.882 ± 0.006 0.801 ± 0.006 0.799 ± 0.009 0.806 ± 0.006 0.801 ± 0.010 0.809 ± 0.007 DTSyn 0.863 ± 0.007 0.775 ± 0.010 0.765 ± 0.007 0.781 ± 0.012 0.778 ± 0.010 0.781 ± 0.007 MR-GNN 0.871 ± 0.007 0.786 ± 0.006 0.783 ± 0.010 0.793 ± 0.012 0.785 ± 0.009 0.809 ± 0.009 DeepSynergy 0.709 ± 0.005 0.715 ± 0.007 0.698 ± 0.007 0.720 ± 0.018 0.691 ± 0.011 0.703 ± 0.008 
+
+ResGIN-Att 0.906 ± 0.009 0.827 ± 0.009 0.816 ± 0.007 0.821 ± 0.017 0.820 ± 0.016 0.834 ± 0.009 
+
+> Table 6: Performance Comparison of Our Model and Existing Models on DrugCombDB Dataset.
+
+Models AUC ACC F1 PREC Recall BACC 
+
+AttenSyn 0.895 ± 0.005 0.814 ± 0.008 0.803 ± 0.006 0.811 ± 0.005 0.809 ± 0.008 0.827 ± 0.008 DTSyn 0.862 ± 0.009 0.778 ± 0.009 0.760 ± 0.009 0.803 ± 0.014 0.780 ± 0.009 0.806 ± 0.008 MR-GNN 0.879 ± 0.010 0.795 ± 0.009 0.785 ± 0.009 0.805 ± 0.020 0.798 ± 0.013 0.815 ± 0.009 DeepSynergy 0.715 ± 0.006 0.722 ± 0.006 0.703 ± 0.008 0.731 ± 0.022 0.702 ± 0.011 0.721 ± 0.005 
+
+ResGIN-Att 0.912 ± 0.004 0.829 ± 0.013 0.818 ± 0.005 0.824 ± 0.015 0.820 ± 0.013 0.835 ± 0.005 
+
+> Table 7: Performance Comparison of Our Model and Existing Models on DrugComb Dataset.
+
+Models AUC ACC F1 PREC Recall BACC 
+
+AttenSyn 0.876 ± 0.009 0.806 ± 0.007 0.801 ± 0.007 0.803 ± 0.006 0.795 ± 0.010 0.801 ± 0.006 DTSyn 0.844 ± 0.008 0.765 ± 0.010 0.755 ± 0.008 0.787 ± 0.013 0.765 ± 0.013 0.782 ± 0.008 MR-GNN 0.856 ± 0.009 0.773 ± 0.007 0.785 ± 0.007 0.793 ± 0.017 0.776 ± 0.012 0.787 ± 0.009 DeepSynergy 0.720 ± 0.008 0.729 ± 0.009 0.710 ± 0.009 0.731 ± 0.022 0.710 ± 0.010 0.726 ± 0.007 
+
+ResGIN-Att 0.895 ± 0.007 0.812 ± 0.013 0.809 ± 0.010 0.815 ± 0.017 0.804 ± 0.016 0.815 ± 0.007 
+
+4.4. Training time and model parameter 
+
+In drug combination prediction, the execution time of the model is equally critical to predictive accuracy. Jointly, these two factors determine the model’s practical utility. Fig.3 illus-trates the relationship between the average training time per epoch and the accuracy of ResGIN-Att and several baseline methods. The results show that ResGIN-Att achieves high accuracy while maintaining a reasonable training time, significantly out-performing more complex models such as DTSyn, which re-quires nearly 35 seconds of training. In contrast, models such as DeepSynergy, while having shorter training times, exhibit significantly lower accuracy, highlighting the inherent trade-off between accuracy and computational e ffi ciency in these ap-proaches. By optimizing the balance between training time and prediction accuracy, ResGIN-Att demonstrates both e ffi -ciency and practicality in large-scale DDI prediction tasks. Al-though methods such as AttenSyn achieve excellent prediction accuracy, their lengthy training times further demonstrate that ResGIN-Att can e ff ectively control computational costs while maintaining high predictive performance. Furthermore, as shown in the figure, ResGIN-Att has a rela-tively moderate parameter scale, whereas models such as Atten-Syn require a significantly larger number of parameters. This further demonstrates the practical scalability of ResGIN-Att, ensuring that it maintains computational e ffi ciency even when processing large scale datasets. The combination of architec-tural e ffi ciency (residual connections, optimized aggregation) and parameter economy allows ResGIN-Att to deliver high predictive performance without incurring prohibitive computa-90.900   
+
+> 0.905
+> 0.910
+> 0.915
+> 0.920
+> 0.925
+> Score
+> O'Neil
+> 0.850
+> 0.855
+> 0.860
+> 0.865
+> 0.870
+> 0.875
+> 0.880
+> ALMANAC
+> 0.875
+> 0.885
+> 0.895
+> 0.905
+> 0.915
+> Oncology Screen
+> 0.885
+> 0.890
+> 0.895
+> 0.900
+> 0.905
+> 0.910
+> 0.915
+> DrugCombDB
+> 0.855
+> 0.865
+> 0.875
+> 0.885
+> 0.895
+> 0.905
+> DrugComb
+> w/o GIN w/o Residual Connection ResGIN-Att
+
+Fig. 2. AUC comparison of ablation study on five datasets. 0.72 0.74 0.76 0.78 0.80 0.82 0.84 
+
+> Accuracy
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> 30
+> 35
+> Average Epoch Time (seconds)
+> ResGIN-Att
+> AttenSyn
+> DTSyn
+> MR-GNN
+> DeepSynergy
+> (A)
+> DeepSynergy
+> MR-GNN
+> DTSyn
+> AttenSyn
+> ResGIN-Att
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> 120
+> 140
+> (B)
+> Model Parameter Size
+
+Fig. 3. The each epoch times (A) and model parameter (B) between ResGIN-Att and baselines methods on O’Neil dataset. 
+
+tional costs. This makes it not only accurate but also practically deployable in real world pharmacological screening pipelines, where speed, precision, and scalability are equally essential. 
+
+4.5. Parameter Sensitivity Analysis 4.5.1. The performance of di ff erent learning rate and dropout rate 
+
+To evaluate how sensitive the ResGIN-Att is to variations in learning rate and dropout rate, we conducted a systematic hyperparameter sweep in which the learning rate was set to 0.00005, 0.0005, and 0.005, and the dropout rate was set to 0.1, 0.2, 0.3, and 0.4. Fig.4 shows the model performance plots measured using four evaluation metrics on the O’Neil and AL-MANAC datasets. For the O’Neil dataset, the model performed best when the learning rate was 0.0005 and the dropout rate was 0.2. Similarly, for the ALMANAC dataset, optimal perfor-mance was also observed when the learning rate was 0.0005 and the dropout rate was 0.2. These results indicate that the model is highly sensitive to both the learning rate and the dropout rate, and optimal performance consistently occurs under these set-tings on both datasets. These findings suggest that although the O’Neil and ALMANAC datasets di ff er in graph density, they exhibit similar sensitivity to these parameters. 
+
+4.5.2. The impact of di ff erent network depths 
+
+To assess the sensitivity of the ResGIN-Att’s performance to the depth of the view encoder, we tested neural networks with [1, 2, 3, 4] layers, as shown in Fig.5, model performance peaks when the network depth is set to 2 layers. As the number of layers increases, performance gradually declines. Prelimi-nary analysis suggests that as network depth increases, node features undergo iterative aggregation with those of neighbor-ing nodes. Consequently, the representations of di ff erent nodes tend to converge, leading to the loss of individual features. This finding highlights the importance of selecting an optimal net-work depth, which involves balancing feature aggregation with the preservation of node-specific features to maximize model performance. 
+
+4.6. Over-smoothing Analysis 
+
+The preliminary experiment above revealed that increasing depth may lead to performance degradation, a phenomenon 10 0.005 0.0005 0.00005       
+
+> Learning Rate
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> Performance
+> (A)Learning Rate - O'Neil
+> AUC
+> ACC
+> F1
+> 0.005 0.0005 0.00005
+> Learning Rate
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> Performance
+> (B)Learning Rate - ALMANAC
+> AUC
+> ACC
+> F1
+> 0.1 0.2 0.3 0.4
+> Dropout Rate
+> 0.80
+> 0.82
+> 0.84
+> 0.86
+> 0.88
+> 0.90
+> 0.92
+> Performance
+> (C)Dropout Rate - O'Neil
+> AUC
+> ACC
+> F1
+> 0.1 0.2 0.3 0.4
+> Dropout Rate
+> 0.78
+> 0.80
+> 0.82
+> 0.84
+> 0.86
+> 0.88
+> Performance
+> (D)Dropout Rate - ALMANAC
+> AUC
+> ACC
+> F1
+
+Fig. 4. The performance of the di ff erent learning rate and dropout rate on the O’Neil and ALMANAC datasets. layer=1 layer=2 layer=3 layer=4    
+
+> Layers
+> 0.76
+> 0.78
+> 0.80
+> 0.82
+> 0.84
+> 0.86
+> ACC Value
+> O'Neil ACC
+> ALMANAC ACC
+> layer=1 layer=2 layer=3 layer=4
+> Layers
+> 0.84
+> 0.86
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> AUC Value
+> O'Neil AUC
+> ALMANAC AUC
+
+Fig. 5. Eff ect of the di ff erent network depths on O’Neil and ALMANAC dataset. Model performance initially improves as the network depth increases, but then declines. The model performs best when the network depth is 2. 
+
+closely related to the classic “over-smoothing" problem in GNNs. Over-smoothing is a well-documented limitation in GNNs that constrains e ff ective model depth. It arises dur-ing multi-layer message passing. As the number of layers increases, node representations progressively converge toward indistinguishable states. This erodes discriminative capacity. Consequently, performance degrades on downstream tasks such as classification and prediction. To validate the e ff ectiveness of the residual mechanism introduced in the proposed ResGIN-Att model for mitigating over-smoothing, we systematically designed “layer wise sensitivity" comparative experiments on two public drug interaction datasets: O’Neil and ALMANAC. The results are shown in Fig.6. The experiment compared the performance trajectories of ResGIN-Att against multiple mainstream baseline models (including AttenSyn, DTSyn, MR-GNN, DeepSynergy, etc.) by varying the network depth while keeping other hyperparameters consistent. The focus was on the patterns of accuracy (ACC) as depth increased. Experimental results on the O’Neil dataset show that all benchmark models exhibit characteristic overfitting behavior: classification accuracy declines consistently and substantially with increasing network depth. While ResGIN-Att also follows the general pattern of “slight performance degradation with in-creasing layers", its decline is markedly smaller than that of all benchmark models. More importantly, at each fixed layer count, ResGIN-Att maintained a comprehensive lead in accu-racy over all benchmark models. This result preliminarily indi-cates that ResGIN-Att not only achieves superior performance but also exhibits lower sensitivity to depth increases. To en-11 hance the universality and robustness of our conclusions, we replicated the aforementioned experiments on the ALMANAC dataset and observed identical patterns. ResGIN-Att again ex-hibited a smaller decline than the baseline model. The highly consistent experimental results across both datasets demon-strate ResGIN-Att’s superior resilience against over-smoothing issues. From the initial depth sensitivity analysis to the systematic, in-depth investigation of the over-smoothing problem, our ex-periments progress from observing the phenomenon to verify-ing the underlying mechanism. The results demonstrate that the ResGIN-Att model e ff ectively mitigates over-smoothing across three complementary dimensions: its emergence, severity, and functional impact. Experimental data clearly demonstrate that compared to existing benchmark models, ResGIN-Att exhibits significantly lower sensitivity to increases in network depth and maintains performance advantages at any tested depth. This empirically demonstrates that residual connections are a key design element for enhancing the robustness and performance of deep graph neural networks. Not only do they strengthen the model’s representational capabilities by preserving multi-level features, but they also provide an e ff ective and concise solution to the long-standing over-smoothing problem in graph neural networks by establishing shortcut connections. This lays a solid foundation for constructing deeper and more powerful graph neural network models. 0 5 10 15 20 25 30      
+
+> Layer
+> 0.650
+> 0.675
+> 0.700
+> 0.725
+> 0.750
+> 0.775
+> 0.800
+> 0.825
+> 0.850
+> Accuracy
+> O'Neil Dataset
+> ResGIN-Att
+> AttenSyn
+> DTSyn
+> MR-Gnn
+> DeepSynergy
+> 510 15 20 25 30
+> Layer
+> 0.650
+> 0.675
+> 0.700
+> 0.725
+> 0.750
+> 0.775
+> 0.800
+> Accuracy
+> ALMANAC Dataset
+> ResGIN-Att
+> AttenSyn
+> DTSyn
+> MR-Gnn
+> DeepSynergy
+> Fig. 6. Performance analysis with varying network depths.
+
+5. Conclusion 
+
+This paper has proposed ResGIN-Att, a novel graph neu-ral network for drug synergy prediction. The core innova-tion has lain in integrating residual connections with graph isomorphism networks to mitigate over-smoothing, combined with a cross-attention mechanism to explicitly model drug-drug interactions. Experiments on five public datasets have demonstrated that ResGIN-Att achieves competitive perfor-mance against state-of-the-art baselines, while ablation, sensi-tivity, and over-smoothing analyses have collectively validated the rationality and robustness of the model design. Future work will focus on incorporating richer biological knowledge, such as protein-protein interaction networks and pathway data, to further enhance predictive accuracy and interpretability, ulti-mately supporting more e ff ective combination therapy discov-ery. 
+
+6. Conflicts of interest 
+
+The authors have no conflicts of interest to declare. 
+
+7. Data availability 
+
+The code and data will be publicly accessible at https: //github.com/szerq/ResGIN-att once this manuscript is accepted. 
+
+8. Acknowledgments 
+
+The work was supported by the Key Technologies for Inte-grated Planning and Operational Optimization of Power Sys-tems in Industrial Parks to Promote the Integration of New En-ergy Sources (No. 2025YFA1017900) and National Under-graduate Training Program for Innovation and Entrepreneur-ship (No. 202510759062). 
+
+References 
+
+[1] Thomas D Giles, Michael A Weber, Jan Basile, Alan H Gradman, David B Bharucha, Wei Chen, and Manoj Pat-tathil. Effi cacy and safety of nebivolol and valsartan as fixed-dose combination in hypertension: a randomised, multicentre study. The Lancet , 383(9932):1889–1898, 2014. [2] Wei Zheng, Wei Sun, and Anton Simeonov. Drug repur-posing screens and synergistic drug-combinations for in-fectious diseases. British journal of pharmacology , 175 (2):181–191, 2018. [3] Tianshuo Wang, Ruheng Wang, and Leyi Wei. Atten-syn: an attention-based deep graph neural network for an-ticancer synergistic drug combination prediction. Jour-nal of Chemical Information and Modeling , 64(7):2854– 2862, 2023. [4] Jonathan B Fitzgerald, Birgit Schoeberl, Ulrik B Nielsen, and Peter K Sorger. Systems biology and combination therapy in the quest for clinical e ffi cacy. Nature chemical biology , 2(9):458–466, 2006. [5] Bissan Al-Lazikani, Udai Banerji, and Paul Workman. Combinatorial drug therapy for cancer in the post-genomic era. Nature biotechnology , 30(7):679–692, 2012. [6] Changjian Zhou, Zhongzheng Li, Jia Song, and Wensheng Xiang. Transvae-dta: Transformer and variational autoen-coder network for drug-target binding a ffi nity prediction. 
+
+Computer Methods and Programs in Biomedicine , 244: 108003, 2024. 12 [7] Gökcen Eraslan, Žiga Avsec, Julien Gagneur, and Fabian J Theis. Deep learning: new computational modelling tech-niques for genomics. Nature reviews genetics , 20(7):389– 403, 2019. [8] Curtis T Keith, Alexis A Borisy, and Brent R Stockwell. Multicomponent therapeutics for networked systems. Na-ture reviews Drug discovery , 4(1):71–78, 2005. [9] Jia Jia, Feng Zhu, Xiaohua Ma, Zhiwei W Cao, Yixue X Li, and Yu Zong Chen. Mechanisms of drug combina-tions: interaction and network perspectives. Nature re-views Drug discovery , 8(2):111–128, 2009. [10] Wenfeng Kang, Robert S DiPaola, and Alexei Vazquez. Inference of synergy /antagonism between anticancer drugs from the pooled analysis of clinical trials. BMC Medical Research Methodology , 13(1):77, 2013. [11] Piet H Van der Graaf and Neil Benson. Systems pharma-cology: bridging systems biology and pharmacokinetics-pharmacodynamics (pkpd) in drug discovery and develop-ment. Pharmaceutical research , 28(7):1460–1464, 2011. [12] Tiziana Pivetta, Francesco Isaia, Federica Trudu, Alessan-dra Pani, Matteo Manca, Daniela Perra, Filippo Amato, and Josef Havel. Development and validation of a general approach to predict and quantify the synergism of anti-cancer drugs using experimental design and artificial neu-ral networks. Talanta , 115:84–93, 2013. [13] Peng Li, Chao Huang, Yingxue Fu, Jinan Wang, Ziyin Wu, Jinlong Ru, Chunli Zheng, Zihu Guo, Xuetong Chen, Wei Zhou, et al. Large-scale exploration and analysis of drug combinations. Bioinformatics , 31(12):2007–2016, 2015. [14] Joseph D. Janizek, Safiye Celik, and Su-In Lee. Explain-able machine learning prediction of synergistic drug com-binations for precision cancer medicine. bioRxiv , May 2018. doi: 10.1101 /331769. Preprint. [15] Hui Liu, Wenhao Zhang, Lixia Nie, Xiancheng Ding, Judong Luo, and Ling Zou. Predicting e ff ective drug com-binations using gradient tree boosting based on features extracted from drug-protein heterogeneous network. BMC bioinformatics , 20(1):645, 2019. [16] Jian-Yu Shi, Jia-Xin Li, Kui-Tao Mao, Jiang-Bo Cao, Peng Lei, Hui-Meng Lu, and Siu-Ming Yiu. Predicting combinative drug pairs via multiple classifier system with positive samples only. Computer methods and programs in biomedicine , 168:1–10, 2019. [17] Heli Julkunen, Anna Cichonska, Prson Gautam, Sandor Szedmak, Jane Douat, Tapio Pahikkala, Tero Aittokallio, and Juho Rousu. Leveraging multi-way interactions for systematic prediction of pre-clinical drug combination ef-fects. Nature communications , 11(1):6136, 2020. [18] Yann LeCun, Yere Yere, and Geo ff rey Hinton. Deep learning. Nature , 521:436–44, 05 2015. doi: 10.1038 /
+
+nature14539. [19] Lu Zhang, Jianjun Tan, Dan Han, and Hao Zhu. From machine learning to deep learning: progress in machine intelligence for rational drug discovery. Drug discovery today , 22(11):1680–1685, 2017. [20] Kristina Preuer, Richard PI Lewis, Sepp Hochreiter, An-dreas Bender, Krishna C Bulusu, and Günter Klambauer. Deepsynergy: predicting anti-cancer drug synergy with deep learning. Bioinformatics , 34(9):1538–1546, 2018. [21] Peiran Jiang, Shujun Huang, Zhenyuan Fu, Zexuan Sun, Ted M Lakowski, and Pingzhao Hu. Deep graph embed-ding for prioritizing synergistic anticancer drug combina-tions. Computational and structural biotechnology jour-nal , 18:427–438, 2020. [22] Qiao Liu and Lei Xie. Transynergy: Mechanism-driven interpretable deep neural network for the synergistic pre-diction and pathway deconvolution of drug combinations. 
+
+PLoS computational biology , 17(2):e1008653, 2021. [23] Mengmeng Liu, Gopal Srivastava, J Ramanujam, and Michal Brylinski. Synergnet: A graph neural network model to predict anticancer drug synergy. Biomolecules ,14(3):253, 2024. [24] Halil Ibrahim Kuru, Oznur Tastan, and A Ercument Cicek. Matchmaker: a deep learning framework for drug synergy prediction. IEEE /ACM transactions on computational bi-ology and bioinformatics , 19(4):2334–2344, 2021. [25] Ran Su, YiXuan Huang, De-gan Zhang, Guobao Xiao, and Leyi Wei. Srdfm: Siamese response deep factor-ization machine to improve anti-cancer drug recommen-dation. Briefings in Bioinformatics , 23, 01 2022. doi: 10.1093 /bib /bbab534. [26] Tian-Hao Li, Chun-Chun Wang, Li Zhang, and Xing Chen. Snrmpacdc: computational model focused on siamese network and random matrix projection for anti-cancer synergistic drug combination prediction. Briefings in bioinformatics , 24(1), 2023. [27] Yang Xiong, Zheng Zhang, and Xian-gan Chen. Improv-ing deep learning model for drug synergy prediction via topological features. In 2024 IEEE International Confer-ence on Bioinformatics and Biomedicine (BIBM) , pages 1269–1274. IEEE, 2024. [28] Zhaohong Sun, Xudong Lu, Huilong Duan, and Haomin Li. Deep dynamic patient similarity analysis: Model de-velopment and validation in icu. Computer Methods and Programs in Biomedicine , 225:107033, 2022. 13 [29] Jiannan Yang, Zhongzhi Xu, William Ka Kei Wu, Qian Chu, and Qingpeng Zhang. Graphsynergy: a network-inspired deep learning model for anticancer drug combi-nation prediction. Journal of the American Medical Infor-matics Association , 28(11):2336–2345, 2021. [30] Jinxian Wang, Xuejun Liu, Siyuan Shen, Lei Deng, and Hui Liu. Deepdds: deep graph neural network with atten-tion mechanism to predict synergistic drug combinations. 
+
+Briefings in Bioinformatics , 23(1), 2022. [31] Jing Hu, Jie Gao, Xiaomin Fang, Zijing Liu, Fan Wang, Weili Huang, Hua Wu, and Guodong Zhao. Dtsyn: adual-transformer-based neural network to predict syner-gistic drug combinations. Briefings in Bioinformatics , 23 (5):bbac302, 2022. [32] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In 
+
+Proceedings of the IEEE conference on computer vision and pattern recognition , pages 770–778, 2016. [33] Can Bai, Xianjun Han, Siqi Li, and Yue Zhang. Predicting synergistic drug combinations via hierarchical molecular representation and cell line latent space fusion. Computer Methods and Programs in Biomedicine , page 108933, 2025. [34] Ge Zhang, Zhijie Gao, Chaokun Yan, Jianlin Wang, Wen-juan Liang, Junwei Luo, and Huimin Luo. Kgansynergy: knowledge graph attention network for drug synergy pre-diction. Briefings in Bioinformatics , 24(3):bbad167, 2023. [35] Keyulu Xu, Weihua Hu, Jure Leskovec, and Stefanie Jegelka. How powerful are graph neural networks? In 
+
+International Conference on Learning Representations ,2019. [36] Ming Chen, Zhewei Wei, Zengfeng Huang, Bolin Ding, and Yaliang Li. Simple and deep graph convolutional net-works. In International conference on machine learning ,pages 1725–1735. PMLR, 2020. [37] Jin Li, Qirong Zhang, Wenxi Liu, Antoni B Chan, and Yang-Geng Fu. Another perspective of over-smoothing: Alleviating semantic over-smoothing in deep gnns. IEEE Transactions on Neural Networks and Learning Systems ,36(4):6897–6910, 2024. [38] Keyulu Xu, Chengtao Li, Yonglong Tian, Tomohiro Sonobe, Ken-ichi Kawarabayashi, and Stefanie Jegelka. Representation learning on graphs with jumping knowl-edge networks. In International conference on machine learning , pages 5453–5462. pmlr, 2018. [39] Greg Landrum et al. Rdkit: A software suite for chemin-formatics, computational chemistry, and predictive mod-eling. Greg Landrum , 8(31.10):5281, 2013. [40] Je ff Heaton. Ian goodfellow, yoshua bengio, and aaron courville: Deep learning. Genetic Programming and Evolvable Machines , 19(1–2):305–307, June 2018. ISSN 1389-2576. doi: 10.1007 /s10710-017-9314-z. [41] Nuo Xu, Pinghui Wang, Long Chen, Jing Tao, and Jun-zhou Zhao. Mr-gnn: Multi-resolution and dual graph neu-ral network for predicting structured entity interactions. In Proceedings of the Twenty-Eighth International Joint Conference on Artificial Intelligence, IJCAI-19 , pages 3968–3974. International Joint Conferences on Artificial Intelligence Organization, 7 2019. doi: 10.24963 /ijcai. 2019 /551. 14

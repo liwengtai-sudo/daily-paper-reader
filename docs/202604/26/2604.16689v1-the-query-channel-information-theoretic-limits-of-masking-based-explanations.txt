@@ -1,0 +1,1384 @@
+Title: The Query Channel: Information-Theoretic Limits of Masking-Based Explanations
+
+URL Source: https://arxiv.org/pdf/2604.16689v1
+
+Published Time: Tue, 21 Apr 2026 00:18:36 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+> 1
+
+# The Query Channel: Information-Theoretic Limits of Masking-Based Explanations 
+
+Erciyes Karakaya*, Ozgur Ercetin †
+
+*Department of Electrical and Computer Engineering, University of Maryland, College Park, USA 
+
+> †
+
+Faculty of Engineering and Natural Sciences, Sabanci University, Turkiye 
+
+Abstract —Masking-based post-hoc explanation methods, such as KernelSHAP and LIME, estimate local feature importance by querying a black-box model under randomized perturbations. This paper formulates this procedure as communication over a 
+
+query channel , where the latent explanation acts as a message and each masked evaluation is a channel use. Within this framework, the complexity of the explanation is captured by the entropy of the hypothesis class, while the query interface supplies information at a rate determined by an identification capacity per query. We derive a strong converse showing that, if the explanation rate exceeds this capacity, the probability of exact recovery necessarily converges to one in error for any sequence of explainers and decoders. We also prove an achievability result establishing that a sparse maximum-likelihood decoder attains reliable recovery when the rate lies below capacity. A Monte Carlo estimator of mutual information yields a nonasymptotic query benchmark that we use to compare optimal decoding with Lasso- and OLS-based procedures that mirror LIME and KernelSHAP. Experiments reveal a range of query budgets where information theory permits reliable explanations but standard convex surrogates still fail. Finally, we interpret super-pixel resolution and tokenization for neural language models as a source-coding choice that sets the entropy of the explanation and show how Gaussian noise and nonlinear curvature degrade the query channel, induce waterfall and error-floor behavior, and render high-resolution explanations unattainable. 
+
+I. I NTRODUCTION 
+
+Masking-based post-hoc explanation methods, such as KernelSHAP and LIME, infer local feature importance by repeatedly querying a model under randomized binary masks. Although widely deployed, these procedures often show large variability with respect to the number of queries, the masking distribution, or the resolution of the feature representation. Existing explanations for this variability focus on algorith-mic instability, regression ill-conditioning, or segmentation heuristics. However, these accounts remain tied to specific implementations and do not address a more fundamental question: Is reliable explanation possible given the query interface itself? 
+
+This work develops an information-theoretic perspective in which explanation extraction is treated as communication over a noisy channel. The unknown explanation vector plays the role of a message, binary masks constitute channel inputs, and oracle evaluations f (x(t)) serve as channel outputs. Within this model, the explainer acts as a decoder attempting to recover a sparse message from noisy linear projections. This framing enables a direct application of Shannon’s theory and, Wolfowitz’s strong converse: when the explanation rate exceeds channel capacity, 
+
+no decoder, regardless of computational power, can reliably recover the explanation .Under this interpretation, the number of queries T is the blocklength of the communication system, the sparsity k and dimensionality d determine the combinatorial entropy of the message, and the masking distribution defines the per-query mutual information of the channel. This yields a nonasymptotic, operational threshold TIT —the minimum number of queries required for reliable decoding—below which all algorithms must fail and above which an optimal decoder succeeds. The information-theoretic approach further clarifies a long-standing practical issue in image explanations: finer super-pixel resolutions often degrade explanation quality even when the underlying model behaves smoothly. In our framework, increasing the number of segments increases the entropy of the explanation source, eventually exceeding the information that the query channel can convey under a fixed budget. This identifies a critical resolution beyond which explanations are mathematically impossible rather than algorithmically deficient. Together, these results show that masking-based explainers are governed by the same rate–capacity tradeoffs as classical communication systems. Reliable explanation is achievable only when the entropy of the explanation source lies below the mutual information delivered by the query channel; when this inequality is violated, instability and error floors are unavoidable, regardless of algorithmic details. 
+
+A. Related Works 
+
+Our work bridges the gap between the information-theoretic limits of high-dimensional statistics and the reliability analysis of post-hoc explanation methods. We categorize the relevant literature into three primary domains. 
+
+Information-Theoretic Limits of Sparse Recovery. The fundamental limits of recovering sparse vectors from noisy linear measurements are well-established in the field of Com-pressed Sensing (CS) [1]–[3]. While initial works focused on noiseless or bounded-error recovery, Wainwright [4] rigorously proved that for the exact support recovery of a k-sparse vector in d dimensions under Gaussian noise, the number of measurements must scale as T > O(k log d). Reeves and Gastpar [5] extended this analysis to approximate recovery, deriving sharp phase transitions that separate achievable regions from impossible ones based on the Signal-to-Noise Ratio (SNR). Other works have refined these limits for specific matrix ensembles [6] and sparse measurement matrices [7]. 
+
+> arXiv:2604.16689v1 [cs.AI] 17 Apr 2026 2
+
+In the broader context of machine learning, information-theoretic tools have been applied to generalization bounds [8], [9] and representation learning (e.g., the Information Bot-tleneck [10]). However, these works typically focus on the sample complexity of learning a model from data. Our work specifically targets the interpretation of an existing model. We extend the classical CS results to the Active Query setting unique to XAI, where the measurement matrix Z is not a fixed Gaussian ensemble but is generated dynamically by the explanation algorithm’s sampling policy (e.g., LIME’s local perturbation or SHAP’s axiomatic kernel). 
+
+Mechanism and Instability of Post-hoc Explanations. 
+
+Perturbation-based methods such as KernelSHAP [11], [12] and LIME [13] operate by regressing model outputs on sampled binary masks. While powerful, these methods suffer from well-documented instability [14]–[16], where small changes in inputs or sampling seeds yield vastly different explanations. Prior theoretical analyses have largely attributed this to optimization variance. For instance, Alvarez-Melis and Jaakkola [14] for-malized stability as Lipschitz continuity, identifying LIME’s local linearity assumption as a source of violation. Garreau and von Luxburg [17] derived asymptotic bounds for LIME’s coefficients, focusing on the variance of the estimator under finite sampling. Other works have proposed evaluating fidelity via sanity checks [18], sensitivity metrics [19], or retraining benchmarks [20], and improving estimation via unbiased estimators [21]. Our work offers a complementary perspective to these optimization-centric views: we reframe instability not as a failure of convergence, but as a channel outage event. By viewing the sampling process as a noisy communication channel, we argue that instability arises fundamentally when the query budget T is insufficient to convey the entropy of the explanation H(S), regardless of the estimator’s variance. 
+
+Strong Converses in Channel Coding. Classical results by Shannon [22] and Wolfowitz [23] establish that for com-munication rates exceeding channel capacity, the probability of decoding error converges to one exponentially fast. This phenomenon, known as the Strong Converse [24], provides a hard thermodynamic limit on recoverability. The present work demonstrates that masking-based explainers obey this same law. By adapting Wolfowitz’s theorem to the masked-query channel, we provide an operational meaning to the “impossibility” of explanation: if the entropy of the desired explanation resolution exceeds the information capacity of the query interface, reliable feature attribution is mathematically impossible. 
+
+Recent work by Rao [25] derives fundamental limits on explainability using Algorithmic Information Theory, showing that any explanatory model whose Kolmogorov complexity is substantially smaller than that of the target predictor must incur non-negligible approximation error (the complexity gap ). Their results characterize when a valid explanation can exist 
+
+given the structural complexity of f .Our work addresses a different axis of limitation based on Shannon Information Theory: even when a valid, low-complexity explanation does exist, it may not be recoverable 
+
+through the stochastic masking interface employed by post-hoc methods such as LIME or KernelSHAP. The constraint in our setting is not the Kolmogorov complexity of g, but the mutual information that the query channel can convey about the latent explanation Φ. By applying a strong converse argument, we show that if the query budget lies below channel capacity, reliable recovery is impossible regardless of the estimator, even when the true explanation is sparse and perfectly well-defined. 
+
+B. Contributions 
+
+This paper provides a rigorous information-theoretic foun-dation for masking-based explanation methods. The main contributions are:  
+
+> •
+
+A formulation of explanation extraction as communication over a noisy query channel , where explanation vectors act as messages and binary masks define channel inputs.  
+
+> •
+
+A characterization of per-query capacity through mutual information I(Φ; Y | Z) and a corresponding explanation rate determined by the entropy of sparse supports.  
+
+> •
+
+A strong converse theorem, adapted from Wolfowitz, proving that if the explanation rate exceeds channel capacity, no decoder can reliably recover the explanation regardless of computation.  
+
+> •
+
+A Monte Carlo estimator that yields a nonasymptotic infor-mation limit TIT and quantifies the gap between theory and the performance of LIME/Lasso and KernelSHAP/OLS.  
+
+> •
+
+A source-coding interpretation of super-pixel resolution that predicts a critical segmentation beyond which expla-nations are information-theoretically infeasible. II. B ACKGROUND AND PRELIMINARIES 
+
+Masking-based explanation methods probe a black-box model through repeated evaluations under binary feature subsets. The purpose of this section is to establish a common technical foundation for analyzing these procedures through an information-theoretic lens. The focus is on the structure of the data generated by perturbed queries, the sparsity model governing the explanation, and the interpretation of the query mechanism as a channel. 
+
+A. Perturbation-Based Explanations as Linear Inverse Prob-lems 
+
+Local explanation methods such as KernelSHAP [11] and LIME [13] operate by sampling binary masks around a fixed input x ∈ Rd. For each query t = 1 , . . . , T , a mask 
+
+Zt ∈ { 0, 1}d is drawn from a sampling distribution πZ . The mask selects a subset of features from x, and the remaining coordinates are replaced by a baseline reference xbase (often zero or a dataset mean): 
+
+x(t) = x ⊙ Zt + xbase ⊙ (1 − Zt), (1) where ⊙ denotes elementwise multiplication. The black-box model is then evaluated on the perturbed sample, producing the scalar output 
+
+Yt = f (x(t)).
+
+These methods fit a local surrogate model to approximate the behavior of f under such perturbations. A common representation is a linear function of the mask, 
+
+g(Zt) = Φ 0 + Z⊤ 
+
+> t
+
+Φ, (2) 3
+
+where Φ ∈ Rd defines the explanation and Φ0 is an offset. Estimating Φ from {(Zt, Y t)}Tt=1 is a linear inverse problem: the masks act as measurement vectors and the outputs as observations. Differences between explanation methods arise from their sampling policy πZ and the loss or regularizer used during fitting (e.g., KernelSHAP’s weighted least squares or LIME’s sparse regression). 
+
+B. Sparsity and the Support Recovery Objective 
+
+Explanations are often expected to be sparse. Practical interpretability typically relies on identifying only a few influ-ential features. We therefore assume that the latent explanation satisfies 
+
+∥Φ∥0 = k ≪ d, (3) with support 
+
+S = {j : Φ j̸ = 0 }.
+
+The central inferential target is the support S, since it cap-tures the discrete structure of the explanation. The goal of any explainer is to produce an estimate of this set; we denote such an estimate by bS, obtained from the observations {(Zt, Y t)}Tt=1 
+
+using any chosen decoding or regression procedure. Recovering 
+
+S from the query responses corresponds to a support recovery problem studied in high-dimensional statistics and information theory [4]. To quantify reliability, we measure the probability that the estimated support differs from the true one, 
+
+Pe = P( bS̸ = S).
+
+This metric depends on the explainer, the sampling strategy, and the underlying model, but the formulation itself does not assume any particular estimation method. It isolates the combinatorial component of the explanation—namely the identity of the active features—which is the part that can be characterized in terms of information content. 
+
+C. The Query Process as a Communication Channel 
+
+The repeated perturbation–evaluation process can be viewed as a channel through which information about the latent explanation Φ is conveyed to the user. Each mask Zt plays the role of a channel input, and the corresponding model output Yt
+
+is the channel output. The pair (Zt, Y t) depends on Φ through the masked input (1). This induces a conditional distribution 
+
+PY |Z, Φ(y | z, ϕ ),
+
+which describes how Φ influences the observable outputs for a given mask. This interpretation does not assume that f is linear. Any deviation of f (x(t)) from a linear surrogate introduces a residual term, and any randomness in the model or numerical implementation introduces stochastic variation. Both effects increase the uncertainty in Yt given (Zt, Φ) and therefore behave as noise from a channel perspective. The masks are drawn from a sampling policy πZ , which plays the role of an input distribution. Different explainers correspond to different policies; for example, LIME uses nearly uniform sampling, while KernelSHAP uses a distribution derived from cooperative game-theoretic axioms. The choice of 
+
+πZ determines how informative each query is, but the structural form of the channel is the same across methods. 
+
+D. Noise and Model Misfit 
+
+Two components contribute to uncertainty in the channel output: 1) Stochastic Noise ( νt): Aleatoric uncertainty arising from the model itself (e.g., randomized smoothing, dropout layers) or the system (numerical precision). 2) Model Misfit / Interference ( ξ(x(t))) : The deterministic residual f (x(t)) − g(Zt) arising from the non-linearity of the black-box model. In the context of linear estimation, this curvature acts as structured interference . Following standard Rate-Distortion practice [24], we model this residual as additive Gaussian noise N (0 , σ 2
+
+> misfit
+
+), which provides a worst-case lower bound on capacity. Both enter the channel model through the conditional distribution PY |Z, Φ. For analytic convenience in later sections, these terms are often represented through an additive noise model 
+
+Yt = Z⊤ 
+
+> t
+
+Φ + ξ(x(t)) + νt
+
+| {z }
+
+> εt
+
+, (4) with εt capturing both stochastic and deterministic deviations. This representation does not assume that the oracle is truly linear; it provides a tractable abstraction for quantifying the information content of the query responses. 
+
+E. Information Measures 
+
+Definition 1 (Entropy of the Support) . The uncertainty in the 
+
+k-sparse support is 
+
+H(S) = log 2
+
+dk
+
+
+
+, (5) 
+
+measured in bits. 
+
+This quantity characterizes the combinatorial complexity of identifying which features matter. It reflects the “information content” of the explanation task, independent of any estimator. 
+
+Definition 2 (Mutual Information) . For the channel defined by (Zt, Y t),
+
+I(Φ; Yt | Zt) (6) 
+
+measures how informative a single query is about the expla-nation, conditioned on the chosen mask. Aggregating over T
+
+queries yields 
+
+I(Φ; YT | ZT ), (7) 
+
+which quantifies the total information that the query process conveys about Φ.
+
+This quantity captures the “information supplied” by the interface. 4
+
+Φ 
+
+> Latent explanation
+
+Masks Z Model f (x) Noise ε Decoder 
+
+> e.g., LIME / SHAP
+
+bΦ       
+
+> Recovered explanation affects outputs f(x⊙Z)Y
+> Channel capacity Climits
+
+information flow Φ → bΦ           
+
+> Fig. 1. The Query Channel: The latent explanation Φinfluences the model outputs observed under binary masks Zthrough the noisy oracle, i.e., the black-box model, and noise, producing outputs from which a decoder attempts to reconstruct bΦ. The channel capacity Cfundamentally limits the information that can flow from Φto bΦ.
+
+III. I NFORMATION -T HEORETIC LIMITS OF THE QUERY 
+
+CHANNEL 
+
+In this section we formalize the masking-based explanation problem as a communication problem over a noisy channel and state a strong converse theorem that governs the fundamental limits of recovery. Our treatment follows classical results of Wolfowitz [23] but is adapted to the reversed roles of encoder and channel input that arise in post-hoc explainability. 
+
+A. System Model 
+
+To apply discrete coding theorems, we view the explanation recovery problem as determining which member of a discrete candidate set M generated the observations. 1) Message Set: The explainer seeks to identify an index 
+
+M ∈ { 1, . . . , |M|} . In the general case, M corresponds to a quantized lattice of explanation vectors. In the sparse case, M corresponds to the set of all possible feature support sets of size k. The entropy of the message is 
+
+H(M ) = log 2 |M| .2) Query Strategy (Encoder): A query strategy generates a sequence of binary masks ZT = ( Z1, . . . , Z T ), where 
+
+Zt ∈ { 0, 1}d. In non-adaptive methods (KernelSHAP, LIME), Zt are drawn i.i.d. from a design distribution 
+
+πZ .3) Oracle (Channel): Each query produces an observation 
+
+Yt according to the channel law PY |Z, Φ. We assume the channel is memoryless given the input and state: 
+
+P (YT | ZT , Φ) = 
+
+> T
+
+Y
+
+> t=1
+
+P (Yt | Zt, Φ) . (8) 4) Decoder: An estimator ψ : YT × Z T → M produces a decoded estimate cM . The probability of error is P (T ) 
+
+> e
+
+=
+
+P( cM̸ = M ).
+
+B. Rate and Capacity 
+
+In the explanation setting, the unknown quantity is a latent parameter vector Φ with a discrete component M identifying the underlying hypothesis (for example, a support set in the sparse case). Each explainer produces an estimator cM based on a block of T queries. To characterize the fundamental limits of this identification problem, we introduce two quantities: (i) the rate at which uncertainty about M must be resolved, and (ii) the maximum per-query information that the query channel can provide. 
+
+Definition 3 (Explanation Rate) . Let M be a discrete random variable taking values in a finite set M with entropy H(M )
+
+bits. For a blocklength of T queries, the explanation rate is defined as 
+
+R ≜ H(M )
+
+T (bits per query) . (9) 
+
+This quantity measures the average amount of information that must be acquired per query in order to reliably determine the value of M .
+
+This definition does not assume a specific estimator or sampling policy; it encapsulates the intrinsic information content of the identification problem induced by the prior distribution of M .
+
+Definition 4 (Parameter-Identification Capacity) . For a single query using mask Z ∈ { 0, 1}d, let the observable channel output be distributed according to PY |Z, Φ. The parameter-identification capacity of the query channel is defined as 
+
+C(S) ≜ sup 
+
+> πZ
+
+I(Φ; Y | Z), (10) 
+
+where the supremum is taken over all input (mask) distributions 
+
+πZ having full support on {0, 1}d. This quantity is the maximum mutual information between the latent parameter Φ and a single channel output Y achievable under any admissible masking strategy. 
+
+Remark 1. The capacity defined above differs from Shannon’s classical channel capacity, which concerns reliable transmission of arbitrary bit sequences. Here, the channel is used for 
+
+parameter identification : the latent parameter Φ induces the output distribution and must be inferred from observations. 
+
+Remark 2. The supremum over πZ captures the fact that dif-ferent explainer sampling policies correspond to different input distributions. Allowing all distributions with full support yields a channel property independent of any particular explainer. 
+
+Remark 3. The quantity I(Φ; Y | Z) measures the information conveyed by a single query. Over T uses of a memoryless 5
+
+query channel, the maximum obtainable information grows at most linearly with T :
+
+I(Φ; YT | ZT ) ≤ T C (S).
+
+C. Strong Converse Theorem 
+
+The following result is a specialization of Wolfowitz’s strong converse for discrete-time memoryless channels to the parameter-identification setting. 
+
+Theorem 1 (Strong Converse for the Query Channel) . Let 
+
+M be a finite hypothesis set with |M| = 2 T R and let M be uniformly distributed over M. Consider any sequence of query strategies π (possibly adaptive) and any sequence of decoders 
+
+ψ. If the rate satisfies 
+
+R > C (S),
+
+where C(S) is the parameter-identification capacity, then there exists a constant A > 0 (depending only on the channel law) such that the error probabilities satisfy 
+
+P (T ) 
+
+> e
+
+≥ 1 − e−AT ,
+
+and consequently lim T →∞ P (T ) 
+
+> e
+
+= 1 .Proof Sketch: Fix a sequence of query strategies and decoders. For each m ∈ M , the query process induces a product distribution 
+
+PY T |M =m,Z T =
+
+> T
+
+Y
+
+> t=1
+
+PY |Z, Φ( m),
+
+where Φ( m) is the parameter associated with message m. Since the channel is memoryless, the log-likelihood ratio between any two hypotheses decomposes into a sum of T i.i.d. terms. Wolfowitz’s strong converse for memoryless channels (see [23]) implies that if the transmission rate exceeds the single-use capacity, then the average error probability of any decoder satisfies 
+
+P (T ) 
+
+> e
+
+≥ 1 − exp( −AT ),
+
+for some A > 0. It remains to identify the relevant per-use capacity. For any masking distribution πZ ,
+
+I(M ; Yt | Zt) ≤ I(Φ; Yt | Zt),
+
+because M → Φ → (Zt, Y t) forms a Markov chain. Taking the supremum over input distributions yields 
+
+I(M ; Yt | Zt) ≤ C(S).
+
+Summing over t = 1 , . . . , T gives 
+
+I(M ; Y T | ZT ) ≤ T C (S).
+
+If R > C (S), then H(M ) = T R exceeds the maximum mutual information that the channel can convey. Wolfowitz’s exponent bound therefore forces P (T ) 
+
+> e
+
+→ 1 as T → ∞ .The theorem states that the query interface can convey a finite information per query. If the explanation task requires more than C(S) bits per query, then no sequence of sampling policies or decoders—adaptive or non-adaptive, randomized or deterministic—can prevent the error probability from con-verging to one. This result is purely information-theoretic: it does not depend on computational constraints, convexity assumptions, or properties of a particular explainer such as LIME or SHAP. The threshold R = C(S) therefore marks a fundamental identifiability boundary for any masking-based explanation scheme. 
+
+D. Instantiation for KernelSHAP: Linear Gaussian Channel 
+
+The purpose of this subsection is to illustrate how the general strong converse (Theorem 1) applies when the black-box model admits a local linear approximation with additive Gaussian noise. This is the regime explicitly assumed by KernelSHAP, where the surrogate is fit via weighted least squares under binary masks. We consider the linear Gaussian oracle model 
+
+Yt = z⊤ 
+
+> t
+
+Φ + εt, εt ∼ N (0 , σ 2), (11) with zt ∈ { 0, 1}d. The latent parameter Φ is not assumed sparse in this subsection; this corresponds to dense explanations as used in standard KernelSHAP implementations. 
+
+1) Per-Query Mutual Information: Conditioned on a mask 
+
+zt, the query-channel output obeys 
+
+Yt | (Zt = zt, Φ = ϕ) ∼ N (z⊤ 
+
+> t
+
+ϕ, σ 2).
+
+Thus, for fixed zt, the mutual information between Φ and Yt
+
+satisfies 
+
+I(Φ; Yt | Zt = zt) = 12 log 2
+
+
+
+1 + Var( z⊤ 
+
+> t
+
+Φ) 
+
+σ2
+
+
+
+, (12) where the variance is taken with respect to the prior over Φ.Since the explainer may choose any input distribution 
+
+πZ over masks, the parameter-identification capacity from Definition 4 becomes 
+
+C(S) = sup 
+
+> πZ
+
+EZ∼πZ [I(Φ; Y | Z)] . (13) For convenience, we define the single-mask upper bound 
+
+Cmax ≜ max 
+
+> z∈{ 0,1}d
+
+I(Φ; Y | Z = z),
+
+so that 
+
+C(S) ≤ Cmax . (14) This inequality does not assert that Cmax equals the opera-tional capacity; its purpose is to provide a tractable envelope that can be used to derive scaling statements in the dense regime. 
+
+2) Rate Requirement Under Dense Explanations: Under dense explanations, the message effectively specifies all d
+
+entries of Φ to resolution δ over a bounded range [−B, B ].Standard quantization arguments show that the hypothesis set can be chosen so that 
+
+H(M ) ≈ d log 2
+
+ Bδ
+
+
+
+.
+
+Substituting this into the rate definition R = H(M )/T gives 
+
+R ≈ dT log 2
+
+ Bδ
+
+
+
+.6
+
+By Theorem 1, reliable identification requires R < C (S).Using the envelope (14) , a necessary condition for reliable recovery is 
+
+dT log 2
+
+ Bδ
+
+
+
+< C max .
+
+Equivalently, 
+
+T > dCmax 
+
+log 2
+
+ Bδ
+
+
+
+. (15) Expression (15) provides an information-theoretic explana-tion for the observed scaling of KernelSHAP: estimating all 
+
+d entries of a dense explanation requires a number of queries that grows at least linearly with d. This lower bound arises from the finite per-query information budget imposed by the query channel. 
+
+E. Sparse Explanations and LIME 
+
+We now apply the strong converse to the sparse setting, where only the support of Φ must be identified. This corresponds to the behavior of sparse estimators used in LIME (e.g., Lasso), which select a small subset of active features. Let Φ be k-sparse in d dimensions, and let S ⊆ [d] with 
+
+|S| = k denote its support. As shown in Section II-E , the entropy of the support is 
+
+H(S) = log 2
+
+dk
+
+
+
+≈ k log 2
+
+ dk
+
+
+
+, (16) when d is large and k ≪ d.Using the rate definition R = H(S)/T , the explanation rate becomes 
+
+Rsparse ≈ kT log 2
+
+ dk
+
+
+
+. (17) Applying Theorem 1 with the upper bound C(S) ≤ Cmax 
+
+yields the necessary condition for reliable support identification: 
+
+kT log 2
+
+ dk
+
+
+
+< C max , (18) or equivalently, 
+
+T > kCmax 
+
+log 2
+
+ dk
+
+
+
+. (19) Expression (19) aligns with the well-known T =Ω( k log( d/k )) scaling for support recovery obtained in high-dimensional statistics and compressed sensing. The novelty here is that the result follows directly from the information-theoretic structure of the query channel, without requiring restricted isometries or linear-algebraic arguments. In contrast to the dense case (15) , sparse recovery requires dramatically fewer queries when k ≪ d. This difference explains why LIME, which leverages sparsity through ℓ1
+
+regularization, succeeds in regimes where dense least-squares estimators such as KernelSHAP are information-limited. IV. A CHIEVABILITY : E XISTENCE OF A RELIABLE DECODER 
+
+BELOW CAPACITY 
+
+This section establishes the achievability counterpart to the strong converse proved in the previous Section. Specifically, we show that whenever the explanation rate is below channel ca-pacity, there exists a decoder—namely the maximum-likelihood (ML) sparse decoder—whose probability of error vanishes as the number of queries grows. 
+
+A. Random Coding Interpretation of Mask-Based Sampling 
+
+Achievability proofs in channel coding rely on ensembles of randomly generated codebooks whose codewords are suffi-ciently separated to allow reliable identification under noise. In the explanation-channel setting, no explicit codebook is designed; instead, the sampling policy automatically induces a random codebook. Let Z ∈ { 0, 1}T ×d be the mask matrix formed by T i.i.d. draws from a full-support distribution πZ (e.g., Bernoulli (0 .5) ). For a k-sparse hypothesis with support S, define the corre-sponding noiseless projection (codeword) as: 
+
+cS = ZΦS ∈ RT . (20) The collection C = {cS : S ⊆ [d], |S| = k} constitutes a random codebook whose elements must be distinguishable by a decoder observing the noisy vector: 
+
+Y = cS + ε, ε ∼ N (0 , σ 2IT ). (21) The structural properties required for achievability follow from standard concentration of measure results (specifically the Johnson-Lindenstrauss lemma and the Restricted Isometry Property): 1) Separation of Competing Hypotheses. For any two distinct supports S̸ = S′, define the difference vector 
+
+∆ = Φ S −ΦS′ . This vector is non-zero on the symmetric difference of the supports. The Euclidean distance between codewords is: 
+
+∥cS − cS′ ∥2 = ∥Z∆∥2. (22) Because the rows of Z are i.i.d. sub-Gaussian, the quadratic form ∥Z∆∥2 concentrates sharply around its expectation. As T → ∞ :
+
+∥Z∆∥2 ≈ T · E[( z⊤∆) 2]. (23) Thus, with probability approaching one, all competing hypotheses generate codewords separated by a distance scaling with √T . Crucially, this argument holds regard-less of whether supports S and S′ overlap; it depends solely on the non-zero energy of the difference vector 
+
+∆.2) Asymptotic Orthogonality of Noise. The noise vector ε
+
+is isotropic and independent of Z. In high dimensions, the inner product between ε and any fixed signal direction concentrates near zero: 
+
+⟨ε, Z ∆⟩ = o (∥Z∆∥) with high probability . (24) 7
+
+Geometrically, this ensures that the received vector Y
+
+remains closer to the true codeword cS than to any imposter cS′ .These properties replicate the geometry of a classical random codebook. Since the signal separation grows as √T while noise fluctuations remain bounded, a Maximum Likelihood decoder over the k-sparse hypothesis class achieves vanishing error probability provided the explanation rate is below capacity. This establishes the achievability component of the query-channel reliability theory. 
+
+B. Optimal Decoder: Maximum-Likelihood Support Recon-struction 
+
+The optimal decoder for the sparse explanation channel is the Maximum Likelihood (ML) estimator restricted to the set of 
+
+k-sparse hypotheses. Given a candidate support S′ ⊆ [d] with 
+
+|S′| = k, define the least-squares estimate of the amplitudes on S′ as 
+
+ΦLS  
+
+> S′
+
+= arg min  
+
+> Φ:supp(Φ) ⊆S′
+
+∥Y − ZΦ∥22. (25) The corresponding predicted signal is ZΦLS  
+
+> S′
+
+. Under the Linear Gaussian Model, the ML decision rule is 
+
+bSML = arg min 
+
+> S′⊆[d]
+> |S′|=k
+
+∥Y − ZΦLS  
+
+> S′
+
+∥22. (26) This rule coincides with minimum-distance decoding on the induced random codebook {cS′ = ZΦLS  
+
+> S′
+
+}: the decoder selects the hypothesis whose induced codeword is closest to the received vector in Euclidean distance. Although evaluating (26) requires a combinatorial search over all  dk
+
+ supports, achiev-ability results permit unbounded computation and therefore focus solely on the information-theoretic feasibility of reliable recovery. 
+
+C. Achievability Theorem 
+
+Let H(S) = log 2
+
+ dk
+
+ denote the entropy of the uniformly distributed k-sparse support, and let C denote the per-query capacity of the explanation channel defined in Section III. The explanation rate is 
+
+R = H(S)
+
+T bits per query .
+
+Theorem 2 (Achievability of Reliable Sparse Explanation Recovery) . Consider the Linear Gaussian explanation channel 
+
+(11) , and let the mask rows {Zt} be drawn i.i.d. from a distribution with full support on {0, 1}d and sub-Gaussian coordinates (e.g., Bernoulli (1 /2) ). If the explanation rate satisfies 
+
+R < C, 
+
+then the Maximum Likelihood decoder (26) satisfies 
+
+P( bSML ̸ = S) −→ 0 as T → ∞ ,
+
+with high probability over the draw of the mask matrix Z and the channel noise. 
+
+This result is the direct analogue of Shannon’s Channel Coding Theorem: whenever the rate lies below capacity, almost every realization of the random mask ensemble yields a codebook for which ML decoding achieves vanishing error probability. Combined with the strong converse, this establishes 
+
+R = C as the fundamental boundary separating reliable and impossible explanation. 
+
+D. Proof Outline 
+
+The proof follows the standard random coding template. We summarize the main steps. 
+
+1) Separation of hypotheses: For any incorrect support 
+
+S′̸ = S, define the prediction error 
+
+∆( S, S ′) = ∥Z(Φ S − ΦOLS  
+
+> S′
+
+)∥22. (27) Because the columns of Z are random and independent across rows, the terms Z(Φ S − ΦS′ ) form sums of i.i.d. random variables. Standard concentration inequalities imply that for each fixed pair (S, S ′),
+
+1
+
+T ∆( S, S ′) P
+
+−−−−→  
+
+> T→∞
+
+E(Z⊤ 
+
+> 1
+
+(Φ S − ΦS′ )) 2. (28) Moreover, with high probability, the similarity between distinct supports is bounded away from zero because ΦS − ΦS′ differs in at least one coordinate. 
+
+2) Error event decomposition: The ML decoder fails if there exists a false support S′ whose prediction error falls within the “noise sphere” surrounding the true signal ZΦS .The probability of this event is bounded via a union bound over all S′̸ = S:
+
+P( bSML ̸ = S) ≤ X 
+
+> S′̸=S
+
+P ∥Y − ZΦOLS  
+
+> S′
+
+∥2 ≤ ∥ Y − ZΦS ∥2 .
+
+(29) Each term in the sum decays exponentially with T , with exponent governed by the divergence between the two Gaussian distributions P (Y |S) and P (Y |S′).
+
+3) Capacity threshold: For any S′̸ = S, the relative entropy 
+
+D(P (Y |S) ∥ P (Y |S′)) (30) is strictly positive. The aggregate number of hypotheses satisfies 
+
+log 
+
+dk
+
+
+
+= H(S) = RT. (31) Using standard bounds for random coding error exponents, the union bound vanishes as T → ∞ if and only if 
+
+R < C, (32) where C is the per-query capacity of the channel, matching the characterization in Section III. This completes the proof. 
+
+Remark (Posterior Concentration).: Although the ML decoder establishes the information-theoretic limit, it is com-putationally infeasible for large d. A useful conceptual in-terpretation is that below capacity ( R < C ), the likelihood 
+
+exp( −∥ Y − ZΦLS  
+
+> S′
+
+∥22/(2 σ2)) assigns exponentially higher weight to the true support than to competing hypotheses. Thus, posterior sampling or approximate Bayesian procedures tend to concentrate around the true support when R < C and become 8
+
+unstable or multimodal when R > C . This provides intuition for why practical sampling-based optimizers exhibit a similar transition, even though the ML decoder remains the formal benchmark. V. S AMPLE COMPLEXITY OF EXPLANATION 
+
+This section empirically evaluates the achievability threshold from Theorem 2 and compares it with the query budgets required by practical decoders. The goal is to place the ML achievability transition, the mutual-information benchmark TIT ,and the behavior of sparsity-aware and dense decoders on a single common scale. 
+
+A. Experimental Setup 
+
+We consider a low-dimensional configuration in which exhaustive ML decoding is feasible. The explanation vector 
+
+Φ ∈ Rd is k-sparse, with support S drawn uniformly at random from all  dk
+
+ subsets. The nonzero entries are independent 
+
+N (0 , 1) and the remaining entries are zero. Given a blocklength 
+
+T , the query masks are drawn as Zt ∈ { 0, 1}d with i.i.d. Bernoulli components, and the oracle outputs follow the Linear Gaussian Model 
+
+Yt = Z⊤ 
+
+> t
+
+Φ + εt, εt ∼ N (0 , σ 2),
+
+independently across t = 1 , . . . , T .The unified experiment uses d = 12 , k = 2 , σ = 0 .1,
+
+and evaluates a range of query budgets T . For each T and each Monte Carlo trial, a fresh realization of (Φ , ZT , YT ) is generated under this model. Three decoders are applied to the same data: 1) Optimal ML decoder: a combinatorial search over all supports of size k, solving a least-squares fit for each candidate support. This decoder attains the achievability limit in Theorem 2. 2) Lasso decoder (sparse): an ℓ1-regularized regression on the masked design, returning the k indices with largest absolute coefficients. This is the sparse decoder associated with LIME-type estimators. 3) OLS decoder (dense): an ordinary least-squares regres-sion on all d features, followed by selecting the k largest coefficients. This mirrors the dense regression step used in KernelSHAP. For each decoder we measure the empirical probability of exact support recovery Pr( bS = S), estimated over many independent draws of (Φ , Z T , Y T ) at each T .The information-theoretic query benchmark is defined by 
+
+I(Φ; YT | ZT ) ≥ H(S), (33) where the support entropy under the uniform-sparsity prior is H(S) = log 2
+
+ dk
+
+. The sparse prior on Φ does not yield a closed-form expression for I(Φ; YT | ZT ), so we estimate it as bIT via Monte Carlo integration using the same oracle prior that generates the experiments 1. The operational information threshold is then 
+
+TIT ≜ min {T : bIT ≥ H(S)}. (35) 
+
+> 1
+
+For each blocklength T :1) Draw Nouter independent triples (Φ i, Z Ti , Y Ti ) from the generative model. 2.5 5.0 7.5 10.0 12.5 15.0 17.5     
+
+> Number of Queries (T)
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Mutual Information (Bits)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Probability of Exact Recovery
+> Mutual Information I(Φ; Y∣Z)
+> Theoretical Lower Bound
+> Optimal Decoder (ML)
+> Lasso Decoder
+> OLS Decoder
+> Algorithmic Gap
+
+Fig. 2. Unified information-theoretic and algorithmic behavior for the sparse explanation model with d = 12 , k = 2 , and σ = 0 .1. Left axis: Monte Carlo estimate of I(Φ; Y T | ZT ) and a vertical line at T = k log( d/k ), indicating the analytic lower bound for sparse recovery. Right axis: empirical probability of exact support recovery for the ML, Lasso, and OLS decoders as a function of the number of queries T . The horizontal separation between the ML and Lasso curves, highlighted by the shaded region, represents the algorithmic gap between the information limit and the performance of a convex surrogate decoder. 
+
+B. Achievability Transition and Algorithmic Gap 
+
+Figure 2 summarizes the empirical behavior under this con-figuration. The left axis plots the estimated mutual information 
+
+bIT against the number of queries T , together with a vertical line at T = k log( d/k ) marking the analytic lower bound for sparse recovery. The curve bIT grows with T and crosses the support entropy H(S) near this scale, which identifies the information benchmark TIT .The right axis shows the empirical probability of exact support recovery Pr( bS = S) for the three decoders. The ML decoder exhibits a sharp transition from failure to success at query budgets close to TIT , in line with Theorem 2. In contrast, the Lasso and OLS decoders require more queries to reach high success probability, with OLS performing worst due to its dense parameterization. The region between the Lasso and ML curves in Fig. 2 defines an algorithmic gap : for T in this interval, information theory allows reliable recovery, but the convex surrogate used by Lasso still fails with non-negligible probability. This gap quantifies the relaxation penalty between the Shannon limit and practical decoding in masking-based explanations. The OLS curve shows that ignoring sparsity leads to even larger 
+
+2) Pre-generate Ninner i.i.d. samples {Φj }Ninner  
+
+> j=1
+
+from the same sparse prior. For each outer sample i, the conditional likelihood p(Y Ti | ZTi , Φi) under Gaussian noise has a closed-form expression. The marginal p(Y Ti | ZTi ) is approximated by averaging the same Gaussian likelihood over the inner prior samples: 
+
+p(Y Ti | ZTi ) ≈ 1
+
+Ninner 
+
+> Ninner
+
+X
+
+> j=1
+
+p(Y Ti | ZTi , Φj ).
+
+This yields the importance-sampling estimator 
+
+bIT = 1
+
+Nouter 
+
+> Nouter
+
+X
+
+> i=1
+
+log 2
+
+ p(Y Ti | ZTi , Φi)
+
+> 1
+> Ninner
+
+PNinner  
+
+> j=1
+
+p(Y Ti | ZTi , Φj )
+
+ . (34) 9Ground Truth   
+
+> (Face is Important)
+> Super-Pixel Channel
+> Reduced d ~ 60
+> Pixel SHAP ( d= 10, 000 )
+> Budget T=800
+> Super-Pixel SHAP ( d= 60 )
+> Budget T=800
+> Theoretical Justification for Super-Pixels via Channel Capacity
+
+d = 4 
+
+Rank=0.01 
+
+d = 30 
+
+Rank=0.10 
+
+d = 98 
+
+Rank=0.33 
+
+d = 217 
+
+Rank=0.72 
+
+d = 486 
+
+Rank=1.62 
+
+d = 944 
+
+Rank=3.15     
+
+> 0200 400 600 800
+> Number of Super-Pixels ( d)
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> Explanation Fidelity
+> (Correlation with GT)
+> Safe Region
+> Impossible Region
+
+Fixed Budget T = 300     
+
+> Hard Limit ( d=T)
+> Soft Limit ( d≈T/2 )
+
+Fig. 3. Sample complexity at fixed query budget and varying resolution. Top: conceptual illustration comparing pixel-level SHAP at very high dimension 
+
+d ≈ 10 4 with a super-pixel channel at d ≈ 60 under the same query budget T = 800 . Pixel-level explanations operate at a rate R > C and are unrecoverable, while super-pixel explanations operate at R < C and are recoverable. Bottom: quantitative capacity breakdown for a fixed budget T = 300 . The curve shows the correlation between the Lasso super-pixel explanation and the ground truth as a function of the number of super-pixels d. The safe region corresponds to 
+
+H(S) ≤ I(Φ; Y T | ZT ), whereas the impossible region corresponds to H(S) > I (Φ; Y T | ZT ).
+
+query budgets, consistent with the ambient-dimension scaling of dense regression. 
+
+C. Sample Complexity at Fixed Budget and Varying Resolution 
+
+The previous experiment varied the number of queries T at fixed dimension d. To connect more directly with image-based explanations, we now fix the query budget T and vary the explanation resolution d through the number of super-pixels. In this regime, the question is how finely an image can be segmented before a given query budget becomes insufficient for reliable explanation. We use a standard image ( scikit-image “Astronaut”) and define a ground-truth salient region (the face) as a rectangular mask at the pixel level. This mask induces a sparse support S in the pixel domain: pixels in the face region are relevant, all others are irrelevant. For each choice of super-pixel resolution d, we apply a SLIC segmentation [26] with 
+
+d regions and map the pixel-level ground truth to a coarse explanation by averaging the pixel-level importance within each super-pixel. This defines a d-dimensional ground-truth super-pixel explanation. For each value of d we then: 1) Generate T binary masks over the d super-pixels, forming a mask matrix ZT ∈ { 0, 1}T ×d.2) Map each super-pixel mask to the image domain and query the image-level oracle under these masked inputs to obtain Y T . The oracle sums intensities within the face region and adds Gaussian noise, implementing a simple but controlled black-box model. 3) Fit a linear regression decoder (Ridge) [27] from the super-pixel masks to the oracle outputs, and project the recovered coefficients back to the image domain to obtain an estimated explanation map bΦ.4) Measure the explanation quality by the correlation between bΦ and the ground-truth super-pixel explanation. The top panel of Fig. 3 provides a conceptual illustration at a fixed budget T = 800 . The first image shows the original astronaut with the face region overlaid as the pixel-level ground truth. The second image shows a super-pixel segmentation with d ≈ 60 , which compresses the explanation into a much lower-dimensional representation. The third panel computes a pixel-level SHAP-style explanation treating each pixel as a feature ( d ≈ 10 4) under the same budget T = 800 ; in this regime, the rate R = H(S)/T exceeds the channel capacity, and the resulting heatmap fails to localize the face. The fourth 10 −25 −20 −15 −10 −5 0         
+
+> Signal -to-Noise Ratio (SNR) [dB]
+> 10 −1
+> 6 × 10 −2
+> Bit Error Rate (BER)
+> Regime A: Noise Limited (AWGN) (α= 0 , Sweeping σ)
+> Dense Decoder
+> Sparse Decoder
+> −5 0510 15 20
+> Signal -to-Interference Ratio (SIR) [dB]
+> 10 −3
+> 10 −2
+> 10 −1
+> Regime B: Interference Limited (Mismatch) (σ= 0 , Sweeping α)
+> Dense Decoder
+> Sparse Decoder Sparse vs. Dense Decoding (Undersampled Regime: T=45 < d=60)
+
+Fig. 4. Block error probability for dense (Ridge / OLS proxy) and sparse (Lasso proxy) decoders in an undersampled regime T < d . Left: noise-limited regime with additive Gaussian noise and zero curvature. Right: interference-limited regime with deterministic quadratic curvature and zero noise. The horizontal axis is the empirical signal-to-distortion ratio (noise or interference). 
+
+panel repeats the experiment using a super-pixel SHAP channel with d ≈ 60 ; here R < C , and the recovered heatmap now aligns with the face region. The middle panel of Fig. 3 makes this transition quantitative at a fixed budget T = 300 . The top row within this panel shows reconstructed explanation heatmaps for increasing numbers of super-pixels d. Each subplot is annotated with the actual d
+
+and the ratio d/T , which serves as an effective resolution-to-budget ratio. For small d, the face region is clearly visible and the decoder recovers a stable explanation. As d grows, the same budget is spread over more degrees of freedom, the ratio 
+
+d/T increases, and the reconstructed maps become noisy and diffuse. The curve at the bottom of the panel plots the empirical correlation between the decoded explanation and the ground truth as a function of d for T = 300 . Two vertical reference lines mark a “soft” limit near d ≈ T / 2 and a “hard” limit near d ≈ T . For d well below T / 2, the correlation remains high and corresponds to resolutions where the query channel can still support accurate explanations. As d approaches and exceeds these reference scales, the correlation drops rapidly and eventually collapses toward zero. From the information-theoretic viewpoint, as the super-pixel resolution increases, the support entropy H(S) grows with d,while the mutual information I(Φ; YT | ZT ) is bounded by the fixed budget T and noise level. There exists a critical resolution at which H(S) exceeds I(Φ; YT | ZT ), beyond which reliable explanation is impossible regardless of the decoder. Section VI formalizes this effect as a source-coding problem and extends the analysis to real-image tasks using the same Astronaut oracle. 
+
+D. Empirical Behavior under Noise and Curvature 
+
+We now study how additive noise and model curvature affect support recovery when the number of queries T is fixed below the ambient dimension d. The goal is to interpret the empirical “waterfall” and “error floor” behavior in Fig. 4 through the information-theoretic bound 
+
+I(Φ; Y T | ZT ) ≥ H(S)
+
+that underlies Theorem 1. Throughout this subsection, the true explanation is represented by a sparse coefficient vector 
+
+Φ⋆ ∈ Rd with support S ⊂ [d], |S| = k, and nonzero entries 
+
+±1.For each query index t = 1 , . . . , T , the explainer selects a binary mask Zt ∈ { 0, 1}d and observes a scalar response 
+
+Yt = Z⊤ 
+
+> t
+
+Φ⋆ + α Z ⊤ 
+
+> t
+
+QZ t + εt, (36) where Q ∈ Rd×d is a fixed symmetric interaction matrix, α ≥ 0
+
+is a curvature (interference) coefficient, and εt ∼ N (0 , σ 2) are i.i.d. Gaussian noise samples. The sequence {Zt}Tt=1 is drawn i.i.d. from a product distribution on {0, 1}d that does not depend on Φ⋆.The linear-Gaussian model of Section II is recovered as the special case α = 0 , σ > 0; however, when α > 0 and 
+
+σ = 0 , the observation includes deterministic, mask-dependent interference: 
+
+Yt = Z⊤ 
+
+> t
+
+Φ⋆ + α Z ⊤ 
+
+> t
+
+QZ t,
+
+and the conditional law of Yt given (Zt, Φ⋆) is no longer Gaussian and no longer linear in Φ⋆.Given T queries and responses {(Zt, Y t)}Tt=1 , we form two linear estimators: a dense decoder bΦdense obtained by ridge regression and a sparse decoder bΦsparse obtained by Lasso. In both cases, the estimated support is defined by selecting the k
+
+largest coordinates in magnitude: 
+
+bS = arg top -k
+
+> j∈[d]
+
+bΦj .
+
+We measure performance via the block error probability 
+
+Perr = P bS̸ = S, estimated empirically by averaging over independent draws of Φ⋆, the masks {Zt}, and the noise {Wt}.
+
+Noise-limited regime: In the first family of experiments (left panel of Fig. 4), we fix α = 0 and vary the noise variance 
+
+σ2. For each σ2, we compute the empirical signal and noise powers 
+
+PS = 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+(Z⊤ 
+
+> t
+
+Φ⋆)2, PN = 1
+
+T
+
+> T
+
+X
+
+> t=1
+
+ε2 
+
+> t
+
+,
+
+and report the block error probability as a function of the effective signal-to-noise ratio SNR = PS /P N (in dB). Both decoders display threshold behavior: as SNR increases, Perr 
+
+drops rapidly from values near 1 to values near 0.From an information-theoretic viewpoint, increasing σ2
+
+decreases the per-query mutual information I(Φ; Yt | Zt) and hence the total information I(Φ; YT | ZT ) for fixed T . For large noise, this quantity is below H(S) and Theorem 1 predicts high block error for any decoder, which is consistent with the plateau at Perr ≈ 1. As σ2 decreases, I(Φ; YT | ZT ) increases and eventually exceeds H(S); in this regime, sparse decoding reaches low error at a lower effective SNR than dense decoding, reflecting the fact that the sparse decoder targets the lower-entropy support S rather than the full ambient vector. 
+
+Interference-limited regime: In the second family of experiments (right panel of Fig. 4), we fix σ = 0 and vary the curvature coefficient α. The interaction matrix Q is scaled so that, for α = 1 , the average interference power matches the average linear signal power. For each α, we decompose 11 
+
+the response into a linear component and a curvature-induced component, 
+
+St = Z⊤ 
+
+> t
+
+Φ⋆, It = α, Z ⊤ 
+
+> t
+
+QZ t,
+
+estimate empirical powers PS = E[S2 
+
+> t
+
+] and PI = E[I2 
+
+> t
+
+], and report an effective signal-to-interference ratio SIR = PS /P I
+
+on the horizontal axis (in dB). For small α (high SIR ), the channel is close to the linear model and the sparse decoder retains a clear block-error advantage over the dense decoder. As α increases and the quadratic term becomes comparable to, and eventually larger than, the linear term, both decoders develop an error floor: even at moderate or high SIR , the block error probability does not approach zero. In this regime, the dominant degradation mechanism is model mismatch rather than stochastic noise. The quadratic term 
+
+Z⊤ 
+
+> t
+
+QZ t induces structured, mask-dependent distortions that cannot be represented by any coefficient vector Φ in the linear surrogate class. Information-theoretically, this implies that 
+
+I(Φ; Y T | ZT ) saturates as the signal power ∥Φ⋆∥22 increases, and can remain below H(S) for the chosen (d, k, T ). The error floor in Fig. 4 is therefore consistent with Theorem 1: once 
+
+I(Φ; Y T | ZT ) < H (S), no linear decoder can drive Perr to zero, even if the nominal SIR (computed from PS /P I ) is large. VI. R ESOLUTION AS SOURCE CODING 
+
+The preceding sections established the query interface as a communication channel with per-query capacity C(S)
+
+and showed that support recovery is feasible only when the explanation rate R is strictly below this capacity. This section formalizes the dependence of R on the resolution used for image explanations and shows that super-pixel granularity induces a source-coding constraint that directly determines the feasibility of reliable recovery. Throughout, an image is partitioned into d disjoint super-pixels, and the explanation is modeled as a k-sparse vector 
+
+Φ ∈ Rd with support S ⊆ [d], |S| = k. The segmentation level d defines the size of the discrete message alphabet and therefore the entropy that must be conveyed through the query channel. 
+
+A. Source Entropy Induced by Resolution 
+
+Under a uniform prior over all k-subsets of [d], the discrete message is the support index S. Its entropy is 
+
+H(S(d)) = log 2
+
+dk
+
+
+
+≈ k log 2
+
+ dk
+
+
+
+, (37) which grows monotonically in d. For any fixed k, increasing resolution increases the cardinality of the support alphabet and therefore the number of bits that must be resolved by the decoder. Given a query budget T , the induced explanation rate is 
+
+R(d) ≜ H(S(d)) 
+
+T . (38) This is the rate at which the support message must be transmitted per query. 
+
+B. Information conveyed by the Query Channel 
+
+Let Y T denote the T oracle outputs generated under masks 
+
+ZT drawn i.i.d. from a full-support design distribution. The mutual information 
+
+IT (d) ≜ I(Φ; Y T | ZT ) (39) quantifies the total information the query channel is capable of conveying. Because the number of queries T and the mask distribution are fixed, IT (d) depends only on noise, model curvature, and mask–signal distinguishability, and is essentially constant in d for typical image settings. Consequently, the denominator in (38) is fixed while the numerator grows with 
+
+d.
+
+C. Resolution-Constrained Feasibility 
+
+The strong converse established in Theorem 1 implies that recovery is impossible whenever the attempted transmission rate exceeds the capacity of the query channel: 
+
+R(d) > C (S) =⇒ lim   
+
+> T→∞
+
+P (T ) 
+
+> e
+
+= 1 . (40) Combining (38) and (40) yields the following resolution threshold. 
+
+Definition 5 (Critical Resolution) . For fixed (T, k ) and channel capacity C(S), the critical resolution is 
+
+dcrit ≜ max 
+
+n
+
+d ∈ N : H(S(d)) ≤ T C (S)o
+
+. (41) 
+
+Theorem 3 (Resolution-Constrained Strong Converse) . Let 
+
+dcrit be given by (41) . If d > d crit , then for any sequence of query strategies and any decoder, 
+
+P (T ) 
+
+> e
+
+≥ 1 − e−AT ,
+
+for some constant A > 0 depending only on the channel law. In particular, 
+
+lim   
+
+> T→∞
+
+P (T ) 
+
+> e
+
+= 1 .
+
+Thus, reliable explanation at resolution d is information-theoretically impossible. 
+
+The theorem follows directly from Theorem 1 by substituting the rate R(d) and observing that R(d) > C (S) exactly when 
+
+d > d crit .
+
+D. Empirical Verification on Image-Based Explanations 
+
+This subsection examines whether the rate–capacity frame-work developed above accurately predicts the behavior of image-based explanations under varying resolution. The ex-periment uses the “Astronaut” image and applies a systematic sweep over the number of super-pixels d. For each value of d,the image is segmented into d regions, and the ground-truth pixel-level explanation is aggregated onto this representation. A fixed number of queries T is then applied, each consisting of a randomly drawn binary mask over the d super-pixels. The oracle output for each mask is generated under the Linear Gaussian Model, and a Monte Carlo mutual-information estimator is used to compute IT (d) = I(Φ; Y T | ZT ) following the procedure described in Section V. A LIME/Lasso decoder is finally 12 25 50 75 100 125 150 175 200                
+
+> Number of Super-Pixels ( d)
+> (Increasing Resolution)
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> Information (Bits)
+> Demand: Support Entropy H(S)
+> Supply: Mutual Info I(Φ; Y|Z)
+> Real Performance (Astronaut)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Decoder Success Rate (Lasso)
+> (Fixed Budget T=40, Noise σ= 0.5 )
+> Fig. 5. Empirical relationship between information content H(S(d)) ,information conveyed by the query channel IT(d), and decoder performance as a function of the number of super-pixels d.
+
+applied to obtain an estimated explanation, which is evaluated by correlation against the ground-truth super-pixel explanation. Figure 5 shows the resulting information accounting and algorithmic performance. The entropy H(S(d)) = log 2
+
+ dk
+
+ in-creases monotonically with d, reflecting the rising combinatorial complexity of identifying a k-sparse support in a d-dimensional representation. In contrast, the information supplied by the query channel, quantified by IT (d), remains approximately constant for fixed T , because the number of observations and the masking distribution are unchanged. The empirical correlation of the Lasso decoder with the ground truth follows these two curves closely: correlation remains high for all d such that H(S(d)) ≤ IT (d) and deteriorates sharply once H(S(d)) 
+
+exceeds IT (d).This behavior matches the strong-converse threshold pre-dicted by the theory. When H(S(d)) > I T (d), the explanation rate R(d) = H(S(d)) /T necessarily exceeds the effective capacity of the query channel. In this regime the strong converse guarantees that the probability of identifying the correct support converges to zero for any decoder, independent of its computational features or regularization strategy. Thus, the observed failure at higher resolutions is an information-theoretic inevitability rather than a consequence of estimator design. Interpreting resolution through this lens formalizes its operational meaning. The choice of d determines the cardinality of the support alphabet and therefore the number of bits that must be conveyed about the explanation. Increasing d increases this informational requirement, and recovery remains feasible only while the channel can support a corresponding amount of information. The empirical transition in Fig. 5 therefore constitutes a direct validation of the rate–capacity law for explanation channels. 
+
+E. Tokenization as Source Coding under Fixed Budget 
+
+In neural language processing (NLP), model is considered as a function that predicts upcoming words, assign probability to entire sentence by using tokenizer and contextual representation of token embeddings. Tokenizer consist tuple of encoder, decoder and finite dictionary where encoder is splitting the input text into smaller units [28]. Thanks to encoding in the tokenizer, model is able to quantize the input and process them in a computational way properly. At this point, how to split input text, i.e segmentation, directly influence on model’s performance either in downstream tasks or pretraining phase [29], [30], [31]. For example, oversegmentation of the text requires much more memory complexity and training time while the input is represented in a high grained way [32], [31] which causes impossible region in terms of the tokenization fidelity 2. Likewise, undersegmentation is creating the scheme that tokens are becoming long and rare which brings huge loss, i.e low performance, to model. Even if low tokenizer fertility is expected as necessary condition in the NLP domain, we know that it is not a sufficient condition to be good tokenizer [33]. Fig. 3 also points out that oversegmenation or undersegmentation regime under the fixed budget violates the explanation fidelity. Analogous to the super-pixel resolution in masking-based explanations, tokenization determines the granularity of the representation and thereby the entropy of the input signal. Under a fixed information-processing budget—realized through compute, or training capacity in terms of tokens—increasing token resolution leads to an increase in representational entropy that may exceed the effective channel capacity of the model. This induces a tradeoff between expressivity and recoverability, yielding an optimal tokenization regime. Ability of text generation for the models can be evaluated as reliable recovery level of the natural language by model. We study the impact of segmentation resolution on the predictive performance of a language model using a synthetic Markovian dataset consisting of 10K samples with varying sequence lengths. The tokenizer dictionary is constructed manually, including both frequent and rare tokens derived from the dataset. During training, standard greedy encoding is employed, consistent with typical BPE tokenization [32]. However, at test time, the encoding process is explicitly controlled via a resolution parameter that limits the maximum subword length. The results demonstrate that both oversegmentation and undersegmentation negatively impact performance. In the oversegmentation regime, sequences become excessively long which increase the size of attention matrices, i.e memory complexity, and inference time. In contrast, undersegmentation leads to coarse tokens that are rarely observed during training due to compute constraints, resulting in poor generalization. Furthermore, due to limitations in compute budget 3 (approx-imately 2K tokens, a 2-layer, 4-head model with embedding dimension d = 16 ), the model is unable to reliably learn representations for long subwords. As illustrated in Figure 6 by using Karpathy’s MicroGPT [35], even if such tokens are theoretically representable, they remain practically inaccessible               
+
+> 2Although there is no formal definition of tokenization fidelity , it can be understood as the extent to which tokens are able to carry semantically meaningful information in their embeddings. In this sense, character-based tokenization is often considered to yield weaker semantic representations compared to higher-level subword units.
+> 3Thanks to Scaling Law [34], N·D≈Cwhere D is the data in tokens and N is the number of parameters. 13
+> Fig. 6. Effect of segmentation resolution for texts on prediction performance. Left: Next-token prediction accuracy on an in-context learning (ICL) task as a function of resolution, where resolution denotes the maximum allowed subword length under greedy encoding. Both oversegmentation (small resolution) and undersegmentation (large resolution) degrade performance, with an optimal region emerging at intermediate resolutions. Right: Dictionary size as a function of resolution for the same dataset. As resolution increases, the number of possible substrings grows rapidly, leading to an unfeasible region beyond resolution
+> 5. The point labeled “ 6(+1K |Dict |)” indicates the asymptotic regime where covering all substrings would require a prohibitively large vocabulary. The horizontal line denotes the maximum achievable dictionary size by BPE under the given compute budget.
+
+during training. This is further supported by the dictionary growth analysis, which shows that covering all substrings at higher resolutions would require a rapidly increasing vocabulary (dictionary) size, rendering such regimes computationally infeasible. VII. C ONCLUSION 
+
+This paper develops a reliability theory for masking-based explanations by interpreting the interaction between an ex-plainer and a black-box model as communication over a query channel. In this formulation, the explanation to be recovered plays the role of a message, the masks are channel inputs, and the oracle responses are channel outputs. The complexity of the explanation is quantified by the entropy of the underlying hypothesis set, while the query interface supplies information at most at a capacity per query. A strong converse adapted from channel coding shows that whenever the explanation rate exceeds this identification capacity, exact recovery of the explanation becomes impossible in the limit, regardless of how queries are chosen or how decoding is implemented. An accompanying achievability result demonstrates that a sparse maximum-likelihood decoder can attain vanishing error when the explanation rate is below capacity, establishing a sharp boundary between feasible and infeasible regimes for masking-based XAI. To connect this theory to practice, we estimate the mutual information of the query channel via Monte Carlo methods and convert it into a finite-query benchmark for reliable explanation. In a controlled setting where exhaustive decoding is tractable, the block error probability of the optimal decoder exhibits a sharp transition near this benchmark, consistent with the theoretical threshold. When the same query data are decoded using Lasso- and OLS-based procedures that emulate LIME and KernelSHAP, the transition shifts to larger query budgets. This shift measures an algorithmic gap: a region where information theory admits reliable explanations but standard convex surrogates still fail to recover the correct support. Dense OLS decoding further requires queries that scale with the ambient dimension rather than the sparsity level, in line with the interpretation of dense regression as ignoring structure in the explanation. The query-channel viewpoint also clarifies the role of resolution and non-idealities. For image-based explanations, the number of super-pixels determines the entropy of the explanation source and therefore the explanation rate for a fixed query budget. The strong converse then implies the existence of a critical resolution beyond which no decoder can reliably recover the explanation. Empirical super-pixel experiments match this prediction: below the critical segmentation level, sparse decoders produce stable, semantically aligned heatmaps, whereas above it the correlation with the ground truth collapses, even though the underlying model remains well behaved. Additive noise and nonlinear curvature appear as channel degradations that reduce mutual information, shift the waterfall transition, and induce error floors when the information delivered by the query channel falls below the entropy of the explanation. Overall, the analysis yields operational design rules for masking-based XAI. For a given model and query mechanism, one can trade off query budget, sparsity level, and resolution to remain in a regime where reliable explanation is information-theoretically possible, and interpret instability or error floors as indicators of operating beyond capacity rather than as symptoms of poor optimization. Future work includes adaptive query policies that seek to maximize information per query under computational constraints, extensions to structured and group-sparse explanations, and applications of the query-channel formalism to other perturbation-based explanation methods and alternative query interfaces. Additionally, future work should investigate tokenization as a resolution problem since reliable recovery of the language, i.e ability of the text generation, is directly related to segmentation of the text by tokenizer and how it is processed by the model. Vocabulary related parameters in large language models are often selected without clear justification, even though they directly affect segmentation quality, rare-token frequency, and compute usage [36]. Existing scaling-law analyses largely emphasize data and non-vocabulary parameters, but vocabulary dependent parameters should also be treated as a core scaling 14 
+
+variable. Moreover, the multilingual perspective suggests that morphologically rich languages may require finer segmentation to avoid under-segmentation, whereas more analytic languages may not. A principled framework relating vocabulary size, tokenizer fertility, language morphology, rare-token statistics, and compute budget could therefore reveal language-dependent optimal tokenizers and move vocabulary design beyond current heuristic practice to more explainable lens. APPENDIX APROOF OF THEOREM 1This appendix provides a formal proof of Theorem 1. The argument proceeds in three steps: (i) we restate the query-channel model as an identification problem over a finite hypothesis set, (ii) we derive a single-letter upper bound on the information that any sequence of query strategies can extract, and (iii) we apply a classical strong converse for discrete memoryless channels to conclude that error probability converges to one whenever the rate exceeds the parameter-identification capacity C(S).
+
+A. Model and Code Definition 
+
+Let M be a finite hypothesis set with cardinality 
+
+|M| = 2 T R ,
+
+and let M be a random variable uniformly distributed over 
+
+M. Each hypothesis m ∈ M is mapped to a latent parameter vector Φ( m) ∈ Rd. In the sparse setting, Φ( m) is k-sparse and encodes, among other things, a support set S(m) ⊆ [d].The query process runs for T time steps. At time t, the explainer chooses a mask Zt ∈ { 0, 1}d according to a (possibly adaptive) query strategy, which may depend on M and all past observations. Formally, a query strategy is a sequence of conditional distributions 
+
+πt(zt | m, z t−1, y t−1), t = 1 , . . . , T, 
+
+where zt−1 = ( z1, . . . , z t−1) and yt−1 = ( y1, . . . , y t−1). The observation at time t is generated according to the query-channel law 
+
+Yt ∼ PY |Z, Φ(· | Zt, Φ( M )) ,
+
+and the joint distribution of (M, Z T , Y T ) is determined by the prior on M , the strategy {πt}, and the channel law PY |Z, Φ.At the end of T queries, a decoder 
+
+ψT : ZT × Y T → M 
+
+produces an estimate cM = ψT (ZT , Y T ) of the true hypothesis. The error probability of this (2 T R , T ) code is 
+
+P (T ) 
+
+> e
+
+= P( cM̸ = M ).
+
+The explanation rate is 
+
+R = 1
+
+T log 2 |M| = H(M )
+
+T bits/query ,
+
+as in Definition 3. The parameter-identification capacity C(S)
+
+is defined in Definition 4 as 
+
+C(S) ≜ sup 
+
+> πZ
+
+I(Φ; Y | Z),
+
+where πZ ranges over all mask distributions with full support on {0, 1}d.Theorem 1 asserts that if R > C (S), then there exists a constant A > 0, independent of T , such that 
+
+P (T ) 
+
+> e
+
+≥ 1 − e−AT ,
+
+for all (2 T R , T ) codes (i.e., for all sequences of strategies and decoders), and hence lim T →∞ P (T ) 
+
+> e
+
+= 1 .
+
+B. Information Bound for Arbitrary Query Strategies 
+
+The first step is to upper bound the mutual information between the hypothesis M and the observations (ZT , Y T ) in terms of C(S).
+
+Lemma 1. For any sequence of query strategies {πt}Tt=1 
+
+(possibly adaptive) and any blocklength T ,
+
+I(M ; Y T , Z T ) ≤ T C (S). (42) 
+
+Proof: We start from the chain rule for mutual information: 
+
+I(M ; Y T , Z T ) = 
+
+> T
+
+X
+
+> t=1
+
+I(M ; Yt, Z t | Y t−1, Z t−1)=
+
+> T
+
+X
+
+> t=1
+
+h
+
+I(M ; Zt | Y t−1, Z t−1) + I(M ; Yt | Y t−1, Z t)
+
+i
+
+.
+
+(43) The first term in the brackets is nonnegative, so 
+
+I(M ; Y T , Z T ) ≤
+
+> T
+
+X
+
+> t=1
+
+I(M ; Yt | Y t−1, Z t). (44) We now bound each summand. Fix t and condition on (Y t−1, Z t) = ( yt−1, z t). Given M
+
+and Zt, the observation Yt is generated according to the single-use query-channel law: 
+
+Yt ∼ PY |Z, Φ(· | Zt, Φ( M )) .
+
+By the memorylessness of the channel, Yt is conditionally independent of (Y t−1, Z t−1) given (M, Z t), so the following Markov chain holds: 
+
+(M, Y t−1, Z t−1) −→ (M, Z t) −→ Yt.
+
+Using data processing and the chain rule, we have 
+
+I(M ; Yt | Y t−1, Z t) ≤ I(M, Z t; Yt | Zt)= I(M ; Yt | Zt). (45) Next, the message M determines the latent parameter Φ = Φ( M ), so M → Φ → (Zt, Y t) forms a Markov chain given 
+
+Zt. In particular, 
+
+M −→ Φ −→ Yt given Zt,
+
+and by data processing, 
+
+I(M ; Yt | Zt) ≤ I(Φ; Yt | Zt). (46) Combining (45) and (46) yields 
+
+I(M ; Yt | Y t−1, Z t) ≤ I(Φ; Yt | Zt). (47) 15 
+
+By definition of C(S), for any distribution of Zt,
+
+I(Φ; Yt | Zt) ≤ C(S).
+
+The query strategy determines the conditional distribution of 
+
+Zt given (M, Y t−1, Z t−1), but the bound above holds for any such distribution, since C(S) is a supremum over all input distributions with full support. Substituting (47) into (44), we obtain 
+
+I(M ; Y T , Z T ) ≤
+
+> T
+
+X
+
+> t=1
+
+C(S) = T C (S),
+
+which proves the lemma. Lemma 1 shows that, regardless of how aggressively the explainer adapts its queries, the total amount of information that can be conveyed about M through T uses of the query channel is at most T C (S) bits. 
+
+C. Operational Capacity and Strong Converse 
+
+We now relate the single-letter bound to an operational capacity and invoke a strong converse result from classical channel coding theory. 
+
+Definition 6 (Operational Identification Capacity) . For the query-channel model described above, define the operational identification capacity as 
+
+Cid ≜ sup   
+
+> {πt,ψ T}T≥1
+
+
+
+lim sup  
+
+> T→∞
+
+1
+
+T log 2 |M T | : lim sup  
+
+> T→∞
+
+P (T ) 
+
+> e
+
+< 1
+
+
+
+,
+
+(48) 
+
+where MT is the message set of the (|M T |, T ) code and 
+
+P (T ) 
+
+> e
+
+is its error probability. The supremum is taken over all sequences of query strategies and decoders. 
+
+By standard arguments (see, e.g., Wolfowitz [23] or Csisz ´ar and K ¨orner), Cid can be expressed in terms of an information quantity associated with the channel. In our setting, the key step is to connect Cid and C(S).
+
+Lemma 2. The operational identification capacity satisfies 
+
+Cid ≤ C(S). (49) 
+
+Proof: Consider any fixed sequence of codes indexed by 
+
+T , with message sets MT , priors uniform over MT , strategies 
+
+{πt}, and decoders ψT . For blocklength T , the rate is 
+
+RT = 1
+
+T log 2 |M T | = H(MT )
+
+T ,
+
+where MT is the uniform message. By Lemma 1, we have 
+
+I(MT ; Y T , Z T ) ≤ T C (S). (50) On the other hand, for any decoder ψT , the joint distribution of 
+
+(MT , cMT ) satisfies the usual relations between error probability and mutual information (via, e.g., the method of types and divergence bounds). In particular, strong converse results for discrete memoryless channels (such as Theorem 5.8.3 in [37] or Wolfowitz’s original theorem [23]) imply that if 
+
+RT > 1
+
+T I(MT ; Y T , Z T ) + δ, 
+
+for some fixed δ > 0 and all sufficiently large T , then the error probability P (T ) 
+
+> e
+
+must converge to one exponentially fast. Combining with (50), we obtain that for any ϵ > 0, if 
+
+RT > C (S) + ϵ
+
+for all sufficiently large T , then P (T ) 
+
+> e
+
+→ 1 and in fact P (T ) 
+
+> e
+
+≥
+
+1 − e−AT for some A > 0. Therefore, any rate strictly greater than C(S) is not achievable in the sense of Definition 6, which implies Cid ≤ C(S).Lemma 2 shows that the single-letter quantity C(S) provides an upper bound on the operational capacity. The converse direction (that rates below C(S) are achievable) is addressed by the achievability results in Section IV and is not needed for the strong converse. 
+
+D. Proof of Theorem 1 
+
+We now combine the lemmas above with a classical strong converse statement. Fix a rate R and consider any sequence of (2 T R , T ) codes with query strategies and decoders ({π(T ) 
+
+> t
+
+}, ψ T ) achieving rate 
+
+R for each blocklength T . Suppose that R > C (S).By Lemma 2, the operational identification capacity satisfies 
+
+Cid ≤ C(S). Hence R > C id . By the strong converse for discrete memoryless channels (with or without feedback), there exists a constant A > 0 (depending only on the channel law) such that the average error probability of any sequence of codes with rate R > C id satisfies 
+
+P (T ) 
+
+> e
+
+≥ 1 − e−AT 
+
+for all sufficiently large T . Since R > C (S) implies R > C id ,the same bound holds for any sequence of query strategies and decoders operating at rate R.REFERENCES [1] D. L. Donoho, “Compressed sensing,” IEEE Transactions on Information Theory , vol. 52, no. 4, pp. 1289–1306, 2006. [2] E. J. Cand `es, J. Romberg, and T. Tao, “Robust uncertainty principles: Ex-act signal reconstruction from highly incomplete frequency information,”                
+
+> IEEE Transactions on Information Theory , vol. 52, no. 2, pp. 489–509, 2006. [3] D. L. Donoho, A. Maleki, and A. Montanari, “Message-passing algo-rithms for compressed sensing,” Proceedings of the National Academy of Sciences , vol. 106, no. 45, pp. 18 914–18 919, 2009. [4] M. J. Wainwright, “Information-theoretic limits on sparsity recovery in the high-dimensional and noisy setting,” IEEE Transactions on Information Theory , vol. 55, no. 12, pp. 5728–5741, 2009. [5] G. Reeves and M. Gastpar, “Compressed sensing phase transitions: Rigorous bounds versus replica predictions,” in 2012 46th Annual Conference on Information Sciences and Systems (CISS) .IEEE, 2012, pp. 1–6. [6] Y. Wu and S. Verd ´u, “Optimal phase transitions in compressed sensing,”
+> IEEE Transactions on Information Theory , vol. 56, no. 8, pp. 3721–3748, 2010. [7] W. Wang, M. J. Wainwright, and K. Ramchandran, “Information-theoretic limits on sparse signal recovery: Dense versus sparse measurement matrices,” IEEE Transactions on Information Theory , vol. 56, no. 6, pp. 2967–2979, 2010. [8] A. Xu and M. Raginsky, “Information-theoretic analysis of generalization capability of learning algorithms,” in Advances in Neural Information Processing Systems (NeurIPS) , vol. 30, 2017. [9] A. Achille and S. Soatto, “Information dropout: Learning optimal representations through noisy computation,” in IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 40, no. 12, 2018, pp. 2897–2905. 16
+
+[10] N. Tishby, F. C. Pereira, and W. Bialek, “The information bottleneck method,” arXiv preprint physics/0004057 , 2000. [11] S. M. Lundberg and S.-I. Lee, “A unified approach to interpreting model predictions,” in Advances in Neural Information Processing Systems (NeurIPS) , vol. 30, 2017, pp. 4765–4774. [12] E. Strumbelj and I. Kononenko, “Explaining prediction models and individual predictions with feature contributions,” Knowledge and Information Systems , vol. 41, no. 3, pp. 647–665, 2014. [13] M. T. Ribeiro, S. Singh, and C. Guestrin, ““why should i trust you?”: Explaining the predictions of any classifier,” in Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining , 2016, pp. 1135–1144. [14] D. Alvarez-Melis and T. S. Jaakkola, “On the robustness of interpretability methods,” in Proceedings of the ICML Workshop on Human Interpretabil-ity in Machine Learning (WHI) , 2018. [15] D. Slack, S. Hilgard, E. Jia, S. Singh, and H. Lakkaraju, “Fooling lime and shap: Adversarial attacks on post-hoc explanation methods,” in 
+
+Proceedings of the AAAI/ACM Conference on AI, Ethics, and Society ,2020, pp. 180–186. [16] A. Ghorbani, A. Abid, and J. Zou, “Interpretation of neural networks is fragile,” in Proceedings of the AAAI Conference on Artificial Intelligence ,vol. 33, 2019, pp. 3681–3688. [17] D. Garreau and U. von Luxburg, “Explaining the explainer: A first theoretical analysis of lime,” Journal of Machine Learning Research ,vol. 22, no. 128, pp. 1–31, 2021. [18] J. Adebayo, J. Gilmer, M. Muelly, I. Goodfellow, M. Hardt, and B. Kim, “Sanity checks for saliency maps,” in Advances in Neural Information Processing Systems (NeurIPS) , vol. 31, 2018. [19] C.-K. Yeh, C.-Y. Hsieh, A. Suggala, D. I. Inouye, and P. Ravikumar, “On the (in)fidelity and sensitivity of explanations,” in Advances in Neural Information Processing Systems (NeurIPS) , vol. 32, 2019. [20] S. Hooker, D. Erhan, P.-J. Kindermans, and B. Kim, “A benchmark for interpretability methods in deep neural networks,” in Advances in Neural Information Processing Systems (NeurIPS) , vol. 32, 2019. [21] I. Covert and S.-I. Lee, “Improving kernelshap: Practical shapley value estimation using linear regression,” in International Conference on Artificial Intelligence and Statistics (AISTATS) . PMLR, 2021, pp. 3457– 3465. [22] C. E. Shannon, “A mathematical theory of communication,” The Bell System Technical Journal , vol. 27, no. 3, pp. 379–423, 1948. [23] J. Wolfowitz, “The coding of messages subject to chance errors,” Illinois Journal of Mathematics , vol. 1, no. 4, pp. 591–606, 1957. [24] T. M. Cover and J. A. Thomas, Elements of information theory . John Wiley & Sons, 2006. [25] S. Rao, “The limits of ai explainability: An algorithmic information theory approach,” 2025. [Online]. Available: https://arxiv.org/abs/2504.20676 [26] R. Achanta, A. Shaji, K. Smith, A. Lucchi, P. Fua, and S. S ¨usstrunk, “Slic superpixels compared to state-of-the-art superpixel methods,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 34, no. 11, pp. 2274–2282, 2012. [27] A. E. Hoerl and R. W. Kennard, “Ridge regression: Biased estimation for nonorthogonal problems,” Technometrics , vol. 12, no. 1, pp. 55–67, 1970. [28] N. Rajaraman, J. Jiao, and K. Ramchandran, “An analysis of tokenization: Transformers under markov data,” Advances in Neural Information Processing Systems , vol. 37, pp. 62 503–62 556, 2024. [29] J. Libovick `y, H. Schmid, and A. Fraser, “Why don’t people use character-level machine translation?” in Findings of the Association for Computational Linguistics: ACL 2022 , 2022, pp. 2470–2485. [30] T. Kudo and J. Richardson, “Sentencepiece: A simple and language independent subword tokenizer and detokenizer for neural text processing,” in Proceedings of the 2018 conference on empirical methods in natural language processing: System demonstrations , 2018, pp. 66–71. [31] L. Xue, A. Barua, N. Constant, R. Al-Rfou, S. Narang, M. Kale, A. Roberts, and C. Raffel, “Byt5: Towards a token-free future with pre-trained byte-to-byte models,” Transactions of the Association for Computational Linguistics , vol. 10, pp. 291–306, 2022. [32] R. Sennrich, B. Haddow, and A. Birch, “Neural machine translation of rare words with subword units,” in Proceedings of the 54th annual meeting of the association for computational linguistics (volume 1: long papers) , 2016, pp. 1715–1725. [33] M. Ali, M. Fromm, K. Thellmann, R. Rutmann, M. L ¨ubbering, J. Leveling, K. Klug, J. Ebert, N. Doll, J. Buschhoff et al. , “Tokenizer choice for llm training: Negligible or crucial?” in Findings of the Association for Computational Linguistics: NAACL 2024 , 2024, pp. 3907–3924. [34] J. Kaplan, S. McCandlish, T. Henighan, T. B. Brown, B. Chess, R. Child, S. Gray, A. Radford, J. Wu, and D. Amodei, “Scaling laws for neural language models,” arXiv preprint arXiv:2001.08361 , 2020. [35] A. Karpathy, “microgpt,” https://karpathy.github.io/2026/02/12/microgpt/, 2026, accessed: 2026-04-12. [36] S. Takase, R. Ri, S. Kiyono, and T. Kato, “Large vocabulary size improves large language models,” in Findings of the Association for Computational Linguistics: ACL 2025 , 2025, pp. 1015–1026. [37] I. Csisz ´ar and J. K ¨orner, Information theory: coding theorems for discrete memoryless systems . Cambridge University Press, 2011.
