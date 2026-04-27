@@ -1,0 +1,306 @@
+Title: IonMorphNet: Generalizable Learning of Ion Image Morphologies for Peak Picking in Mass Spectrometry Imaging
+
+URL Source: https://arxiv.org/pdf/2604.19369v1
+
+Published Time: Wed, 22 Apr 2026 01:20:03 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# IonMorphNet: Generalizable Learning of Ion Image Morphologies for Peak Picking in Mass Spectrometry Imaging 
+
+## Philipp Weigand 1,2,* Niels Nawrot 1,* Nikolas Ebert 1 Carsten Hopf 1 Oliver Wasenm¨ uller 1,2 1Mannheim University of Applied Sciences, Germany 
+
+> 2
+
+## Faculty of Biosciences, Heidelberg University, Germany 
+
+{p.weigand, n.nawrot, n.ebert, c.hopf, o.wasenmueller }@th-mannheim.de 
+
+## Abstract 
+
+Peak picking is a fundamental preprocessing step in Mass Spectrometry Imaging (MSI), where each sample is repre-sented by hundreds to thousands of ion images. Existing approaches require careful dataset-specific hyperparameter tuning, and often fail to generalize across acquisition proto-cols. We introduce IonMorphNet, a spatial-structure–aware representation model for ion images that enables fully data-driven peak picking without any task-specific supervision. We curate 53 publicly available MSI datasets and define six structural classes capturing representative spatial pat-terns in ion images to train standard image backbones for structural pattern classification. Once trained, IonMor-phNet can assess ion images and perform peak picking without additional hyperparameter tuning. Using a Con-vNeXt V2-Tiny backbone, our approach improves peak pick-ing performance by +7% mSCF1 compared to state-of-the-art methods across multiple datasets. Beyond peak pick-ing, we demonstrate that spatially informed channel re-duction enables a 3D CNN for patch-based tumor classi-fication in MSI. This approach matches or exceeds pixel-wise spectral classifiers by up to +7 .3% Balanced Accuracy on three tumor classification tasks, indicating meaningful ion image selection. The source code and model weights are available at https://github.com/CeMOS-IS/ IonMorphNet .
+
+## 1. Introduction 
+
+Mass Spectrometry Imaging (MSI) enables label-free anal-ysis of molecular spatial distributions in biological tis-sues which is important for pharmaceutical research, drug development [35], discovery of candidate biomarkers [6] and histopathological tissue analysis [34]. MSI produces biomolecular images with channel dimensions of up to tens  
+
+> *Equal contribution IonMorphNet
+> Foundational
+> Encoder
+> Spatially Grounded
+> Peak Picking
+> +7 %
+> mSCF1 Diverse Organisms
+> (Human, Mouse, Plant, ...)
+> Heterogeneous Organs
+> (Brain, Kidney, Lung, ...)
+> Different Instruments
+> (timsTOF, FT-ICR, Orbitrap)
+> Spatio-
+> Spectral
+> Sampling 3D
+> CNN
+> Downstream Task:
+> Tumor Classification
+> +7.3 %
+> Balanced
+> Accuracy
+
+Figure 1. Overview of IonMorphNet, a foundational ion image encoder for Mass Spectrometry Imaging (MSI). IonMorphNet is pre-trained on morphology classification across diverse organ-isms, organs and instrument types. The frozen encoder performs ion image assessment, thereby enabling spatially grounded peak picking across diverse datasets. Furthermore, spatially grounded peak picking enables tumor classification with 3D CNNs which can improve Balanced Accuracy by up to +7 .3% compared to pix-elwise approaches. 
+
+of thousands of channels (m/z values). Untargeted analysis requires prefiltering of distinct signals and removal of arti-facts and noise to enhance the information content in MSI data and the single channel images called ion images .The standard filtering strategy is peak picking [9, 17], which is currently challenged by rule-based spatially in-formed approaches [3, 4, 21, 26] as well as deep-learning-based methods [1, 41]. However, all existing methods need hyperparameter tuning, and in the case of deep-learning-based approaches, training from scratch is necessary for each MSI dataset. This has the potential to yield favourable outcomes on particular datasets for which a method was de-veloped. However, it can result in suboptimal generalization 
+
+> arXiv:2604.19369v1 [cs.CV] 21 Apr 2026
+
+across other datasets, as demonstrated recently [41]. While powerful image encoders dominate the domain of natural images [14, 33, 36], they have so far been absent from the MSI domain. Tasks like classification, segmentation, and object detection have not been widely applied in MSI due to the limited availability and high cost of annotated samples. Furthermore, the tissue sections originate from different or-ganisms and organs, that are measured on different devices and require expert annotation to obtain labels such as tumor-ous and healthy tissue regions. These diverse data sources pose a challenge regarding the generalization across organ-isms, organs and measurement devices. Currently, most su-pervised tasks are performed on single datasets with their specific characteristics [2, 7, 20, 22, 24]. Therefore, the MSI domain would greatly benefit from a generalizable ion image encoder which can be applied across various types of datasets. In this work, we propose IonMorphNet, the first general-purpose image encoder for MSI ion images. It is designed to enhance spatially informed peak picking without any re-quired hyperparameter tuning during inference. To enable cross-dataset generalization, we collected 53 publicly avail-able diverse MSI datasets covering different organisms and organs, measured with various devices, and labeled their ion images with structure-based class labels that can be transferred to any MSI dataset. This unique dataset collec-tion enables, for the first time, large scale training of com-mon image encoders for structure assessment of ion images. Our IonMorphNet outperforms state-of-the-art peak pick-ing methods by +7% Avg. mSCF1 while requiring nei-ther retraining nor hyperparameter tuning for new datasets. We perform ablation studies on the selected classes for peak picking, on different backbones and analyze the impact of ImageNet [12] pretraining. Furthermore, we showcase the applicability of our Ion-MorphNet as a preprocessing step before tumor classifi-cation. By reducing the channel dimensionality of MSI datasets, we enable the application of 3D CNNs, which ex-ceed pixel-wise classification by up to +7 .3% Balanced Ac-curacy or achieve similar results. 
+
+## 2. Related Work 
+
+2.1. Peak Picking 
+
+Classical Peak Picking. In an MSI dataset, spectra are typically represented in either profile or centroided format. Profile spectra retain the full peak shapes and typically con-tain the same number of m/z values in each pixel. Cen-troiding, or peak picking, reduces these peak shapes to a single m/z value per peak. Most peak picking methods process spectra separately from each other, without spa-tial context. MALDIquant [17] and Cardinal [9], for in-stance, offer modular MSI analysis pipelines that encom-pass peak picking functionality. Such methods typically rely on signal-to-noise ratio thresholding applied to indi-vidual spectra to differentiate true peaks from background noise. However, they completely neglect the spatial in-formation inherent in MSI data. Sparse frame multipli-ers [26] were proposed as the first technique to exploit both spatial and spectral (spatio-spectral) information for peak picking of structured ion images in matrix-assisted laser desorption/ionization (MALDI) time-of-flight (TOF) MSI datasets. Unlike the methods described above, another line of work operates exclusively on ion images, disregarding the spectral dimension of MSI data. The measure of spa-tial chaos [4] was introduced to quantify the spatial struc-ture of peak picked ion images, while an adaptation of the Gray Level Co-Occurrence (GCO) matrix [16] was later proposed for analogous purposes [43]. A subsequent refine-ment of the spatial chaos measure was presented as part of a broader pipeline for identifying biologically meaningful molecular signals [30]. It is important to note that both the spatial chaos measure and the GCO matrix approach have been specifically designed to evaluate the spatial quality of pre-selected, already peak-picked ion images, and neither constitutes a peak picking method in its own right. SPUT-NIK [21] takes a different approach, even though it simi-larly focuses on ion images, but is explicitly designed as a peak picking pipeline for profile MSI data. The method first constructs a dataset-level reference image via principal component analysis [32], then identifies relevant peaks by correlating individual ion images against this reference. 
+
+Deep-Learning-based Peak Picking. The latest peak picking approaches are both self-supervised autoencoders. msiPL [1] utilizes a variational autoencoder [23] of feed-forward-layers to reconstruct single mass spectra of a MSI dataset separately. Subsequently, relevant peaks are se-lected by identifying the most prominent input weights of the model and the corresponding m/z-values. S 3PL [41] ex-tends this approach by processing spatio-spectral patches in a self-supervised manner using 3D Convolutions and an at-tention mask as the bottleneck. After training, the attention mask is analyzed for the most prominent m/z-values. How-ever, unlike our proposed IonMorphNet, both msiPL and S3PL have to be trained individually for each MSI dataset. 
+
+Evaluation of Peak Picking Methods. Recently, the first quantitative evaluation procedure for spatially struc-tured peak picking on profile datasets has been pro-posed [41]. Instead of labeling every single peak in a dataset, a segmentation mask for the specific MSI dataset is correlated to all ion images to conclude a ground truth peak selection. The pearson correlation coefficient (PCC) is employed as the correlation measure between every ion image and segmented area to rank every ion image. Multi-ple correlation thresholds are considered to prevent a biased threshold selection and to define the metric for the perfor-MALDI    
+
+> DESI
+> Orbitrap
+> FT-ICR
+> timsTOF
+> Human
+> Mouse
+> Other animal
+> Plant
+> Kidney
+> Colon
+> Whole organism
+> Root
+> Skin
+> Brain
+> Ovary
+> Lung
+> Leaf
+> Heart
+> Other parts
+> Ion Source Analyzer Organism Organism Part
+
+Figure 2. Overview of all 53 collected public datasets regarding ion source, analyzer, organism and organism part. 
+
+mance of a peak picking method, called the mean spatial correlation F1 Score: mSCF1 . We will use the mSCF1 to evaluate our proposed IonMorphNet and compare it against the current state-of-the-art. 
+
+2.2. Tumor Classification in Mass Spectrometry Imaging 
+
+The spectral information in mass spectra enables the clas-sification of different tumor types such as lung tumor [7], colorectal cancer [20], bladder cancer [18], ductal carci-noma [22], brain tumor [2] and renal cell carcinoma [8]. These works classify each pixel (spectrum) of an MSI mea-surement separately, finally leading to a segmentation map. Supervised segmentation networks, which directly output a segmentation map have not been proposed yet, as the num-ber of available tissue samples is usually limited to two to eight tissue sections. Therefore, current approaches clas-sify mass spectra of MSI datasets separately and report the mean balanced accuracy across all test tissue sections as their evaluation metric. Using our IonMorphNet, we will demonstrate a spatio-spectral classification that is superior to pixel-wise classification. 
+
+## 3. Method 
+
+3.1. Dataset Collection and Annotation 
+
+In Mass Spectrometry Imaging (MSI), a large-scale standardized benchmark comparable to ImageNet [12], COCO [27], or CIFAR [25] does not yet exist. MSI data are generated using a wide range of mass spectrometers, acquisition protocols, and tissue types, making cross-study standardization difficult. However, the platform METAS-PACE [5] enables researchers to upload and publicly share MSI datasets, resulting in a large and diverse collection of ion images acquired under heterogeneous experimental conditions. In this work, we utilize 53 public datasets from METAS-PACE to construct a labeled dataset for learning spatial mor-phology in ion images. The selected datasets cover a wide range of organisms, organs, acquisition protocols, instru-ment types, and spatial resolutions. Although human and mouse tissue samples constitute the majority of publicly available MSI data, we intentionally limited their propor-tion and preferentially included datasets from plants and other animals in order to increase biological diversity. An overview of the collected datasets is shown in Fig. 2. 
+
+Structural Classes. The central task addressed in this work is the assessment of spatial structure and information content in ion images. In contrast to conventional visual recognition benchmarks such as ImageNet, MSI ion im-ages do not contain discrete semantic objects. Instead, they represent spatial distributions of molecules whose patterns may vary in intensity, coherence, and spatial extent. Conse-quently, the distinction between “structured” and “unstruc-tured” images is inherently ambiguous and subjective. To reduce this ambiguity, we introduce a standardized annotation protocol that captures common spatial patterns observed in MSI. Rather than enforcing a binary decision, we define six structural classes that represent the most fre-quently occurring spatial signal patterns while remaining sufficiently general to transfer across different organisms, organs, and acquisition protocols. The six structural classes are defined as follows: 
+
+Structured: The entire sample structure is clearly visi-ble; signal is dense, continuous, and fills the region without Localized  Fragmented Negative Structured  Weakly structured  Unstructured Figure 3. Overview of the six structural classes we used to label all 53 collected MSI datasets. Table 1. Class distribution across training, validation and test set. Counts refer to the number of ion images per morphology class in each split; the last row reports the total sum across all splits. 
+
+Dataset Split Structured Weakly Structured Localized Fragmented Unstructured Negative Total Training (80.0 %) 3,136 883 1,141 947 1,218 1,099 8,424 Validation (3.5 %) 137 46 81 19 32 23 338 Test (16.5 %) 616 209 227 196 303 175 1,726 
+
+P 3,889 1,138 1,449 1,162 1,553 1,297 10,488 
+
+gaps. 
+
+Negative: Images exhibit strong but inverted structure, the sample appears as a dark mask. 
+
+Localized: The signal is confined to specific localized re-gions and does not represent the full structure. 
+
+Weakly Structured: The full structure is visible but with lower intensity or thinner signal; gaps and reduced contrast may occur. 
+
+Fragmented: The signal is split into multiple distinct dense clusters; clusters are separated and not continuous. 
+
+Unstructured: The signal is random, noisy, sparse, or dif-fuse with no discernible pattern or anatomical correspon-dence. A visual overview across these classes is provided in Fig. 3. 
+
+Annotation Strategy and Dataset Split. Using the de-fined structural classes, we manually annotated ion images extracted from the selected datasets. Instead of labeling all ion images within each MSI dataset, we focused primarily on images exhibiting meaningful spatial patterns. In raw MSI datasets, the majority of ion images contain little sig-nal or are dominated by noise, which would lead to a severe class imbalance if annotated exhaustively. To preferentially sample informative ion images, we leveraged the ranking system provided by METASPACE, which prioritizes ion signals supported by database-based molecular annotations. Ion images were generated by inte-grating intensities within a symmetric window around each target mass-to-charge ratio (m/z), using the dataset-specific parts-per-million (ppm) tolerance from METASPACE. Each extracted ion image was assigned one of the six structural labels. All annotations were performed by three experts. Ambiguous cases were resolved by consensus. In total, this procedure resulted in 10 , 488 labeled ion images across the 53 datasets. To prevent leakage of spatial pat-terns, dataset splits are performed at dataset level. The dataset collection was split into 43 training, 5 validation, and 5 test datasets. Detailed statistics on class distributions and dataset splits are provided in Tab. 1. The resulting col-lection of labeled ion images forms the basis for training a generalizable representation model for MSI morphology. 
+
+3.2. Ion Image Preprocessing 
+
+Each ion image represents a single-channel spatial intensity map. Prior to training, all images undergo a standardized preprocessing pipeline consistent with the visualization pro-cedure used in METASPACE. First, hotspot clipping is applied to reduce the influence of sparse high-intensity spikes that commonly occur in MSI measurements. Next, each image is robustly normalized by dividing intensities by the 99th percentile value and subse-quently clamped to the range [0 , 1] . This normalization en-sures comparable dynamic ranges across datasets with dif-ferent acquisition conditions. After normalization, ion im-ages are resized to a fixed resolution of 224 × 224 pixels to match the input requirements of standard image classifica-tion networks. To improve model robustness, we apply image aug-mentations that preserve the underlying spatial structure. Specifically, we use random horizontal and vertical flipping as well as random rotations by multiples of 90 ◦. These transformations are chosen because they do not alter the structural morphology of ion images. In contrast, region-removal augmentations such as CutMix [45] or Cutout [13] are intentionally avoided, as removing image regions may significantly alter or destroy the spatial patterns associated with a given structural label. 
+
+3.3. Spatial Structure Learning with IonMorphNet 
+
+Direct supervision for tasks such as MSI peak picking or ion relevance estimation is scarce and often tied to specific studies or expert assumptions. Instead of training a model directly for peak selection, we formulate spatial structure classification as a proxy learning task. Given an ion image I ∈ RH×W , the objective is to pre-dict a structural label y ∈ { 1, . . . , N }, where N = 6 refers to the number of structural classes defined in Sec. 3.1. Al-though this task is not the final application goal, it encour-ages the model to learn representations that capture spatial coherence, localization, fragmentation, and noise patterns-properties that are highly relevant for downstream MSI analysis. The proposed model, IonMorphNet, follows a standard image classification architecture consisting of an image en-coder and a lightweight prediction head. The encoder maps each ion image to a fixed-dimensional embedding vector, which is subsequently passed to a classifier that predicts the structural class. As encoders, we consider both convolutional neural net-works (CNN) and vision transformer (ViT) architectures pretrained on ImageNet. Pretraining provides generic visual features that can be adapted to MSI morphology learning. The impact of ImageNet pretraining is analyzed in Tab. 5. After training, the model can be applied to ion images from unseen MSI datasets to assess their spatial structure. The diversity of the curated dataset collection plays an important role in enabling the model to generalize across different biological tissues, acquisition protocols, and in-strument types. By learning to discriminate between dif-ferent spatial structure types across many heterogeneous datasets, IonMorphNet acquires representations that capture common morphological characteristics of MSI ion images. 
+
+## 4. Experiments 
+
+We evaluate IonMorphNet on two complementary tasks. First, we assess its performance for peak picking on raw mass spectrometry imaging (MSI) spectra and compare it against established peak picking methods. Second, we in-vestigate whether IonMorphNet can serve as an effective dimensionality reduction step for downstream tumor classi-fication using spatially aware spectral patches. In addition, we analyze the influence of several design choices through ablation studies. 
+
+4.1. Experimental Setup 
+
+Evaluation Datasets. For our evaluations, we use the same test datasets as described in S 3PL [41] to validate our pretrained IonMorphNet. The test datasets include a mouse brain tumor model of glioblastoma (GBM) [2], a renal cell carcinoma (RCC) dataset [8], and a human colorectal ade-nocarcinoma (CAC) dataset [20]. The datasets consist of raw profile spectra together with corresponding tissue an-notations. Each dataset collection contains eight tissue sec-tions, resulting in a total of 24 tissue sections across all datasets. Note that these datasets are not included in our labeled collection of 53 MSI datasets. 
+
+Training Details. We employ Cross-Entropy as the loss function. All experiments are performed using weighted random sampling with a batch size of 16 , cosine learn-ing rate schedule with warm restarts [29] with 8 warmup epochs, starting with a learning rate of 3 × 10 −5 and a min-imum learning rate of 10 −6. Dropout [37] is used with a rate of 0.05 . We train with a patience of 10 epochs but for a maximum of 100 epochs. We track the validation loss and choose the model with the lowest validation loss as our final model. We obtained all model architectures and pre-trained weights from the timm library [42] and performed our experiments on a single NVIDIA A100 GPU. We use pyM2aia [11] as an efficient batch generator for imzML files. 
+
+4.2. Peak Picking Evaluation 
+
+Peak picking is a standard preprocessing step for raw (pro-file) mass spectra, reducing data dimensionality while fo-cusing on informative peaks and ion images. We com-pare our approach with current state-of-the-art peak pick-ing methods by evaluating the spatial informativeness of the selected ion images, as recently proposed [41]. To do so, our IonMorphNet is applied on each ion image of a dataset and provides a score for the degree of structure S
+
+for each ion image. Given the logit vector z ∈ RN , where 
+
+N = 6 denotes the number of classes, produced by our Ion-MorphNet, we apply softmax to obtain the predicted class probabilities ˆp = softmax (z). We then define the degree of structure score S for a predefined set of target classes 
+
+T ⊆ { 1, . . . , N } as the cumulative probability mass over those classes: 
+
+ST = X
+
+> k∈T
+
+ˆpk. (1) Here, T may correspond to a semantically meaningful grouping of classes. For instance, we consider the classes 
+
+Structured , Negative and Localized as spatially informative and calculate the Score S by summing the softmax probabil-ities of these specific classes. We will later demonstrate that this combination yields optimal peak picking results (see Tab. 3). The IonMorphNet is applied to each ion image, re-sulting in the generation of a list that provides a ranking of all ion images in a dataset according to their degree of spa-tial structure. In order to compare our approach to the state-GBM12 1 GBM12 2 GBM22 1 GBM22 2 GBM39 1 GBM39 2 GBM108 pos GBM108 neg 0.00.20.40.60.81.0
+
+> mSCF  1
+
+GBM 
+
+> MH0204 33 UH0505 12 UH0710 33 UH9610 15 UH9812 03 UH9905 18 UH9911 05 UH9912 01
+
+0.00.20.40.60.81.0 RCC 
+
+> 40TopL 160TopL 200TopL 240TopL 280TopL 360TopL 400TopL 520TopL
+
+0.00.20.40.60.81.0 CAC 
+
+msiPL Lieb et al. MALDIquant SPUTNIK S3PL IonMorphNet (Ours) Figure 4. Detailed peak picking results of our model compared to the State of the Art [1, 17, 21, 26, 41] on the GBM [2], RCC [8] and CAC [20] datasets. For further details, we refer to the benchmark paper [41]. Our model picked those ion images for which the summed probability predictions for the classes structured , localized and negative are the highest. Table 2. Averaged peak picking results of our model compared to the State of the Art [1, 17, 21, 26, 41] across the GBM [2], RCC [8] and CAC [20] datasets. 
+
+Method Avg. mSCF1 (%) Lieb et al. [26] 25.7 MALDIquant [17] 30.7 SPUTNIK [21] 32.9 msiPL [1] 33.2 S3PL [41] 52.2 IonMorphNet (Ours) 59.2 
+
+of-the-art peak picking methods, it is necessary to select a comparable number of peaks n, for each tissue section. This number is provided by the evaluation protocol, and the or-dered list of ion images can simply be cut off at this number 
+
+n, leaving the top n ion images with a high degree of spatial structure. Tab. 2 shows the averaged mSCF1 results across the three evaluation datasets and Fig. 4 illustrates the peak pick-ing performance for all tissue sections separately. Our ap-proach outperforms state-of-the-art methods on 19 out of 24 
+
+tissue sections with an overall average mSCF1 of 59 .2 %. In contrast to the current state-of-the-art in peak picking, we achieve these impressive results without any required parameter tuning or dataset-specific training. Overall, our evaluation demonstrates that incorporating spatial morphol-ogy through ion image analysis enhances peak selection performance compared to purely spectral approaches. 
+
+4.3. Ablation Studies 
+
+Structure Class Selection. IonMorphNet relies on struc-tural labels that describe characteristic spatial patterns ob-served in ion images. To evaluate the influence of these classes, we evaluate models using different subsets of the available structural categories. Tab. 3 reports the resulting mSCF1 scores for each configuration. 
+
+> Table 3. Ablation study on classes which are considered as spa-tially structured for the task of peak picking.
+
+Structured Negative Localized Weakly Struc-tured Avg. mSCF1 (%) 
+
+✓ ✓ ✓ 59.2 
+
+✓ ✓ ✓ ✓ 56.0 
+
+✓ ✓ 55.4 
+
+✓ ✓ ✓ 53.6 
+
+✓ ✓ 50.3 
+
+✓ 45.2 The classes structured and negative are essential to in-clude, as they contribute to the best four results. Although 
+
+localized and weakly structured both represent subtle pat-terns, peak picking is most beneficial when focusing specif-ically on the structured , negative , and localized categories. 
+
+Backbone Architectures. To investigate the impact of the feature extractor, we evaluate several state-of-the-art CNN and ViT backbone architectures commonly used for image classification in Tab. 4. All backbones are trained under identical conditions. Note that we chose the classes in ac-cordance with our previously described ablation. The ConvNeXt-V2 Tiny backbone achieves the best av-erage mSCF1 of 59 .2 %. It is important to note that each backbone outperforms the current State of the Art, S 3PL. 
+
+ImageNet Pretraining. We further examine whether ini-tializing the backbone with ImageNet-pretrained weights improves performance. Tab. 5 compares models trained from random initialization with models initialized using Table 4. Comparison of different backbones for our classification model. We use the classes ”structured”, ”localized” and ”negative” to select spatially structured peaks. 
+
+Backbone Params Avg. Test mSCF1 Acc. (%) (%) 
+
+Convolutional Neural Networks 
+
+ConvNeXt V2-Ti [44] 27.9 M 59.2 74.0 ConvNeXt V2-B [44] 87.7 M 57.6 63.1 ResNet34 [19] 21.2 M 55.2 70.0 ResNet50 [19] 23.5 M 58.1 71.8 ResNet101 [19] 42.5 M 58.7 68.1 ResNet152 [19] 58.1 M 55.6 73.2 Xception [10] 24.9 M 56.4 71.1 EfficientNet-B3 [38] 10.7 M 52.6 62.1 EfficientNet-B5 [38] 28.3 M 55.9 65.2 
+
+Vision Transformers 
+
+SwinV2-S [28] 48.9 M 54.7 71.0 PVTv2-B0 [40] 3.4 M 54.7 74.3 PVTv2-B3 [40] 44.7 M 53.0 72.9 PVTv2-B5 [40] 81.4 M 53.6 74.3 DeiT-Ti [39] 5.4 M 55.4 70.9 DeiT-S [39] 21.5 M 53.8 67.1 DINOv3-S [36] 21.4 M 53.6 68.6   
+
+> Table 5. Comparison of Avg. mSCF1 results for ImageNet [12] pretrained backbones and training from scratch.
+
+Backbone Avg. mSCF1 (%) Pretrained from Scratch ConvNeXt V2-Ti [44] 59.2 48.4 ResNet101 [19] 58.7 50.7 ResNet50 [19] 58.1 52.9 Xception [10] 56.4 56.6 
+
+SwinV2-S [28] 54.7 53.1 DeiT-Ti [39] 55.4 54.3 pretrained weights. The results show that ImageNet pre-training improves the performance in terms of mSCF1 in most cases. This suggests that generic visual features learned from natural images can transfer to ion image anal-ysis despite the domain difference. 
+
+4.4. Downstream Tumor Classification 
+
+Beyond peak picking, we evaluate whether the channels se-lected by IonMorphNet improve tumor classification as a downstream MSI task. The goal of this experiment is not to introduce a new classification architecture, but to demon-strate that the learned channel reduction preserves — and can even enhance — discriminative information relevant for clinically meaningful tasks. 
+
+Spatio-Spectral Patch Sampling. Tumor classification in MSI is commonly performed by classifying each spec-trum independently using the raw spectrum [7, 22, 24]. However, this approach ignores the spatial context that is provided in MSI datasets. In Hyperspectral Image Clas-sification, spatially aware models such as 3D CNNs [31] can be used due to the comparably low number of channels (100 − 200 ). Since the number of model parameters of a 3D CNN increases drastically with more than 10 , 000 channels, their application is impractical for unprocessed MSI data. We address these limitations by applying our proposed peak picking IonMorphNet for dimensionality reduction prior to tumor classification. For each dataset collection, we perform peak picking on all eight tissue sections and select every m/z value that was picked for any of the eight tissue sections. This ensures the same channel count across all tis-sue sections. As our IonMorphNet produces an ordered list of spatially structured ion images for each tissue section, we selected the top n picked peaks so that the final peak number is close to those of the state-of-the-art methods. We divide each dataset collection into three training, two validation and three testing tissue sections. We use IonMorphNet with a ConvNeXt V2 - Tiny Backbone, as it achieved the best average mSCF1 in our ablation study (see Tab. 4). 
+
+Classification Setup. We extract a spectral cube of size (p × p × C) around each spatial coordinate and assign it the label of the central spectrum. Here, p refers to the spatial dimension of the spectral cube and C to the channel dimen-sion, which is the number of peak picked channels. Tumor classification is performed using a 3D convolutional neural network that processes the resulting spatio-spectral patches. For comparison, we also train an MLP for single spectrum classification of unprocessed mass spectra. For each test tis-sue section, the Balanced Accuracy is calculated separately and we report the mean Balanced Accuracy across all test tissue sections. Cross-Entropy is utilized as the loss function. All ex-periments are performed using weighted random sampling with a batch size of 16 and a learning rate of 10 −4. The 3D CNN[31] is trained for three epochs, as it typically con-verges after one epoch. The MLP is trained for 100 epochs. The validation loss is used to select the best model. Fi-nal evaluation is performed on the test tissue sections. The selected 3D CNN architecture represents the current state-of-the-art method on the Hyperspectral Imaging Bench-mark [15]. Results are averaged across five seeds. All ex-periments are performed on a single NVIDIA A100 GPU. 1.0 1.5 2.0 2.5Data Ratio (%)       
+
+> 84
+> 86
+> 88
+> 90
+> 92
+> 94
+> 96
+> 98
+> 100 Balanced Accuracy (%)
+> GBM (85,062 m/z values)
+> with IonMorphNet (Ours) with S 3PL MLP with all m/z values
+> 46810 12 Data Ratio (%)
+> 84
+> 86
+> 88
+> 90
+> 92
+> 94
+> 96
+> 98
+> 100 Balanced Accuracy (%)
+> RCC (10,200 m/z values)
+> with IonMorphNet (Ours) with S 3PL with MALDIquant MLP with all m/z values
+> 10 20 30 Data Ratio (%)
+> 58
+> 60
+> 62
+> 64
+> 66
+> 68
+> 70
+> 72 Balanced Accuracy (%)
+> CAC (1,481 m/z values)
+> with IonMorphNet (Ours) with S 3PL with MALDIquant MLP with all m/z values
+
+Figure 5. Tumor classification results of a 3D CNN [31] on peak picked datasets [2, 8, 20] with a spectral patch size p = 11 . We compare different peak picking methods and data ratios of the entire spectra. Note that MALDIquant [17] was unable to generate a unified peak list for the GBM [2] dataset due to limitations in memory capacity. 
+
+Results. Fig. 5 shows the classification performance of the 3D CNN and the MLP on the test tissue sections of the GBM [2], RCC [8] and CAC [20] datasets, respectively. For the 3D CNN, different channel ratios resulting from peak picking are used. The horizontal black lines represent the Balanced Accuracy of the MLP trained on single unpro-cessed spectra. Note, that every peak picking method se-lects a specific number of peaks, which is parameter depen-dent. Therefore, we can only report results for similar but not identical data ratios. For the GBM dataset, the MLP result of 97 .4% Balanced Accuracy is matched by the 3D CNN on peak picked spectra from S 3PL and our approach, where only about 1% − 2% of the entire spectrum is utilized. MALDIquant [17] was un-able to generate a unified peak list for the GBM dataset due to limitations in memory capacity. When using less than 
+
+1% of the full spectrum, the performance declines.For the RCC dataset, channel reduction by peak picking with our IonMorphNet consistently improves results over the MLP result and compared to other peak picking methods with similar amounts of data. Interestingly, the Balanced Ac-curacy increases with fewer data, resulting in the best im-provement of +7 .3% Balanced Accuracy over the single spectrum MLP result with approximately 3% of the chan-nels. For the CAC dataset, all peak picking methods enable the 3D CNN equally well to enhance Balanced Accuracy by up to +3% . Note that we selected higher data ratios for this dataset, because the unprocessed spectra already consists of relatively few channels ( 1, 481 ) compared to the GBM (85 , 062 channels) and RCC ( 10 , 200 channels) dataset. These results suggest that peak channels identified through spatial morphology analysis retain biologically meaningful information that is beneficial for tumor classifi-cation as a downstream task. 
+
+Table 6. Ablation study on different patch sizes p for the spatio-spectral sampling for tumor classification using a 3D CNN [31]. 
+
+patch size GBM RCC CAC 0.75 % 2.5 % 2.9 % 10.2 % 8.3 % 37.5 % 11 96.4 97.4 98.7 94.6 66.9 67.9 13 93.3 97.1 97.0 95.1 65.7 69.3 15 92.5 95.4 98.9 95.8 64.3 69.5 
+
+Patch Size Ablation. Finally, we evaluate the influence of the spatial patch size p used during classification. Dif-ferent patch sizes control the spatial context available to the classifier. Tab. 6 summarizes the resulting performance for several patch size configurations. The classification performance benefits from smaller patch sizes for the GBM dataset which suggests that local spatial context provides the best con-textual information in this case. For the RCC dataset, the performance is stable across various sizes for p. Note that the 3D CNN architecture requires a minimum patch size 
+
+p = 11 .
+
+## 5. Conclusion 
+
+We present IonMorphNet, the first generalizable ion im-age encoder for ion image morphology assessment in MSI. Through a diverse dataset collection of 53 public MSI datasets, IonMorphNet enables generalizable and hyperpa-rameter free peak picking, outperforming state-of-the-art methods by +7% Avg. mSCF1. Furthermore, we demon-strate that spatially informative channel reduction enables 3D CNNs for spatio-spectral tumor classification, improv-ing classification performance compared to conventional pixel-wise approaches. Acknowledgments 
+
+This project has been partially funded by the Ministry of Science, Research and Arts Baden-W¨ urttemberg in the project Perpharmance (BW6-07) and the German Research Foundation (INST874/9-1). 
+
+## References 
+
+[1] Walid M Abdelmoula, Begona Gimenez-Cassina Lopez, Elizabeth C Randall, Tina Kapur, Jann N Sarkaria, Forest M White, Jeffrey N Agar, William M Wells, and Nathalie YR Agar. Peak learning of mass spectrometry imaging data us-ing artificial neural networks. Nat. Commun. , 12(1):5544, 2021. 1, 2, 6 [2] Walid M Abdelmoula, Sylwia A Stopka, Elizabeth C Ran-dall, Michael Regan, Jeffrey N Agar, Jann N Sarkaria, William M Wells, Tina Kapur, and Nathalie YR Agar. mass-net: integrated processing and classification of spatially re-solved mass spectrometry data using deep learning for rapid tumor delineation. Bioinformatics , 38(7):2015–2021, 2022. 2, 3, 5, 6, 8 [3] Denis Abu Sammour, James L Cairns, Tobias Boskamp, Christian Marsching, Tobias Kessler, Carina Ramallo Gue-vara, Verena Panitz, Ahmed Sadik, Jonas Cordes, Stefan Schmidt, et al. Spatial probabilistic mapping of metabolite ensembles in mass spectrometry imaging. Nat. Commun. , 14 (1):1823, 2023. 1 [4] Theodore Alexandrov and Andreas Bartels. Testing for pres-ence of known and unknown molecules in imaging mass spectrometry. Bioinformatics , 29(18):2335–2342, 2013. 1, 2 [5] Theodore Alexandrov, Katja Ovchinnikova, Andrew Palmer, Vitaly Kovalev, Artem Tarasov, Lachlan Stuart, Renat Nig-metzianov, Dominik Fay, Key METASPACE contributors, Mathieu Gaudin, et al. Metaspace: A community-populated knowledge base of spatial metabolomes in health and dis-ease. BioRxiv , page 539478, 2019. 3 [6] Adrian Arendowski. Matrix-and surface-assisted laser des-orption/ionization mass spectrometry methods for urological cancer biomarker discovery—metabolomics and lipidomics approaches. Metabolites , 14(3):173, 2024. 1 [7] Jens Behrmann, Christian Etmann, Tobias Boskamp, Rita Casadonte, J¨ org Kriegsmann, and Peter Maa β. Deep learn-ing for tumor classification in imaging mass spectrometry. 
+
+Bioinformatics , 34(7):1215–1223, 2018. 2, 3, 7 [8] KA Bemis. Cardinalworkflows: Datasets and workflows for the cardinal mass spectrometry imaging package. R package version , 1(0), 2019. 3, 5, 6, 8 [9] Kyle D Bemis, April Harry, Livia S Eberlin, Christina Ferreira, Stephanie M van de Ven, Parag Mallick, Mark Stolowitz, and Olga Vitek. Cardinal: an r package for sta-tistical analysis of mass spectrometry-based imaging experi-ments. Bioinformatics , 31(14):2418–2420, 2015. 1, 2 [10] Franc ¸ois Chollet. Xception: Deep learning with depthwise separable convolutions. In Proceedings of the IEEE con-ference on computer vision and pattern recognition , pages 1251–1258, 2017. 7 [11] Jonas Cordes, Thomas Enzlein, Carsten Hopf, and Ivo Wolf. pym2aia: Python interface for mass spectrometry imaging with focus on deep learning. Bioinformatics , 40(3):btae133, 2024. 5 [12] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In 2009 IEEE conference on computer vision and pattern recognition , pages 248–255. Ieee, 2009. 2, 3, 7 [13] Terrance DeVries and Graham W Taylor. Improved regular-ization of convolutional neural networks with cutout. arXiv preprint arXiv:1708.04552 , 2017. 4 [14] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Syl-vain Gelly, et al. An image is worth 16x16 words: Trans-formers for image recognition at scale. arXiv preprint arXiv:2010.11929 , 2020. 2 [15] Hannah Frank, Leon Amadeus Varga, and Andreas Zell. Hy-perspectral benchmark: Bridging the gap between hsi ap-plications through comprehensive dataset and pretraining. 
+
+arXiv preprint arXiv:2309.11122 , 2023. 7 [16] ES Gadelmawla. A vision system for surface roughness char-acterization using the gray level co-occurrence matrix. NDT & e International , 37(7):577–588, 2004. 2 [17] Sebastian Gibb and Korbinian Strimmer. Maldiquant: a ver-satile r package for the analysis of mass spectrometry data. 
+
+Bioinformatics , 28(17):2270–2271, 2012. 1, 2, 6, 8 [18] Dan Guo, Melanie Christine F¨ oll, Veronika Volkmann, Kathrin Enderle-Ammour, Peter Bronsert, Oliver Schilling, and Olga Vitek. Deep multiple instance learning classifies subtissue locations in mass spectrometry images from tissue-level annotations. Bioinformatics , 36(Supplement 1):i300– i308, 2020. 3 [19] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In Proceed-ings of the IEEE conference on computer vision and pattern recognition , pages 770–778, 2016. 7 [20] Paolo Inglese, James S McKenzie, Anna Mroz, James Kinross, Kirill Veselkov, Elaine Holmes, Zoltan Takats, Jeremy K Nicholson, and Robert C Glen. Deep learning and 3d-desi imaging reveal the hidden metabolic heterogeneity of cancer. Chem. Sci. , 8(5):3500–3511, 2017. 2, 3, 5, 6, 8 [21] Paolo Inglese, Gonc ¸alo Correia, Zoltan Takats, Jeremy K Nicholson, and Robert C Glen. Sputnik: an r package for fil-tering of spatially related peaks in mass spectrometry imag-ing data. Bioinformatics , 35(1):178–180, 2019. 1, 2, 6 [22] Frederic Kanter, Jan Lellmann, Herbert Thiele, Steve Kalloger, David F Schaeffer, Axel Wellmann, and Oliver Klein. Classification of pancreatic ductal adenocarcinoma using maldi mass spectrometry imaging combined with neu-ral networks. Cancers , 15(3):686, 2023. 2, 3, 7 [23] Diederik P Kingma. Auto-encoding variational bayes. arXiv preprint arXiv:1312.6114 , 2013. 2 [24] Mark Kriegsmann, Christiane Zgorzelski, Rita Casadonte, Kristina Schwamborn, Thomas Muley, Hauke Winter, Mar-tin Eichhorn, Florian Eichhorn, Arne Warth, Soeren-Oliver Deininger, et al. Mass spectrometry imaging for reliable and fast classification of non-small cell lung cancer subtypes. 
+
+Cancers , 12(9):2704, 2020. 2, 7 [25] Alex Krizhevsky, Geoffrey Hinton, et al. Learning multiple layers of features from tiny images. 2009. 3 [26] Florian Lieb, Tobias Boskamp, and Hans-Georg Stark. Peak detection for maldi mass spectrometry imaging data using sparse frame multipliers. J. Proteomics , 225:103852, 2020. 1, 2, 6 [27] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro Perona, Deva Ramanan, Piotr Doll´ ar, and C Lawrence Zitnick. Microsoft coco: Common objects in context. In 
+
+European conference on computer vision , pages 740–755. Springer, 2014. 3 [28] Ze Liu, Han Hu, Yutong Lin, Zhuliang Yao, Zhenda Xie, Yixuan Wei, Jia Ning, Yue Cao, Zheng Zhang, Li Dong, et al. Swin transformer v2: Scaling up capacity and resolution. In 
+
+Proceedings of the IEEE/CVF conference on computer vi-sion and pattern recognition , pages 12009–12019, 2022. 7 [29] Ilya Loshchilov and Frank Hutter. Sgdr: Stochas-tic gradient descent with warm restarts. arXiv preprint arXiv:1608.03983 , 2016. 5 [30] Andrew Palmer, Prasad Phapale, Ilya Chernyavsky, Regis Lavigne, Dominik Fay, Artem Tarasov, Vitaly Kovalev, Jens Fuchser, Sergey Nikolenko, Charles Pineau, et al. Fdr-controlled metabolite annotation for high-resolution imaging mass spectrometry. Nat. Methods , 14(1):57–60, 2017. 2 [31] Mercedes Eugenia Paoletti, Juan Mario Haut, Javier Plaza, and Antonio Plaza. Deep learning classifiers for hyperspec-tral imaging: A review. ISPRS Journal of Photogrammetry and Remote Sensing , 158:279–317, 2019. 7, 8 [32] Karl Pearson. Liii. on lines and planes of closest fit to sys-tems of points in space. The London, Edinburgh, and Dublin philosophical magazine and journal of science , 2(11):559– 572, 1901. 2 [33] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, et al. Learning transferable visual models from natural language supervi-sion. In International conference on machine learning , pages 8748–8763. PmLR, 2021. 2 [34] Miriam F Rittel, Nikolas Ebert, Denis Abu Sammour, Se-bastian Graf, Bj¨ orn C Fr¨ ohlich, Emrullah Birgin, Shad A Mohammed, Nuh N Rahbari, Axel Wellmann, Oliver Wasenm¨ uller, et al. Cohort-scale spatial autocorrelation for tumor prediction in mid-infrared pathology and spatial biomarker discovery using maldi imaging lipidomics. Ad-vanced Science , page e16847, 2026. 1 [35] Sandra Schulz, Michael Becker, M Reid Groseclose, Simone Schadt, and Carsten Hopf. Advanced maldi mass spectrom-etry imaging in pharmaceutical research and drug develop-ment. Curr. Opin. Biotechnol. , 55:51–59, 2019. 1 [36] Oriane Sim´ eoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Micha¨ el Ramamonjisoa, et al. Dinov3. arXiv preprint arXiv:2508.10104 , 2025. 2, 7[37] Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky, Ilya Sutskever, and Ruslan Salakhutdinov. Dropout: a simple way to prevent neural networks from overfitting. The journal of machine learning research , 15(1):1929–1958, 2014. 5 [38] Mingxing Tan and Quoc Le. Efficientnet: Rethinking model scaling for convolutional neural networks. In International conference on machine learning , pages 6105–6114. PMLR, 2019. 7 [39] Hugo Touvron, Matthieu Cord, Matthijs Douze, Francisco Massa, Alexandre Sablayrolles, and Herv´ e J´ egou. Training data-efficient image transformers & distillation through at-tention. In International conference on machine learning ,pages 10347–10357. PMLR, 2021. 7 [40] Wenhai Wang, Enze Xie, Xiang Li, Deng-Ping Fan, Kaitao Song, Ding Liang, Tong Lu, Ping Luo, and Ling Shao. Pvt v2: Improved baselines with pyramid vision transformer. 
+
+Computational visual media , 8(3):415–424, 2022. 7 [41] Philipp Weigand, Nikolas Ebert, Shad A. Mohammed, De-nis Abu Sammour, Carsten Hopf, and Oliver Wasenm¨ uller. Spatial self-supervised peak learning and correlation-based evaluation of peak picking in mass spectrometry imaging. 
+
+arXiv preprint arXiv:2603.10487 , 2026. 1, 2, 5, 6 [42] Ross Wightman. Pytorch image models. https : / / github . com / rwightman / pytorch - image -models , 2019. 5 [43] Chalini D Wijetunge, Isaam Saeed, Berin A Boughton, Jef-frey M Spraggins, Richard M Caprioli, Antony Bacic, Ute Roessner, and Saman K Halgamuge. Exims: an improved data analysis pipeline based on a new peak picking method for exploring imaging mass spectrometry data. Bioinformat-ics , 31(19):3198–3206, 2015. 2 [44] Sanghyun Woo, Shoubhik Debnath, Ronghang Hu, Xinlei Chen, Zhuang Liu, In So Kweon, and Saining Xie. Con-vnext v2: Co-designing and scaling convnets with masked autoencoders. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 16133– 16142, 2023. 7 [45] Sangdoo Yun, Dongyoon Han, Seong Joon Oh, Sanghyuk Chun, Junsuk Choe, and Youngjoon Yoo. Cutmix: Regu-larization strategy to train strong classifiers with localizable features. In Proceedings of the IEEE/CVF international con-ference on computer vision , pages 6023–6032, 2019. 4
