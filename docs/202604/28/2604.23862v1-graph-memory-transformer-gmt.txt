@@ -1,0 +1,1335 @@
+Title: Graph Memory Transformer (GMT)
+
+URL Source: https://arxiv.org/pdf/2604.23862v1
+
+Published Time: Tue, 28 Apr 2026 01:27:09 GMT
+
+Number of Pages: 65
+
+Markdown Content:
+# Graph Memory Transformer (GMT) 
+
+# Nicola Zanarini ∗† Niccol` o Ferrari ‡§¶ 
+
+# April 28, 2026 
+
+Abstract 
+
+We investigate whether the Feed-Forward Network ( FFN ) sublayer in a decoder-only transformer can be replaced by an explicit learned memory graph while preserving the surrounding autoregressive ar-chitecture. The proposed Graph Memory Transformer ( GMT ) keeps causal self-attention intact, but replaces the usual per-token FFN trans-formation with a memory cell that routes token representations over a learned bank of centroids connected by a learned directed transition matrix. In the base GMT v7 instantiation studied here, each of 16 transformer blocks contains 128 centroids, a 128 × 128 edge matrix, gravitational source routing, token-conditioned target selection, and a gated displacement readout. The cell therefore returns movement from an estimated source memory state toward a target memory state, rather than a retrieved value. The resulting model is a fully decoder-only language model with 82.2M trainable parameters and no dense FFN sublayers, compared with a 103.0M-parameter dense GPT-style baseline used in the eval-uation. The base v7 model trains stably and exposes centroid usage, transition structure, and source-to-target movement as directly in-spectable quantities of the forward computation. It remains behind the larger dense baseline in validation loss and perplexity (3.5995/36.58 vs. 3.2903/26.85), while showing close zero-shot benchmark behavior under the evaluated setting. These results are not intended as a state-of-the-art claim; they support the viability and structural inter-pretability of replacing dense within-token transformation with graph-mediated memory navigation. Broader scaling, optimized kernels, and more extensive benchmark evaluation are left for subsequent work. 
+
+> ∗
+
+nicola.zanarini@hotmail.it 
+
+> †
+
+Bonfiglioli Engineering s.r.l. 
+
+> ‡
+
+University of Ferrara 
+
+> §
+
+NAIS Engineering s.r.l. 
+
+> ¶
+
+niccolo.ferrari@unife.it 
+
+1Keywords: transformer architecture; language models; memory-augmented transformers; graph-based memory; feed-forward network replacement; con-cept centroids; interpretable memory 
+
+Code: https://github.com/Nemesis533/GMT-GraphMemoryTransformer 
+
+# 1 Introduction 
+
+# 1.1 Motivation 
+
+In transformer language models [ 1], FFN s provide much of the model’s trans-formation capacity, functioning as implicit key-value memories [2]. Yet they remain difficult to inspect directly. Once trained, they apply rich nonlinear updates without exposing an explicit intermediate structure that can be ex-amined, queried, or modified in a principled way. It is therefore often unclear which internal concepts are being used, how they are organized, or how a token is moved from one representation to the next inside the block [3, 4]. GMT starts from the idea that at least part of this computation could instead be carried by a more explicit internal memory [ 5, 6, 7, 8, 9, 10 ]. Rather than relying entirely on a dense feed-forward mapping, the architecture routes token representations through a learned bank of centroids linked by a learned transition graph and feeds the resulting displacement back into the residual stream. The goal is to express part of the block transformation through components that are identifiable and structurally legible, replacing the opaque FFNs module for a more interpretable one. These goals connect naturally to broader themes in interpretability and explainability [ 11 , 12 , 4]. GMT does not claim to make transformer com-putation fully transparent; the ambition is narrower. It makes one part of the computation less opaque than a conventional FFN by exposing cen-troid usage, transition structure, and token-dependent movement through the memory graph as objects that can be inspected directly—something much harder when the same transformation is absorbed entirely into dense matrices. GMT therefore aims at reducing the opacity of transformer architectures at the FFN sublayer, using a more structured and analyzable form of internal memory [13, 10]. 
+
+# 1.2 Core Idea of GMT 
+
+At its core, GMT preserves the overall transformer structure and replaces only one of its least interpretable components with a more explicit mechanism. Causal self-attention keeps its usual role of integrating contextual information 2across the sequence [ 1]. The change happens in the position normally occupied by the feed-forward network, whose role in transformer computation has been studied extensively [ 2, 3]. Instead of applying a dense channel-wise transformation, the model consults a learned memory organized as a graph of centroids and uses that interaction to produce the block update [5, 6, 9]. At a high level, the memory cell treats the current token representation as a point in a learned conceptual space. It first identifies a source region, represented as a soft distribution over centroids rather than a hard slot. It then combines learned graph transitions with token-dependent context to determine a target region better matched to the transformation required at that stage of computation. The output is not a retrieved value in the usual key-value sense, but a displacement: the difference between the estimated source memory state and the target memory state selected for the token. This reshapes how the block computation can be interpreted. In a con-ventional FFN , the transformation is encoded implicitly in dense weight matrices and is difficult to decompose into meaningful intermediate opera-tions [ 2]. Here, the same transformation is expressed as movement through a learned structured memory. Centroids act as persistent representational land-marks, while graph edges encode preferred transitions between them. The resulting update remains continuous and differentiable, but it is mediated by components that can be inspected more directly than a standard dense Multi-Layer Perceptron (MLP) [11, 4, 13]. These features of GMT position it as a reinterpretation of the FFN layers. Instead of ”bolting” memory on top of a standard transformer, it recasts part of the transformer’s internal computation as navigation over an explicit learned memory structure. The expressive role of the FFN is preserved, but the model gains an internal organization that is more structured, more analyz-able, and potentially more amenable to post hoc inspection or modification. 
+
+# 1.3 Why This Could Matter 
+
+Recasting part of the FFN role around explicit memory matters for at least three reasons: 
+
+• First, it may offer a clearer view of what the model is doing internally [11 , 12 , 4]. A learned set of centroids and graph transitions provides concrete objects to analyze: which memory regions are active, how tokens move between them, whether certain transitions specialize, and how that organization changes during training. 
+
+• Second, it opens a possible route to more direct intervention. Even if such interventions remain difficult in practice, an architecture with iden-3tifiable memory components is conceptually more receptive to post hoc inspection and modification than one in which the relevant computation is diffused across dense matrices [3, 14]. 
+
+• Third, it raises a broader question: whether part of the transformer’s internal computation can be usefully recast as structured memory nav-igation rather than as unconstrained channel mixing alone. 
+
+# 1.4 Main Contribution 
+
+This paper introduces GMT v7, a decoder-only transformer in which each block’s FFN is replaced by a memory block that routes tokens over a learned centroid graph and returns a gated displacement to the residual stream. The contribution is both architectural—source routing, graph-mediated target selection, and a gated displacement readout—and operational, specifying the auxiliary objectives, online write-back rule, and centroid-maintenance procedures that keep the learned memory structure usable during training. More broadly, the work asks whether dense within-token transformation can be partially recast as explicit, inspectable memory navigation under the same modeling constraints. 
+
+# 1.5 Paper Roadmap 
+
+The remainder of the paper develops this argument in stages. Section 2 places the proposed architecture in the context of prior work on transformer internals, memory-augmented models, and adjacent interpretability-oriented lines of research. Section 3 then describes the model itself, moving from the high-level architectural idea to the routing mechanism, displacement readout, training objectives, and memory-maintenance procedures that make the approach operational. The experimental setup follows, then the empirical results. The paper closes with a discussion of what those results imply for the viability, limitations, and broader significance of the proposed architecture. 
+
+# 2 Related Work 
+
+# 2.1 Transformer Feed-Forward Computation 
+
+The transformer FFN is often described operationally as a position-wise nonlinear transformation, but several analyses suggest that its role is richer than simple channel mixing. Geva et al. [ 2] interpret transformer feed-forward layers as key-value memories, in which the first projection detects patterns 4and the second projection writes associated information back into the residual stream. Knowledge editing methods similarly provide evidence that factual associations can be localized and modified within feed-forward parameters [3, 14 ]. These observations motivate architectures that make the memory-like function of the FFN more explicit rather than leaving it implicit in dense matrices. The architecture proposed here makes this memory-like computation more structurally interpretable. GMT replaces the FFN sublayer with a structured memory block containing centroids (memory cells) and directed transitions (the edge matrix). The resulting update remains continuous and differen-tiable, but the intermediate objects through which it is computed are directly inspectable. 
+
+# 2.2 Memory-Augmented Neural Architectures 
+
+Memory-augmented models have a long history in neural network research. Memory Networks [ 5], End-to-End Memory Networks [ 6], Neural Turing Ma-chines [ 15 ], and Differentiable Neural Computers [ 16 ] introduced mechanisms for reading from and writing to explicit memory stores. A related thread re-frames attention itself as continuous associative retrieval over learned patterns, culminating in modern Hopfield networks [ 17 ]. More recent language-model architectures incorporate large external or semi-external memories through product-key layers, nearest-neighbor retrieval, memorizing transformers, and memory layers at scale [7, 18, 8, 9]. GMT departs from these approaches in where the memory lives. Rather than being appended to a conventional transformer as an auxiliary retrieval component, the memory replaces the block-level FFN transformation itself. It therefore becomes part of the layer’s internal computation: token states are routed to source centroids, propagated through a learned transition graph, and updated by the resulting displacement. 
+
+# 2.3 FFN Replacement and Prototype Variants 
+
+Recent work has begun to question whether the standard FFN should remain a dense, opaque sublayer. A long-standing line of research already replaces or augments it through routing: Mixture-of-Experts models [ 19 , 20 ] and Switch Transformers [ 21 ] gate token states to specialist FFN sub-modules. GMT shares the idea that the FFN position can be reorganized around routing, but the routed objects are different: MLP s chosen from a bank of specialists in one case, passive centroids connected by a learned transition graph in the other. 5MemoryLLM [10] stays closer to the original FFN form and decouples it from self-attention so that the FFN ’s token-wise retrieval behavior can be studied and precomputed in isolation. Both works treat the FFN as more than a generic nonlinear projection. The architectural step taken here is different: rather than isolating an existing FFN , GMT replaces the residual branch with an active memory cell whose routing, transition, and displacement variables are part of the forward computation. A complementary direction is taken by MemoryFormer [ 22 ], which removes most fully connected computations and replaces them with memory lookup tables of discrete vectors. Its goal is primarily computational: retrieved vectors are combined to approximate the effect of linear projection at lower cost. In GMT , memory instead plays a representational role. The centroids act as layer-local landmarks, the edge matrix equips them with directed transition structure, and the returned update is a displacement between source and target memory states rather than a lookup approximation to matrix multiplication. The closest conceptual neighbor to the centroid idea is the Prototype Transformer [ 13 ], which builds an autoregressive language model around learned prototype vectors that can acquire concept-like roles during training. Both architectures draw on the appeal of legible internal objects, but they place them differently. Prototype Transformer promotes prototypes to central communication objects for the model as a whole; GMT keeps the ordinary causal-attention backbone and uses centroids locally inside the second residual branch of each block. The intervention here is correspondingly narrower: it asks whether the transformation normally assigned to the FFN can be expressed as graph-structured movement through memory. 
+
+# 2.4 Interpretable-by-Design Alternatives 
+
+The proposed architecture is also related to work on mechanistic interpretabil-ity and models designed to expose more structured internal representations [11, 12, 4]. These lines of work do not make transformer computation trans-parent in any complete sense, but they motivate a useful design principle: if some internal objects are stable, named by their role in the architecture, and repeatedly reused across inputs, then their usage and dynamics can be studied more directly than the activations of an unconstrained dense sublayer. From this point of view, the memory cell adds an explicitly relational layer to the design principle: centroids provide persistent memory locations, and the edge matrix represents directed transition tendencies between them. The explainability claim is correspondingly structural rather than absolute. The model remains a neural language model, but the transformation replacing the 6FFN exposes source routing, target selection, and displacement as analyzable intermediate quantities. 
+
+# 3 Method 
+
+# 3.1 Overall Architecture 
+
+GMT retains the global organization of a decoder-only transformer language model [ 23 ] while changing the way each block performs its feed-forward trans-formation. Tokens are embedded by summing token and positional embed-dings, passed through a stack of causal transformer blocks, then normalized and projected to next-token logits through a language-model head tied to the input embedding matrix [ 24 ]. At the whole-model level, the architecture remains recognizably transformer-based: it is autoregressive, it uses causal self-attention to exchange information across the prefix, and it is trained for standard next-token prediction. The main architectural change lies inside the block. Each layer follows a pre-normalization residual design [ 25 ] with two successive transformations. The first is conventional causal self-attention [ 1]; the second places a memory block in the position normally occupied by the standard FFN . At the whole-block level, the memory cell estimates a source distribution over layer-specific centroids, propagates that distribution through a learned directed transition matrix, combines the result with token-conditioned target scores, and returns a gated displacement to the residual stream. The resulting architecture is conservative at the outer level and selective in its intervention: the autoregressive attention path, residual organization, tokenizer interface, and next-token objective remain standard, while the within-token transformation after attention is recast as graph-routed mem-ory navigation. The following subsections formalize the block computation, memory representation, routing, graph traversal, displacement readout, and update rules. 
+
+# 3.2 Transformer Block with Memory Cells 
+
+We now describe the computation performed by a single GMT block. As in a standard pre-normalized transformer layer [ 25 ], the block is organized around two residual branches: context aggregation by causal self-attention [1], followed by the memory-cell transformation. Let x(ℓ) ∈ RT ×H denote the sequence of hidden states entering layer ℓ,where T is the sequence length and H is the hidden dimension. For clarity, 7we omit the batch dimension in the equations below. The attention branch follows the standard pre-norm residual form 
+
+h(ℓ) = x(ℓ) + Attn (︂ LN (ℓ)1(︁ x(ℓ))︁)︂ , (1) where Attn (·) is masked self-attention and LN (ℓ)1 is the first layer normal-ization of the block. This stage plays the same role it does in an ordinary decoder-only transformer: each token updates its representation by attending to the available left context. The second branch begins from the post-attention representation h(ℓ).Instead of sending it through a dense feed-forward network, GMT applies a second normalization and passes the result to a memory cell: 
+
+d(ℓ) = MC (ℓ)(︂ LN (ℓ)2(︁ h(ℓ))︁ ; τ)︂ , (2) where MC (ℓ) denotes the layer-specific memory cell and τ is the routing temperature used in the soft assignment over centroids. The block output is then 
+
+x(ℓ+1) = h(ℓ) + d(ℓ). (3) Thus, the memory cell occupies the same residual branch in which a standard transformer would add its FFN output [ 1], but the branch now returns a displacement produced by structured memory interaction rather than a dense MLP update. At a high level, the memory cell computes two soft memory states for each token: a source state, which describes where the current hidden repre-sentation is located in the learned centroid space, and a target state, which describes where that representation should move after graph-mediated mem-ory processing. If we denote these states by csrc and ctgt , the returned update takes the form 
+
+d(ℓ) = σ(︁ g(ℓ))︁ LN (ℓ)disp (ctgt − csrc ) , (4) where g(ℓ) is a learned scalar gate and LN (ℓ)disp is a layer normalization applied to the displacement vector. This equation previews the mechanism formal-ized below: source and target memory states are computed from centroid distributions, and their difference is normalized and gated before being added to the residual stream. This structure preserves the residual stability and causal organization of the transformer while changing the semantics of the second sublayer. In GMT ,the post-attention transformation exposes centroids, transitions, source and target distributions, and a geometrically interpretable displacement rather than hiding the entire operation inside dense MLP weights [2]. 83.3 Memory Representation 
+
+The memory block is built around two learned objects: a bank of centroids and a matrix of directed transitions between them. Together they provide the representational substrate on which the block operates. The centroids define the regions of memory the model can occupy, while the transition matrix biases movement between those regions once a token has been located in that space. Before discussing routing, it is therefore useful to state explicitly what is being represented and in what form. For a given layer ℓ, let 
+
+C(ℓ) ∈ RF ×H (5) denote the centroid bank, where F is the number of memory slots and H is the hidden dimension. The i-th row, 
+
+c(ℓ) 
+
+> i
+
+∈ RH , (6) is a learned centroid vector that can be interpreted as a persistent represen-tational landmark in the layer-specific memory space. Unlike token states, which vary from sequence to sequence, these centroids are global parameters of the model and are shared across all inputs. In that sense, they act as stable reference points against which the current hidden state can be positioned. The centroids are initialized on the unit sphere and then learned jointly with the rest of the model. During the forward pass, however, the memory cell does not use C(ℓ) directly. Instead, it first applies a layer normalization to obtain ˜︁ 
+
+C(ℓ) = LN (ℓ)
+
+> C
+
+(︁ C(ℓ))︁ , (7) and, when normalized directions are needed for routing, it further forms ˆ︁ 
+
+C(ℓ) 
+
+> i
+
+=˜︁ c(ℓ)
+
+> i
+
+⃦⃦⃦˜︁ 
+
+c(ℓ)
+
+> i
+
+⃦⃦⃦ 2
+
+. (8) This separation is deliberate. The normalized centroids ˆ︁ C(ℓ) provide a geomet-rically stable basis for similarity-based assignment, while the layer-normalized centroids ˜︁ C(ℓ) remain the actual vectors used to construct memory states and displacements. The model therefore distinguishes between the directional geometry used to decide where a token lies in memory and the vector repre-sentation used to compute the update returned to the residual stream. The second component of the memory representation is a learned edge matrix 
+
+E(ℓ) ∈ RF ×F , (9) 9whose entry E(ℓ) 
+
+> ij
+
+expresses the preference for moving from centroid i toward centroid j. This matrix is directed: in general, E(ℓ)
+
+> ij
+
+̸ = E(ℓ) 
+
+> ji
+
+. As a result, the memory structure is not merely a set of prototypes, but a graph with asymmetric transition tendencies. This asymmetry matters because the trans-formation performed by the block is not intended to be a symmetric notion of similarity; it is intended to represent a directed computational step from one memory region to another. To prevent trivial self-loops from dominating the traversal, diagonal tran-sitions are masked before normalization. If M ∈ RF ×F denotes a mask with 
+
+Mij ={︄ 0, i̸ = j, 
+
+−∞ , i = j, (10) then the row-stochastic transition matrix used by the memory cell is 
+
+P(ℓ) = softmax (︁ E(ℓ) + M)︁ , (11) where the softmax is applied row-wise. Each row of P(ℓ) can therefore be read as a distribution over possible outgoing moves from a given centroid, excluding the degenerate case of remaining in place by default. Taken together, C(ℓ) and E(ℓ) define a memory that is both geometric and relational. The centroid bank provides learned locations in hidden-state space, while the transition matrix equips those locations with a directed neighborhood structure. This combination is central to the design of GMT .The model does not treat memory as a flat collection of retrievable entries, but as an organized space in which both position and movement matter. The next subsections explain how a token is mapped into that space, propagated through the graph, and finally converted into a block update. 
+
+# 3.4 Source Routing 
+
+Once the memory representation is fixed, the first computational question is how a token is placed within it. In GMT , this is done through a soft routing step that assigns the current hidden state to the centroid bank. The goal is not to select a single discrete slot, but to estimate a source region in memory from which subsequent graph traversal will begin. Source assignment is therefore the token’s entry point into the memory structure. This soft assignment is intentional. At the forward-computation level, a token need not be committed immediately to a single centroid; it can instead occupy a local region of memory, with uncertainty represented by the routing distribution itself. This preserves differentiability and allows the source state 10 to reflect partial membership across nearby memory cells, which is especially important while the centroid geometry is still being shaped during training. Hard assignments are used later for the write-back update, where a decisive maintenance signal is useful, but the source-routing distribution used for traversal remains soft. Let z(ℓ) 
+
+> t
+
+∈ RH denote the layer-normalized token state entering the memory cell at layer ℓ and position t, that is, 
+
+z(ℓ) 
+
+> t
+
+= LN (ℓ)2(︂ h(ℓ)
+
+> t
+
+)︂ . (12) For routing, the model uses direction-normalized versions of both token states and centroids. Specifically, it forms ˆ︁ 
+
+z(ℓ) 
+
+> t
+
+= z(ℓ)
+
+> t
+
+∥z(ℓ) 
+
+> t
+
+∥2
+
+,ˆ︁ c(ℓ) 
+
+> i
+
+=˜︁ c(ℓ)
+
+> i
+
+∥˜︁ c(ℓ) 
+
+> i
+
+∥2
+
+, (13) where ˜︁ c(ℓ) 
+
+> i
+
+is the layer-normalized centroid introduced in the previous sub-section. The similarity between token t and centroid i is then computed by inner product: 
+
+s(ℓ) 
+
+> t,i
+
+=ˆ︁ z(ℓ) 
+
+> t
+
+·ˆ︁ c(ℓ) 
+
+> i
+
+. (14) Because both vectors are normalized, this quantity corresponds to cosine sim-ilarity. Rather than applying a softmax to the similarities directly, however, GMT converts them into inverse distances. The corresponding distance term is 
+
+d(ℓ) 
+
+> t,i
+
+= max (︂ 1 − s(ℓ) 
+
+> t,i
+
+, ε grav )︂ , (15) where εgrav > 0 is a small constant used to avoid numerical instability when similarity becomes very close to one. The source-routing weights are then defined as 
+
+w(ℓ)src , t,i = e
+
+> 1
+> τ d (ℓ)
+> t,i
+> F
+
+∑︁ 
+
+> j=1
+
+e
+
+> 1
+> τ d (ℓ)
+> t,j
+
+, (16) where τ > 0 is a temperature parameter. For each token position t, this yields a probability distribution over the F centroids: 
+
+w(ℓ)src , t ∈ ∆F −1. (17) In other words, the model does not commit to a single source centroid during the forward pass. Instead, it represents the token’s starting position in 11 memory as a soft combination of nearby centroids, assigning more mass to centroids that lie closer in the normalized hidden-state geometry. This inverse-distance formulation is important to the character of the routing mechanism. A direct softmax over similarities would still favor aligned centroids, but it would treat routing as an ordinary score comparison. By working instead with reciprocal distance, the model makes proximity more explicit: centroids that are geometrically close to the current token state exert a stronger pull, and that pull increases sharply as distance decreases. The temperature τ controls how concentrated the assignment becomes. Higher values yield a broader source distribution, while lower values make routing more selective. Once the source weights have been computed, they define the token’s ini-tial location in memory. The explicit source memory state used later by the readout is then formed as a weighted combination of the layer-normalized cen-troids. Source routing therefore plays a simple but crucial role: it translates a continuous token representation into a structured location in the layer’s learned memory space. 
+
+# 3.5 Graph Traversal and Target Selection 
+
+Source routing determines where a token is located in memory; the next step is to estimate a target distribution for that token. In GMT , this is not done by reading directly from the source distribution alone. Instead, the model first propagates that distribution through the learned transition graph and then refines the result with token-conditioned contextual scores. The target distribution is therefore shaped by two complementary factors: the structural transition tendencies encoded in the memory graph and the local computational needs of the current token. Let w(ℓ)src , t ∈ ∆F −1 denote the source distribution for token t at layer 
+
+ℓ, and let P(ℓ) ∈ RF ×F be the row-stochastic transition matrix defined in the previous subsection. The first stage of traversal propagates the source distribution through the graph: 
+
+w(ℓ)edge , t = w(ℓ)src , t P(ℓ). (18) This operation can be read as a one-step diffusion over the learned centroid graph. If the source distribution says where the token currently lies, then 
+
+w(ℓ)edge , t expresses which memory regions become likely after following the transition tendencies associated with that source location. By itself, however, graph propagation is unconditional with respect to the specific token content at the current step. 12 To reintroduce token-specific information, the memory cell computes a second set of scores based on learned query and key projections. For each layer ℓ, let 
+
+W(ℓ) 
+
+> Q
+
+∈ RH×D, W(ℓ) 
+
+> K
+
+∈ RH×D, (19) where D is the navigation dimension. Given the same layer-normalized token state z(ℓ) 
+
+> t
+
+that was passed into the memory cell, the query vector is 
+
+q(ℓ) 
+
+> t
+
+= z(ℓ) 
+
+> t
+
+W(ℓ) 
+
+> Q
+
+, (20) while each centroid key is computed from the layer-normalized centroid rep-resentation: 
+
+k(ℓ) 
+
+> i
+
+=˜︁ c(ℓ) 
+
+> i
+
+W(ℓ) 
+
+> K
+
+. (21) The contextual compatibility between token t and centroid i is then 
+
+a(ℓ) 
+
+> t,i
+
+= q(ℓ) 
+
+> t
+
+· k(ℓ)
+
+> i
+
+√D . (22) These scores play a role analogous to attention logits [ 1], but here they are not used to aggregate values across sequence positions. Instead, they measure how appropriate each centroid is as a destination for the current token given its present state. The model combines graph propagation and contextual scoring additively before normalizing: 
+
+w(ℓ)tgt , t,i = ew(ℓ)edge , t,i +a(ℓ)
+
+> t,i
+> F
+
+∑︁ 
+
+> j=1
+
+ew(ℓ)edge , t,j +a(ℓ)
+
+> t,j
+
+. (23) Equivalently, if a(ℓ) 
+
+> t
+
+∈ RF collects the contextual scores over all centroids, then 
+
+w(ℓ)tgt , t = softmax (︂ w(ℓ)edge , t + a(ℓ)
+
+> t
+
+)︂ . (24) This target distribution again lies on the simplex ∆ F −1, but its interpretation differs from that of the source distribution. Whereas w(ℓ)src , t estimates where the token currently sits in memory, w(ℓ)tgt , t estimates the target memory region selected after the graph structure and the token’s contextual requirements have both been taken into account. In this formulation, graph propagation and contextual scoring enter the target logits additively before the final softmax. This two-stage construction keeps target selection from becoming either purely graph-driven or purely content-driven. Graph propagation supplies a structural prior, while token-conditioned scores adapt the destination to the 13 current hidden state. The output remains a target distribution over centroids rather than a single selected node, preserving differentiability and allowing mixed destinations near boundaries between memory regions. 
+
+# 3.6 Displacement Readout 
+
+After source routing and target selection, the readout stage converts the two centroid distributions into a vector in hidden-state space. In GMT , this readout is relational: it forms a source memory state, forms a target memory state, and returns their displacement rather than retrieving a single stored value. Let w(ℓ)src , t , w(ℓ)tgt , t ∈ ∆F −1 denote the source and target distributions for token t at layer ℓ, and let ˜︁ C(ℓ) ∈ RF ×H be the layer-normalized centroid bank. The corresponding source and target memory states are defined by weighted aggregation: 
+
+c(ℓ)src , t = w(ℓ)src , t ˜︁ C(ℓ), (25) 
+
+c(ℓ)tgt , t = w(ℓ)tgt , t ˜︁ C(ℓ). (26) Each of these vectors lies in RH and represents a soft point in the layer’s memory space. They are not tied to a single centroid unless the corresponding distribution becomes nearly one-hot. More typically, they summarize a local region of memory by taking a convex combination of multiple centroids. 1
+
+The readout vector is then obtained by subtracting the source memory state from the target memory state: ∆c(ℓ) 
+
+> t
+
+= c(ℓ)tgt , t − c(ℓ)src , t . (27) This quantity is the core output of the memory cell. It expresses, in hidden-state coordinates, how the token should move according to the memory dynamics of the layer. If the source and target states coincide, the displace-ment is small; if they differ substantially, the memory cell proposes a larger update. Before this vector is added back into the residual stream, the model applies a learned post-processing step: 
+
+d(ℓ) 
+
+> t
+
+= σ(︁ g(ℓ))︁ LN (ℓ)disp (︂ ∆c(ℓ)
+
+> t
+
+)︂ , (28) 
+
+> 1Strictly speaking, because the centroids are not constrained to be nonnegative and are layer-normalized before aggregation, the resulting vector is an affine weighted combination rather than a convex combination in the geometric sense. The important point is that the coefficients are nonnegative and sum to one.
+
+14 where g(ℓ) ∈ R is a learned scalar gate and LN (ℓ)disp is a layer normalization applied to the displacement. The sigmoid gate keeps the effective scaling bounded while still allowing the layer to learn how strongly the memory-cell update should influence the residual stream. In practice, the architecture can modulate the contribution of the memory mechanism rather than forcing it to dominate every token update equally. This formulation is one of the main conceptual departures of GMT . In many memory-augmented architectures, the readout stage is framed as re-trieval: the model identifies relevant memory content and injects that content back into the computation [ 5, 6, 16 ]. Here, by contrast, the readout is explic-itly relational. What matters is not only which memory state is reached, but how that state differs from the one from which the token started. The output of the memory cell is therefore best understood as a directed correction in representation space rather than as a stored value recovered from memory. This design has two advantages for the present architecture. First, it aligns naturally with the interpretation of the memory graph as a space of positions and transitions, since the block update is literally defined by movement between positions in that space. Second, it keeps the readout compatible with the residual structure of the transformer block [ 1]: the memory cell returns a vector in the same hidden dimension as the token representation, making it straightforward to add the result back to the ongoing computation. The next subsections describe how this memory is updated during forward execution and how auxiliary objectives and maintenance rules stabilize the learned centroid and transition structure during training. 
+
+# 3.7 Memory Write-Back 
+
+The forward path described so far explains how the memory cell reads from its centroid bank in order to produce a displacement. The architecture also includes a complementary write-back mechanism that updates the centroids online during training. The centroids are therefore not treated as fixed reference vectors shaped only by backpropagation. They are also adjusted directly so that frequently selected centroids continue to track the token states associated with those routes. This design is broadly consistent with the tradition of memory-augmented architectures that combine explicit read operations with explicit memory updates during computation or learning [15, 16]. The write-back rule operates on the source distribution rather than on the target distribution. This reflects the interpretation of the memory cell: source routing identifies where the current token is located in memory, and write-back uses that information to refine the corresponding memory region. 15 In the formulation studied here, the state written back is the post-memory block output rather than the pre-memory input to the cell. Let 
+
+r(ℓ) 
+
+> t
+
+= h(ℓ) 
+
+> t
+
++ d(ℓ) 
+
+> t
+
+= x(ℓ+1)  
+
+> t
+
+(29) denote that block output at position t in layer ℓ, and let w(ℓ)src , t ∈ ∆F −1 be the corresponding source-routing distribution. Although the forward pass uses soft assignments, the write-back step converts them into hard assignments in order to obtain more decisive centroid updates. For each token position t, the assigned centroid index is 
+
+i(ℓ) 
+
+> t
+
+= arg max  
+
+> 1≤i≤F
+
+w(ℓ)src , t,i . (30) This induces a one-hot assignment vector 
+
+e(ℓ) 
+
+> t
+
+∈ { 0, 1}F , e(ℓ) 
+
+> t,i
+
+= I[︂ i = i(ℓ)
+
+> t
+
+]︂ . (31) Over all token positions in the current batch and sequence window, these assignments partition the observed states by the centroids to which they are most strongly routed. For each centroid i, the write-back step computes the empirical mean of the states assigned to it. If T (ℓ) 
+
+> i
+
+denotes the set of token positions assigned to centroid i, then the batch-level centroid update target is ¯r(ℓ) 
+
+> i
+
+= 1max (︂ |T (ℓ) 
+
+> i
+
+|, ε )︂∑︂ t∈T (ℓ)
+
+> i
+
+r(ℓ) 
+
+> t
+
+, (32) where ε > 0 is a small constant preventing division by zero in empty-assignment cases. The expression above makes clear what is being estimated: a per-centroid average of the post-block states that currently map to that centroid. The actual centroid update is an exponential moving average with a learned scalar momentum. Let 
+
+m(ℓ) = σ(︁ u(ℓ))︁ , (33) where u(ℓ) ∈ R is a learnable parameter and σ(·) is the sigmoid function. The centroid bank is then updated according to 
+
+c(ℓ) 
+
+> i
+
+← m(ℓ)c(ℓ) 
+
+> i
+
++(︁ 1 − m(ℓ))︁ ¯r(ℓ) 
+
+> i
+
+. (34) After the update, each centroid is renormalized: 
+
+c(ℓ) 
+
+> i
+
+← c(ℓ)
+
+> i
+
+∥c(ℓ) 
+
+> i
+
+∥2
+
+. (35) 16 This normalization keeps the centroid magnitudes controlled and makes the geometry of the memory bank more stable over training. Conceptually, this rule allows the memory representation to evolve on two timescales. Gradients from the main objective and auxiliary losses shape the centroids indirectly through end-to-end optimization, while write-back provides a direct local adaptation mechanism based on the states currently routed to each slot. The learned momentum determines how conservative or reactive that adaptation should be. When m(ℓ) is high, centroid updates are slow and memory remains stable; when it is lower, the centroids track recent assignments more aggressively. This write-back mechanism is deliberately simple. It does not attempt to rewrite the transition graph or perform a complex associative memory update at each step. Instead, it gives the centroid bank a lightweight online adjustment rule that helps keep the memory aligned with the token states encountered on recent forward passes. In practice, the centroids are not merely abstract parameters optimized by distant gradients; they are continually nudged toward the data regions for which they currently serve as source landmarks. The following subsections describe the additional losses and maintenance rules used to keep this process stable and to prevent the memory structure from collapsing or becoming underutilized. 
+
+# 3.8 Auxiliary Objectives 
+
+Objective composition. The memory cell is trained not only through the main language-modeling objective, but also through a set of auxiliary losses designed to stabilize centroid geometry, improve memory utilization, and regularize the transition graph. These terms are not peripheral heuristics added after the fact. They are part of the training recipe that makes the memory structure usable in practice. Without them, the model can still optimize the next-token objective, but the learned centroids and edges are more likely to collapse, become redundant, or fail to organize into a meaningful routing substrate. Let Ltask denote the standard next-token cross-entropy loss. For each layer, the model also computes five memory-specific terms: 
+
+• a tracking loss 
+
+• an orthogonality loss on the centroid bank 
+
+• a clustering penalty on centroid usage 
+
+• an edge-entropy regularizer 17 • an edge-contrastive term that encourages diversity among transition patterns. The total auxiliary contribution is therefore 
+
+Lmem = λtrack Ltrack +βortho Lortho +λcluster Lcluster +λedge Ledge +λcontrast Lcontrast ,
+
+(36) and the full training objective is 
+
+L = Ltask + Lmem . (37) 
+
+Tracking loss. The tracking loss ensures that the source-routing distribu-tion remains predictive of the hidden state written back into memory. Given the source weights wsrc and the layer-normalized centroid bank ˜︁ C, the model reconstructs a source-conditioned memory estimate and compares it to the post-memory block output x(ℓ+1) . If m = σ(u) is the learned write-back momentum introduced earlier, then the loss takes the form 
+
+Ltrack = (1 − m) MSE (︂ sg (︁ x(ℓ+1) )︁ , wsrc ˜︁ C)︂ , (38) where sg (·) denotes stop-gradient and the expression is understood over the batch and sequence dimensions. This term replaces a conventional commitment-style penalty [ 26 ]: rather than forcing a hard matching be-tween token states and centroids, it encourages the routed centroid mixture to remain a useful predictor of the state being written. The prefactor (1 − m)couples this loss to the write-back dynamics, reducing tracking pressure when the learned momentum becomes highly conservative. 
+
+Centroid orthogonality. The orthogonality term regularizes the centroid bank itself. Let Cn denote the row-wise ℓ2-normalized centroid matrix and let 
+
+G = CnC⊤ 
+
+> n
+
+(39) be its Gram matrix. The orthogonality loss penalizes off-diagonal similarity: 
+
+Lortho = 1
+
+F (F − 1) ∑︂ i̸=j
+
+G2 
+
+> ij
+
+. (40) This discourages different centroids from collapsing onto nearly identical directions. In geometric terms, it pushes the memory bank toward a more distributed set of representational landmarks instead of allowing many slots to concentrate around the same region of hidden-state space, helping to avoid trivial solutions. 18 Usage clustering. The clustering term addresses memory utilization by estimating both the average source usage of centroid i over the current batch of N routed states and the corresponding normalized usage distribution: ¯ui = 1
+
+N
+
+> N
+
+∑︂ 
+
+> t=1
+
+wsrc ,t,i , ui = ¯ui∑︁  
+
+> Fj=1
+
+¯uj + ε (41) where ui is the numerically renormalized usage distribution used by the entropy term. The model then forms 
+
+H(u) = −
+
+> F
+
+∑︂ 
+
+> i=1
+
+ui log( ui + ε), (42) and the corresponding effective number of active centroids 
+
+Neff = eH(u). (43) The clustering penalty is then 
+
+Lcluster = max (︃ Ntarget 
+
+max( Neff , 1) − 1, 0)︃ , (44) where Ntarget is a desired lower bound on the effective number of active centroids. This loss becomes zero once centroid usage is sufficiently spread out, but it penalizes situations in which only a small subset of slots carries most of the routing mass. 
+
+Edge entropy. The edge-entropy term regularizes the transition graph. Let 
+
+P = softmax( E + M) (45) denote the row-stochastic edge matrix introduced earlier. For each row i, the model computes the entropy 
+
+Hi = −
+
+> F
+
+∑︂ 
+
+> j=1
+
+Pij log( Pij + ε). (46) The edge-entropy loss then enforces a minimum degree of outgoing uncer-tainty: 
+
+Ledge = 1
+
+F
+
+> F
+
+∑︂ 
+
+> i=1
+
+max( Htarget − Hi, 0) , (47) where Htarget is a prescribed minimum entropy level. This prevents the transition graph from becoming too sharply peaked too early, which would make traversal brittle and reduce the effective diversity of available moves. 19 Edge contrast. The edge-contrastive term encourages different centroids to induce different outgoing transition patterns. If Pn denotes the row-wise 
+
+ℓ2-normalized version of P, then the model forms the row-similarity matrix 
+
+S = PnP⊤ 
+
+> n
+
+(48) and penalizes its off-diagonal mean: 
+
+Lcontrast = 1
+
+F (F − 1) ∑︂ i̸=j
+
+Sij . (49) Minimizing this quantity pushes different rows of the transition matrix away from one another, so that the graph does not degenerate into many centroids sharing nearly identical outgoing behavior. In effect, it complements the centroid orthogonality term: one regularizes the diversity of the memory locations themselves, while the other regularizes the diversity of how those locations connect and propagate. Together, these losses keep routing, centroid geometry, and graph struc-ture aligned with the language-modeling objective. 
+
+# 3.9 Centroid Maintenance 
+
+The auxiliary objectives do not directly recycle dead or redundant slots, so GMT also includes an explicit maintenance procedure distinct from per-forward write-back. This procedure operates directly on the centroids during training and addresses practical failure modes that are difficult to eliminate by gradient-based losses alone: some centroids may become effectively inactive, while others may converge to nearly identical directions and waste memory capacity through redundancy. The first quantity tracked for this purpose is centroid usage. After each forward pass, the model forms the batch-level source utilization 
+
+u(ℓ)batch = 1
+
+N
+
+> N
+
+∑︂ 
+
+> t=1
+
+w(ℓ)src , t , (50) where N is the total number of routed token states in the current batch and 
+
+w(ℓ)src , t ∈ ∆F −1 is the source-routing distribution. The stored usage statistic is then updated by exponential smoothing: 
+
+u(ℓ) ← ρ u(ℓ) + (1 − ρ) u(ℓ)batch , (51) where ρ ∈ (0 , 1) is a smoothing coefficient. This gives a slowly varying estimate of how often each centroid is being selected over time. In addition 20 to usage, each centroid is assigned an age counter 
+
+a(ℓ) 
+
+> i
+
+∈ R≥0, (52) which is incremented after each write-back step and reset whenever a centroid is reinitialized. These statistics support two maintenance operations: dead-centroid re-set and similarity-based merging. A centroid is considered dead when its smoothed usage falls below a fixed threshold. Formally, centroid i is marked inactive if 
+
+u(ℓ) 
+
+> i
+
+< δ dead , (53) where δdead is a reset threshold. If no centroid satisfies this condition, the reset procedure does nothing. Otherwise, let D(ℓ) = {i : u(ℓ) 
+
+> i
+
+< δ dead } be the set of inactive centroids. Each inactive centroid receives a newly normalized replacement vector 
+
+r(ℓ) 
+
+> i
+
+={︄ norm (︂ x(ℓ)
+
+> si
+
+)︂ , |D (ℓ)| ≤ F/ 2,
+
+norm( ϵi) , ϵi ∼ N (0, I), |D (ℓ)| > F/ 2, (54) where x(ℓ) 
+
+> si
+
+is a sampled current state. Thus, when only a limited number of centroids are inactive, replacements are drawn from the current batch geometry; when more than half of the memory bank is inactive, the procedure falls back to random unit-sphere directions to avoid repopulating many slots from the same narrow batch geometry. The reset rule may then be written compactly as 
+
+c(ℓ) 
+
+> i
+
+← r(ℓ) 
+
+> i
+
+, u(ℓ) 
+
+> i
+
+← 1
+
+F , a(ℓ) 
+
+> i
+
+← 0, (55) for each centroid i flagged as dead. The second maintenance rule targets redundancy rather than inactivity. Let 
+
+C(ℓ) 
+
+> n
+
+(56) denote the row-wise normalized centroid bank, and let 
+
+G(ℓ) = C(ℓ)
+
+> n
+
+(︁ C(ℓ)
+
+> n
+
+)︁ ⊤ (57) be the corresponding similarity matrix. The algorithm searches for centroid pairs ( i, j ) such that 
+
+G(ℓ) 
+
+> ij
+
+> τ merge , (58) where τmerge is a similarity threshold. However, this comparison is restricted to mature centroids only. If either centroid is younger than a cooldown threshold, 
+
+a(ℓ) 
+
+> i
+
+< a cool or a(ℓ) 
+
+> j
+
+< a cool , (59) 21 the pair is ignored. This prevents newly reset centroids from being merged again before they have had time to stabilize. When a mature pair exceeds the merge threshold, the model does not average the two centroids. Instead, it keeps the more frequently used one and repurposes the other. If ui ≥ uj , centroid j is selected for replacement; otherwise centroid i is replaced. Denoting the replaced index by r, the update takes the form 
+
+c(ℓ) 
+
+> r
+
+← s(ℓ), u(ℓ) 
+
+> r
+
+← 1
+
+F , a(ℓ) 
+
+> r
+
+← 0, (60) where s(ℓ) is a normalized replacement vector. Conceptually, this operation frees one slot from a redundant pair and reassigns it to a new candidate region of representation space, rather than allowing two nearly identical centroids to persist indefinitely. These maintenance steps are applied periodically during training. At each maintenance event, dead-centroid reset is executed first, followed by similarity-based merging. This ordering is sensible in practice: the reset stage restores clearly inactive capacity, while the merge stage removes redundancy among centroids that remain active and mature. These operations should be read as safeguards rather than as evidence for a universal failure law. During early training, or in settings where the memory bank has more slots than the current routing distribution can use effectively, two local pathologies are especially plausible: some centroids may receive too little probability mass to specialize, while others may remain active but drift toward nearly redundant directions. Reset and merge address these complementary cases without changing the differentiable source-routing rule used in the forward computation. Viewed together, usage tracking, reset, and merging provide lightweight online control over centroid capacity. Auxiliary losses shape the global ge-ometry of the memory bank, while maintenance handles local pathologies by recycling unused slots, repurposing overly similar mature slots, and protecting newly created centroids while they begin to specialize. 
+
+# 4 Experimental Setup 
+
+# 4.1 Base Model Instantiation 
+
+The preceding section described the GMT architecture in abstract form. We now specify the concrete instantiation used for the base v7 study. This separation is deliberate: the method itself is defined independently of any 22 particular scale, but empirical evaluation requires fixing a model configuration. The base model is instantiated as a decoder-only language model [23] with 
+
+L = 16 (61) transformer blocks, hidden dimension 
+
+H = 768 , (62) and 
+
+Nh = 12 (63) attention heads per layer. The corresponding per-head dimension is therefore 
+
+dh = HNh
+
+= 64 . (64) The maximum sequence length is 
+
+Tmax = 1024 , (65) and the vocabulary size used by the model head is 
+
+V = 50 ,257 . (66) With these settings, the instantiated base model contains 82 ,213 ,152 (67) trainable parameters. Each transformer block contains one memory cell in place of the usual FFN. The memory bank of each cell has 
+
+F = 128 (68) centroids, and the query-key navigation subspace has dimension 
+
+D = 128 . (69) Because the centroid bank is block-specific rather than shared across layers, the model contains a total of 
+
+L · F = 16 × 128 = 2048 (70) learned centroid slots across the full network. This means that memory organization is allowed to differ from layer to layer: earlier layers need not 23 use memory in the same way as later ones, and no global centroid vocabulary is imposed across depth. Each centroid bank is initialized by sampling Gaussian vectors and project-ing them onto the unit sphere. In addition, every memory cell has a learned scalar output gate initialized at 1 .0 and a learned write-back-momentum parameter initialized at 4 .6, corresponding to initial sigmoid values of ap-proximately 0 .731 and 0 .99, respectively. At the embedding level, token embeddings and positional embeddings are both learned and randomly ini-tialized, and the output projection is tied to the token embedding matrix after the final layer normalization [ 24 ]. The embeddings remain trainable throughout; there is no pretrained initialization or freeze stage. The model applies dropout with rate 
+
+pembed = 0 .1 (71) to the summed input embeddings and 
+
+pattn = 0 .1 (72) within causal self-attention. No separate dropout is introduced inside the memory cell itself beyond the normalization and gating operations described earlier. The routing mechanism is instantiated with minimum routing distance 
+
+εgrav = 0 .01 (73) and with a monotone logarithmic temperature schedule from 
+
+τmax = 1 .0 to τmin = 0 .1. (74) Thus, routing begins relatively soft and becomes progressively sharper as training proceeds. The memory objective combines the five auxiliary terms with 
+
+λtrack = 1 .0, βortho = 0 .05 , λcluster = 0 .3, λedge = 0 .1, λcontrast = 0 .5,
+
+(75) and uses 
+
+Ntarget = F
+
+4 , H target = 4 .0, δdead = 10 −3, (76) 
+
+τmerge = 0 .95 , acool = 100 . (77) These values are not claimed to be uniquely optimal; rather, they define the specific base GMT model studied in this work. 24 Taken together, these choices place the base configuration in a moderate model-size regime: large enough to make the interaction between attention and memory nontrivial, yet still compact enough for the role of the memory mechanism to be examined without conflating it with very-large-scale model effects. In that sense, the configuration is intended to serve as a faithful base model for studying the architectural behavior of GMT , rather than as a maximally scaled instance. 
+
+# 4.2 Datasets, Tokenization, and Splits 
+
+This subsection defines the corpus preparation, tokenizer, sequence construc-tion, and train-validation split used for the reported language-modeling ex-periments. 
+
+4.2.1 OpenWebText Preparation 
+
+The language-modeling corpus used for the base experiment is OpenWebText [27 ], prepared as a flat autoregressive token stream. Documents are tokenized with the GPT-2 tokenizer [ 28 ]; an end-of-text token is appended after each document, and the resulting token ids are stored as contiguous unsigned 16-bit integer arrays. The training and validation streams are then memory-mapped during training rather than loaded fully into memory. The default preparation cap is 
+
+Ntrain ,max = 3 × 10 9 (78) training tokens. If a positive cap is used, the validation stream is capped at one tenth of the training cap; if the cap is disabled, all available tokens from the corresponding document ranges are retained. The preparation procedure is intentionally simple: it does not perform document-level filtering beyond the upstream dataset, and it does not insert special separators other than the tokenizer end-of-text marker. This keeps the training stream close to the standard GPT-style autoregressive setup. In order to facilitate reproducibility of our results we provide a description of the experimental setup in the following subsections. 
+
+4.2.2 Tokenization and Sequence Packing 
+
+Let 
+
+s = ( s0, s 1, . . . , s N −1) (79) denote the concatenated token stream after tokenization and end-of-text insertion. The training dataset forms fixed-length, non-overlapping windows 25 of length Tmax = 1024. For sequence index i, the model input and target are 
+
+x(i) = ( siT max , . . . , s iT max +Tmax −1), (80) 
+
+y(i) = ( siT max +1 , . . . , s iT max +Tmax ). (81) The target is therefore the one-token shifted continuation of the input. Each training example is obtained by reading Tmax + 1 consecutive tokens from the memory-mapped stream: the first Tmax tokens form the input, and the last 
+
+Tmax tokens form the target. This packing rule has two practical consequences. First, the number of usable examples in a shard of length N is 
+
+Nseq =⌊︃ N − 1
+
+Tmax ⌋︃ . (82) Second, sequence boundaries are determined by fixed stream offsets rather than by document boundaries. Documents remain separated only through the inserted end-of-text token. This is consistent with the goal of training a decoder-only language model on a continuous token stream. 
+
+4.2.3 Training and Validation Split 
+
+The train-validation split is performed before tokenization at the document-index level. Let D be the number of OpenWebText training documents. The first 
+
+⌊0.95 D⌋ (83) documents are assigned to the training stream, and the remaining documents are assigned to the validation stream. The split is deterministic with respect to the dataset order. During training, packed training windows are shuffled, while validation windows are evaluated in a fixed order. The validation set is used for two distinct purposes: estimating next-token predictive loss and selecting the lowest-validation-loss checkpoint. It is not used to tune the architecture during a run, and no validation examples are mixed into the training stream. 
+
+# 4.3 Training Protocol 
+
+4.3.1 Optimization and Learning-Rate Schedule 
+
+The base GMT v7 model is trained as a standard autoregressive language model with teacher forcing. For a minibatch of size B and sequence length 26 T , the next-token loss is 
+
+LLM = − 1
+
+BT 
+
+> B
+
+∑︂ 
+
+> b=1
+> T
+
+∑︂ 
+
+> t=1
+
+log pθ(yb,t | xb, ≤t) . (84) The objective optimized during training adds the memory-specific auxiliary terms defined in Section 3: 
+
+Ltrain = LLM + λtrack Ltrack + βortho Lortho 
+
++ λcluster Lcluster + λedge Ledge + λcontrast Lcontrast . (85) Optimization uses AdamW with learning rate 3 × 10 −4, weight decay 0 .1, and coefficients ( β1, β 2) = (0 .9, 0.95). The scheduler is cosine decay with 2,000 warmup steps. The physical minibatch size is 
+
+B = 8 , (86) with gradient accumulation over 
+
+A = 33 (87) minibatches. Thus each optimizer update sees 
+
+B · A · Tmax = 8 × 33 × 1024 = 270 ,336 (88) tokens, ignoring any final incomplete accumulation window at the end of an epoch. Gradients are clipped to norm 1 .0. Training uses bfloat16 mixed precision. The base run is configured for two epochs over the prepared stream. 
+
+4.3.2 Routing-Temperature Schedule 
+
+The routing temperature is not a free per-batch hyperparameter. It is a de-terministic function of the global optimizer step. If s is the current optimizer step and S is the planned number of optimizer steps, define 
+
+p(s) = min (︂ sS , 1)︂ (89) and 
+
+ρ(s) = log (1 + (e − 1) p(s)) . (90) The temperature used by all memory cells at step s is then 
+
+τ (s) = τmax ·(︃ τmin 
+
+τmax )︃ 
+
+> ρ(s)
+
+, (91) 27 with τmax = 1 .0 and τmin = 0 .1. In the base configuration, this simplifies to 
+
+τ (s) = 0 .1ρ(s). (92) The schedule begins with softer source routing and gradually sharpens the gravitational assignment as training proceeds. This is important for the memory cell: early in training, centroids and edges are not yet organized, so overly sharp routing would make the memory bank brittle; later in training, sharper routing encourages more decisive centroid usage. 
+
+4.3.3 Memory Maintenance During Training 
+
+There are two update mechanisms for the memory bank. The first is the online write-back described in Section 3. In the base v7 realization, source weights are converted to hard assignments by an argmax over wsrc , and per-centroid averages are used as targets for the learned Exponential Moving Average ( EMA ) update. The centroid matrix is then renormalized. This online adaptation is part of the operational definition of the model, rather than a separate optimizer-side procedure. The second mechanism is periodic maintenance after optimizer steps. Every 
+
+Kmaint = 110 (93) global optimizer steps, each block first resets dead centroids and then repur-poses one centroid from each overly similar mature pair. Dead centroids are detected by usage below 10 −3. Similarity-based merging uses cosine similar-ity threshold 0 .95 and excludes centroids younger than 100 maintenance-age units. These rules are not intended as a general memory-allocation algorithm; they are safeguards used in the base v7 configuration to prevent unused or duplicated slots from silently consuming the memory budget. 
+
+4.3.4 Validation and Checkpointing 
+
+Validation computes the same next-token cross-entropy as training, but with-out auxiliary memory losses in the reported scalar validation value. Let Bval 
+
+denote the ordered validation minibatches and let 
+
+Kval = min(512 , |B val |).
+
+The reported validation loss is 
+
+Lval = 1
+
+Kval 
+
+> Kval
+
+∑︂ 
+
+> k=1
+
+[︄ 
+
+− 1
+
+BkT
+
+> Bk
+
+∑︂ 
+
+> b=1
+> T
+
+∑︂ 
+
+> t=1
+
+log pθ(︂ y(k) 
+
+> b,t
+
+| x(k)
+
+> b, ≤t
+
+)︂]︄ , (94) 28 The reported perplexity is PPL = eLval , (95) with the exponent clipped in the numerical evaluation only to avoid overflow. Checkpoint selection is based on the lowest validation loss, with periodic recovery checkpoints retained during training. Validation follows the same adaptive forward dynamics as training: source-usage statistics and centroid write-back remain active during the forward evaluation pass. Consequently, validation measures the base v7 model in its adaptive memory regime rather than in a separately frozen-memory mode. This convention is part of the evaluation protocol and is relevant when com-paring validation loss against models whose parameters are not modified during evaluation. Alongside validation loss and perplexity, training records memory diag-nostics used for analysis in Section 5. These include mean and minimum effective centroid count, total dead centroids, centroid cosine similarity, cover-age, gate statistics, write-back momentum statistics, edge entropy, maximum edge mass, and edge-row similarity. 
+
+# 4.4 Baselines and Evaluation Metrics 
+
+4.4.1 Dense GPT Baseline 
+
+The comparison baseline is a decoder-only transformer with the same outer language-modeling setup: vocabulary size 50 ,257, context length 1024, 16 blocks, hidden dimension 768, 12 attention heads, tied input-output em-beddings, learned positional embeddings, and the same dropout rates. The architectural difference is confined to the second sublayer of each block. In-stead of a memory cell, the baseline uses a conventional two-layer MLP MLP( h) = W2 GELU( W1h), (96) with intermediate width 
+
+Hff = 1050 . (97) This width gives a dense baseline of approximately 103M trainable parameters. It is therefore larger than the 82.2M-parameter base GMT v7 model, but it shares the same depth, hidden size, attention configuration, context length, tokenizer, and training pipeline. We treat this as a strong architectural baseline rather than as a parameter-matched control. 29 4.4.2 Validation-Loss Evaluation 
+
+The first evaluation axis is validation loss on the held-out OpenWebText stream. This metric directly measures the training objective without the memory auxiliary terms and is the criterion used for checkpoint selection. For comparisons against the dense baseline, the important quantities are the validation cross-entropy, the derived perplexity, the optimizer step, and the amount of training data consumed. Because GMT contains online memory adaptation inside the forward path, validation-loss comparisons are specified by the checkpoint and evaluation protocol rather than by the scalar loss alone. 
+
+4.4.3 ARC-Easy Evaluation 
+
+The standalone ARC-Easy evaluation follows a multiple-choice log-likelihood protocol for the AI2 Reasoning Challenge [ 29 ]. For a question q and answer choices a1, . . . , a K , the evaluator forms the textual context 
+
+c(q) = concat( Question: , q, ⟨newline ⟩, Answer: ) (98) and scores each answer as a continuation under the language model. If 
+
+ak = ( ak, 1, . . . , a k,m k ) is the tokenized continuation, its raw score is 
+
+Sraw (ak) = 
+
+> mk
+
+∑︂ 
+
+> j=1
+
+log pθ(ak,j | c(q), a k,<j ) . (99) The length-normalized score is 
+
+Snorm (ak) = 1
+
+mk
+
+Sraw (ak). (100) The predicted raw and normalized answers are ˆkraw = arg max  
+
+> k
+
+Sraw (ak), ˆknorm = arg max  
+
+> k
+
+Snorm (ak). (101) The evaluator reports both raw accuracy and length-normalized accuracy. This avoids treating a single scalar accuracy as definitive when answer-choice lengths differ. 
+
+4.4.4 Multi-Benchmark Zero-Shot Evaluation 
+
+For broader evaluation, we adopt the standardized language-model evaluation protocol of Gao et al. [ 30 ]. Scores for the base v7 model are computed through 30 the standard log-likelihood and rolling-log-likelihood interfaces, using the same GPT-2 tokenization and the model’s native context window. In the zero-shot setting, 
+
+nfewshot = 0 , (102) so each benchmark example is evaluated without task-specific demonstrations. Result tables therefore identify the task set, shot count, checkpoint, tokenizer, context length, and batch size used for evaluation. The role of the multi-benchmark evaluation in this paper is deliberately conservative. It is not intended to establish broad state-of-the-art perfor-mance. Rather, it provides a standardized test of whether the graph-memory replacement preserves enough language-modeling and commonsense behavior to remain competitive with a dense transformer baseline under the same checkpointing and tokenization conventions. 
+
+# 5 Results 
+
+# 5.1 Predictive Performance 
+
+We evaluate predictive behavior along three axes: held-out OpenWebText loss, standalone ARC-Easy accuracy, and zero-shot benchmark performance. These results compare the base v7 GMT model with the dense GPT-style baseline while keeping the parameter-count difference and the architectural scope of the v7 base configuration in view. 
+
+5.1.1 Validation-Loss Comparison Against the Baseline 
+
+Table 1 reports the validation cross-entropy and derived perplexity for both models at their respective best checkpoints, selected by the lowest validation loss observed during training on the OpenWebText stream. Table 1: Validation-loss comparison at the best checkpoint. Model Params Step Val. Loss PPL Baseline GPT-2 103.0M 22,096 3.2903 26.85 GMT v7 82.2M 18,310 3.5995 36.58 The baseline reaches a lower validation loss (3.2903 vs. 3.5995, a gap of ∆ = 0 .309 nats) and a correspondingly lower perplexity (26.85 vs. 36.58). This is expected: the baseline contains 20.8M more parameters, concentrated in the 16 × MLP FFN blocks that GMT replaces with graph-memory cells. 31 Because the two models are matched in block count rather than parameter count, validation loss and perplexity are interpreted here primarily as indi-cators of training quality and relative predictive fit, not as a same-capacity efficiency comparison. The baseline therefore provides an upper bound on what a standard dense transformer achieves at this depth and hidden size, not a parameter-matched control. Despite operating at a 20% parameter disadvantage, GMT reaches a stable training trajectory and a well-formed validation-loss curve, confirming that the graph-memory mechanism does not impede convergence. 
+
+5.1.2 Standalone ARC-Easy Evaluation 
+
+Table 2 reports the standalone ARC-Easy test-split results (2,376 examples, 0-shot), scored independently of the lm-evaluation-harness framework using the raw and length-normalised log-likelihood protocol described in Section 4.4. Table 2: ARC-Easy test-split accuracy (0-shot, 2,376 examples). Model Acc (raw) Acc (norm) Baseline GPT-2 0.3893 0.3561 
+
+GMT v7 0.3704 0.3384 ∆ −0.019 −0.018 The baseline leads by 1.9 percentage points on raw accuracy and 1.8 points on length-normalised accuracy. Both gaps are consistent in sign with the validation-loss advantage: the model with greater FFN capacity assigns higher likelihood to the correct answer in the majority of cases where the two models disagree. The absolute accuracy of both models ( ∼37–39%) reflects the zero-shot difficulty of ARC-Easy at this model scale on a standard language-modelling pretraining objective, and is not intended to match fine-tuned or instruction-tuned results. This result supports the same cautious interpretation: despite the 20.8M-parameter difference, GMT remains within 1.8–1.9 percentage points of the larger baseline on this standalone evaluation. Parameter-matched compar-isons and architectures evaluated at matched parameter count are left for future work. 
+
+5.1.3 Multi-Benchmark Zero-Shot Evaluation 
+
+Table 3 reports zero-shot results across four benchmarks evaluated with the 
+
+lm-evaluation-harness framework [ 30 ]: ARC-Easy [ 29 ], HellaSwag [ 31 ], 32 PIQA [32], and WinoGrande [33]. Table 3: Zero-shot multi-benchmark evaluation (lm-evaluation-harness, 0-shot). Task Metric Baseline GMT v7 ∆ARC-Easy acc 0.3893 0.3746 −0.015 acc norm 0.3569 0.3476 −0.009 HellaSwag acc 0.2693 0.2665 −0.003 acc norm 0.2750 0.2734 −0.002 PIQA acc 0.5947 0.5778 −0.017 acc norm 0.5958 0.5789 −0.017 WinoGrande acc 0.5051 0.5146 +0.010 Across the six accuracy-based metrics where the baseline leads, the gaps range from 0.2 to 1.7 percentage points, consistent with the parameter and validation-loss disadvantage of GMT v7. HellaSwag shows the smallest deficit (<0.3 pp on both metrics), suggesting that sentence-completion tasks requir-ing multi-step contextual coherence are less sensitive to the FFN-to-memory substitution than answer-selection tasks such as PIQA. The exception is WinoGrande, where GMT v7 outperforms the base-line by 1.0 percentage point (0.5146 vs. 0.5051). WinoGrande probes pronoun-resolution requiring implicit commonsense reasoning [ 33 ]. We hypothesize that the graph-memory routing mechanism, which dynamically indexes and retrieves structured associations, is particularly suited to this referent-disambiguation pattern. The result is preliminary—it reflects a single evaluation run on a single checkpoint—but it motivates targeted analysis of which reasoning sub-types benefit from persistent relational memory. 
+
+# 5.2 Memory Dynamics and Utilization 
+
+Beyond predictive loss, the base v7 run is evaluated through diagnostics that track whether the memory mechanism remains organized during training and evaluation. These diagnostics focus on centroid stability, slot utilization, routing structure, and edge diversity, since a graph-memory block can match language-modeling behavior only if its memory bank avoids collapse, remains sufficiently active, and develops interpretable transition patterns. 33 5.2.1 Centroid Stability 
+
+The retained diagnostics are interpreted against three failure modes that motivated the base v7 maintenance design: 
+
+• Collapse to a single attractor : routing mass concentrates on one or a few centroids, giving the model a trivial memory solution rather than a distributed graph state. Persistent collapse during early training was treated as a failed development configuration, so the final diagnostics track whether slot usage remains distributed. 
+
+• Centroid under-utilization : some slots can receive negligible as-signment mass, either as a short early-training transient or as a per-sistent dead-centroid state. The maintenance procedure resets long-inactive slots and merges near-duplicate centroids; the relevant question is whether such corrections fade as the memory geometry stabilizes. 
+
+• Momentum-related instability : write-back momentum controls how quickly centroids follow assigned post-memory states. Lower momen-tum increases adaptability but can destabilize early centroid geometry, whereas high momentum improves stability at the cost of slower adapta-tion. The base v7 run starts in the high-momentum regime and learns a slightly larger value over training; this is descriptive evidence, not a controlled momentum ablation. 
+
+5.2.2 Routing Utilization 
+
+To inspect routing behavior directly, we visualize source-to-target centroid transitions for three short text probes: narrative, political, and scientific. These probes are qualitative diagnostics, not separate benchmarks; they are intended to show whether the learned memory graph exposes coherent routing structure across linguistic contexts. Representative excerpts are: 
+
+• Narrative : ”Maria had lived in the crumbling house at the edge of the forest for twenty years before the letter arrived. The envelope was yellowed, its wax [...]” 
+
+• Politics : ”The central bank raised interest rates by 25 basis points on Thursday, its seventh consecutive increase, citing persistent inflationary pressure across [...]” 
+
+• Science : ”The electron was first identified by J. J. Thomson in 1897 during experiments with cathode rays. His measurements of the charge-to-mass ratio [...]” 34 For each probe, we provide centroid-routing visualizations for four memory blocks. These views are interpreted as structural diagnostics rather than proof of semantic disentanglement. The corresponding routing-flow visualizations are shown in Figures 1, 2, 3, and 5; together they trace the transition from early intake, through mid-depth routing diversification, to late-stage output compression. 
+
+Figure 1: Slot-routing flow at Block 00. 
+
+Figure 2: Slot-routing flow at Block 06. 35 Figure 3: Slot-routing flow at Block 11. 36 Figure 4: Topic-separated Block 11 routing flows for the narrative, political, and scientific probes. The comparison preserves the same visual encoding across topics and highlights how a shared block-level routing regime can coexist with topic-dependent centroid activation. 37 Figure 5: Slot-routing flow at Block 15. The sequence from Blocks 00, 06, 11, and 15 shows the transition from early intake, through mid-depth routing diversification, to late-stage output compression. The diagrams trace source-to-destination centroid transitions for part-of-speech (POS) token groups. They make the routing mechanism inspectable in two complementary senses. First, the visualizations expose how grammat-ical token classes move through the memory graph. Second, they show that routing is modulated by the topic of the probe, not only by local grammatical role. This is most visible in the topic-separated Block 11 views in Figure 4. Across the narrative, political, and scientific probes, Block 11 preserves the same broad routing regime: source usage remains highly distributed, desti-nation routing remains partly concentrated, and POS-colored paths retain a comparable global layout. At the same time, the active centroids are not identical across topics. Some slots that are inactive or marginal in one probe become active sources or destinations in another, and the political probe activates the broadest source set. We therefore interpret Block 11 as evi-dence of topic-conditioned routing modulation within a stable layer-specific memory structure. This supports a structural interpretability claim: the memory graph exposes where token groups move inside the block and how those movements change with discourse context. Stronger semantic claims require targeted analysis. 
+
+• Block 00 : At the network entrance, the retained probe traces route most source mass through a dominant centroid. Destination routing already fans out over 13 slots, suggesting that early structural sort-ing begins before source routing has diversified. Source Neff remains roughly 2 .8–3 .6, with Gini around 0 .96–0 .97; Slot 121 captures about 75–82 percent of tokens, while destinations include slots such as S59 for determiners, S107 for nouns, and S29 for punctuation. 38 • Block 06 : Mid-depth routing is visibly more distributed, with source and destination bars spread across more than 30 slots. POS-specific paths become clearer: punctuation, determiners, and nouns concentrate in distinct destination slots, and the science probe shows a narrower source distribution than the narrative probe, consistent with repeated technical structure in the input. 
+
+• Block 11 : Among the displayed depths, Block 11 is the high-diversity routing stage. The three topic traces use 60–66 unique source slots, with Neff ≈ 43 .5–50 .0 and Gini around 0 .69–0 .73. A small number of self-routes appears, indicating tokens whose source and destination centroids coincide, while the destination side remains moderately con-centrated around S62. The politics probe has the broadest source spread, consistent with longer clause structure. 
+
+• Block 15 : The final block compresses most tokens into Slot 109, which receives about 95–96 percent of destination assignments. Source routing remains differentiated, so this is not a collapse of all token content into a single semantic representation; rather, S109 acts as a shared output address reached from topic-specific source paths. The few non-S109 destinations, including S79, S127, and S96, are consistent exceptions across the probes. Table 4: Block 15: source slots feeding into the shared destination Slot 109. Although the output address is identical across topics, the provenance and lexical content differ entirely. Topic Top sources into S109 Representative tokens carried Narrative S23 (58), S87 (40), S66 (17) house, forest, arrived, yellow ; its, the, nor ; She, dog, sentence         
+
+> Politics S121 (30), S14 (19), S116 (14) raised, by, citing, priced ;rates, basis, points, Thursday ;central, bank, prime
+> Science S70 (108), S20 (37), S100 (19) ode, update, ta ;during, with, revealed ;lighter, charge, operation
+
+The source-slot distributions summarized in Table 4 are disjoint across topics—narrative draws from 33 unique sources (dominated by S23/S87), politics from 64 (the most dispersed), and science from 40 (dominated by S70 alone handling 108 tokens). The hidden states that accumulate at S109 therefore encode the full upstream routing history, which is entirely topic-dependent; the LM head reads a single address whose content was shaped by 15 blocks of divergent centroid traversals. 
+
+5.2.3 Edge Structure Analysis 
+
+The learned edge matrix provides a complementary view of GMT ’s routing structure; to keep the visualization readable, we report active-edge maps for 39 the top 32 active centroids rather than the full 128-slot graph. Figures 6, 7, 8, and 9 show the corresponding active-edge maps for the same representative depths used in the routing-flow analysis. 
+
+Figure 6: Active edge structure at Block 00. Darker cells indicate stronger routing signal among the top active centroids. 40 Figure 7: Active edge structure at Block 06. 
+
+Figure 8: Active edge structure at Block 11. 41 Figure 9: Active edge structure at Block 15. These are the same representative memory blocks used in the routing-flow analysis. Together, these diagrams represent the top 32 active centroids/slots on the vertical axis and the target slots on the horizontal one - the color gradient map is darker when the edge routing between them provides a stronger signal, lighter when the signal is weaker. It can be see that most edge tend to route between two given slots for a given topic (the chosen edges still very by the topic the token belongs to); in some cases however we see more than one edge being activated, hinting at the fact that, even for a given context, the memory graph is capable of selectively pieces of sentence based on the current specific context. 
+
+# 5.3 Sensitivity and Stabilization Analysis 
+
+This section separates retained base v7 diagnostics from development evidence. Where preserved artifacts support quantitative statements, we report them directly; where controlled sweeps were not preserved, we use the observations only to motivate the design and identify the corresponding comparison as future work. This distinction is important because the present study evaluates the base v7 configuration rather than a complete ablation program over every auxiliary objective and routing hyperparameter. 42 5.3.1 Auxiliary Objectives and Stabilization Diagnostics 
+
+The complete training objective combines the language-modeling loss with five auxiliary terms specific to the GMT memory cell: 
+
+Ltrain = LLM + λtrack Ltrack + βortho Lortho 
+
++ λcluster Lcluster + λedge Ledge + λcontrast Lcontrast . (103) Each auxiliary term was introduced to address a specific instability observed during development: poor memory tracking, centroid redundancy, under-utilization, edge collapse, or lack of transition diversity. The retained evidence in this subsection should therefore be read as stabilization diagnostics for the reported base v7 configuration, not as a complete controlled ablation study. Where controlled sweeps were not preserved, we state the corresponding comparison as future work. 
+
+Tracking Loss. The tracking loss encourages the source-weighted centroid states to predict the block state written back into memory: 
+
+Ltrack = (1 − m) MSE (︂ sg (︁ x(ℓ+1) )︁ , wsrc ˜︁ C)︂ . (104) Here m = σ(u) is the learned write-back momentum. This term was intro-duced to replace an earlier commitment-style formulation inspired by vector-quantized representation learning [ 26 , 34 , 35 ], whose stop-gradient placement conflicted with the EMA write-back mechanism. This commitment-style term is not part of the reported base v7 training objective: 
+
+Lcommit = MSE (︂ x(ℓ+1) , sg (︂ wsrc ˜︁ C)︂)︂ , (105) which pulled hidden states toward the memory reconstruction but provided no gradient to the centroids themselves. Early development configurations using this direction of stop-gradient placement exhibited centroid collapse, with pairwise cosine similarity rising above 0 .6 within the first epoch. The tracking loss inverts the stop-gradient placement and couples the objective to the learnable momentum parameter, allowing the model to regulate the relative strength of gradient-based correction and EMA drift. Development runs without this tracking signal showed rapid centroid under-utilization and unstable memory geometry, but the retained artifacts are not sufficient to treat those runs as a controlled ablation. We therefore use this observation as design motivation and leave a systematic tracking-loss ablation to future work. 43 Table 5: Centroid maintenance and orthogonality observations across devel-opment configurations.                     
+
+> Configuration βortho Init. cos sim Outcome
+> Early k-means A –k-means >0.6Collapsed Early k-means B –k-means >0.6Collapsed Base v7 0.05 sphere 0.587 →0.155 (1110 steps) Stable
+
+Orthogonality Loss. The orthogonality penalty discourages centroid re-dundancy by penalizing off-diagonal entries in the centroid Gram matrix: 
+
+Lortho = 1
+
+F (F − 1) ∑︂ i̸=j
+
+G2 
+
+> ij
+
+, G = CnC⊤ 
+
+> n
+
+, Cn,i = Ci
+
+∥Ci∥2
+
+. (106) Here Gij is the cosine similarity between centroids i and j after row-wise normalization. Minimizing this loss discourages distinct memory slots from collapsing onto the same direction while leaving each centroid free to specialize within the shared hidden-state geometry. In the retained base v7 run, this term is associated with a rapid reduction in centroid similarity during early training: the mean pairwise cosine similarity decreases from 0 .587 at step 554 to 0 .155 at step 1664, and then remains in a substantially lower range through the rest of training. This trajectory supports the role of the orthogonality term as a stabilizing pressure on the centroid geometry. The available zero-weight and higher-weight development runs, however, are not sufficient to report a controlled ablation, so systematic variation of βortho remains future work. This loss is particularly important because contextual embedding spaces in GPT-2-style models are generally anisotropic, with high average pairwise cosine similarity in many layers [ 36 ]. In the memory cell, allowing centroids to concentrate in a narrow region reduces expressiveness and makes the maintenance procedure more likely to fall into a trivial configuration. Table 5 summarizes the observed difference between k-means-style initial-ization without the same stabilizing recipe and the spherical initialization used in the base v7 configuration. The earlier configurations, which lacked the same orthogonality regularization and maintenance behavior, stagnated at much higher cosine similarity and collapsed the memory block, while the base v7 configuration moved toward a more distributed centroid geometry. 
+
+Clustering Loss. The active-slot clustering term is a one-sided anti-collapse pressure. Rather than forcing the model to use exactly a prescribed 44 number of cells, it penalizes only the regime in which the effective number of source-routed cells falls below a target: 
+
+ui =
+
+> 1
+> BT
+
+∑︁ b,t wsrc ,bti ∑︁ 
+
+> j
+> 1
+> BT
+
+∑︁ b,t wsrc ,btj + ϵ, (107) 
+
+H(u) = −∑︂ 
+
+> i
+
+ui log( ui + ϵ), Neff = eH(u), (108) 
+
+Lcluster = max (︃ Ntarget 
+
+max( Neff , 1) − 1, 0)︃ . (109) Here u is the normalized source-routing usage distribution over memory cells, computed from the current batch and sequence positions. With the reported base v7 setting λcluster = 0 .3 and Ntarget = F/ 4, the mean effective number of source-routed cells remains above the target across the logged checkpoints, ranging from 61 .6 to 114 .4 for F = 128. The term therefore acts as a guardrail against under-utilization: it applies pressure when routing collapses below the threshold, but does not force the model toward an exact number of active cells once sufficient coverage has been reached. Controlled sweeps over λcluster 
+
+and Ntarget were not retained for the present study, so the sensitivity of this threshold remains future ablation work. 
+
+Edge Losses. The edge matrix E is regularized by two terms. The row-wise entropy term is a one-sided minimum-entropy guardrail over the masked edge rows: 
+
+Pij = softmax( Ei, : + mi, :)j , mij ={︄ −∞ , i = j, 
+
+0, i̸ = j, (110) 
+
+Hi = −∑︂ 
+
+> j
+
+Pij log( Pij + ϵ), (111) 
+
+Ledge = 1
+
+F
+
+> F
+
+∑︂ 
+
+> i=1
+
+max ( Htarget − Hi, 0) . (112) This term keeps each source slot from becoming too sharply restricted to a single target too early in training. In the retained base v7 run, the mean edge-row entropy remains close to the target throughout training, ranging from 3 .946 to 4 .352 for Htarget = 4 .0; over the same checkpoints, the mean largest edge probability remains below 0 .283. These measurements support the role of the entropy term as a minimum-entropy guardrail in the evaluated configuration. Development runs suggested that removing this pressure can 45 produce low-entropy, near-deterministic off-diagonal routing, but the corre-sponding ablation artifacts were not retained; systematic sweeps over λedge 
+
+therefore remain future work. 
+
+Contrastive Loss. The edge-row contrastive term is 
+
+Lcontrast = 1
+
+F (F − 1) ∑︂ i̸=j
+
+⟨ei, ej ⟩, (113) where 
+
+pi = softmax( Ei, : + mi, :), ei = pi
+
+∥pi∥2
+
+(114) is the masked transition distribution for source slot i, followed by row-wise 
+
+ℓ2 normalization. This term complements the row-wise entropy loss: even if each row is individually high entropy, all rows can still converge to the same distributional shape. In the retained base v7 run, mean edge-row similarity decreases from 0 .397 at step 554 to 0 .096 at step 9 ,987 and 0 .094 at step 10 ,542, and reaches 0 .085 at the final logged checkpoint, step 19 ,974. This trajectory is consistent with progressive diversification of outgoing transition patterns under the reported setting λcontrast = 0 .5. A controlled sweep over λcontrast 
+
+was not retained, so isolating its marginal effect remains future ablation work. 
+
+Loss Weight Configuration. The base v7 configuration uses 
+
+λtrack = 1 .0, βortho = 0 .05 , λcluster = 0 .3,λedge = 0 .1, λcontrast = 0 .5. (115) These coefficients define the reported base v7 training recipe. They should be read as the fixed configuration used for the retained experiments, rather than as the outcome of a fully controlled loss-weight sweep. Development runs guided the choice of these values: tracking and centroid-geometry regulariza-tion were treated as primary stabilizers, while the clustering, edge-entropy, and edge-contrastive terms were used as guardrails against under-utilization and transition-graph degeneration. The component-level evidence above re-ports what is supported by the retained base v7 artifacts; independently varying all loss weights remains future ablation work. 
+
+5.3.2 Sensitivity to Memory Size and Routing Hyperparameters Number of Memory Slots. The base v7 model uses F = 128 memory slots. This choice was informed by development runs rather than by a matched memory-size sweep. In earlier higher-capacity configurations, larger slot 46 banks showed stronger dead-centroid accumulation and less stable utilization, motivating a more conservative active memory size for the reported base model. Because memory size was not isolated from other architectural and training changes in those runs, we treat this as development evidence rather than as a scaling result. Systematic exploration of F ∈ { 32 , 64 , 128 , 256 } with matched training budgets and comparable hyperparameter tuning remains necessary for determining how memory capacity should scale with model size. 
+
+Routing Temperature Schedule. The soft source-routing weights use a temperature-annealed gravitational distance: 
+
+wsrc = softmax (︃ 1
+
+τ d (hn, Cn))︃ , d(hn, ci) = max( εgrav , 1 − ⟨ hn, ci⟩) .
+
+(116) The temperature is annealed logarithmically from τmax = 1 .0 to τmin = 0 .1over the training horizon. The gravitational floor εgrav = 0 .01 prevents divi-sion by near-zero distances when a hidden state aligns closely with a centroid. Systematic comparison against constant or linearly annealed temperature schedules was not conducted and remains future work. 
+
+5.3.3 Sensitivity to Initialization and Write-Back Dynamics Centroid Initialization. Early development configurations initialized cen-troids using k-means over samples from a pretrained GPT-2 embedding space. This led to severe packing: centroids concentrated in a small subregion with pairwise cosine similarity above 0 .6, consistent with the anisotropy of con-textual representation spaces [ 36 ]. This made gravitational routing nearly uniform and provided little useful signal to the edge matrix; historical de-velopment notes record mean pairwise cosine similarity above 0 .6 in the corresponding collapsed configurations. Sphere initialization, introduced in a later development configuration and used consistently in base v7, samples centroids as 
+
+ci = ϵi
+
+∥ϵi∥2
+
+, ϵi ∼ N (0, I). (117) This produces mean cosine similarity near 0 .01 at initialization and allows contrastive and orthogonality signals to act from the beginning of training. The retained evidence therefore supports treating spherical initialization as part of the base v7 stabilization recipe: the early k-means-initialized configu-rations collapsed with high centroid similarity, whereas the base v7 run moved toward a lower-similarity, more distributed centroid geometry, as summarized in Table 5. Because initialization was not isolated from the accompanying 47 losses and maintenance rules, this contrast should be read as development evidence rather than as a controlled initialization ablation. 
+
+Gate Initialization. The displacement returned by the memory cell is scaled by a learned scalar gate: 
+
+x(ℓ+1) = h(ℓ) + σ(g(ℓ)) LN (ℓ)disp (︂ c(ℓ)tgt − c(ℓ)src )︂ . (118) In v7, the raw gate parameter is initialized to g0 = 1 .0, giving an initial effective scale σ(g0) ≈ 0.731. This intermediate value is a design choice: it keeps the memory path active from the beginning of training while limiting the influence of large untrained displacements on the residual stream. We do not report an independent gate-initialization sweep, so this should be read as implementation rationale rather than as an ablation result. 
+
+Write-Back Momentum. The centroid bank is maintained by an EMA write-back: 
+
+Cnew  
+
+> i
+
+= norm( mCi + (1 − m)ri) , (119) where ri is the mean post-memory block state assigned to slot i. The base v7 implementation uses a learnable momentum parameter u with m = σ(u)initialized at u0 = 4 .6, corresponding to m ≈ 0.99. Training logs show that 
+
+m increased slightly over training, from approximately 0 .990 at step 554 to approximately 0 .998 at step 19 ,974, remaining close to the high-momentum regime. Operationally, this EMA assignment is an online state update rather than a differentiable assignment rule: the write-back step uses the current scalar value of m without backpropagating through the centroid assignment itself. The momentum parameter is instead learned through the tracking objective described above, where (1 − m) modulates the pressure for source-weighted centroids to predict the written state. 
+
+Assignment Strategy. Write-back assignment uses hard source assign-ments: 
+
+i∗ 
+
+> t
+
+= arg max 
+
+> 1≤j≤F
+
+wsrc ,t,j , ri = 1max( |{ t : i∗ 
+
+> t
+
+= i}| , ε )∑︂ t:i∗ 
+
+> t=i
+
+rt. (120) Here rt denotes the post-memory block output passed to write-back, not the pre-memory input used to compute the source-routing distribution. Thus, source routing remains soft during the forward traversal, while write-back uses hard assignments for the maintenance target. This separates differentiable 48 traversal from decisive memory updates: the former preserves partial semantic membership, while the latter provides clearer centroid targets for the EMA update. 49 6 Discussion 
+
+The results above suggest that the base v7 GMT should be interpreted less as a simple drop-in replacement for dense feed-forward layers and more as a structured alternative for expressing part of the transformer block update. This section discusses the main implications of that choice: the graph-memory cell exposes routing and displacement variables that make the transformation more inspectable, while also leaving open questions about scale, controlled ablations, and generality. 
+
+# 6.1 Interpretability Implications 
+
+One motivation for the GMT architecture is to make the transformation normally implemented by the FFN branch more directly inspectable without leaving the decoder-only transformer setting. Mechanistic interpretability has shown that transformer computations can often be analyzed through circuits, causal tracing, neuron- or parameter-level localization, sparse feature decompositions, and views of FFN layers as memory-like structures [ 2, 3, 4,37 , 38 , 39 ]. Recent neuron-, layer-, and parameter-activation studies make the post hoc nature of this analysis especially explicit [ 40 , 41 ]. These methods are valuable, but they usually recover structure after training from dense activations, interventions, auxiliary probes, or learned decompositions. GMT takes a complementary route: source routing, target routing, centroid usage, transition weights, gates, and displacement vectors are explicit variables of the forward computation. The interpretability claim is therefore structural rather than absolute. The model is not transparent in every respect, but several objects that would otherwise have to be inferred post hoc are available as native architectural quantities. By running text through the model and tracking memory-cell activation together with the displacements produced in each memory block, one can inspect both block specialization and how its behavior changes across contexts. This is especially useful because the same centroid region may act as a source in one context and as a destination in another, making the graph traversal part of the explanation rather than only an artifact recovered after the forward pass. 50 Figure 10: Slot-routing flow in block 13 for a political-text probe, illustrating the source/destination role switching discussed in the interpretability analysis. Figure 10 illustrates this role switching. The same semantic or conceptual region can be associated with different meanings depending on the surround-ing context, and therefore with different displacement vectors. The block-13 routing data for Slots 127 and 117 provides a clearer instance of the same mechanism, with an explicit handoff between two distinct centroid regions. In block 13, Slot 127 functions as a predicate source in this probe. The verbs in the sequence route through it— citing, signalling, addressing, defend-ing, criticising, arguing, expressing, threatening and others—with consistently high source entropy (4 .61–4 .70), indicating competitive but stable specializa-tion. Three of these self-route ( →127): addressed , arguing , acknowledged , all verbs that can stand at a clause boundary without a following complement. The slot is acting as a predicate anchor, holding clause-internal verbs in place while displacing transitional ones outward. The outward displacement targets Slot 117 selectively. Specifically, ’defending’ , ’ criticised’ , and ’ described’ —all transitive verbs that introduce a prepositional complement—are routed from Slot 127 with Slot 117 as their destination. Slot 117 then changes role: it becomes the source for the relational and directional prepositions that follow those verbs in the text— ’ in’ , ’ against’ , ’ toward’ , ’ with’ , ’ over’ —displacing them onward to Slot 85. The displacement vectors thus point in opposite directions across the same centroid region. Slot 117 receives incoming tokens from Slot 127 along one directional axis, then emits a structurally different token class outward along another. The centroid origin is shared; the incoming and outgoing trajectories are not. The incoming and outgoing token sets at Slot 117 are disjoint in this 51 probe. Its incoming tokens are verbs ( ’ defending’ , ’ criticised’ , ’described’ ), and its outgoing tokens are prepositions ( ’ in’ , ’ against’ ,
+
+’ toward’ , ’ with’ , ’ over’ )—disjoint POS classes with no lexical overlap. Yet the same geometric region in memory space mediates both transforma-tions. Slots 127 and 117 implement the same routing pattern across a two-node pathway: the verb centroid handles the predicate class and selectively hands off to the preposition centroid, which absorbs the displacement and routes onward into the complement position. 
+
+# 6.2 Limitations 
+
+The present evidence should be interpreted as an architectural proof of con-cept rather than as a comprehensive performance study. The dense GPT-style baseline has 20.8M more parameters than the base v7 GMT model, so the comparison isolates the feasibility of the FFN -to-memory substitution only imperfectly. A parameter-matched baseline, multiple random seeds, and controlled ablations of routing, write-back, auxiliary losses, and centroid maintenance are needed before stronger conclusions can be drawn about effi-ciency or robustness. The benchmark set is also limited: the language-model results show stable training and close downstream behavior in the evaluated setting, but they do not establish broad task generality, scaling behavior, or superiority over dense transformer baselines. 
+
+# 7 Conclusion and Future Work 
+
+# 7.1 Conclusion 
+
+This paper introduced the base v7 GMT , a decoder-only transformer variant in which the feed-forward branch is replaced by a graph-structured memory cell. The architecture keeps the outer transformer scaffold intact while re-casting the post-attention transformation as source routing, one-hop graph traversal, token-conditioned target selection, and a gated displacement re-turned to the residual stream. In doing so, it exposes centroid usage, transi-tion structure, displacement vectors, gate values, and memory-maintenance dynamics as native quantities of the forward computation, rather than as objects inferred only after training. Empirically, the base v7 model trains stably and preserves meaningful downstream behavior under a smaller parameter budget than the dense GPT-style baseline considered here, while still lagging that baseline in validation 52 loss and perplexity. Its strongest result is therefore not a claim of superior-ity, but a viability and structural-interpretability result: replacing the dense FFN path with a graph-memory displacement remains trainable, exposes routing and transition variables directly in the forward computation, and pro-vides concrete objects for analysis. The present evidence is best read as an architectural proof of concept for explicit graph-mediated token transforma-tion, with parameter-matched baselines, multi-seed studies, and mechanistic interventions left as necessary next steps. 
+
+# 7.2 Future Work 
+
+The directions below are hypotheses for subsequent studies rather than ad-ditional results of the base v7 model; they are included to clarify which questions remain open after the present evaluation. 
+
+7.2.1 Evaluation and Mechanistic Validation 
+
+This paper evaluates only the v7 base architecture, and the most immedi-ate future work is therefore not to enlarge the architectural story, but to make the empirical evidence around the current mechanism sharper. Several diagnostic controls are especially important: parameter-matched dense base-lines, repeated runs over multiple random seeds, and interventions on the learned graph and displacement path. For example, the learned edge matrix can be compared at evaluation time against identity, uniform, shuffled, or randomized alternatives, while the displacement contribution can be scaled as 
+
+x(ℓ+1)  
+
+> t
+
+(α) = h(ℓ) 
+
+> t
+
++ α d(ℓ) 
+
+> t
+
+,
+
+d(ℓ) 
+
+> t
+
+= σ(︁ g(ℓ))︁ LN (ℓ)disp (︂ c(ℓ)tgt , t − c(ℓ)src , t )︂ , α ≥ 0. (121) for a range of fixed α values, with the base v7 update corresponding to α = 1. Such tests would help distinguish whether the observed behavior comes from the graph structure itself, from the centroid bank acting as a generic memory, or simply from residual capacity elsewhere in the model. 
+
+7.2.2 Hybrid Dense and Graph-Memory Computation 
+
+A second direction is to study GMT as an augmentation of dense token-wise computation rather than only as a direct replacement for the FFN .The base model examined here deliberately makes a strong intervention: every transformer block replaces the dense feed-forward sub-layer with a 53 graph-memory displacement. A natural extension is to preserve the semantic displacement path while adding a controlled dense path around it, 
+
+z = x + αmem dmem ,
+
+y = z + αffn FFN(LN( z)) , (122) where x denotes the post-attention state entering the second sublayer, z is the memory-updated intermediate state, and the residual scales may be learned per block or per channel. The setting αmem = 1 and αffn = 0 recovers the memory-only second sublayer studied in the base v7 model, while nonzero 
+
+αffn defines a controlled hybrid. This would test whether graph memory is most useful as a structured transition operating alongside ordinary nonlinear channel mixing, rather than as the only source of token-wise transformation. 
+
+7.2.3 Multi-Hop Graph Traversal 
+
+The graph traversal itself also remains intentionally minimal in the present architecture. The v7 base model performs a single step from source routing through the edge matrix to target routing. Future work should examine whether deeper concept composition could be supported by propagating the routing distribution over multiple graph steps, 
+
+w(0)  
+
+> t
+
+= wsrc , t ,
+
+w(k) 
+
+> t
+
+= softmax (︂ w(k−1)  
+
+> t
+
+A + sctx (ht))︂ , k = 1 , . . . , K, 
+
+dK,t = σ(g) LN disp (︂ (w(K) 
+
+> t
+
+− w(0)  
+
+> t
+
+)˜︁ C)︂ .
+
+(123) Here A denotes the row-normalized transition graph and sctx (ht) denotes the token-conditioned context score. For K = 1, this recovers the base v7 one-hop target routing and gated target-minus-source displacement readout; values K > 1 define a future extension. This direction should be approached carefully: repeated graph propagation may increase compositional depth, but it can also over-smooth the routing distribution or weaken the signal carried by later hops. Hop-wise residual gates, entropy diagnostics, and explicit comparisons between final-hop and multi-scale readout would therefore be needed. 
+
+7.2.4 Memory Maintenance and Write-Back 
+
+The maintenance mechanism is another central open question. The base v7 model uses hard source assignments for write-back, which preserves discrete slot identity but can be brittle when source routing is uncertain. Future 54 variants should compare hard assignment against soft, top-k, and confidence-gated write-back rules. If Ik(t) denotes the top-k source slots for token t, one possible update family is 
+
+a(k) 
+
+> t,i
+
+=
+
+⎧⎨⎩
+
+wsrc ,t,i ∑︁   
+
+> j∈Ik(t)
+
+wsrc ,t,j 
+
+, i ∈ Ik(t),
+
+0, otherwise ,
+
+¯r(k) 
+
+> i
+
+=∑︁ t γta(k) 
+
+> t,i
+
+rt
+
+max (︂∑︁ t γta(k) 
+
+> t,i
+
+, ε )︂ 
+
+.
+
+(124) Here γt ∈ [0 , 1] is an optional confidence term derived from routing entropy or top-two margin. Setting k = 1 and γt = 1 recovers the base v7 hard write-back target before applying the same EMA and centroid-renormalization update described above. Separating train-time maintenance from evaluation-time and generation-time behavior will also be important, since online mutation can otherwise make it difficult to isolate the effect of the learned parameters from the effect of state updates. 
+
+7.2.5 Controlled Memory Flexibility 
+
+Finally, future work should explore controlled ways of increasing the flexibility of the memory representation without turning the graph into a generic key-value lookup table. The semantic identity of a slot is central to the GMT interpretation, so any separation between routing geometry and readout content should be constrained. Examples include a residual value component initialized at zero, a shared semantic slot embedding from which routing and readout views are derived, multi-head memory spaces, or token-conditioned low-rank edge modulation. These extensions would test whether the centroid graph can gain expressive capacity while preserving the displacement-based interpretability of the base model. 
+
+7.2.6 Vision and Anomaly Detection 
+
+A separate future direction concerns vision models, particularly anomaly detection. Memory-bank methods have proved effective in industrial inspec-tion by storing normal patch-level features extracted from pretrained visual backbones and scoring test patches by their distance from nominal feature support [ 42 , 43 , 44 ]. A vision-oriented GMT variant could replace a flat mem-ory bank with a compact graph of learned centroids trained on normal patch embeddings. In such a setting, anomaly scores could be derived not only from distance to the nearest normal centroid, but also from routing entropy, 55 unlikely centroid transitions, and unusually large source-to-target displace-ments. This direction is speculative in the present work: the v7 base model is evaluated only as a language model, and any claim about visual anomaly detection would require a dedicated vision architecture and evaluation on industrial anomaly benchmarks such as MVTec AD [45]. 56 Acknowledgments 
+
+The authors acknowledge that this work was conducted as independent re-search, using local computational resources. The authors also thank the open-source machine-learning community for the software libraries, public datasets, and evaluation tools that made the experiments possible. 57 References 
+
+[1] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, L ukasz Kaiser, and Illia Polosukhin. Attention is all you need. In Advances in Neural Information Processing Systems ,volume 30, 2017. [2] Mor Geva, Roei Schuster, Jonathan Berant, and Omer Levy. Transformer feed-forward layers are key-value memories. In Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing , pages 5484–5495, 2021. [3] Kevin Meng, David Bau, Alex Andonian, and Yonatan Belinkov. Lo-cating and editing factual associations in GPT. In Advances in Neural Information Processing Systems , volume 35, pages 17359–17372, 2022. [4] Daking Rai, Yilun Zhou, Shi Feng, Abulhair Saparov, and Ziyu Yao. A practical review of mechanistic interpretability for transformer-based language models. arXiv preprint arXiv:2407.02646 , 2024. [5] Jason Weston, Sumit Chopra, and Antoine Bordes. Memory networks. In International Conference on Learning Representations , 2015. [6] Sainbayar Sukhbaatar, Jason Weston, and Rob Fergus. End-to-end mem-ory networks. In Advances in Neural Information Processing Systems ,volume 28, 2015. [7] Guillaume Lample, Alexandre Sablayrolles, Marc’Aurelio Ranzato, Lu-dovic Denoyer, and Herv´ e J´ egou. Large memory layers with product keys. In Advances in Neural Information Processing Systems , volume 32, 2019. [8] Yuhuai Wu, Markus N. Rabe, DeLesley Hutchins, and Christian Szegedy. Memorizing transformers. In International Conference on Learning Rep-resentations , 2022. [9] Vincent-Pierre Berges, Barlas Oguz, Daniel Haziza, Wen-Tau Yih, Luke Zettlemoyer, and Gargi Ghosh. Memory layers at scale. In Proceedings of the 42nd International Conference on Machine Learning , volume 267 of Proceedings of Machine Learning Research , pages 3831–3842, 2025. [10] Ajay Jaiswal, Lauren Hannah, Han-Byul Kim, Duc Hoang, Arnav Kundu, Mehrdad Farajtabar, and Minsik Cho. MemoryLLM: Plug-n-play interpretable feed-forward memory for transformers. arXiv preprint arXiv:2602.00398 , 2026. 58 [11] Chris Olah, Nick Cammarata, Ludwig Schubert, Gabriel Goh, Michael Petrov, and Shan Carter. Zoom in: An introduction to circuits. Distill ,2020. [12] Nick Cammarata, Shan Carter, Gabriel Goh, Chris Olah, Michael Petrov, Ludwig Schubert, Chelsea Voss, Ben Egan, and Swee Kiat Lim. Thread: Circuits. Distill , 2020. [13] Yordan Yordanov, Matteo Forasassi, Bayar Menzat, Ruizhi Wang, Chang Qi, Markus Kaltenberger, Amine M’Charrak, Tommaso Salvatori, and Thomas Lukasiewicz. Prototype transformer: Towards language model architectures interpretable by design. arXiv preprint arXiv:2602.11852 ,2026. [14] Ningyu Zhang, Yunzhi Yao, Bozhong Tian, Peng Wang, Shumin Deng, Mengru Wang, Zekun Xi, Shengyu Mao, et al. A comprehensive study of knowledge editing for large language models. arXiv preprint arXiv:2401.01286 , 2024. [15] Alex Graves, Greg Wayne, and Ivo Danihelka. Neural turing machines. 
+
+arXiv preprint arXiv:1410.5401 , 2014. [16] Alex Graves, Greg Wayne, Malcolm Reynolds, Tim Harley, Ivo Dani-helka, Agnieszka Grabska-Barwi´ nska, Sergio G´ omez Colmenarejo, Ed-ward Grefenstette, Tiago Ramalho, John Agapiou, Adri` a Puigdom` enech Badia, Karl Moritz Hermann, Yori Zwols, Georg Ostrovski, Adam Cain, Helen King, Christopher Summerfield, Phil Blunsom, Koray Kavukcuoglu, and Demis Hassabis. Hybrid computing using a neu-ral network with dynamic external memory. Nature , 538(7626):471–476, 2016. [17] Hubert Ramsauer, Bernhard Sch¨ afl, Johannes Lehner, Philipp Seidl, Michael Widrich, Lukas Gruber, Markus Holzleitner, Thomas Adler, David Kreil, Michael K Kopp, G¨ unter Klambauer, Johannes Brand-stetter, and Sepp Hochreiter. Hopfield networks is all you need. In 
+
+International Conference on Learning Representations , 2021. [18] Urvashi Khandelwal, Omer Levy, Dan Jurafsky, Luke Zettlemoyer, and Mike Lewis. Generalization through memorization: Nearest neighbor lan-guage models. In International Conference on Learning Representations ,2020. 59 [19] Robert A. Jacobs, Michael I. Jordan, Steven J. Nowlan, and Geoffrey E. Hinton. Adaptive mixtures of local experts. Neural Computation , 3(1):79– 87, 1991. [20] Noam Shazeer, Azalia Mirhoseini, Krzysztof Maziarz, Andy Davis, Quoc Le, Geoffrey Hinton, and Jeff Dean. Outrageously large neural networks: The sparsely-gated mixture-of-experts layer. In International Conference on Learning Representations , 2017. [21] William Fedus, Barret Zoph, and Noam Shazeer. Switch transformers: Scaling to trillion parameter models with simple and efficient sparsity. 
+
+Journal of Machine Learning Research , 23(120):1–39, 2022. [22] Ning Ding, Yehui Tang, Haochen Qin, Zhenli Zhou, Chao Xu, Lin Li, Kai Han, Heng Liao, and Yunhe Wang. MemoryFormer: Minimize transformer computation by removing fully-connected layers. arXiv preprint arXiv:2411.12992 , 2024. [23] Tom B. Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared D. Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Ariel Herbert-Voss, Gretchen Krueger, Tom Henighan, Rewon Child, Aditya Ramesh, Daniel M. Ziegler, Jeffrey Wu, Clemens Winter, Christopher Hesse, Mark Chen, Eric Sigler, Mateusz Litwin, Scott Gray, Benjamin Chess, Jack Clark, Christopher Berner, Sam McCandlish, Alec Radford, Ilya Sutskever, and Dario Amodei. Language models are few-shot learners. In Advances in Neural Information Processing Systems , volume 33, 2020. [24] Ofir Press and Lior Wolf. Using the output embedding to improve language models. In Proceedings of the 15th Conference of the European Chapter of the Association for Computational Linguistics: Volume 2, Short Papers , pages 157–163, 2017. [25] Ruibin Xiong, Yunchang Yang, Di He, Kai Zheng, Shuxin Zheng, Chen Xing, Huishuai Zhang, Yanyan Lan, Liwei Wang, and Tie-Yan Liu. On layer normalization in the transformer architecture. In Proceedings of the 37th International Conference on Machine Learning , volume 119 of 
+
+Proceedings of Machine Learning Research , 2020. [26] Aaron van den Oord, Oriol Vinyals, and Koray Kavukcuoglu. Neural discrete representation learning. In Advances in Neural Information Processing Systems , volume 30, 2017. 60 [27] Aaron Gokaslan and Vanya Cohen. OpenWebText Corpus. https: //skylion007.github.io/OpenWebTextCorpus/ , 2019. [28] Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei, and Ilya Sutskever. Language models are unsupervised multitask learners. Technical report, OpenAI, 2019. [29] Peter Clark, Isaac Cowhey, Oren Etzioni, Tushar Khot, Ashish Sabhar-wal, Carissa Schoenick, and Oyvind Tafjord. Think you have solved question answering? try ARC, the AI2 reasoning challenge. arXiv preprint arXiv:1803.05457 , 2018. [30] Leo Gao, Jonathan Tow, Baber Abbasi, Stella Biderman, Sid Black, Anthony DiPofi, Charles Foster, Laurence Golding, Jeffrey Hsu, Alain Le Noac’h, Haonan Li, Kyle McDonell, Niklas Muennighoff, Chris Ociepa, Jason Phang, Laria Reynolds, Hailey Schoelkopf, Aviya Skowron, Lin-tang Sutawika, Eric Tang, Anish Thite, Ben Wang, Kevin Wang, and Andy Zou. The language model evaluation harness, July 2024. [31] Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali Farhadi, and Yejin Choi. HellaSwag: Can a machine really finish your sentence? In Proceed-ings of the 57th Annual Meeting of the Association for Computational Linguistics , pages 4791–4800, 2019. [32] Yonatan Bisk, Rowan Zellers, Ronan Le Bras, Jianfeng Gao, and Yejin Choi. PIQA: Reasoning about physical commonsense in natural lan-guage. In Proceedings of the AAAI Conference on Artificial Intelligence ,volume 34, pages 7432–7439, 2020. [33] Keisuke Sakaguchi, Ronan Le Bras, Chandra Bhagavatula, and Yejin Choi. WinoGrande: An adversarial winograd schema challenge at scale. In Proceedings of the AAAI Conference on Artificial Intelligence , vol-ume 34, pages 8732–8740, 2020. [34] Ali Razavi, Aaron van den Oord, and Oriol Vinyals. Generating diverse high-fidelity images with VQ-VAE-2. In Advances in Neural Information Processing Systems , volume 32, pages 14837–14847, 2019. [35] Patrick Esser, Robin Rombach, and Bjorn Ommer. Taming transformers for high-resolution image synthesis. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 12873–12883, 2021. 61 [36] Kawin Ethayarajh. How contextual are contextualized word represen-tations? comparing the geometry of BERT, ELMo, and GPT-2 embed-dings. In Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing , pages 55–65, 2019. [37] Kevin Wang, Alexandre Variengien, Arthur Conmy, Buck Shlegeris, and Jacob Steinhardt. Interpretability in the wild: A circuit for indirect object identification in GPT-2 small. arXiv preprint arXiv:2211.00593 ,2022. [38] Arthur Conmy, Augustine N. Mavor-Parker, Aengus Lynch, Stefan Heimersheim, and Adri` a Garriga-Alonso. Towards automated circuit discovery for mechanistic interpretability. In Advances in Neural Infor-mation Processing Systems , volume 36, 2023. [39] Hoagy Cunningham, Aidan Ewart, Logan Riggs, Robert Huben, and Lee Sharkey. Sparse autoencoders find highly interpretable features in language models. arXiv preprint arXiv:2309.08600 , 2023. [40] Yudong Wang, Damai Dai, and Zhifang Sui. Exploring activation pat-terns of parameters in language models. arXiv preprint arXiv:2405.17799 ,2024. [41] Zhe Yin, Xiaodong Gu, and Beijun Shen. Neuron-guided interpretation of code LLMs: Where, why, and how? arXiv preprint arXiv:2512.19980 ,2025. [42] Dong Gong, Lingqiao Liu, Vuong Le, Budhaditya Saha, Moussa Reda Mansour, Svetha Venkatesh, and Anton van den Hengel. Memorizing normality to detect anomaly: Memory-augmented deep autoencoder for unsupervised anomaly detection. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 1705–1714, 2019. [43] Thomas Defard, Aleksandr Setkov, Angelique Loesch, and Romaric Au-digier. PaDiM: A patch distribution modeling framework for anomaly detection and localization. In Pattern Recognition. ICPR International Workshops and Challenges , pages 475–489, 2021. [44] Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard Sch¨ olkopf, Thomas Brox, and Peter Gehler. Towards total recall in industrial anomaly detection. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 14318–14328, 2022. 62 [45] Paul Bergmann, Michael Fauser, David Sattlegger, and Carsten Ste-ger. MVTec AD: A comprehensive real-world dataset for unsupervised anomaly detection. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9592–9600, 2019. 63 A Reference V7 Realization Details 
+
+This appendix records implementation-fidelity details needed to interpret the base v7 method and results. The material is separated from the main text to preserve the conceptual flow of the paper while making the reference realization explicit where it affects write-back, tracking, and maintenance behavior. 
+
+# A.1 Online Write-Back Realization 
+
+In the reference base-v7 realization, the online write-back described in Sec-tion 3 is executed by the reference forward pass under torch.no grad() .As a result, centroid adaptation occurs on every forward pass rather than only after optimizer steps. The write-back call receives the post-block state together with the source-routing weights, so centroids are updated from the state that already includes the memory-cell displacement. 
+
+# A.2 Tracking Target and Hard Assignment 
+
+The v7 tracking loss is computed against the same post-block state that is supplied to write-back. For write-back itself, soft source-routing weights are converted to hard assignments by taking the argmax centroid index for each token state and forming one-hot assignment masks. These masks are then used to aggregate per-centroid state averages before the EMA-style update is applied. 
+
+# A.3 Periodic Maintenance Policy 
+
+Centroid maintenance is executed separately from per-forward write-back. In the base-v7 training loop, maintenance is triggered after the optimizer step every 
+
+Kmaint = 110 (125) global steps. At each maintenance event, dead-centroid reset is applied first and similarity-based merging second. 
+
+# A.4 Reset and Merge Realization 
+
+In the reference v7 path, dead centroids are normally reinitialized from nor-malized token states drawn from the current batch. When the number of dead centroids exceeds half of the memory bank, random normalized vectors are used instead to avoid reseeding too many slots from a narrow local sample. 64 During similarity-based merging, the less-used centroid in an overly similar mature pair is repurposed rather than averaged with its partner, and its replacement vector is sampled from normalized token states from the current batch. 65

@@ -1,0 +1,279 @@
+Title: KAConvNet: Kolmogorov-Arnold Convolutional Networks for Vision Recognition
+
+URL Source: https://arxiv.org/pdf/2604.23320v1
+
+Published Time: Tue, 28 Apr 2026 00:42:40 GMT
+
+Number of Pages: 23
+
+Markdown Content:
+# KAConvNet: Kolmogorov–Arnold Convolutional Networks for Vision Recognition 
+
+Zhaoxiang Liu a,b , Zhicheng Ma a,b, ∗, Kaikai Zhao a,b , Kai Wang a,b , Shiguo Lian a,b, ∗
+
+> aData Science & Artificial Intelligence Research Institute, China Unicom, Beijing, China
+> bUnicom Data Intelligence, China Unicom, Beijing, China
+
+Abstract 
+
+The Convolutional Neural Networks (CNNs) have been the dominant and effec-tive approach for general computer vision tasks. Recently, Kolmogorov–Arnold neural networks (KANs), based on the Kolmogorov-Arnold representation the-orem, have shown potential to replace Multi-Layer Perceptrons (MLPs) in deep learning. KANs, which use learnable nonlinear activations on edges and simple summation on nodes, offer fewer parameters and greater explainability com-pared to MLPs. However, there has been limited exploration of integrating the Kolmogorov-Arnold representation theorem with convolutional methods for computer vision tasks. Existing attempts have merely replaced learnable acti-vation functions with weights, undermining KANs’ theoretical foundation and limiting their potential effectiveness. Additionally, the B-spline curves used in KANs suffer from computational inefficiency and a tendency to overfit. In this paper, we propose a novel Kolmogorov–Arnold Convolutional Layer that deeply integrates the Kolmogorov-Arnold representation theorem with convolu-tion. This layer provides stronger method interpretability because it is based on established mathematical theorems and its design has theoretical alignment. Building on the Kolmogorov–Arnold Convolutional Layer, we design an efficient network architecture called KAConvNet, which outperforms existing methods combining KAN and convolution, and achieves competitive performance com-pared to mainstream ViTs and CNNs. We believe that our work offers valu-able insight into the field of artificial intelligence and will inspire the develop-ment of more innovative CNNs in the 2020s. The code is publicly available at https://github.com/UnicomAI/KAConvNet. 
+
+Keywords: 
+
+Convolutional neural networks, Vision recognition, Vision backbone networks, Kolmogorov-Arnold representation theorem    
+
+> ∗Corresponding author
+> Email addresses: mazhicheng99@163.com (Zhicheng Ma), liansg@chinaunicom.cn
+> (Shiguo Lian)
+> arXiv:2604.23320v1 [cs.CV] 25 Apr 2026
+
+1. Introduction 
+
+The advancement of deep learning architectures has accelerated progress in computer vision. Since LeNet [1] introduced convolution neural networks (CNNs) into image recognition tasks, CNNs have rapidly evolved and now dom-inate various vision tasks, including classification, detection, and segmentation. Following this, ViT [2] expanded Transformer [3] from natural language pro-cessing to computer vision for the first time, and researchers have continually improved upon it. Kolmogorov–Arnold Neural Networks (KANs) [4] have recently emerged as a promising alternative to Multi-Layer Perceptrons (MLPs) in deep learning. Un-like MLPs, KANs employ learnable nonlinear activations on edges and simple summation at nodes, resulting in fewer parameters and enhanced fitting capa-bilities. Despite their potential, limited research has explored the integration of KANs with convolutional neural networks (KACNNs) for computer vision tasks. 
+
+> Fig. 1. Comparison of some competitive methods on ImageNet-1K. Our KAConvNets achieve higher accuracy with fewer parameters.
+
+One notable attempt is CKAN [5], which incorporates KANs into convo-lution layers. However, it demonstrates subpar performance on the MNIST dataset. And CKAN employs a shared learnable activation function across all channels, restricting the ability of individual channels to express unique features. Another study, KACN [6], applies the learnable activation function across all channels, resulting in a significant increase in the number of parameters. Both CKAN and KACN deviate from the original Kolmogorov–Arnold representa-tion theorem by merely placing the learnable activation function on the weights. 20100 200 300 024TrainingLoss Epoch  KAVGG11 (ours)  VGG11  KACN-VGG11  CKAN-VGG11 (a) Training Loss 0100 200 300 50 55 60 65 70 75 Accuracy Epoch  KAVGG11 (ours)  VGG11  KACN-VGG11  CKAN-VGG11 (b) Test Accuracy Fig. 2. The (a) training loss and (b) test accuracy after 300 epoch on the CIFAR-100. VGG-like CKAN and VGG-like KACN which adopt B-spline overfit compared to convolution and our method. 
+
+This simplified approach compromises the theoretical foundation and potential effectiveness of KANs in CNN-based architectures. In addition, the B-spline function used in CKAN and KACN, while effective for fitting certain functions, introduces two key challenges. First, parameter updates for B-splines slow down training, especially with finer interval divisions and higher-order splines. Second, B-splines are prone to overfitting in computer vision tasks, leading to lower test accuracy despite reduced training loss, as shown in Fig. 2. In this paper, we propose a novel and efficient Kolmogorov–Arnold Con-volution Layer (KAConvLayer) by deeply integrating KANs with convolution layers. Our approach applies the inner function of the Kolmogorov–Arnold rep-resentation theorem to each channel for information aggregation within each channel, and the outer function across all channels for effective information exchange. This design allows each channel to maintain distinct functional map-pings while reducing the total number of input elements and learnable functions. Consequently, our method achieves faster computation and convergence, while enhancing representational flexibility compared to existing approaches.In view of the fact that B-spline curves are prone to overfitting, we use a piecewise linear learnable activation function on the convolution layer nodes to prevent overfitting. Based on this layer, we design a new network architecture called KAConvNet, which demonstrates outstanding performance in computer vision tasks such as classification, detection, and segmentation, as illustrated in Fig. 1. Finally, we explore the advantages and limitations of KAConvLayers, provid-ing valuable insights for their application in computer vision and laying a solid foundation for future research on KAN-CNN integration. The core contribution of our work is to propose an advanced KAN-CNN hybrid paradigm that delivers significant and consistent improvements in both accuracy and inference speed over existing KAN-based methods. 32. Related Work 
+
+In this section, we summarize the latest applications of Kolmogorov–Arnold representation theorem in deep learning and briefly review the development of convolutional neural networks. 
+
+2.1. Kolmogorov–Arnold Neural Networks 
+
+Vladimir Arnold and Andrey Kolmogorov established that if f is a multivari-ate continuous function on a bounded domain, and then the f can be expressed as a finite composition of continuous functions of one-dimensional variable and the binary operation of addition [7, 8]. That is to say that a smooth f (·) can be written as 
+
+f (x1, . . . , x n) = 
+
+> 2n
+
+X
+
+> q=0
+
+Φq
+
+> n
+
+X
+
+> p=1
+
+ψq,p (xp)
+
+!
+
+(1) However, it is unclear how to choose the outer and inner functions Φq and 
+
+ψq,p . KAN [4] creatively uses neural networks to approximate these functions and places learnable activation functions on weights of MLP. Extensive numeri-cal experiments show that the KAN is a powerful new neural network architec-ture known for its improved performance and interpretability. Inspired by KAN, TKANs [9] combines the strength of both KAN and LSTM, and is composed of Recurring Kolmogorov-Arnold Networks (RKANs) Layers embedding memory management to perform multi-step time series fore-casting with enhanced accuracy and efficiency. PointNet-KAN [10] retains the core principle of PointNet by using shared KAN layers and applying symmetric functions for global feature extraction, ensuring permutation invariance with respect to the input features. KAN-CUT [11] replaces the two-layer MLP with a two-layer KAN in the existing model, which substitution favors the generation of more informative features in low-dimensional vector representations and can utilize more effectively to produce high-quality images in the target domain. U-KAN [12] integrates the dedicated KAN layers on the tokenized intermediate representation based on UNet. Because Fourier coefficients are more dense than B-splines and are easier to optimize, FourierKAN [13] replaces the activation function of B-spline with Fourier coefficients. Building on this, Wav-KAN [14] replaces the Fourier coef-ficients with wavelet coefficients. This approach efficiently handles both high-frequency and low-frequency components of the input data. GKAN [15] adapts the KAN principles to graph-structured data. It introduces learnable spline-based functions between layers, revolutionizing information processing within graph structures. KAL-Net [16] presents a novel architecture that utilizes Leg-endre polynomials. Specifically, KAL-Net employs Legendre polynomials up to a certain order for input normalization, which allows for more efficient cap-ture of nonlinear relationships. JacobiKAN [17] replaces B-splines with Jacobi polynomials. Fast-KAN [18] substitutes the 3rd-order B-spline basis in original KANs with Radial Basis Functions (RBFs). CKAN [5] employs a shared learn-able activation function across all channels, restricting the ability of individual channels to express unique features and leading to subpar performance on the 4MNIST dataset. KACN [6] applies the learnable activation function across all channels but makes the the number of parameters increase. Despite these advancements, networks based on KAN often suffer from slow speeds and long training times. Efficient-KAN [19] reformulates the computa-tion by activating the input with different basis functions and then combining them linearly to reduce the memory cost and make the computation a straight-forward matrix multiplication. In constrast, we propose a novel and efficient Kolmogorov–Arnold Convolu-tion Layer (KAConvLayer) by deeply integrating KANs with convolution layers. Our approach applies the inner function of the Kolmogorov–Arnold representa-tion theorem to each channel for information aggregation within each channel, and the outer function across all channels for effective information exchange. This design allows each channel to maintain distinct functional mappings while reducing the total number of input elements and learnable functions. Conse-quently, our method achieves faster computation and convergence, while en-hancing representational flexibility compared to existing approaches. 
+
+2.2. Convolution Neural Networks 
+
+LeNet [1] is the first CNN designed for image recognition tasks, providing crucial insights for the development of subsequent CNNs. AlexNet [20], con-sisting of five convolution layers and three fully connected layers, achieves top results in the ILSVRC-2012 competition. VGG [21] reduces the size of the con-volution kernels while increasing the number of network layers, establishing the practice of using stacks of small convolution kernels in CNNs. GoogLeNet introduces inception modules, enabling multi-scale processing within the network and improving both depth and width without increasing computational costs. ResNet [22] addresses the vanishing gradient problem by adding skip connections to learn residual functions relative to the layer inputs, facilitating the optimization of very deep networks. Several works focus on proposing new convolution layers. Dilation convolu-tions [23] systematically aggregate multi-scale contextual information without losing resolution. MobileNet [24] and Xception [25] use depthwise separable con-volutions, performing depthwise convolution followed by pointwise convolution, which reduces theoretical computation. Deformable convolution [26] introduces 2D offsets to the regular grid sampling locations in standard convolution, allow-ing free-form deformation of the sampling grid. In the 2020s, the Vision Transformer demonstrates exceptional performance in computer vision, prompting researchers to explore modern CNN architec-tures. ConvNeXt [27] is the first to design a modern architecture inspired by the Vision Transformer. RepVGG [28] introduces structural re-parameterization to decouple a training-time multi-branch topology from an inference-time plain architecture, highlighting the potential of multi-branch re-parameterized CNNs and inspiring subsequent large-kernel works. RepLKNet [29] scales up the ker-nel size to 31 × 31 by re-parameterizing a small kernel (e.g., 5 × 5) parallel to it, showcasing the versatility of re-parameterized CNNs in achieving enhanced 5(a) An illustration of KAConvLayer. The red boxes and lines denote the internal functions ϕ of Kolmogorov-Arnold representation theorem, and the green lines denote the outer functions of Kolmogorov-Arnold Representation theorem. The blue lines denote the fully connected layer, which are used to adjust the number of channels.  
+
+> (b) Activation functions in fully connected layers and convolutions at different posi-tions. Fig. 3. Illustrations of (a) KAConvLayer structure and (b) sketch of activation on different positions.
+
+performance. SLaK [30] combines decomposed convolution with dynamic spar-sity to scale up kernels to 51 × 51 in the form of two rectangular convolutions. UniRepLKNet [31] employs multi-branch dilated convolutions to enhance the capability of large kernels in capturing sparse patterns and introduces the re-parameterization method of dilated convolution. 
+
+3. Kolmogorov–Arnold Convolution Neural Network 
+
+In this section, we first revisit the Kolmogorov–Arnold representation theo-rem and propose a new Kolmogorov–Arnold Convolution Layer (KAConvLayer) by applying this theorem to convolution. Then we propose KAConvNet, a pure CNN architecture with KAConvLayer design. 63.1. Kolmogorov–Arnold Convolution Layer 
+
+Given an image patch IK×K with a size of K × K and an unknown multi-variate continuous function f (·), by Kolmogorov-Arnold representation theorem representation theorem we can get 
+
+f (Ik×k) = f (
+
+
+
+I1,1 I1,2 · · · I1,K 
+
+I2,1 I2,2 · · · I1,K 
+
+... ... . . . ...
+
+IK, 1 IK, 2 · · · IK,K 
+
+)=
+
+> 2K2+1
+
+X
+
+> q=1
+
+Φq (
+
+> K
+
+X
+
+> i=1
+> K
+
+X
+
+> j=1
+
+ϕqi,j (Ii,j )) 
+
+(2) where i and j denote pixel coordinates of image patch, and the Φq and ϕqi,j 
+
+represent the outer functions and internal functions respectively. Specifically, the single internal function extracts simple local features within a pixel receptive field, while the outer function aggregates multiple such local features to form complex hierarchical feature patterns. Eq. (2) implies that function f (·) can be obtained by identifying suitable individual functions Φq and ϕqi,j . This insight motivates the development of a neural network that explicitly incorporates the parameterization defined in Eq. (2). Since all functions to be learned are univariate functions, we can parametrize each 1D function as rectified learnable activation functions. The rectified learnable function ϕ(·) is the product of a basis function b(·) and a learnable function ˜ϕ(·), so the ϕ(·) be described as follows 
+
+ϕ(x) = w1b(x) × w2 ˜ϕ(x) (3) where w1 and w2 denote weights. We can multiply the two different activation functions to achieve Eq. (3). And we select 
+
+b(x) = SiLU (x) = x
+
+1 + e−x (4) in most cases. B-spline activations, as higher-order polynomial functions, pos-sess strong representational power but can also exhibit excessive flexibility, po-tentially leading to the modeling of high-frequency noise and an increased risk of overfitting due to their higher model capacity.So we design a new learnable function named Grid Linear (GLinear) function as ˜ϕ(x), the function can be formulated as 
+
+GLinear (x) = 
+
+
+
+β + α1x, x ≤ g1
+
+GLinear (gi−1) + αi(x − gi−1), gi−1 < x ≤ gi (i ≥ 2) 
+
+GLinear (gn) + αn+1 (x − gn), gn ≤ x
+
+(5) where {αi}(i = 1, . . . , n, n + 1) and β are learnable parameters, the G =
+
+{g1, . . . , g n−1, g n} (g1 < . . . < g n−1 < g n) denotes the interval division. The 7Fig. 4. Architectural design of KAConvNet, which comprises Stem, Stages and Transitions as conventional CNNs. 
+
+piecewise linear GLinear function has lower functional complexity (e.g., lower VC dimension, in an informal sense), which is generally associated with tighter generalization bounds and improved robustness to overfitting. From a com-putational perspective, the evaluation of a B-spline of degree k requires O(k)
+
+operations, whereas the GLinear function involves only simple linear interpola-tion, thus substantially reducing computational cost and improving efficiency. The denser the interval division, the better the function fits, but at the same time the larger the number of parameters. We use n = 1 , g 1 = 0 , which is the simplest interval partitioning, as the default value. And now, we can use pointwise convolution with learnable activation func-tions on weights to represent external functions Φq and use convolution with learnable activation functions to represent internal functions ϕqi,j for each in-put channel of input feature map respectively, as shown in the green and red lines in the dashed box of Figure 3(a). When this calculation process slides over the input data, it is considered convolution. We refer to the entire process as KA convolution, with the patch size K × K referred to as the kernel size of KA convolution. As for the specific algorithm implementation, we use the unfold function and channel-separable rectangular convolution to maximize the acceleration of this process. In order to generalize the KA convolution to arbitrary channels, we propose the KAConvLayer module as shown in Fig. 3. In this module, KA convolutions with KA kernel size K are applied to each input channel in a multi-channel fea-ture map with Cin channels. Subsequently, for changing the number of channels 8to Cout and channel mixing, a fully connected layers are followed. To further explain the concept, Figure 3(b) also highlights the differences between tradi-tional fixed activation functions applied to neurons and the learnable activation functions applied to weights. 
+
+3.2. Network Architecture 
+
+We sketch the architecture of KAConvNet in Fig. 4, and adopt a 4-stage framework which is same as the popular CNNs [32, 31, 29]. 
+
+Stem: In the initial layers of our model, we focus on achieving high per-formance in downstream dense-prediction tasks by capturing more details. To accomplish this, we use several convolution layers at the beginning. KACon-vNet starts with a 3 × 3 KAConvLayer with 2× downsampling. Following this, it includes a 3 × 3 depthwise convolution layer to capture low-level patterns, a common 1 × 1 convolution layer, and another 3 × 3 depthwise convolution layer for further 2× downsampling. The Stem has a total of 4× downsampling of the input image. 
+
+Stages: For stages 1-4, each stage contains several KAConvBlocks, which all use residual structure. The KAConvBlock uses a KAConvLayer and a channel attention named SE Block [33] to further enhance spatial aggregation transfor-mations and channel mixing. We set the kernel sizes K of KA convolution layers to 3 as default, consistent with kernel sizes used in common convolution layers. 
+
+Transitions: Transitions are strategically placed between stages to enhance the model’s performance. Initially, we increase the channel dimension using a 
+
+1 × 1 convolution layer. This is followed by 2× downsampling achieved through a 3 × 3 depthwise convolution layer. In summary, our network only includes common convolution, channel atten-tion and KA convolution we proposed. Each stage has two architectural hyper-parameters: the number of KAConvBlock Bi and the channel dimension Ci. So a KAConvNet architecture is defined by [B1, B 2, B 3, B 4] and [C1, C 2, C 3, C 4].
+
+4. Experiments 
+
+In this section, we first introduce the implementation details of experimental setup, and the we evaluate our KAConvNet on image classification, object de-tection and semantic segmentation tasks. Since KAConvLayers use only small-kernel convolutions (i.e., 3 × 3), our network contains fewer parameters. Conse-quently, this paper primarily focuses on comparison with lightweight CNNs and ViTs to demonstrate the superiority of KAConvLayers, rather than optimizing for deployment-oriented trade-offs.Finally, the proposed network is investigated through several ablation studies. 
+
+4.1. Experimental Setup 
+
+As for datasets, we use ImageNet-1K for image classification, COCO [34] for object detection, and Cityscapes [35] for semantic segmentation. 9By default, we set all KAConvLayers in KAConvNet with K = 3 as men-tioned above. And we name the KAConvNet with [B1, B 2, B 3, B 4] = [1 , 1, 3, 1] 
+
+and [C1, C 2, C 3, C 4] = [32 , 64 , 128 , 256] as KAConvNet-S , the one with [B1, B 2, B 3, B 4] = [2 , 2, 6, 2] and [C1, C 2, C 3, C 4] = [32 , 64 , 128 , 256] as KAConvNet-B and the one with [B1, B 2, B 3, B 4] = [2 , 2, 6, 2] and [C1, C 2, C 3, C 4] = [48 , 96 , 192 , 384] as 
+
+KAConvNet-L .                                                                    
+
+> Tab. 1. A comprehensive comparison on the ImageNet-1K classification dataset. Method #Params. FLOPs Acc (%) RedNet-101 [36] 25.6M 4.1G 79.1 MobileOne-S4 [37] 14.8M 2.9G 79.4 EfficientFormer-L1 [38] 12.3M 1.3G 79.2 GC ViT-XXT [39] 12.0M 2.1G 79.9 KACN-VGG19 [6] 21.1M 5.1G 79.2 Fast-KAN-ResNet18 [18] 23.8M 4.2G 79.6 JacobiKAN-ResNet18 [18] 22.6M 4.2G 79.5 VMamba-T[40] 15.5M 2.6G 80.0 MambaVision [41] 17.8M 2.8G 80.1 KAConvNet-L (Ours) 17.5M 2.9G 80.1
+> GhostNet ×1.3 [42] 7.3M 0.2G 75.7 RedNet-26 [36] 9.2M 1.7G 75.9 DeiT-Tiny+ [43] 10.1M 2.1G 75.9 KACN-VGG11 [6] 11.5M 2.1G 74.6 Vim-T [44] 7.0M —76.1
+> KAConvNet-B (Ours) 8.6M 1.4G 76.8
+> ShuffleNetV2 1.5 ×[45] 3.5M 0.3G 72.6 RevBiFPN-S0 [46] 3.4M 0.3G 72.8 DeiT-Tiny [43] 5.9M 1.1G 72.2 LocalViT-T2T [47] 4.3M 1.2G 72.5
+> KAConvNet-S (Ours) 5.0M 0.7G 73.7
+
+In the image classification experiments, the initial learning rate is set to 2e-3, with a warm-up strategy and cosine annealing applied to adjust the rate throughout training. Models are trained for 300 epochs using the AdamW opti-mizer [48], with a weight decay of 1e-4 and beta parameters of (0.9, 0.99). The warm-up phase lasts for 5 epochs, and the minimum learning rate under cosine annealing is set to 1e-6. For data augmentation, we employ RandAugment, Mixup, and CutMix, with both Mixup and CutMix using an alpha value of 0.5. For object detection, the initial learning rate is set to 2.5e-3, and the same warm-up and cosine annealing schedule is used. For semantic segmentation, we use the pretrained KAConvNets from the image classification experiments as the backbones of PSPNet [49]. The initial learning rate is set to 1e-3, with warm-up and cosine annealing applied for adjustment. Models are trained for 50 epochs using the AdamW optimizer. In both object detection and segmentation experiments, pretrained models are fine-tuned with all backbone layers unfrozen. The batch size is set to 64. All experiments are implemented in PyTorch and trained on eight NVIDIA A100 GPUs (80 GB each). 10 4.2. Image Classification 
+
+We evaluate the performance of our KAConvNet architecture on the ImageNet-1K classification dataset across three parameter scales: KAConvNet-S (small), KAConvNet-B (medium), and KAConvNet-L (large). Comprehensive compar-isons are conducted against three categories of baseline models: traditional CNNs (e.g., RedNet [36], MobileOne [37], GhostNet [42], ShuffleNet [45], and RevBiFPN [46]), Transformers (e.g., EfficientFormer [38], GC-ViT [39], DeiT-Tiny+ [43], and LocalViT-T2T [47]), Mamba-based models (e.g., VMamba-T [40], MambaVision [41]) and KACNNs (e.g., KACN-VGG19 [6], KACN-VGG11 [6], JacobiKAN [17], Fast-KAN [18]). It is worth noting that due to the scale incompatibility between Mamba-based models and our proposed method, we adjusted the relevant settings to match the current model scale. As shown in Tab. 1, our large-scale model KAConvNet-L achieves remark-able performance compared to other KA-based methods. Additionally, it at-tains competitive performance to mainstream Mamba-based models, CNNs, and ViTs. For the medium-scale model KAConvNet-B, our model achieves a Top-1 accuracy of 76.8% with 8.6M parameters and 1.4G FLOPs. This surpasses comparable models like GhostNetx1.3, RedNet-26, and DeiT-Tiny+ in both efficiency and accuracy. For the small-scale KAConvNet-S, we achieve a Top-1 accuracy of 73.7% with 5.0M parameters and 0.7G FLOPs. Despite having slightly more parame-ters than lightweight CNNs like ShuffleNetV2 and RevBiFPN-S0, KAConvNet-S achieves significant accuracy gains by 1.5%. It also outperforms transformer-based models like DeiT-Tiny and LocalViT-T2T with fewer resources. These results highlight KAConvNet’s ability to integrate convolution and KA mechanisms effectively, outperforming both mainstream Mamba-based models, CNNs and ViTs in accuracy and efficiency. 
+
+4.3. Object Detection 
+
+To evaluate the versatility of KAConvNet, we test its performance on the object detection task using the RTMDet-tiny detector [50] as the base frame-work. By replacing the backbone with KAConvNet variants (small, medium, and large) and comparing them with other mainstream models of similar scale, we measure mean Average Precision (mAP) on the MS COCO validation set. All models are trained using the mmdetection library [51] with consistent set-tings and an input resolution of 640 ×640. As shown in Tab. 2, KAConvNet achieves mAP scores of 43.3, 45.8, and 48.0 for the small, medium, and large scales, respectively. Our KAConvNets are highly competitive compared to the excellent CNN-based and Transformer-based methods under the same object de-tection framework. These results demonstrate the effectiveness of KAConvNet in object detection. 11 Tab. 2. Object detection results on MS COCO. Models mAP mAP 50 mAP 75                                                              
+
+> EfficientNet-B2 [52] 47.6 65.3 51.4 MobileOne-S4 [37] 47.5 65.1 51.4 IPT-T [53] 47.9 65.5 51.8 HVT Base [54] 47.8 65.6 51.5
+> KAConvNet-L (Ours) 48.0 65.7 51.9
+> MobileVit-S [55] 45.7 63.0 49.5 PVT-Tiny [56] 45.7 62.8 49.5
+> KAConvNet-B (Ours) 45.8 63.1 49.6
+> MobileOne-S0 [37] 43.1 60.4 47.0 DeiT-Tiny [43] 43.0 60.5 46.8
+> KAConvNet-S (Ours) 43.3 60.6 47.1
+> Tab. 3. Semantic segmentation performance on Cityscapes. Backbone Mean IoU Mean Pixel Acc ResNet-18 (baseline) 68.02 77.90 RepVGG-A2 [28] 69.94 78.89 MobileOne-S4 [37] 70.21 79.36 HVT Base [54] 70.32 79.25
+> KAConvNet-L (Ours) 70.58 79.51
+> RepVGG-A1 [28] 68.52 78.33 GhostNet1.3 [42] 68.66 78.47 LocalViT-T [47] 69.07 78.55 ViL-Tiny-APE [57] 69.10 78.52
+> KAConvNet-B (Ours) 69.20 78.70
+> MobileV3-L 0.75 [58] 65.19 76.01 DeiT-Tiny [43] 64.95 75.90
+> KAConvNet-S (Ours) 65.32 76.06
+
+4.4. Semantic Segmentation 
+
+Next, we assess KAConvNet on the semantic segmentation task using the Cityscapes dataset. We integrate KAConvNet into PSPNet [49] and compare it with mainstream backbones across three parameter scales, measuring Mean Intersection over Union (Mean IoU) and Mean Pixel Accuracy (Mean Pixel Acc). All models are trained under the same settings, and the results are summarized in Tab. 3. Our KAConvNets outperform other competitive CNN-based and Transformer-basedIntern models. Impressively, KAConvNet-L achieves the best performance, with a Mean IoU of 70.58 and a Mean Pixel Accuracy of 79.51, marking a significant improvement over established baselines such as ResNet-18. These results confirm KAConvNet’s robustness across classification, detec-tion, and segmentation tasks, highlighting its effectiveness not only in image-level recognition but also in pixel-level tasks. This underscores its potential as a versatile backbone for a wide range of vision applications. 
+
+4.5. Ablation Studies 
+
+To further evaluate the effectiveness of our KAConvLayer, we conduct abla-tion experiments using VGG-like networks on the CIFAR-100 dataset. VGG-like 12 Tab. 4. Accuracy results of different learnable activation functions ˜ϕ and different operations                                               
+
+> op on the CIFAR-100 dataset. Method ˜ϕnAcc (%) #Param. FLOPs VGG11 (baseline) ——69.74 29.0M 173.0M KAVGG11 PReLU 271.29 39.7M 369.3M KAVGG11 B-Spline 370.46 40.1M 366.5M KAVGG11 B-Spline 569.51 40.3M 366.5M KAVGG11 GLinear 271.40 39.8M 371.2M KAVGG11 GLinear 472.38 39.8M 371.2M KAVGG11 GLinear 672.28 39.9M 371.2M KAVGG11 GLinear 871.65 40.0M 371.2M
+
+networks, consisting solely of stacked convolution layers without residual struc-ture, offer a straightforward comparison between the performance of our KA-ConvLayers and standard convolution layers. Specifically, we create KAVGG11 by replacing all standard convolution layers in VGG11 with KAConvLayers. We first explore the impact of different learnable activation functions and their interval divisions on model performance. We test GLinear, PReLU, and B-spline functions, combining them with the basic activation function in KAVGG11 on CIFAR-100. The B-spline function is set to an order of 3, matching the con-figuration in KAN. As shown in Tab. 4, most learnable activation functions enhance the model’s performance, but the B-spline function results in lower accuracy. This overly complex activation function appears prone to overfitting, making it unsuitable for computer vision tasks. For the GLinear function, we observe that increasing the number of inter-vals from 2 to 4 improves model accuracy by about 1%. Performance stabilizes when the number of intervals is increased from 4 to 6, but accuracy declines by approximately 0.6% when the number of intervals reaches 8. These findings in-dicate that finer interval divisions do not necessarily lead to better performance. The optimal number of intervals for a learnable activation function appears to depend on the complexity of the visual task.                                                      
+
+> Tab. 5. Results of replacing the standard convolution layers in VGG11 with the KAConvLayers on the CIFAR-100. Layers with KAConvLayer Top-1 Acc Top-5 Acc #Param. FLOPs
+> –69.74 89.96 29.0M 173.0M
+> [1 ,2] 71.95 90.25 29.2M 204.5M
+> [3 ,4] 72.85 91.26 29.9M 246.9M
+> [5 ,6] 70.38 89.61 32.9M 241.8M
+> [7 ,8] 67.65 88.67 34.7M 195.7M
+> [1 ,2,3,4] 73.41 91.47 38.6M 265.5M
+> [5 ,6,7,8] 68.96 89.03 29.8M 277.8M
+> [1 ,2,3,4,5,6,7,8] 71.40 89.86 39.8M 371.2M
+
+Next, we investigate the impact of the number and position of KAConvLay-ers in the VGG11 architecture. For example, replacing the first and second stan-dard convolution layers with KAConvLayers is denoted as " [1 , 2] ". The notation "−" refers to the original VGG11 without KAConvLayers, and the deepest pos-13 sible replacement occurs at the eighth layer, denoted as " [1 , 2, 3, 4, 5, 6, 7, 8] ". As demonstrated in Tab. 5, placing KAConvLayers in the shallow layers of the model yields better performance when the residual structure is not used. In contrast, replacing the deepest layers with KAConvLayers leads to reduced ac-curacy. Notably, the model without KAConvLayers in the last two layers shows improved performance. The best results are achieved when KAConvLayers are placed in the first four layers, resulting in an accuracy of 73.41%.                         
+
+> Tab. 6. Ablation experiment with the residual structure. The KAConvLayers in the deep layers don’t lead to poor performance. Stages w/ KAConvLayer #Params. FLOPs Acc (%) —11.0M 1.7G 77.1
+> [1 ,2] 13.2M 2.1G 79.1
+> [3 ,4] 15.3M 2.5G 79.4
+> [1 ,2,3,4] 17.5M 2.9G 80.1
+
+We further investigated the impact of KAConvLayers at different network depths within a residual structure. Using the KAConvNet architecture, we replaced the KAConvLayers at various stages with standard convolution layers and evaluated performance on the ImageNet-1K dataset. As shown in Tab. 6, incorporating KAConvLayers alongside residual connec-tions does not result in a significant performance drop in the deeper stages of the network. This suggests that the residual structure effectively mitigates the degradation observed when KAConvLayers are applied in deeper layers, helping to reduce harmful representations and maintain stable performance. These experiments provide valuable insights into the optimal configuration of KAConvLayers, suggesting that both the choice of activation function and the placement of KAConvLayers play crucial roles in improving model performance. 
+
+4.6. Computational Complexity Analysis 
+
+We provide pseudo code of our KAConvLayer as follows:                         
+
+> d e f convkan : k a c o n v 1 _ f e a t u r e =conv1 ( a c t 1 ( x ) ) u n f o l d _ f e a t u r e =unfold_and_rearrange ( x ) u n f o l d _ f e a t u r e =r e a r r a n g e ( u n f o l d _ f e a t u r e ) k a c o n v 2 _ f e a t u r e =conv2 ( a c t 2 ( u n f o l d _ f e a t u r e ) ) k a c o n v 2 _ f e a t u r e =r e a r r a n g e ( k a c o n v 2 _ f e a t u r e ) k a c o n v 2 _ f e a t u r e =k a c o n v 2 _ f e a t u r e . r e s h a p e r e t u r n k a c o n v 1 _ f e a t u r e ∗k a c o n v 2 _ f e a t u r e d e f KAConvolutionLayer : k a c o n v _ f e a t u r e =convkan ( x ) k a c o n v _ f e a t u r e = norm ( k a c o n v _ f e a t u r e ) k a c o n v _ f e a t u r e =a c t ( k a c o n v _ f e a t u r e ) k a c o n v _ f e a t u r e = group_mlp ( k a c o n v _ f e a t u r e ) r e t u r n mlp ( k a c o n v _ f e a t u r e )
+
+14 The computational complexity of a regular convolution layer is O(Hout ×
+
+Wout ×Cout ×Cin ×K ×K), while the computational complexity of our proposed KAConvLayer is O(Hout × Wout × Cin × (2 K2 + 1) × K2 + Hout × Wout × Cin ×
+
+Cout ), where Hout and Wout denote the output height and width, Cin and 
+
+Cout represent the input and output channel dimensions and K is the kernel size. When the number of output channels is small, the regular convolution computation is less than our KAConvLayer. As the number of output channels increases to a certain extent, our KAConvLayer requires less computation than regular convolution. 
+
+5. Discussions and Limitations 
+
+5.1. Discussions                
+
+> Tab. 7. Comparison on GPU latency with KA-based convolution layers. GPU Latency (ms) KAConvLayer 86.4 ±2.9 CKAN-Layer [5] 249.8 ±4.6 KACN-Layer [6] 101.5 ±3.1 Fast-KAN-Layer [18] 99.7 ±1.9 JacobiKAN-Layer [17] 114.5 ±4.3
+
+We compared the inference latency of individual layers among different KA-based convolution layers, with the tensor dimension set to 32 × 256 × 64 × 64 
+
+and kernel size fixed at 3 × 3. The inference latency results tested on the H800 GPU are presented in Tab. 7. Our method achieves superior inference speed compared to other competing methods, which can be attributed to the linearly learnable GLinear activation function and the channel-wise processing mechanism adopted in our design. This experimental result further verifies the superiority of the proposed method in terms of inference efficiency.                                                      
+
+> Tab. 8. Comparison results of KAConv Layer and standard convolution layer in the same architecture. †indicates replacing all KAConvLayers in the KAConvNet architecture with standard convolution layers configured identically. ′signifies expanding the 3×3KAConv layer in the first stage of KAConvNet to a 5×5configuration. Method #Params. FLOPs Inference Speed Acc (%) ConvNet-L †11.0M 1.7G 15.1ms 77.1 KAConvNet-L 17.5M 2.9G 20.8ms 80.1 KAConvNet-L ′17.8M 4.0G 21.0ms 80.3 ConvNet-B †5.6M 0.7G 14.9ms 74.0 KAConvNet-B 8.6M 1.4G 20.6ms 76.8 KAConvNet-B ′8.9M 2.0G 20.8ms 77.0 ConvNet-S †3.5M 0.4G 8.5ms 70.1 KAConvNet-S 5.0M 0.7G 11.4ms 73.7 KAConvNet-S ′5.1M 1.1G 11.5ms 74.2
+
+15 (a) Image (b) ConvNeXt-T (c) ConvNet-L † (d) KAConvNet-L Fig. 5. Grad-CAM of ConvNeXt-T, ConvNet-L † and our KAConvNet-L. 
+
+We present Gradient-weighted Class Activation Mapping (Grad-CAM) vi-sualizations for ConvNeXt-T [27] (82.1% accuracy on ImageNet-1K), ConvNet-L†1, and KAConvNet-L, as shown in Fig. 5. The results reveal that, compared to ConvNeXt-T and ConvNet-L, KAConvNet-L more effectively and comprehensively locates objects in the images. For in-stance, in the hummingbird image, KAConvNet-L accurately highlights the entire bird, including the beak and tail. Similarly, in the street sign image, KAConvNet-L not only identifies the entire signal board, but also focuses more precisely on the text and logo, demonstrating a more detailed and accurate object attention. Our experiments show that while KAConvNet performs well on the ImageNet-1K dataset, it still slightly lags behind existing large-kernel convolution net-works. We attribute this performance gap to the small kernel size ( 3 × 3) in the KAConvLayer, which limits the effective receptive field and hinders the model’s  
+
+> 1†indicates that all KAConvLayers in the KAConvNet architecture are replaced with standard convolution layers, configured identically.
+
+16 ability to capture long-range pixel dependencies. To validate this hypothesis, we increase the kernel size to 5 × 5 in the first stage of a pretrained KAConvNet and train the model for 50 epochs. Addi-tionally, we examine the performance differences between KAConvLayer and standard convolution within the same modern convolutional neural network ar-chitecture. As shown in Tab. 8, replacing standard convolutional layers with KACon-vLayers leads to a significant improvement in accuracy. Although the use of a 
+
+5 × 5 KAConvLayer increases computational cost compared to the 3 × 3 version, it results in only a slight rise in parameter count and inference time. these results demonstrates the scalability of our KAConvnet to some extent. Previous studies [29, 30, 31] have highlighted that shallow networks with large convolution kernels often outperform deeper models with smaller kernels. We believe that combining KAConvLayer with larger convolution kernels is a promising direction for future research. Tab. 4 also shows that the most of learnable activation functions used on the weights enable the model to achieve accuracy gains. The optimal number of intervals for a learnable activation function appears to depend on the complexity of the visual task. Finally, we advocate that using KAConvLayer together with the residual structure like KAConvNet, or only using KAConvLayer in the shallow layer of the network, in the hope that the model will achieve better performance after training. 
+
+5.2. Limitations 
+
+Since learnable activation functions for feature map need to be placed on weights, it inevitably leads to an increase in the amount of computation. We use the unfold function, linear learnable activation function and channel-separable rectangular convolution to maximize the acceleration of this process, but the computational efficiency is still somewhat lower than that of the standard con-volution. We acknowledge that we currently lack an effective solution to accelerate the runtime overhead induced by segmented activation functions—a limitation that is, in fact, a common drawback of existing KAN-based architectures. It is important to clarify that the core contribution of this work is to propose a KAN-based convolution method that achieves significant improvements over KAN methods in both accuracy and inference speed. For future work, advancing KAN-based convolution methods to match the efficiency of leading ViTs and CNNs will require more explorative experiments on architectural designs, as well as in-depth research and development of mathematical theorems underpinned by the KA representation theorem. 
+
+6. Conclusion 
+
+In this paper, we apply the Kolmogorov–Arnold representation theorem to 2D convolution, introducing the KAConvLayer, which demonstrates both strong 17 fitting ability and method interpretability. Building on this, we design a net-work architecture called KAConvNet, which has shown excellent performance in classic computer vision tasks. On the one hand, our results highlight the superior fitting ability of the KAConvLayer compared to standard convolution layers. On the other hand, we propose using residual structures to increase the depth of KAConvNets, thereby preventing performance degradation. Looking ahead, our future work will focus on leveraging KAConvLayers with larger ker-nels and exploring computational acceleration techniques for KA convolutions. We believe our work offers a fresh perspective on convolutional methods for the 2020s. 
+
+References 
+
+[1] Y. LeCun, L. Bottou, Y. Bengio, P. Haffner, Gradient-based learning ap-plied to document recognition, Proceedings of the IEEE 86 (11) (1998) 2278–2324. [2] A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Un-terthiner, M. Dehghani, M. Minderer, G. Heigold, S. Gelly, et al., An image is worth 16x16 words: Transformers for image recognition at scale, arXiv preprint arXiv:2010.11929 (2020). [3] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, I. Polosukhin, Attention is all you need, Advances in neural information processing systems 30 (2017). [4] Z. Liu, Y. Wang, S. Vaidya, F. Ruehle, J. Halverson, M. Soljačić, T. Y. Hou, M. Tegmark, Kan: Kolmogorov-arnold networks, arXiv preprint arXiv:2404.19756 (2024). [5] A. D. Bodner, A. S. Tepsich, J. N. Spolski, S. Pourteau, Convolutional kolmogorov-arnold networks, arXiv preprint arXiv:2406.13155 (2024). [6] I. Drokin, Kolmogorov-arnold convolutions: Design principles and empiri-cal studies, arXiv preprint arXiv:2407.01092 (2024). [7] A. N. Kolmogorov, On the representation of continuous functions of several variables by superpositions of continuous functions of a smaller number of variables, American Mathematical Society, 1961. [8] J. Braun, M. Griebel, On a constructive proof of kolmogorov’s superposition theorem, Constructive approximation 30 (2009) 653–675. [9] R. Genet, H. Inzirillo, Tkan: Temporal kolmogorov-arnold networks, arXiv preprint arXiv:2405.07344 (2024). [10] A. Kashefi, Pointnet with kan versus pointnet with mlp for 3d classification and segmentation of point sets, arXiv preprint arXiv:2410.10084 (2024). 18 [11] A. Mahara, N. D. Rishe, L. Deng, The dawn of kan in image-to-image (i2i) translation: Integrating kolmogorov-arnold networks with gans for unpaired i2i translation, Conference on Algebraic Informatics (2024). doi:10.1109/CAI64502.2025.00134. [12] C. Li, X. Liu, W. Li, C. Wang, H. Liu, Y. Liu, Z. Chen, Y. Yuan, U-kan makes strong backbone for medical image segmentation and generation, in: Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 39, 2025, pp. 4652–4660. [13] Fourierkan, https://github.com/GistNoesis/FourierKAN (2024). [14] Z. Bozorgasl, H. Chen, Wav-kan: Wavelet kolmogorov-arnold networks, arXiv preprint arXiv:2405.12832 (2024). [15] M. Kiamari, M. Kiamari, B. Krishnamachari, Gkan: Graph kolmogorov-arnold networks, arXiv preprint arXiv:2406.06470 (2024). [16] Torchkan: Simplified kan model with variations., https://github.com/ 1ssb/torchkan (2024). [17] Jacobikan, https://github.com/SpaceLearner/JacobiKAN (2024). [18] Very fast kolmogorov-arnold network via radial basis functions, https: //github.com/ZiyaoLi/fast-kan (2024). [19] An efficient implementation of kolmogorov-arnold network, https:// github.com/Blealtan/efficient-kan (2024). [20] A. Krizhevsky, I. Sutskever, G. E. Hinton, Imagenet classification with deep convolutional neural networks, Advances in neural information processing systems 25 (2012). [21] K. Simonyan, A. Zisserman, Very deep convolutional networks for large-scale image recognition, arXiv preprint arXiv:1409.1556 (2014). [22] K. He, X. Zhang, S. Ren, J. Sun, Deep residual learning for image recog-nition, in: Proceedings of the IEEE conference on computer vision and pattern recognition, 2016, pp. 770–778. [23] F. Yu, V. Koltun, Multi-scale context aggregation by dilated convolutions, arXiv preprint arXiv:1511.07122 (2015). [24] A. G. Howard, M. Zhu, B. Chen, D. Kalenichenko, W. Wang, T. Weyand, M. Andreetto, H. Adam, Mobilenets: Efficient convolutional neural net-works for mobile vision applications, arXiv preprint arXiv:1704.04861 (2017). [25] F. Chollet, Xception: Deep learning with depthwise separable convolutions, in: Proceedings of the IEEE conference on computer vision and pattern recognition, 2017, pp. 1251–1258. 19 [26] J. Dai, H. Qi, Y. Xiong, Y. Li, G. Zhang, H. Hu, Y. Wei, Deformable con-volutional networks, in: Proceedings of the IEEE international conference on computer vision, 2017, pp. 764–773. [27] Z. Liu, H. Mao, C.-Y. Wu, C. Feichtenhofer, T. Darrell, S. Xie, A convnet for the 2020s, in: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2022, pp. 11976–11986. [28] X. Ding, X. Zhang, N. Ma, J. Han, G. Ding, J. Sun, Repvgg: Making vgg-style convnets great again, in: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2021, pp. 13733–13742. [29] X. Ding, X. Zhang, J. Han, G. Ding, Scaling up your kernels to 31x31: Revisiting large kernel design in cnns, in: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2022, pp. 11963– 11975. [30] S. Liu, T. Chen, X. Chen, X. Chen, Q. Xiao, B. Wu, T. Kärkkäinen, M. Pechenizkiy, D. Mocanu, Z. Wang, More convnets in the 2020s: Scaling up kernels beyond 51x51 using sparsity, arXiv preprint arXiv:2207.03620 (2022). [31] X. Ding, Y. Zhang, Y. Ge, S. Zhao, L. Song, X. Yue, Y. Shan, Unire-plknet: A universal perception large-kernel convnet for audio video point cloud time-series and image recognition, in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2024, pp. 5513– 5524. [32] H. Chen, X. Chu, Y. Ren, X. Zhao, K. Huang, Pelk: Parameter-efficient large kernel convnets with peripheral convolution, in: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, 2024, pp. 5557–5567. [33] J. Hu, L. Shen, G. Sun, Squeeze-and-excitation networks, in: Proceedings of the IEEE conference on computer vision and pattern recognition, 2018, pp. 7132–7141. [34] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ramanan, P. Dol-lár, C. L. Zitnick, Microsoft coco: Common objects in context, in: Com-puter Vision–ECCV 2014: 13th European Conference, Zurich, Switzerland, September 6-12, 2014, Proceedings, Part V 13, Springer, 2014, pp. 740–755. [35] M. Cordts, M. Omran, S. Ramos, T. Rehfeld, M. Enzweiler, R. Benenson, U. Franke, S. Roth, B. Schiele, The cityscapes dataset for semantic urban scene understanding, in: Proceedings of the IEEE conference on computer vision and pattern recognition, 2016, pp. 3213–3223. [36] D. Li, J. Hu, C. Wang, X. Li, Q. She, L. Zhu, T. Zhang, Q. Chen, In-volution: Inverting the inherence of convolution for visual recognition, in: 20 Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2021, pp. 12321–12330. [37] P. K. A. Vasu, J. Gabriel, J. Zhu, O. Tuzel, A. Ranjan, Mobileone: An im-proved one millisecond mobile backbone, in: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2023, pp. 7907– 7917. [38] Y. Li, G. Yuan, Y. Wen, J. Hu, G. Evangelidis, S. Tulyakov, Y. Wang, J. Ren, Efficientformer: Vision transformers at mobilenet speed, Advances in Neural Information Processing Systems 35 (2022) 12934–12949. [39] A. Hatamizadeh, H. Yin, G. Heinrich, J. Kautz, P. Molchanov, Global con-text vision transformers, in: International Conference on Machine Learn-ing, PMLR, 2023, pp. 12633–12646. [40] Y. Liu, Y. Tian, Y. Zhao, H. Yu, L. Xie, Y. Wang, Q. Ye, J. Jiao, Y. Liu, Vmamba: Visual state space model, Advances in neural information pro-cessing systems 37 (2024) 103031–103063. [41] A. Hatamizadeh, J. Kautz, Mambavision: A hybrid mamba-transformer vi-sion backbone, in: Proceedings of the Computer Vision and Pattern Recog-nition Conference, 2025, pp. 25261–25270. [42] K. Han, Y. Wang, Q. Tian, J. Guo, C. Xu, C. Xu, Ghostnet: More features from cheap operations, in: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, 2020, pp. 1580–1589. [43] H. Touvron, M. Cord, A. Sablayrolles, G. Synnaeve, H. Jégou, Going deeper with image transformers, in: Proceedings of the IEEE/CVF international conference on computer vision, 2021, pp. 32–42. [44] L. Zhu, B. Liao, Q. Zhang, X. Wang, W. Liu, X. Wang, Vision mamba: Efficient visual representation learning with bidirectional state space model, arXiv preprint arXiv:2401.09417 (2024). [45] N. Ma, X. Zhang, H.-T. Zheng, J. Sun, Shufflenet v2: Practical guide-lines for efficient cnn architecture design, in: Proceedings of the European conference on computer vision (ECCV), 2018, pp. 116–131. [46] V. Chiley, V. Thangarasa, A. Gupta, A. Samar, J. Hestness, D. DeCoste, Revbifpn: the fully reversible bidirectional feature pyramid network, Pro-ceedings of Machine Learning and Systems 5 (2023) 625–645. [47] Y. Li, K. Zhang, J. Cao, R. Timofte, L. Van Gool, Localvit: Bringing locality to vision transformers, arXiv preprint arXiv:2104.05707 (2021). [48] I. Loshchilov, F. Hutter, Decoupled weight decay regularization, arXiv preprint arXiv:1711.05101 (2017). 21 [49] H. Zhao, J. Shi, X. Qi, X. Wang, J. Jia, Pyramid scene parsing network, in: Proceedings of the IEEE conference on computer vision and pattern recognition, 2017, pp. 2881–2890. [50] C. Lyu, W. Zhang, H. Huang, Y. Zhou, Y. Wang, Y. Liu, S. Zhang, K. Chen, Rtmdet: An empirical study of designing real-time object de-tectors (2022). arXiv:2212.07784. [51] K. Chen, J. Wang, J. Pang, Y. Cao, Y. Xiong, X. Li, S. Sun, W. Feng, Z. Liu, J. Xu, Z. Zhang, D. Cheng, C. Zhu, T. Cheng, Q. Zhao, B. Li, X. Lu, R. Zhu, Y. Wu, J. Dai, J. Wang, J. Shi, W. Ouyang, C. C. Loy, D. Lin, MMDetection: Open mmlab detection toolbox and benchmark, arXiv preprint arXiv:1906.07155 (2019). [52] M. Tan, Q. Le, Efficientnet: Rethinking model scaling for convolutional neural networks, in: International conference on machine learning, PMLR, 2019, pp. 6105–6114. [53] L. Fu, H. Tian, X. B. Zhai, P. Gao, X. Peng, Incepformer: efficient incep-tion transformer with pyramid pooling for semantic segmentation, arXiv preprint arXiv:2212.03035 (2022). [54] J. Fein-Ashley, E. Feng, M. Pham, Hvt: A comprehensive vision frame-work for learning in non-euclidean space, arXiv preprint arXiv:2409.16897 (2024). [55] S. Mehta, M. Rastegari, Mobilevit: light-weight, general-purpose, and mobile-friendly vision transformer, arXiv preprint arXiv:2110.02178 (2021). [56] W. Wang, E. Xie, X. Li, D.-P. Fan, K. Song, D. Liang, T. Lu, P. Luo, L. Shao, Pyramid vision transformer: A versatile backbone for dense pre-diction without convolutions, in: Proceedings of the IEEE/CVF interna-tional conference on computer vision, 2021, pp. 568–578. [57] P. Zhang, X. Dai, J. Yang, B. Xiao, L. Yuan, L. Zhang, J. Gao, Multi-scale vision longformer: A new vision transformer for high-resolution image encoding, in: Proceedings of the IEEE/CVF international conference on computer vision, 2021, pp. 2998–3008. [58] A. Howard, M. Sandler, G. Chu, L.-C. Chen, B. Chen, M. Tan, W. Wang, Y. Zhu, R. Pang, V. Vasudevan, et al., Searching for mobilenetv3, in: Pro-ceedings of the IEEE/CVF international conference on computer vision, 2019, pp. 1314–1324. 22 Appendix A. Visualization Results in Semantic Segmentation 
+
+> Fig. A.6. Visual comparison of semantic segmentation performance on Cityscapes.
+
+As shown in Fig. A.6, our KAConvNet demonstrates superior capability in accurately delineating object boundaries. 23

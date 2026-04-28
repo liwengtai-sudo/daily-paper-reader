@@ -1,0 +1,899 @@
+Title: The Cost of Relaxation: Evaluating the Error in Convex Neural Network Verification
+
+URL Source: https://arxiv.org/pdf/2604.18728v1
+
+Published Time: Wed, 22 Apr 2026 00:09:30 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# The Cost of Relaxation: Evaluating the Error in Convex Neural Network Verification 
+
+## Merkouris Papamichail #
+
+Foundation for Research and Technology – Hellas, Heraklion, Greece University of Crete, Heraklion, Greece 
+
+## Konstantinos Varsos #
+
+Foundation for Research and Technology – Hellas, Heraklion, Greece University of Crete, Heraklion, Greece 
+
+## Giorgos Flouris #
+
+Foundation for Research and Technology – Hellas, Heraklion, Greece 
+
+## João Marques-Silva #
+
+Catalan Institution for Research and Advanced Studies, Barcelona, Spain University of Lleida, Lleida, Spain 
+
+Abstract 
+
+Many neural network (NN) verification systems represent the network’s input-output relation as a constraint program. Sound and complete, representations involve integer constraints, for simulating the activations. Recent works convexly relax the integer constraints, improving performance, at the cost of soundness. Convex relaxations consider outputs that are unreachable by the original network. We study the worst case divergence between the original network and its convex relaxations; both qualitatively and quantitatively. The relaxations’ space forms a lattice, where the top element corresponds to a full relaxation, with every neuron linearized. The bottom element corresponds to the original network. We provide analytical upper and lower bounds for the ℓ∞-distance between the fully relaxed and original outputs. This distance grows exponentially, w.r.t. the network’s depth, and linearly w.r.t. the input’s radius. The misclassification probability exhibits a step-like behavior, w.r.t. input radius. Our results are supported by experiments on MNIST, Fashion MNIST and random networks 1.
+
+2012 ACM Subject Classification Computing methodologies → Neural networks; Computing methodologies → Equation and inequality solving algorithms 
+
+Keywords and phrases Neural network verification, constraint relaxation, approximation error 
+
+## 1 Introduction 
+
+Artificial Intelligence, mostly driven by deep neural networks (NNs), has achieved remarkable progress in diverse domains, including recommendation systems [ 34 ], autonomous driving [ 18 ], healthcare [ 21 ], and large language models chat-bots [ 4]. Despite these advances, NNs remain vulnerable to critical reliability and safety issues, such as adversarial examples [ 29 , 8 ] and hallucinations in generative models [ 10 ]. These shortcomings raise concerns about deploying NNs in safety-critical settings, where incorrect behavior may have severe consequences [ 28 ]. Importantly, such vulnerabilities persist even in highly accurate models and often evade standard empirical defenses [ 1, 26 ]. This has led researchers to seek formal methods that provide provable guarantees regarding the safety of NN systems. This challenge has given rise to a growing body of work on neural network verification [3 ]. Formally, a verification query comes as a tuple τ = ⟨P , ⟨CP (σ)⟩, Q⟩ . A verification system either proves that the state Q is reachable by the neural network σ(·), beginning from  
+
+> 1
+
+https://github.com/merkouris148/worst-case-convex-approx-error 
+
+> arXiv:2604.18728v1 [cs.LG] 20 Apr 2026
+
+2 Evaluating the Error in Convex NN Verification 
+
+state P, or responds with a counter example. Usually, the neural network σ(·) is represented internally as a set of constraints ⟨CP (σ)⟩ [22 ]. Depending on the type of queries they answer, verification systems are characterized as sound and/or complete. A verification system is 
+
+sound , when every query that it verifies, also holds for the original network. Symmetrically, a verification system is complete when every query, that holds for the original network, is also verified [ 22 ]. The soundness or completeness of a verification largely depends on the choice of the internal representation ⟨CP (σ)⟩, as the latter describes the NN’s input-output (IO) relation. An over-approximation of the IO-relation verifies states that are unreachable from the original network, thus leading to unsoundness. However, under-approximating the IO-relation fails to verify states that are reachable from the true network. One popular technique for representing the NN’s IO-relation is mixed integer linear programming (MILP) [ 22 ]. This involves expressing the NN’s behavior as a set of linear inequalities on real or integer variables. The use of integer variables is essential for exactly describing the non-linearity introduced by the activation functions. MILP leads to sound and complete verification, and has been successfully employed by a variety of systems, e.g. [13 , 31 ]. However, this precision comes at the cost of performance, since the NN verification problem is intractable [12]. In parallel to sound and complete verification alternative approaches are proposed, relaxing the verification problem, thus improving on performance. In particular, here we focus on a popular technique for complete , but unsound , verification, via convex relaxations. There the NN’s IO-relation is described as a convex (linear) program , involving only linear constraints on real variables [ 6]. Typically this involves the computation of pre-activation interval bounds for each neuron in the network, using interval bound propagation (IBP) [ 9 ]. Since we now only have linear, real constraints the program can be solved in polynomial time [14 ]. Additionally, numerical methods can be employed, further improving efficiency [ 30 , 19 , 17 , 11 ]. This approach has been applied in adversarial robustness certification [30 , 19 , 17 , 11 ]. Finally, a linear objective is employed to keep the relaxation close to the original network [ 30 , 19 , 17 , 11 ]. The above methods avoid the computational cost, by relaxing the integer constraints involved in a MILP. However, this non-linearity is essential to a NN’s expressive power. Thus, relaxations hinder a NN’s expressivity [ 16 , 24 ]. In this work, we are interested to evaluate 
+
+the cost of convex relaxations have to a verification system’s precision. Related work in [ 27 ] studies the consequences convex relaxations have to robustness certification queries. They present a novel framework which characterizes a family of convex relaxations including popular approaches, such as [ 30 , 33 ]. They prove that the certification quality of each relaxation in the family cannot exceed a certain optimal barrier. Moreover, their extensive experimental results suggest that this barrier has already reached by existing methods. Thus, conclude that further research will not provide significant improvements. Despite their insights, some details where not included in their examination. Their work primarily focuses on robustness certification, not examining the consequences of convex relaxations in other verification settings. Moreover, they concentrate on “static” real-word networks, not exploring the correlation of the relaxation error with other network parameters. Our work aims to cover the above gaps. We examine a fundamental reachability query. Since NNs are functions, a given input, completely determines their output. However, this does not hold for convexly relaxed representations of NNs. There, an input specifies a set of possible outcomes, including the original network’s output. This work aims to evaluate the degree of error introduced by choosing a relaxed output, instead of computing the true value. 
+
+We answer this question both qualitatively and quantitatively . First, we explore the space of the feasible convex relaxations, observing its lattice structure. The lattice’s top element Merkouris Papamichail et al. 3
+
+corresponds to the fully relaxed convex solution, where every neuron is linearized. The lattice’s bottom element corresponds to the original network. We remark that a fully relaxed NN corresponds to the strictly weaker learning paradigm of a linear model. Subsequently, we proceed on evaluating the difference between the fully relaxed and original output. We present analytical upper and lower bounds for their ℓ∞-distance. Further we experimentally, test the correlation of the fully relaxed and original distance, w.r.t. the network’s depth and input radius. We observe an exponential growth to the ℓ∞-distance, w.r.t. the network’s depth, while a linear growth, w.r.t. the input radius. Additionally, we test how this divergence affects classification problems, by estimating the misclassification probability. We observe that the misclassification probability follows a step-like behavior, w.r.t. the input radius. 
+
+Contributions. This paper includes the following contributions: 
+
+(i) We characterize the space of convex relaxations for a particular ReLU-NN. For relax-ations choosable by a linear objective, we observe a lattice structure in the solution space (Theorem 3). The lattice’s top element corresponding to a fully relaxed, linear network, while the bottom element to the original network. We explore the structural differences between the fully relaxed convex solution, where every neuron is linearized and the original network. We remark their expressive difference. 
+
+(ii) We quantify the difference between the fully relaxed and the original network. We measure the ℓ∞-distance between the relaxed and original outputs, where we provide analytical lower (Theorem 4) and upper (Theorem 7) bounds. Our analytical expressions highlight an exponential dependence from the network’s depth. This dependence becomes also evident from experiments on 30 random networks with increasing depths. 
+
+(iii) The computation of a convex relaxation is initialized w.r.t. a vicinity of the input space. We examine how this vicinity’s radius affects the quality of the relaxation. We perform experiments on real-life MNIST and Fashion MNIST networks. There, we observe a linear dependence of the ℓ∞-distance, between the relaxed and original outputs, w.r.t. the input vicinity’s radius. In the same setting, we examine how relaxations affect classification. We observe a step-like behavior of the misclassification probability, w.r.t. the input vicinity’s radius. For both networks the misclassification probability approaches 1 , when half of the input space is considered for the relaxation. 
+
+Outline. We begin in Section 2 presenting some preliminary notions, rigorously defining ReLU-NN, and the Interval Bound Propagation method. Subsequently, in Section 3 we explore the connection between NN verification and various constraint formulations. In particular, we discuss MILP and convex relaxations, followed by analysis on the solution space of convex relaxations. We focus on the top relaxation, where every neuron is convexly relaxed. In Section 4 we discuss various error metrics. We rigorously define the worst case relaxation error, proving upper and lower bounds. We supplement our theoretical analysis, with experiments in Section 5. Finally, we conclude in Section 6. 
+
+## 2 Preliminaries 
+
+For any natural number d ∈ N, [d] denotes the set [d] = {1, 2, . . . , d }. Vectors in Rd are denoted by bold, e.g., x, with coordinates xi, i ∈ [d], while scalar values by light, e.g., x.The vectors 0 and 1 denote the all-zeros and all-ones vectors, respectively. For i ∈ [d], ei
+
+denotes the i-th canonical base vector. For a vector x ∈ Rd, ∥x∥p denotes its ℓp–norm. We are particularly interested in ℓ∞–norm, where ∥x∥∞ = max i∈[d] |xi|. Finally, for ρ > 0,
+
+Bp(xo, ρ ) denotes the ℓp–sphere, centered at xo, with radius ρ, w.r.t. the ℓp–norm. Namely, 
+
+Bp(xo, ρ ) = {x ∈ Rd | ∥ xo − x∥ ≤ ρ}. We extend real-valued operations to vectors in a 4 Evaluating the Error in Convex NN Verification 
+
+coordinate-wise manner. For two vectors x, y ∈ Rd, x ⊙ y denotes their coordinate-wise product. For x ∈ Rd, |x| denotes the vector |x| = ( |x1|, . . . , |xd|). Additionally, x+ denotes the positive part, while x− the negative part of a vector. For two vectors x, y ∈ Rd,
+
+m = max {x, y} denotes the coordinate-wise maximum, i.e. mi = max {xi, y i}, for every 
+
+i ∈ [d]. Matrices A ∈ Rd1×d2 are denoted with capital letters. For a matrix A ∈ Rd1×d2
+
+its transpose is denoted by AT ∈ Rd2×d1 . Additionally, O denotes the all zero matrix. The vector conventions are also applied to matrices. Comparison x ≤ y, for two vectors x, y ∈ Rd should be understood coordinate-wise .Namely, the comparison x ≤ y holds if and only if xi ≤ yi, for every i ∈ [d]. We extend real interval to multidimensional spaces. In particular, let I = [ ℓ, u] ⊆ Rd denote the set of points 
+
+x ∈ Rd, s.t. ℓ ≤ x ≤ u. Geometrically, multidimensional intervals correspond to axis-aligned ,
+
+hyper-rectangles . For a real function f : R → R, we implicitly use f (·) to denote the function 
+
+f : Rd → Rd, where f (x) = ( f (x1), f (x2), . . . , f (xd)) . Subsequently, we use extensively linear 
+
+functions of the form f (x) = W x + b, where f : Rdin → Rdout , W ∈ Rdout ×din , and b ∈ Rdout .
+
+## 2.1 Neural Networks 
+
+We view neural networks as functions between two sets. In particular, we denote the inputs or feature space by F. Moreover, we denote the outputs or score space by S. A neural network simply maps feature points to scores. This is achieved by passing the features point through a sequence of “semi-linear” layers. In each layer, the linearity is disrupted by an activation function. This enables neural networks to have a sophisticated emergent behavior. We give the following formal definition. 
+
+▶ Definition 1 (Neural Network) . Let L ∈ N denote the number of layers (or depth) .Moreover, let D denote the network’s architecture , i.e. a sequence of L + 1 natural numbers, where din = d0, d 1, . . . , d L−1, d L = dout . Additionally, let W denote a sequence of L real matrices, s.t. W (i) ∈ Rdi×di−1 , for each i ∈ [L]. Furthermore, β denotes a sequence of L
+
+real vectors, s.t. b(i) ∈ Rdi , for each i ∈ [L]. Finally, α denotes a sequence of L activation 
+
+functions, s.t. a(i) : Rdi → Rdi , for every i ∈ [L]. A neural network (NN) σ : F → S, with 
+
+F ⊂ Rdin , S ⊂ Rdout . is described as the tuple σ = ⟨L, D, W, β, α ⟩. For an input x ∈ F, the value of σ(x) is given as the value σ(L) in the system of recursive equations below. 
+
+σ(0) = x
+
+σ(i) = a(i)[W (i)σ(i−1) + b(i)], ∀i ∈ [L]
+
+}
+
+(1) We focus on the Rectified Linear Unit (ReLU) activation function. Given a vector x, let r(x)
+
+denote the vector max {x, 0}, where the maximum is taken coordinate-wise .In many applications, we need to map inputs to a finite set of labels, or classes . We do this by assigning to the input the class with the highest score. Formally, let C ⊂ N be a finite set of classes, with |C| = dout . A classifier κ : F → C is constructed with respect to the NN 
+
+σ(·), as κ(x) = arg max i∈[dout ] σi(x).
+
+## 2.2 Interval Bound Propagation 
+
+Consider a network σ = ⟨L, D, W, β, α ⟩, where α denotes a sequence of L increasing activation functions of the form a(i) : Rdi → Rdi . Let ̂ I(0) = [ ℓ, u] be an interval in the input space F.For each layer i ∈ [L], we call pre -activation bound I(i) the minimum interval that bounds the output of the layer’s linear part , i.e. the layer’s value before the activation is applied. For the i-th layer, the post -activation bound ̂ I(i) is the minimum interval that bounds the Merkouris Papamichail et al. 5
+
+Figure 1 From left to right: The input domain [−1, 1] 2 (blue). The pre-activation polytope (blue). The post-activation polytope (red). For the pre- and post- activation polytopes, we also depict their interval bounds (grey). The figures are drawn for a single layer network, with parameters 
+
+W =
+
+[ 1 23 −4
+
+]
+
+and b = [ −1 1] T . All the points of the pre-activation polytope with non-positive 
+
+x-values are projected to the y-axis. Similarly, the points with non-positive y-values are projected to the x-axis. Finally, all points of the pre-activation polytope with both non-positive coordinates are projected to the axes’ origins. The pre-activation bound is I = [ ℓ, u], where ℓ = [ −5 − 5] T and 
+
+u = [3 7] T . The post-activation bound ̂ I = [ ̂ ℓ,̂u], where ℓ = 0 and ̂u = u.
+
+output of the layer’s activation. Thus, we derive two sequences {I(i)}i∈[L], {̂I(i)}i∈[L] of the pre- and post- activation bounds, respectively. Here we briefly review the Interval Bound Propagation (IBP) method [9], for computing the pre- and post- activation bounds. For each layer i ∈ [L], we can decompose its weight matrix W (i) into its positive 
+
+W (i)+ ≥ O and negative W (i) 
+
+> −
+
+≤ O components, s.t. W (i) = W (i)+ + W (i) 
+
+> −
+
+. Now the pre- and post- activation bounds can be computed recursively, using Equation (2). The method’s correctness is established in Proposition 2. Finally, IBP on a single layer is illustrated in Figure 1. 
+
+I(i+1) =
+
+
+
+ℓ(i+1) = W (i+1) +̂ ℓ(i)
+
++ W (i+1) +̂ u(i) + b(i+1) 
+
+u(i+1) = W (i+1) 
+
+> −
+
+̂ u(i) + W (i+1) 
+
+> −
+
+̂ ℓ(i)
+
++ b(i+1) ̂ I(i+1) =
+
+{̂ 
+
+ℓ(i+1) 
+
+= a(i+1) (ℓ(i+1) )̂
+
+u(i+1) = a(i+1) (u(i+1) ) (2) 
+
+▶ Proposition 2. Consider σ = ⟨L, D, W, β, α ⟩, where α denotes a sequence of increasing 
+
+activation functions. Now, let {I(i)}i∈[L] and {̂I(i)}i∈[L] be the sequence of pre- and post-activation bounds generated by the IBP, for an input interval ̂ I(0) . Then ̂ I(L) is the minimum interval, s.t. σ(̂I(0) ) ⊆̂ I(L), w.r.t. set inclusion 2.
+
+## 3 Verification as Constraint Programming 
+
+In this section, we explore the connections between various constraint-based formula-tions and NN verification. Recall, a verification instance is described by a query τ =
+
+⟨P (x), ⟨σ⟩(x, y), Q(y)⟩. A verification system, answers a reachability query. Namely, if for every input x, satisfying the pre-condition P(x), every output y, reachable from x by the NN σ(·), satisfies the post-condition Q(y). This is captured by the problem of satisfying the first-order formula (∀x ∀y) [ P(x) ∧ ⟨ σ⟩(x, y) → Q (y)] . Otherwise, the verification system returns a counterexample , as a pair x, y, s.t. x, y |= P(x) ∧ ⟨ σ⟩(x, y) ∨ ¬Q (y). 
+
+> 2Proofs are included in Section A.
+
+6 Evaluating the Error in Convex NN Verification 
+
+Above, ⟨σ⟩(x.y) denotes the IO-relationship 3 of a fixed neural network σ(·). However, directly applying the recursive definition of Equation (1) is not suitable for efficient reasoning. In the literature, a NN σ(·) is often described by a set of constraints CP (σ). Let ⟨CP (σ)⟩(x, y)
+
+denote the IO-relationship of the constraint program CP (σ). If ⟨CP (σ)⟩(x, y) ⊇ ⟨ σ⟩(x, y),we call the formalism CP (σ) complete . Symmetrically, we call the formalism CP (σ) sound if 
+
+⟨CP (σ)⟩(x, y) ⊆ ⟨ σ⟩(x, y). Naturally, the choice of formalism directly affects the behavior of a verification system. A complete, but unsound formalism leads to verification of queries 
+
+τ , that do not hold for the true network σ(·). On the other hand, a sound but incomplete formalism will fail to verify queries τ that hold for σ(·).We examine two such formalisms, widely used in the literature. The sound and complete MILP, and its complete, but unsound convex relaxation. We focus on an fundamental reachability query. For a fixed input xo, how far apart can be the outputs yo, w.r.t. each formalism. We give a qualitative view of the problem, highlighting the structural differences. 
+
+## 3.1 The Sound and Complete MILP Formalization 
+
+One popular way to implement a sound and complete verification system is to express a given ReLU-NN as a mixed integer linear program (MILP) . This results in expressing the given network as a set of linear constraints , involving both integer and real variables. Subsequently, we call integer constraints the constraints that include discrete variables. In Equation (3) below, we present the description of a ReLU-NN as a MILP 4.̂
+
+σ(0) = xy =̂ σ(L)
+
+σ(i) = W (i)̂ σ(i−1) + b(i), ∀i ∈ [L]̂
+
+σ(i) ≥ σ(i), ∀i ∈ [L]̂
+
+σ(i) ≥ 0, ∀i ∈ [L]̂
+
+σ(i) ≤ σ(i) + M t(i), ∀i ∈ [L]̂
+
+σ(i) ≤ M (1 − t(i)), ∀i ∈ [L]
+
+t(i) ∈ { 0, 1}di 
+
+> out
+
+, ∀i ∈ [L]
+
+σ(i),̂ σ(i) ∈ Rdi 
+
+> out
+
+, ∀i ∈ [L]
+
+x ∈ Rdin , y ∈ Rdout 
+
+
+
+(3) Above, for the j-th neuron of the i-th layer we distinguish between its pre-activation value 
+
+σ(i) 
+
+> j
+
+and its post-activation value ̂σ (i) 
+
+> j
+
+. The constant M represents an arbitrarily high value. The integer vector t models the behavior of the ReLU activation. For the j-th neuron of the 
+
+i-th layer, t(i+1)  
+
+> j
+
+= 0 iff ̂σ (i+1)  
+
+> j
+
+= σ(i+1)  
+
+> j
+
+, i.e., ReLU is activated; otherwise, t(i+1)  
+
+> j
+
+= 1 .For a given ReLU-NN σ(·), we denote the mixed-integer linear program of Equation (3) by Milp (σ). Additionally, let Milp (σ)|x=xo denote the set of solutions of the MILP, for a fixed input x = xo. Observe that Milp (σ)|x=xo is a singleton . In other words, for a given input, we have a unique solution. Thus, the MILP formalism results is sound and complete.   
+
+> 3Input/output relationship.
+> 4Here we use the big-M formalization of [20]. Other formalizations have also been proposed, see [22].
+
+Merkouris Papamichail et al. 7
+
+## 3.2 Completeness with Convex Relaxations 
+
+Unfortunately, the appealing theoretical properties of MILP formulation comes at the cost of performance [ 12 ]. Due to the involvement of integer constraints, solving the system of Equation (3) is intractable [ 23 ]. To circumvent this, some approaches use convex relaxations 
+
+[30]. They replace the integer constraints of Equation (3), with their convex relaxations. To achieve this, we assume the pre-activation bounds, as derived from IBP [ 9]. Consider an interval Io ⊆ F. For the i-th layer, the pre-activation bound is the interval I(i), s.t. 
+
+σ(i) ∈ I(i), for any x ∈ Io. For I(i) = [ ℓ(i), u(i)], with ℓ ≤ 0 ≤ u, we define the vector 
+
+q(i) ∈ [0, 1], s.t. 
+
+q(i) = u(i)
+
+u(i) − ℓ(i) . (4) Then, the integer constraints are replaced with ̂ σ(i) ≤ q(i) ⊙ (σ(i) − ℓ(i)). Thus, resulting to the convex program bellow. ̂
+
+σ(0) = xy =̂ σ(L)
+
+σ(i) = W (i)̂ σ(i−1) + b(i), ∀i ∈ [L]̂
+
+σ(i) ≥ σ(i), ∀i ∈ [L]̂
+
+σ(i) ≥ 0, ∀i ∈ [L]̂
+
+σ(i) ≤ qi ⊙ (σ(i) − ℓ(i)), ∀i ∈ [L]
+
+σ(i),̂ σ(i) ∈ Rdi 
+
+> out
+
+, ∀i ∈ [L]
+
+x ∈ Rdin , y ∈ Rdout 
+
+
+
+(5) We denote the convex program of Equation (5) by Conv (σ). For a given input xo, the set of solutions to this program is denoted by Conv (σ)|x=xo . Notably, the set Conv (σ)|x=xo
+
+contains multiple solutions, including the MILP solution, i.e., 
+
+Conv (σ)|x=xo ⊇ Milp (σ)|x=xo = {σ(xo)}. (6) Finally, due to the soundness and completeness of the MILP formulation, we know that Equation (3) has a unique solution, for a given input xo, namely yo = σ(xo).
+
+## 3.3 Optimization & Adversarial Robustness 
+
+In many applications [ 30 , 19 , 17 , 11 , 27 ], we want to optimize an objective function over the feasible NN states. In particular, assume a linear objective function of the form 
+
+ξ([ σ̂ σ]) = cT [σ̂ σ] + c0, where the vector [σ̂ σ] is composed of all the variables in Milp (σ)
+
+and Conv (σ)5. Let CP ∈ { Milp , Conv }. We consider the following optimization problem, 
+
+ξ∗ = max {ξ([ σ̂ σ]) | σ,̂ σ ∈ CP (σ)}. (7)  
+
+> 5Both CPs have the same variables (but different constraints).
+
+8 Evaluating the Error in Convex NN Verification 
+
+Figure 2 (Top) The lattice-structured space of feasible convex relaxations, that are choosable by a linear objective function V (Λ) . (Bottom) The relaxation of V (Λ) , for the single-layer network of Figure 1. For the layer’s two neurons, holds qT = [0 .37 0 .58] . From left to right. λ1 = 0 , λ 2 = 0 ,thus ̂σ 1,̂σ 2 is exact. λ1 = 0 , λ 2 = 1 , thus ̂σ 1 is exact and ̂σ 2 is linearized. λ1 = 1 , λ 2 = 0 , thus ̂σ 1 is linearized and ̂σ 2 is exact. Finally, λ1 = λ2 = 1 , where the network is fully relaxed. 
+
+A particular instance of the above optimization problem includes adversarial robustness 
+
+[8 , 30 , 27 ]. In adversarial robustness we are interested in examining if a given area is free of adversarial examples. In particular, assume a point xo, and an interval Io, s.t. xo ∈ Io. Is every input in Io assigned to the same class jo = κ(xo) of xo? We can certify the robustness of the network in the vicinity Io, by defining a certain linear cost function. In particular, let 
+
+ξ([ σ̂ σ]) = w(L)
+
+> j
+
+̂ σ(L) − w(L)
+
+> jo
+
+̂ σ(L). (8) for some j̸ = jo. If the optimization problem (7) with the objective function of Equation (8) yields a positive solution, then there is an adversarial example in Io. If the optimization problem yields a negative solution for every j̸ = jo, then the vicinity Io is robust .Note that the choice of the CP formulation matters. In particular, since Conv (σ)|x=xo ⊇
+
+Milp (σ)|x=xo , we have Conv (σ)|x∈Io ⊇ Milp (σ)|x∈Io . Intuitively, this entails that fewer and smaller vicinities Io will be certified as robust by the convex relaxation [ 30 , 27 ]. However, every robustly certifiable vicinity Io, by the convex relaxation, will also be robustly certified by the original MILP [30]. 
+
+## 3.4 The Solutions Space of the Convex Relaxation 
+
+Here we discuss the structure of the solutions space Conv (σ)|x=xo . Firstly, we observe that this space is innumerable , but bounded, and isomorphic to a hypercube . However, only the vertices of the hypercube are eligible to be chosen by a linear objective. This drastically reduces the number of relevant feasible solutions to a finite set. Moreover, the vertices of the Merkouris Papamichail et al. 9
+
+hypercube exhibit an interesting lattice-structure. The top element of the lattice corresponds to the fully-relaxed convex solution, where every neuron is linearized. The bottom element of the lattice corresponds to the original network, where no neuron is relaxed. For each element between the top and bottom, we have an intermediate case, where only a portion of the total number of neurons is linearly relaxed. This lattice is presented in Figure 2. We characterize the family of solutions in Conv (σ)|x=xo . Each solution will correspond to a vector λ ∈ [0 , 1] ∆, s.t. ∆ = ∑ 
+
+> i∈[d]
+
+di 
+
+> in
+
++ dL
+
+> out
+
+. Intuitively, the dimension ∆ corresponds to the number of neurons in the network. Let λ(i) 
+
+> j
+
+be the coordinate of the λ vector, corresponding to the j-th neuron of the i-th layer. When the neuron is linearly relaxed, we have λ(i) 
+
+> j
+
+= 1 . Otherwise, it holds λ(i) 
+
+> j
+
+= 0 . Formally, we define λ(i) 
+
+> j
+
+as the following ratio: 
+
+λ(i) 
+
+> j
+
+=̂
+
+σ (i) 
+
+> j
+
+· (̂σ (i) 
+
+> j
+
+− σ(i) 
+
+> j
+
+)
+
+q(i) 
+
+> j
+
+· (σ(i) 
+
+> j
+
+− ℓ(i) 
+
+> j
+
+) . (9) Let Λ = [0 , 1] ∆, be set including all possible vectors λ. Observe that Λ is a ∆-dimensional hypercube; isomorphic to Conv (σ)|x=xo . Namely, every λ ∈ Λ uniquely determines a sequence of feasible solutions [σ̂ σ] ∈ Conv (σ)|x=xo , and vice versa .
+
+▶ Theorem 3. Consider any linear objective of the form ξ([ σ̂ σ]) = cT [σ̂ σ] + c0, where 
+
+[σ̂ σ] ∈ Conv (σ)|x=xo . Let [σ̂ σ]∗ be the optimal solution w.r.t. ξ(·), and λ∗ ∈ Λ its corresponding ratios vector. Then, λ∗ is a vertex of Λ, i.e. λ∗ ∈ V (Λ) = {0, 1}∆.
+
+Theorem 3 radically reduces the number of relevant convex solutions. From the innu-merable hypercube Λ, to the finite set of vertices V (Λ) . Moreover, the vertices V (Λ) form a 
+
+lattice , with max , min as its join and meet operations. For the top element of this lattice, we have λ = 1, corresponding to the fully relaxed network. For its bottom element, we have 
+
+λ = 0 corresponding to the original network. For the single layer network of Figure 1, we present all the relaxations in V (Λ) in Figure 2. However, note that, in general the hypercube 
+
+Λ has an exponential number of vertices, w.r.t. the number of neurons ∆.
+
+## 3.5 The Top Convex Relaxation 
+
+We conclude this section by discussing the top element of the V (Λ) lattice. Recall that this solution of Equation (5) corresponds to the case where every neuron relaxed. Interestingly, this results into degenerating the NN into a single layer. Thus, drastically reducing the its expressivity [24, 16]. To that end, we rewrite the CP of Equation (5) as follows. ̂
+
+σ(0) = xy =̂ σ(L)
+
+σ(i) = W (i)̂ σ(i−1) + b(i), ∀i ∈ [L]̂
+
+σ(i) = q(i) ⊙ (σ(i) − ℓ(i)), ∀i ∈ [L]
+
+σ(i),̂ σ(i) ∈ Rdi 
+
+> out
+
+, ∀i ∈ [L]
+
+x ∈ Rdin , y ∈ Rdout 
+
+
+
+(10) For a NN σ(·), let ⊤–Conv (σ) denote the program in Equation (10). Since we have tightened a constraint of Conv (σ)6, for an input xo, it holds that ⊤–Conv (σ)|x=xo ⊆ Conv (σ)|x=xo . 
+
+> 6And removed some other constraints, that are now subsumed by
+
+̂σ (i) = q(i) ⊙ (σ(i) − ℓ(i)).10 Evaluating the Error in Convex NN Verification 
+
+Furthermore, observe that the constraint program in Equation (10) admits a unique solution, thus describing a function. In fact, we can represent Equation (10) as a NN. Indeed, given a NN σ = ⟨L, D, W, β, r⟩, we construct the network ˜σ = ⟨L, D, W, β, ˜r⟩, where ˜r = q ⊙ (σ − ℓ),i.e., we replace every ReLU with its convex relaxation. However, ˜r(·) is linear, thus all the layers of the relaxed network can be merged into a single one. 
+
+˜σ(x) = 
+
+( L∏
+
+> i=1
+
+W (i) ⊙ q(i)
+
+)
+
+x +
+
+> L
+
+∑
+
+> i=1
+
+
+
+> L
+
+∏
+
+> j=i+1
+
+W (j) ⊙ q(j)
+
+ (b(i) − ℓ(i)) (11) From Equation (11) we can express the relaxed network in the form ˜σ(x) = ˜W x + ˜b. Thus, being equivalent to a linear model. Moreover, Equation (11) reveals an important structural difference between the original network and the top relaxation. The latter being equivalent to a properly simpler learning paradigm, since there are functions learnable by a NN, but a linear model is unable to learn [24, 16]. This difference is quantified in the next section. 
+
+## 4 The Price of Unsoundness for Convex NN Verification 
+
+In this section, we quantify the difference between the top and bottom elements of the lattice in Figure 2 (top). Recall that the top element of the lattice corresponds to the fully relaxed solution of the convex program in Equation (5), while the bottom element corresponds to the original network. We measure the cost of relaxation as the maximum ℓ∞-distance, between the solution in Milp (σ)|x=xo and the solutions in Conv (σ)|x=xo , for every vector xo ∈ Io,where Io denotes an input interval. In our experiments, we also use the average ℓ∞-distance, between the original and fully relaxed outputs. Moreover, we evaluate the misclassification probability . Namely, the probability the fully-relaxed network classifies an input to a different class than its original counterpart. We begin by reviewing the worst case ℓ∞-distance between the fully-relaxed and original network. To that end, for a network σ(·) we define the worst-case error E(σ) > 0, as, 
+
+E(σ) = sup 
+
+> xo∈Io
+
+sup {∥ σ(xo) − y∥∞ | y ∈ Conv (σ)|x=xo }. (12) Observe that the worst-case error of Equation (12) considers two levels of adversity. For a particular input xo ∈ Io we are interested in the output y of the convex program, of Equation (5), that diverges the furthest from the true output ̂σ (xo). Subsequently, we choose the input xo ∈ Io that yields the worst error. We estimate the error in Equation (12), from bellow, using the fully-relaxed network of Equation (11). Thus, eliminating the inner supremum of Equation (12): 
+
+E(σ) = sup 
+
+> xo∈Io
+
+sup {∥ σ(xo) − y∥∞ | y ∈ Conv (σ)|x=xo }≥ sup 
+
+> xo∈Io
+
+sup {∥ σ(xo) − y∥∞ | y ∈ ⊤ –Conv (σ)|x=xo }
+
+= sup 
+
+> xo∈Io
+
+∥σ(xo) − ˜σ(xo)∥∞ = ˜E(σ). (13) Above, we obtain the second inequality, from the first, since ⊤–Conv (σ)|x=xo ⊆ Conv (σ)|x=xo .The third equality is obtained from the second by substituting y with the single solution ˜σ(xo)
+
+in ⊤–Conv (σ)|x=xo . Finally, we denote the quantity in Equation (13) by ˜E(σ). Subsequently, we approximate ˜E(σ) from above and below, thus deriving a lower bound to E(σ).Merkouris Papamichail et al. 11 
+
+## 4.1 A Lower Bound to ˜E(σ)
+
+In this subsection we derive a simple lower bound for ˜E(σ). To that end, observe that both 
+
+˜E(σ) and E(σ) are invariant to translations. For example, E(σ + t) = E(σ). Therefore, we can always assume that σ(0) = 0. Otherwise, let σ′ = σ − σ(0). Then, E(σ) = E(σ′).Similarly, for ˜E(σ). Based on this simple observation we give the following theorem. 
+
+▶ Theorem 4. Let an interval Io, with Io = [ ℓo, uo] ⊆ Rdin , where din ≥ 1 is the input dimension. Moreover, let the interval Io include the origin, i.e. 0 ∈ Io. Additionally, consider a NN σ : Io → Rdout , where dout ≥ 1 is the output dimension. Then, 
+
+˜E(σ) = sup 
+
+> xo∈Io
+
+∥σ(xo) − ˜σ(xo)∥∞ ≥ ∥ σ(0) − ˜σ(0)∥∞ = ∥˜σ(0)∥∞ (14) In Theorem 4 we assumed without loss of generality that σ(0) = 0. Notably, Theorem 4 has an important consequence, namely that the error E(σ) grows exponentially w.r.t. the network’s depth. Indeed, from Equation (11), we have that 
+
+˜σ(0) = 
+
+> L
+
+∑
+
+> i=1
+
+
+
+> L
+
+∏
+
+> j=i+1
+
+W (j) ⊙ q(j)
+
+ (b(i) − ℓ(i)). (15) Equation (15) describes a polynomial, dominated by the term ∏Lj=2 W (j) ⊙ q(j). When 
+
+|W (i) ⊙ q(i)| ≥ 1, for every i ∈ [L], the dominating term grows exponentially , w.r.t. the network’s depth L. Since E(σ) ≥ ˜E(σ), the worst case error E(σ) also grows at least 
+
+exponentially. This behavior is also supported by our experiments in the next section. 
+
+## 4.2 An Upper Bound to ˜E(σ)
+
+Now we discuss a simple upper bound to ˜E(σ). Our upper bound derives from the observation that the intervals of the IBP for σ(·) and ˜σ(·) are identical. In other words, replacing the ReLU activation r(·) with its convexly relaxed counterpart ˜r(·) does not change the interval bounds. Formally, we have the following result. 
+
+▶ Proposition 5. Let {I(i)}i∈[L] and {̂ I(i)}i∈[L] be the sequences of the pre- and post-activation bounds generated by the IBP, for the network σ(·). Moreover, let {J(i)}i∈[L] and 
+
+{ ˜J(i)}i∈[L] be the sequences of pre- and post- activation bounds generated by IBP for the top convex relaxation ˜σ(·). If ̂ I(0) = ˜J(0) , then I(i) = J(i) and ̂ I(i) = ˜J(i), for every layer i ∈ [L].
+
+Proposition 5 essentially states that despite the local divergence between the original network σ(·) and its full-relaxation ˜σ(·), at a given point xo, their outputs belong to the same interval. Moreover, let I be the common output interval I =̂ I(L) =̂ J(L) for a given 
+
+L-layer NN. Note that the interval I over-approximates the outputs of the NN σ(·) and is the smallest (minimum) interval over-approximation w.r.t. set-inclusion. 
+
+▶ Proposition 6. Consider the output intervals ̂ I(L) and ˜J(L) of σ(·) and ˜σ(·), respectively, obtained by IBP on the same input interval Io. From Proposition 5 we have ̂ I(L) = ˜J(L) = I .It holds that σ(x), ˜σ(x) ∈ I , for every x ∈ Io. Moreover, I is the minimum interval w.r.t. set inclusion with the latter property. 
+
+Using Proposition 6 we derive an upper bound to ˜E(σ), in the following theorem. 12 Evaluating the Error in Convex NN Verification 
+
+▶ Theorem 7. Let an interval Io, with Io = [ ℓo, uo] ⊆ Rdin , where din ≥ 1 is the input dimension. Additionally, consider a NN σ : Io → Rdout , where dout ≥ 1 is the output dimension, and the output bounding interval ̂ I(L) = [ ℓ(L), u(L)] obtained by the IBP. Then, 
+
+˜E(σ) = sup 
+
+> xo∈Io
+
+∥σ(xo) − ˜σ(xo)∥∞ ≤ sup 
+
+> xo∈Io
+
+∥˜σ(xo)∥∞ = ∥u(L)∥∞. (16) In Equation (16) we use the fact that σ(x), ˜σ(x) ≥ 0. Following the same rationale of Theorem 7, we can also derive that the upper bound to ˜E(σ) grows exponentially, for 
+
+|W (i) ⊙ q(i)| ≥ 1. This should come to no surprise, since the upper bound should at least follow the growth rate of the upper bound. However, the upper bound of Theorem 7, gives us a way to normalize and compare the error values. Indeed, note that the quantity ∥u(L)∥∞
+
+corresponds to the output space diameter , w.r.t. the ℓ∞-distance. For a fixed input xo, we call relative error the ratio ∥σ(xo) − ˜σ(xo)∥∞/∥u(L)∥∞. The relative error evaluates the error’s growth as a portion of the output’s space diameter. From Theorem 7 we observe that the network’s output space grows exponentially, w.r.t. the network’s depth. Should the (absolute) error growth be a side-effect of the output space’s growth, the relative error should remain constant. Nevertheless, our experiments in the next section reject this hypothesis, exhibiting a linear increase in the relative error. 
+
+## 4.3 Statistical Evaluation: Average Divergence A(σ) &Missclassification Probability 
+
+We conclude our discussion on error quantification, with some metrics that we use in our experimentation. Namely, the average divergence A(σ) and misclassification probability ,beginning from the former. In our experiments, we use the average divergence see how our previously introduced bounds are compared to the average case. To that end, for an input 
+
+xo, let dvg (xo) = ∥σ(xo) − ˜σ(xo)∥∞ be the divergence between the output of the original network and the full relaxation. Assume a finite set of samples D ⊂ F. We define the average divergence A(σ) as, 
+
+A(σ) = 1
+
+|D|
+
+∑
+
+> x∈D
+
+∥σ(xo) − ˜σ(xo)∥∞ = 1
+
+|D|
+
+∑
+
+> x∈D
+
+dvg (x). (17) The Equation (17) provides us with an alternative way to statistically approximate the value of the worst case error E(σ). Indeed, from Equations (17) , (12) , (13) , we derive that E(σ) ≥ ˜E(σ) ≥ A (σ). However, it should be clear that calculating A(σ) is more computationally expensive than calculating the aforementioned bounds analytically. In the next section, we observe that A(σ) and ˜E(σ) exhibit similar behavior. Above, we only considered the error between the score vectors of the fully-relaxed and original networks. However, there are applications, e.g. robustness certification [ 30 ], where relaxations are used in classification problems. Recall that a NN-based classifier κ : F → C 
+
+is obtained by the neural network σ : F → S, with S ⊆ Rd and d = |C| , by computing the coordinate that achieves the maximum score. Namely, κ(x) = arg max i∈[d] σ(x). When sub-stituting the original network σ(·) with its full-relaxation ˜σ(·), we obtain the relaxed classifier 
+
+˜κ(x) = arg max i∈[d] ˜σ(x). Then, the misclassification probability is given by Pr [κ(x)̸ = ˜κ(x)] .For a finite set of samples D ⊂ F, we estimate the misclassification probability by, 
+
+PD = 1
+
+|D|
+
+∑
+
+> x∈D
+
+1[κ(x)̸ = ˜κ(x)] . (18) Merkouris Papamichail et al. 13 
+
+Above, 1[κ(x)̸ = ˜κ(x)] denotes the indicator function, returning 1, if there is a misclassifica-tion; 0, otherwise. Note that the misclassification probability does not necessarily correlates to the worst case error E(σ). We may have no misclassifications, despite having large error values. However, our subsequent experiments falsify this hypothesis, exhibiting a step-like behavior w.r.t. the input’s space radius. 
+
+## 5 Experimental Evaluation 
+
+In this section, we experimentally evaluate the error emerging when using the fully-relaxed, instead of the original network. This error is quantified in two ways. First, we consider the worst ℓ∞-distance between the relaxed and original output. For the ℓ∞-distance, we compute both the upper (Theorem 7) and lower (Theorem 4) bounds, along with the average divergence of Equation (17). Moreover, for the average divergence, we present the error both in absolute and relative values. Second, we estimate the misclassification probability, as given in Equation (18). Additionally, we study the correlation of the above metrics, w.r.t. various NN parameters. In particular, we consider the network’s depth, given by the constant L in Definition 1, and the input radius. The latter parameter regards the input interval w.r.t. which the full-relaxation is computed. Indeed, note that for the convex program of Equation (5), we assume the existence of an input interval Io, which is used to compute the ℓ(i), u(i) bounds. We want to observe how the above error metrics change, while we move from smaller to larger intervals Io. Thus, we consider ℓ∞-spheres of increasing radius. Subsequently, we observe a rapid growth of the error, as the complexity of the network increases. 
+
+Methodology. Here we briefly discuss our experimentation methodology. The correlation between the network’s depth and the average divergence is observed by generating 30 random networks, of increasing number of layers. Using this technique we avoid considering redundant neurons, which would have generate artificially high error values. Indeed, due to the network circuit complexity [ 25 ] being dictated by the available dataset, considering larger networks, trained on the same dataset, would result in redundancies. However, we make use of real-life networks, trained on MNIST [ 5] and Fashion MNIST [ 32 ], when considering the correlation of the error metrics and the input radius. 
+
+Hardware & Software Configuration. All experiments were conducted on Ubuntu 24.04, with an AMD Ryzen 5 5500U, at 4.056GHz. The experimentation scripts were written in Python v3.8. For the NN’s implementation we used the TensorFlow v2.4.1 7 library, while the NumPy v1.23.5 8 was used for numeric computations. Finally, MatplotLib v3.7.2 9 software was used for visualization. All experiments were concluded in about an hour. 
+
+## 5.1 Random Networks of Increasing Depth 
+
+Firstly, we examine how the ℓ∞-distance between the original and relaxed outputs grows, w.r.t. the network’s depth. To that end, we generate 30 random NNs with increasing depth, i.e., σ1, . . . , σ 30 . The input interval consists of the ℓ∞-sphere around the origin 0 with radius 
+
+ρ = 0 .025 . We begin with one hidden layer, each time increasing the depth by one, with each layer having a uniformly random number of neurons (width) between 2 and 100. The    
+
+> 7https://www.tensorflow.org/
+> 8https://numpy.org/
+> 9https://matplotlib.org/
+
+14 Evaluating the Error in Convex NN Verification                
+
+> (a) The growth of average (blue), worst case lower bound (dashed, red), and worst case upper bound (dashed, orange) errors, w.r.t. the network’s depth, for input domain radius ρ= 0 .025 .Shown in absolute values, and in logarithmic scale.
+> (b) Normalized average divergence for input do-main radius ρ= 0 .025 . We show the proportion that the average divergence A(σk)covers w.r.t. the
+> k-th upper bound U(σk), as obtained by applying Theorem 7 to the k-th NN σk.
+
+Figure 3 The growth of the average divergence, in absolute (left) and normalized (right) values. 
+
+weights and biases are chosen uniformly, randomly, from [−1, 1] . Each NN takes as input a 
+
+10 × 10 -matrix. The output dimension is dout = 10 . To measure the average tight divergence, we took 100,000 random samples from the [−1, 1] 10 ×10 hypercube. For D ⊆ [−1, 1] 10 ×10 
+
+the set of random samples, in Figure 3a we present the growth of the average divergence 
+
+Ak = A(σk), as well as the lower (Theorem 4) and the upper (Theorem 7) bounds. The graph is presented on a logarithmic scale, supporting the exponential growth highlighted by our theoretical analysis in the previous section. In Figure 3b we present the relative error values , as discussed in Section 4. Recall that the upper bound ∥u(L)∥∞ of Theorem 7 essentially captures the diameter of the output space. Thus, we are able to normalize the average divergence A(σi), by taking the ratio 
+
+A(σi)/U(σi), for the network σi, i ∈ [30] . Note that the output space varies depending the network, thus the values U(σi) are, in general, distinct. Nevertheless, in Figure 3b, we observe a steady, linear , increase of the average divergence, even as a portion of the output’s space diameter. 
+
+## 5.2 Real-World MNIST & Fashion MNIST Networks 
+
+Subsequently, we examine real-world networks trained on MNIST and Fashion MNIST, respectively. Note that both of those datasets are composed of 28 × 28 grayscale images, belonging to 10 distinct classes. However, Fashion MNIST exhibits greater complexity, thus demanding a more complex architecture than MNIST. For our training, we normalize both datasets, bringing the images into the [0 , 1] 28 ×28 
+
+hypercube. The MNIST NN is composed of a single hidden layer, with 32 neurons and 25,408 trainable parameters, trained for 6 epochs, achieving 90% test-set accuracy. The Fashion MNIST NN is composed of two hidden layers of 64 and 32 neurons, respectively. This results in 52,544 trainable parameters. We trained the Fashion MNIST NN for 10 epochs, achieving 76% test-set accuracy. Finally, for both NNs, we used the Adam [ 15 ] optimization algorithm, the Glorot [7] weight initializer, and the cross-entropy loss. Merkouris Papamichail et al. 15   
+
+> (a) The growth of the average divergence, w.r.t. an increasing radius. For each class of MNIST.
+> (b) The growth of the average divergence, w.r.t. an increasing radius. For each class of Fashion MNIST.
+
+Figure 4 The correlation of the average divergence, w.r.t. the input radius, for a MNIST (left) and a Fashion MNIST (right) NN.   
+
+> (a) The growth of the misclassification probability, w.r.t. an increasing radius. The metric is presen-ted for each class of MNIST
+> (b) The growth of the misclassification probability w.r.t. an increasing radius. The metric is presen-ted for each class of Fashion MNIST.
+
+Figure 5 The correlation of the misclassification probability, w.r.t. the input radius, for a MNIST (left) and a Fashion MNIST (right) NN. 
+
+## 5.2.1 Average Divergence 
+
+For our MNIST and Fashion MNIST NNs we test how the average divergence grows, as a function of the input radius . In both cases we work similarly. For each class j, we chose (uniformly, randomly) an input xj , s.t. κ(xj ) = j. Then, we sequentially consider the vicinities B∞(xj , ρ ) for increasing values of ρ, beginning from ρ = 0 to ρ = 1 , with step 
+
+0.1. Each time we uniformly, randomly choose 10,000 samples in B∞(xj , ρ ), composing the dataset Dj,ρ . Subsequently, we evaluate the average divergence for each input. We present our results in Figure 4. In both cases, we observe a linear growth of the error as a function of the input radius. Despite the slight differences among the classes the linear growth is observed for every instance. 
+
+## 5.2.2 Misclassification Probability 
+
+For the misclassification probability, we use a similar methodology as before. Again, for each class j, we chose (uniformly, randomly) an input xj , s.t. κ(xj ) = j. Then, we sequentially consider the vicinities B∞(xj , ρ ) for increasing values of ρ, beginning from ρ = 0 to ρ = 1 , with 16 Evaluating the Error in Convex NN Verification 
+
+step 0.1. Each time we uniformly, randomly choose 10 , 000 samples in B∞(xj , ρ ), composing the dataset Dj,ρ . Then, we compute Pj,ρ = 1
+
+> |Dj,ρ |
+
+∑ 
+
+> x∈Dj,ρ
+
+1[˜κ(x)̸ = κ(x)] , following the definition in Equation (18). In Figure 5 we present the misclassification probability as function of the input radius for our MNIST and Fashion MNIST NNs. In both cases, we observe a step-like behavior, where the misclassification probability grows rapidly, after a certain threshold. Moreover, we observe that this threshold varies depending on the input’s class. However, in both cases, the misclassification probability approaches 1, for radius ρ ≥ 0.5.
+
+## 6 Conclusions & Future Work 
+
+In this paper, we study the cost of relaxation in ReLU-NNs. We began from a qualitative review, observing the lattice-structured space of convex relaxations (Theorem 3). The lattice’s top element corresponds to a fully relaxed convex solution, while the bottom element to the original network. We proceeded with a quantitative analysis, examining the ℓ∞-distance between the relaxed a true output. We gave analytical lower (Theorem 4) and upper (Theorem 7) bounds, which highlight an exponential growth of the relaxation error, w.r.t. the network’s depth. This behavior was also observed in our experiments. Additionally, our experimental results show a linear growth of the relaxation error, w.r.t. the input radius. Finally, we observe a step-like behavior of the misclassification probability. Direction for future research include investigating stronger relaxations, e.g., quadratic or semidefinite. 
+
+References 
+
+1 Anish Athalye, Nicholas Carlini, and David A. Wagner. Obfuscated gradients give a false sense of security: Circumventing defenses to adversarial examples. In ICML , pages 274–283, 2018. 
+
+2 Dimitris Bertsimas and John N. Tsitsiklis. Introduction to linear optimization. In Athena scientific optimization and computation series , 1997. 
+
+3 Christopher Brix, Mark Niklas Müller, Stanley Bak, Taylor T. Johnson, and Changliu Liu. First three years of the international verification of neural networks competition (VNN-COMP). 
+
+International Journal on Software Tools for Technology Transfer , 2023. 
+
+4 DeepSeek-AI, :, Xiao Bi, Deli Chen, Guanting Chen, Shanhuang Chen, Damai Dai, Chengqi Deng, Honghui Ding, Kai Dong, Qiushi Du, Zhe Fu, Huazuo Gao, Kaige Gao, Wenjun Gao, Ruiqi Ge, Kang Guan, Daya Guo, Jianzhong Guo, Guangbo Hao, Zhewen Hao, Ying He, Wenjie Hu, Panpan Huang, Erhang Li, Guowei Li, Jiashi Li, Yao Li, Y. K. Li, Wenfeng Liang, Fangyun Lin, A. X. Liu, Bo Liu, Wen Liu, Xiaodong Liu, Xin Liu, Yiyuan Liu, Haoyu Lu, Shanghao Lu, Fuli Luo, Shirong Ma, Xiaotao Nie, Tian Pei, Yishi Piao, Junjie Qiu, Hui Qu, Tongzheng Ren, Zehui Ren, Chong Ruan, Zhangli Sha, Zhihong Shao, Junxiao Song, Xuecheng Su, Jingxiang Sun, Yaofeng Sun, Minghui Tang, Bingxuan Wang, Peiyi Wang, Shiyu Wang, Yaohui Wang, Yongji Wang, Tong Wu, Y. Wu, Xin Xie, Zhenda Xie, Ziwei Xie, Yiliang Xiong, Hanwei Xu, R. X. Xu, Yanhong Xu, Dejian Yang, Yuxiang You, Shuiping Yu, Xingkai Yu, B. Zhang, Haowei Zhang, Lecong Zhang, Liyue Zhang, Mingchuan Zhang, Minghua Zhang, Wentao Zhang, Yichao Zhang, Chenggang Zhao, Yao Zhao, Shangyan Zhou, Shunfeng Zhou, Qihao Zhu, and Yuheng Zou. Deepseek llm: Scaling open-source language models with longtermism, 2024. 
+
+5 Li Deng. The mnist database of handwritten digit images for machine learning research. IEEE Signal Processing Magazine , 2012. 
+
+6 Rüdiger Ehlers. Formal verification of piece-wise linear feed-forward neural networks. In 
+
+ATVA , 2017. Merkouris Papamichail et al. 17 
+
+7 Xavier Glorot and Yoshua Bengio. Understanding the difficulty of training deep feedforward neural networks. In AISTATS , JMLR Proceedings. JMLR.org, 2010. 
+
+8 Ian J. Goodfellow, Jonathon Shlens, and Christian Szegedy. Explaining and harnessing adversarial examples. In ICLR , 2015. 
+
+9 Sven Gowal, Krishnamurthy Dvijotham, Robert Stanforth, Rudy Bunel, Chongli Qin, Jonathan Uesato, Relja Arandjelovic, Timothy A. Mann, and Pushmeet Kohli. On the effectiveness of interval bound propagation for training verifiably robust models. CoRR , 2018. 
+
+10 Ziwei Ji, Nayeon Lee, Rita Frieske, Tiezheng Yu, Dan Su, Yan Xu, Etsuko Ishii, Ye Jin Bang, Andrea Madotto, and Pascale Fung. Survey of hallucination in natural language generation. 
+
+ACM Comput. Surv. , 2023. 
+
+11 Anan Kabaha and Dana Drachsler-Cohen. Maximal robust neural network specifications via oracle-guided numerical optimization. In Cezara Dragoi, Michael Emmi, and Jingbo Wang, editors, VMCAI , 2023. 
+
+12 Guy Katz, Clark W. Barrett, David L. Dill, Kyle Julian, and Mykel J. Kochenderfer. Reluplex: An efficient SMT solver for verifying deep neural networks. In CAV , 2017. 
+
+13 Guy Katz, Derek A. Huang, Duligur Ibeling, Kyle Julian, Christopher Lazarus, Rachel Lim, Parth Shah, Shantanu Thakoor, Haoze Wu, Aleksandar Zeljic, David L. Dill, Mykel J. Kochenderfer, and Clark W. Barrett. The marabou framework for verification and analysis of deep neural networks. In CAV , 2019. 
+
+14 L. G. Khachiyan. A polynomial algorithm in linear programming. Doklady Akademii Nauk SSSR , 1979. 
+
+15 Diederik P. Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In ICLR ,2015. 
+
+16 Johannes Lederer. Activation functions in artificial neural networks: A systematic overview. 
+
+CoRR , 2021. 
+
+17 Changjiang Li, Shouling Ji, Haiqin Weng, Bo Li, Jie Shi, Raheem Beyah, Shanqing Guo, Zonghui Wang, and Ting Wang. Towards certifying the asymmetric robustness for neural networks: Quantification and applications. IEEE TDSC , 2022. 
+
+18 Dianzhao Li, Paul Auerbach, and Ostap Okhrin. Autonomous driving small-scale cars: A survey of recent development. IEEE Transactions on Intelligent Transportation Systems , 2025. 
+
+19 Chen Liu, Ryota Tomioka, and Volkan Cevher. On certifying non-uniform bounds against adversarial attacks. In ICML . PMLR, 2019. 
+
+20 Alessio Lomuscio and Lalit Maganti. An approach to reachability analysis for feed-forward relu neural networks. CoRR , 2017. 
+
+21 Fenglong Ma, Radha Chitta, Jing Zhou, Quanzeng You, Tong Sun, and Jing Gao. Dipole: Diagnosis prediction in healthcare via attention-based bidirectional recurrent neural networks. In ICKDDM . ACM, 2017. 
+
+22 Mark Huasong Meng, Guangdong Bai, Sin Gee Teo, Zhe Hou, Yan Xiao, Yun Lin, and Jin Song Dong. Adversarial robustness of deep neural networks: A survey from a formal verification perspective. IEEE TDSC , 2022. 
+
+23 Giacomo Zambelli Michele Conforti, Gerard Cornuejols. Integer programming . Springer, 2014. 
+
+24 Marvin Minsky and Seymour Papert. Perceptron: an introduction to computational geometry. 
+
+The MIT Press, Cambridge, expanded edition , 19(88):2, 1969. 
+
+25 Ian Parberry. Circuit Complexity and Neural Networks . The MIT Press, 1994. 
+
+26 Aditi Raghunathan, Sang Michael Xie, Fanny Yang, John C. Duchi, and Percy Liang. Under-standing and mitigating the tradeoff between robustness and accuracy. In ICML , Proceedings of Machine Learning Research. PMLR, 2020. 
+
+27 Hadi Salman, Greg Yang, Huan Zhang, Cho-Jui Hsieh, and Pengchuan Zhang. A convex relaxation barrier to tight robustness verification of neural networks. In NeurIPS , 2019. 
+
+28 Sanjit A. Seshia, Dorsa Sadigh, and S. Shankar Sastry. Toward verified artificial intelligence. 
+
+Commun. ACM , 2022. 18 Evaluating the Error in Convex NN Verification 
+
+29 Christian Szegedy, Wojciech Zaremba, Ilya Sutskever, Joan Bruna, Dumitru Erhan, Ian J. Goodfellow, and Rob Fergus. Intriguing properties of neural networks. In ICLR , 2014. 
+
+30 Eric Wong and J. Zico Kolter. Provable defenses against adversarial examples via the convex outer adversarial polytope. In ICML . PMLR, 2018. 
+
+31 Haoze Wu, Omri Isac, Aleksandar Zeljic, Teruhiro Tagomori, Matthew L. Daggitt, Wen Kokke, Idan Refaeli, Guy Amir, Kyle Julian, Shahaf Bassan, Pei Huang, Ori Lahav, Min Wu, Min Zhang, Ekaterina Komendantskaya, Guy Katz, and Clark W. Barrett. Marabou 2.0: Aversatile formal analyzer of neural networks. In CAV , 2024. 
+
+32 Han Xiao, Kashif Rasul, and Roland Vollgraf. Fashion-mnist: a novel image dataset for benchmarking machine learning algorithms. CoRR , 2017. URL: http://arxiv.org/abs/1708. 07747. 
+
+33 Huan Zhang, Tsui-Wei Weng, Pin-Yu Chen, Cho-Jui Hsieh, and Luca Daniel. Efficient neural network robustness certification with general activation functions. In NeurIPS 2018 , 2018. 
+
+34 Yaochen Zhu, Chao Wan, Harald Steck, Dawen Liang, Yesu Feng, Nathan Kallus, and Jundong Li. Collaborative retrieval for large language model-based conversational recommender systems. ACM, 2025. Merkouris Papamichail et al. 19 
+
+## A Mathematical Proofs A.1 Proofs of Section 2 
+
+▶ Proposition 2. Consider σ = ⟨L, D, W, β, α ⟩, where α denotes a sequence of increasing 
+
+activation functions. Now, let {I(i)}i∈[L] and {̂I(i)}i∈[L] be the sequence of pre- and post-activation bounds generated by the IBP, for an input interval ̂ I(0) . Then ̂ I(L) is the minimum interval, s.t. σ(̂I(0) ) ⊆̂ I(L), w.r.t. set inclusion 10 .
+
+Proof. For an NN σ(·) and an input interval Io, by definition the pre-activation bound I
+
+is the minimum interval s.t. W x + b ∈ I, for every x ∈ Io. For the post-activation, for every x ∈ Io, we have that r[W x + b] ⊆ σ(I) = ̂ I(L). Since I is minimal and r monotone, small interval would fail to contain r[W x + b], for every x ∈ Io, so ̂ I is the minimal interval enclosing σ(x), for every x ∈ Io.Now, let I(0) = Io, and assume that after the i–th layer, the post-activation interval ̂ I(i)
+
+is the minimal interval s.t. 
+
+σ(i) (
+
+. . . 
+
+(
+
+σ1(̂ I(0) )
+
+)) 
+
+⊆̂ I(i). (19) At the i + 1 –layer, that is σ(i+1) = r[W (i+1) σ(i) + b(i+1) ], the IBP provides the interval 
+
+I(i+1) which is the minimal interval enclosing σ(i+1) (̂ I(i)), and ̂ I(i+1) is the minimum interval containing r[W (i+1) x + b(i+1) ], for every x ∈̂ I(i).Applying the i + 1 –layer in both sides in Equation (19) and using monotonicy we take, 
+
+σ(i+1) (
+
+σ(i) (
+
+. . . 
+
+(
+
+σ1(̂I(0) )
+
+))) 
+
+⊆ σ(i+1) (̂ 
+
+I(i))
+
+⊆̂ I(i+1) .
+
+Minimality follows since both the affine and activation steps produce minimal enclosing intervals at layer i + 1 . Therefore, after L layers we obtain σ(Io) ⊆̂ I(L), with ̂ IL being the minimal interval satisfying this condition. ◀
+
+## A.2 Proofs of Section 3 
+
+▶ Theorem 3. Consider any linear objective of the form ξ([ σ̂ σ]) = cT [σ̂ σ] + c0, where 
+
+[σ̂ σ] ∈ Conv (σ)|x=xo . Let [σ̂ σ]∗ be the optimal solution w.r.t. ξ(·), and λ∗ ∈ Λ its corresponding ratios vector. Then, λ∗ is a vertex of Λ, i.e. λ∗ ∈ V (Λ) = {0, 1}∆.
+
+Proof. The objective function ξ(·) is an affine function, attaining its maximum at an extreme point, [ 2], so [σ̂ σ]∗ lie on the boundary of the feasible space. The last implies that convex relaxations at some neurons are exact, while at other neurons are tight. Any relaxation that is not either exact or tight sets the output strictly in the interior of the feasible space. Take the i–th layer and the jth–neuron. An exact convex relaxation at the jth–neuron implies that either (̂σ ∗)(i) 
+
+> j
+
+= 0 or (̂σ ∗)(i) 
+
+> j
+
+= ( σ∗)(i) 
+
+> j
+
+, hence (λ∗)(i) 
+
+> j
+
+= 0 . On the other hand, a tight convex relaxation at the jth–neuron yields (λ∗)(i) 
+
+> j
+
+= 1 . Consequently, λ∗ ∈ { 0, 1}∆, a vertex of the hypercube Λ. ◀
+
+## A.3 Proofs of Section 4 
+
+▶ Theorem 4. Let an interval Io, with Io = [ ℓo, uo] ⊆ Rdin , where din ≥ 1 is the input dimension. Moreover, let the interval Io include the origin, i.e. 0 ∈ Io. Additionally, consider  
+
+> 10 Proofs are included in Section A.
+
+20 Evaluating the Error in Convex NN Verification 
+
+a NN σ : Io → Rdout , where dout ≥ 1 is the output dimension. Then, 
+
+˜E(σ) = sup 
+
+> xo∈Io
+
+∥σ(xo) − ˜σ(xo)∥∞ ≥ ∥ σ(0) − ˜σ(0)∥∞ = ∥˜σ(0)∥∞ (14) 
+
+Proof. From Equation (13) we have ˜E(σ) = sup xo∈Io ∥σ(xo) − ˜σ(xo)∥∞. A basic property of the supremum is, sup xo∈Io ∥σ(xo) − ˜σ(xo)∥∞ ≥ ∥ σ(x) − ˜σ(x)∥∞, for each x ∈ Io. Since 
+
+0 ∈ Io we have, sup xo∈Io ∥σ(xo) − ˜σ(xo)∥∞ ≥ ∥ σ(0) − ˜σ(0)∥∞. Finally, using that σ(0) = 0
+
+we take, ˜E(σ) ≥ ∥ ˜σ(0)∥∞. ◀▶ Proposition 5. Let {I(i)}i∈[L] and {̂I(i)}i∈[L] be the sequences of the pre- and post-activation bounds generated by the IBP, for the network σ(·). Moreover, let {J(i)}i∈[L] and 
+
+{ ˜J(i)}i∈[L] be the sequences of pre- and post- activation bounds generated by IBP for the top convex relaxation ˜σ(·). If ̂ I(0) = ˜J(0) , then I(i) = J(i) and ̂ I(i) = ˜J(i), for every layer i ∈ [L].
+
+Proof. Starting from ̂ I(0) = ˜J(0) , the pre-activation interval at the first layer are identical since both computed from the same affine map, Equation (3) and Equation (10), σ(1) =
+
+W (1) σ(0) + b(1) = W (1) x + b(1) , therefore I(1) = J(1) .For the induction hypothesis, assume that ̂ I(i) = ˜J(i). The pre-activation interval at the 
+
+i + 1 layer are computed from the same affine map, σ(i) = W (i)̂ σ(i−1) + b(i). Since affine propagation is identical we obtain I(i+1) = J(i+1) . Then applying the activations r(·) and 
+
+˜r(·) we take, ̂ I(i+1) = r(I(i+1) ) and ˜J(i+1) = ˜r(J(i+1) ) = ˜r(I(i+1) ). Since r(I) = ˜r(I) for any interval I, we conclude that ̂ I(i+1) = ˜J(i+1) , and the proof is complete. ◀▶ Proposition 6. Consider the output intervals ̂ I(L) and ˜J(L) of σ(·) and ˜σ(·), respectively, obtained by IBP on the same input interval Io. From Proposition 5 we have ̂ I(L) = ˜J(L) = I .It holds that σ(x), ˜σ(x) ∈ I , for every x ∈ Io. Moreover, I is the minimum interval w.r.t. set inclusion with the latter property. 
+
+Proof. The sequences of the pre- and post- activation bounds generated by the IBP inititiated from the same input interval Io, so it holds ̂ I(0) = ˜J(0) = Io. Applying Proposition 5 we have ̂ I(i) = ˜J(i), for every layer i ∈ [L]. Therefore, it holds ̂ I(L) = ˜J(L), so both ̂ I(L) and 
+
+˜J(L) are the common output interval I . So for every x ∈ Io, σ(L), ˜σ(L) ∈ I , implying that 
+
+σ(x), ˜σ(x) ∈ I .Now assume there exists an interval I ′ ⊂ I s.t. σ(x), ˜σ(x) ∈ I ′ for every x ∈ Io. Then there exists a point x′ ∈ Io s.t. σ(x′) ∈̂ I(L) and ˜σ(x′) ∈ ˜J(L), and either σ(x′)̸ ∈ I ′ or 
+
+˜σ(x′)̸ ∈ I ′, a contradiction. Therefore, the interval I is the minimum interval w.r.t. set inclusion with the latter property. ◀▶ Theorem 7. Let an interval Io, with Io = [ ℓo, uo] ⊆ Rdin , where din ≥ 1 is the input dimension. Additionally, consider a NN σ : Io → Rdout , where dout ≥ 1 is the output dimension, and the output bounding interval ̂ I(L) = [ ℓ(L), u(L)] obtained by the IBP. Then, 
+
+˜E(σ) = sup 
+
+> xo∈Io
+
+∥σ(xo) − ˜σ(xo)∥∞ ≤ sup 
+
+> xo∈Io
+
+∥˜σ(xo)∥∞ = ∥u(L)∥∞. (16) 
+
+Proof. From Proposition 6 applying σ(·) and ˜σ(·) on the same input interval Io, it holds σ(L),
+
+˜σ(L) ∈̂ I(L) = [ ℓ(L), u(L)], for every x ∈ Io. Therefore, ∥σ(xo)∥∞, ∥˜σ(xo)∥∞ ≤ ∥ u(L)∥∞.Thus, ∥σ(xo) − ˜σ(xo)∥∞ ≤ ∥ ˜σ(xo)∥∞. Since the inequality holds for every x ∈ Io we take 
+
+sup xo∈Io ∥σ(xo)− ˜σ(xo)∥∞ ≤ sup xo∈Io ∥˜σ(xo)∥∞. Since the supremum of a bounded function equals its maximum possible bound we have sup xo∈Io ∥˜σ(xo)∥∞ = ∥u(L)∥∞. ◀

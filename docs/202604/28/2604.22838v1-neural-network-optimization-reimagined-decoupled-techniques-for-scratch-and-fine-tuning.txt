@@ -1,0 +1,509 @@
+Title: Neural Network Optimization Reimagined: Decoupled Techniques for Scratch and Fine-Tuning
+
+URL Source: https://arxiv.org/pdf/2604.22838v1
+
+Published Time: Tue, 28 Apr 2026 00:04:40 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+> IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 1
+
+# Neural Network Optimization Reimagined: Decoupled Techniques for Scratch and Fine-Tuning 
+
+Xin Ning *, Senior Member, IEEE , Qiankun Li *, Member, IEEE , Xiaolong Huang, Qiupu Chen, Feng He, Weijun Li, Senior Member, IEEE , Prayag Tiwari, Senior Member, IEEE , Xinwang Liu †, Senior Member, IEEE 
+
+Abstract —With the accumulation of resources in the era of big data and the rise of pre-trained models in deep learning, opti-mizing neural networks for various tasks often involves different strategies for fine-tuning pre-trained models versus training from scratch. However, existing optimizers primarily focus on reducing the loss function by updating model parameters, without fully addressing the unique demands of these two major paradigms. In this paper, we propose DualOpt, a novel approach that decouples optimization techniques specifically tailored for these distinct training scenarios. For training from scratch, we introduce real-time layer-wise weight decay, designed to enhance both conver-gence and generalization by aligning with the characteristics of weight updates and network architecture. For more importantly fine-tuning, we integrate weight rollback with the optimizer, incorporating a rollback term into each weight update step. This ensures consistency in the weight distribution between upstream and downstream models, effectively mitigating knowledge for-getting and improving fine-tuning performance. Additionally, we extend the layer-wise weight decay to dynamically adjust the rollback levels across layers, adapting to the varying demands of different downstream tasks. Extensive experiments across diverse tasks, including image classification, object detection, semantic segmentation, and instance segmentation, demonstrate the broad applicability and state-of-the-art performance of DualOpt. Code is available at https://github.com/qklee-lz/OLOR-AAAI-2024. 
+
+Index Terms —Neural network optimization, fine-tuning, train-ing from scratch, weight rollback, layer-wise penalty. 
+
+I. I NTRODUCTION 
+
+# EARLY deep learning models were typically trained from scratch, and model parameters were initialized randomly [1], [2]. However, with the rapid growth of data and ad-vances in deep learning [3]–[5], a wealth of publicly available pre-trained models has emerged [6]–[8]. These pre-trained models have significantly enhanced performance in various tasks through transfer learning and fine-tuning techniques [9], [10]. Consequently, fine-tuning has become the mainstream 
+
+This work is funded by Beijing Natural Science Foundation (No. L233036) and National Natural Science Foundation of China (No. 62373343). Xin Ning and Qiankun Li contributed equally to this work Xin Ning and Weijun Li are with Institute of Semiconductors, Chinese Academy of Sciences, Beijing, 10083, China. Qiankun Li is with the College of Computing and Data Science (CCDS), Nanyang Technological University, 639798, Singapore. Qiupu Chen and Feng He are both with the University of Science and Technology of China, Hefei 230027, China. Xiaolong Huang is with Mila-Quebec AI Institute, Montreal, QC H2S 3H1, Canada. Prayag Tiwari is with the School of Information Technology, Halmstad University, Sweden. Xinwang Liu is with College of Computer, National University of Defense Technology, Changsha, 410073, China. Xinwang Liu is the corresponding author (Email: xinwangliu@nudt.edu.cn). Backbone 
+
+Pre-T rained 
+
+Weights  Initialization 
+
+Random 
+
+From Scratch Fine-tuning 
+
+Head 
+
+Layer -W ise 
+
+Weight Decay 
+
+Weight Rollback 
+
+Mechanism 
+
+Optimizer: DualOpt  Adam, SGD …… 
+
+Optimizing 
+
+Fig. 1. Overview of the proposed DualOpt. The optimization is both fine-tuning with pre-trained weights and training from scratch with random initialization. The DualOpt integrates a weight rollback mechanism for fine-tuning and layer-wise weight decay for training from scratch, providing flexibility and efficiency for various tasks. 
+
+approach in many deep learning applications [11]–[13], though training from scratch is still essential for certain tasks and specific scenarios [14], [15]. Traditional neural network optimizers focus primarily on minimizing the loss function by updating model parameters [16], [17]. In addition, weight decay is often combined with optimization algorithms to constrain the model weights, help-ing to promote better generalization [18], [19]. While these methods are effective, they often overlook the distinct needs of training paradigms. Training from scratch requires careful balancing to ensure efficient convergence and robust general-ization, whereas fine-tuning faces the challenge of knowledge forgetting, where the model may lose valuable information learned during pre-training [20]. In the deep learning domain, optimizers like Stochastic Gra-dient Descent (SGD) [21] and Adaptive Moment Estimation (Adam) [22] are widely used. Researchers have continually proposed improvements to enhance optimization efficiency [23], [24], focusing on gradient propagation [25], parameter update mechanisms [26], and regularization techniques [27]. Momentum was introduced to accelerate convergence by in-corporating past gradient information [25]. Adaptive Gradient assigned individual learning rates to parameters [26], a concept further refined in the Adam optimizer [22]. Weight decay was  
+
+> arXiv:2604.22838v1 [cs.CV] 21 Apr 2026 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 2
+
+introduced to prevent overfitting and improve generalization [27], prompting a series of widely used regularization tech-niques [28]–[30]. However, these methods often overlook the structural characteristics of neural networks. When training from scratch, shallow layers capture low-level features (e.g., color, edges, texture), with less risk of overfitting, while deeper layers focus on high-level features (e.g., objects, semantics), which are more prone to overfitting. On the other hand, fine-tuning requires more preserving the general shallow layer information acquired during the pre-training phase. Therefore, the same decay rate across the entire network results in a coarse decay effect. In addition, existing fine-tuning methods have not fully considered the design of optimizers. Replay-based methods [31]–[34] focus on incorporating pre-trained data, but this approach is often inefficient. EWC [35] and L2-SP [36] use regularization to constrain weight parameters, but they are even incompatible with adaptive optimizers [22], [29], [30]. Parameter isolation methods [37], [38], which tailor new branches or modules for downstream tasks and networks, introduce additional training parameters and generally lack versatility. In this paper, we propose DualOpt, a novel optimizer that reimagines neural network optimization by decoupling the strategies for fine-tuning and training from scratch. The overview is shown in Fig. 1. For training from scratch, DualOpt introduces a real-time layer-wise weight decay mech-anism that dynamically adjusts the decay rate across different layers of the network. This method enhances convergence speed and generalization by tailoring the optimization process to the structural and functional characteristics of the network. For fine-tuning, DualOpt introduces a weight rollback term to the weight update term, allowing the model to gradually ap-proach the pre-trained weights while adapting to downstream tasks. This mitigates knowledge forgetting and improves fine-tuning performance. In addition, we extend this approach by employing a layer-wise penalty mechanism with penalty decay and a diversified decay rate. Penalty decay integrates feature pyramids and transfer learning, applying more significant rollback to shallow layers that capture features like color and texture, and less rollback to deeper layers that focus on semantic features. The diversified decay rate adjusts rollback levels based on the similarity between the pre-training and downstream task domains, enabling more adaptive and task-specific fine-tuning. We validate the effectiveness of our proposed DualOpt through extensive experiments on tasks including image clas-sification [39]–[46], object detection [47], semantic segmen-tation [48], and instance segmentation [47] on 10 popular datasets. The results demonstrate that DualOpt achieves state-of-the-art performance and offers a generalizable solution for a wide range of training scenarios. The contributions of this paper are summarized as follows:  
+
+> •
+
+We propose DualOpt, an optimizer that decouples strate-gies for training from scratch and fine-tuning to address distinct needs of these two major training paradigms.  
+
+> •
+
+A real-time layer-wise weight decay mechanism is intro-duced to enhance convergence and generalization during training from scratch.  
+
+> •
+
+For fine-tuning, we propose a weight rollback mecha-nism combined with layer-wise penalty decay, mitigating knowledge forgetting and improving task adaptation.  
+
+> •
+
+The proposed DualOpt achieves state-of-the-art perfor-mance on ten popular datasets across various tasks. This work is an extension of our earlier conference version presented at AAAI 2024 [2]. Compared to the conference version, the journal version includes the following key en-hancements:  
+
+> •
+
+The previous fine-tuning optimizer is significantly im-proved with detailed theoretical proofs, efficiency analy-ses, validation experiments, and comprehensive ablation studies.  
+
+> •
+
+We expand the original work into a unified framework by developing DualOpt to effectively address both fine-tuning and training from scratch, making it more gener-alizable and versatile.  
+
+> •
+
+To evaluate the effectiveness of the newly proposed Du-alOpt, extensive experiments are conducted on 10 popular datasets across diverse tasks, including image classifica-tion (In-Distribution, Out-of-Distribution, and large-scale datasets), object detection, semantic segmentation, and instance segmentation. The structure of this paper is as follows. Section II reviews existing optimizer design and fine-tuning work and briefly clarifies the superiority of our method. Section III presents the architectural design of the proposed method. The experimental configuration are outlined in Section IV. Section V includes the results and discussion that demonstrate the effectiveness of the proposed method. Finally, Section VI concludes our work. II. R ELATED WORK 
+
+A. Training from Scratch, Pre-training and Fine-tuning 
+
+In early deep learning models, training was predominantly conducted from scratch, requiring large datasets and compu-tational resources [49]. As models and datasets grew in size, this approach became increasingly resource-intensive [50]. Currently, the deep learning field has numerous pre-trained resources available, including large-scale datasets and pre-trained models. These datasets cover many domains, such as ImageNet [51], COCO [47], and Open Images [52], which have been widely applied in tasks like image classification, ob-ject detection, and image segmentation. In the natural language processing domain, large-scale corpora such as Common Crawl [53] and BooksCorpus [54] provide rich linguistic infor-mation for pre-training. Based on these datasets, researchers have developed several high-performance pre-trained models, such as BERT [55], GPT [50], CLIP [6], and T5 [56], which have become foundational for many applications, demonstrat-ing exceptional performance across various tasks [13], [57]. Therefore, pre-trained models, trained on large-scale datasets have since emerged as a more efficient alternative, enabling models to learn general representations and later adapt through fine-tuning [55]. However, despite being a powerful approach, fine-tuning cannot completely eliminate the need for training from scratch in certain specific scenarios [58]. IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 3
+
+One of the challenges in fine-tuning pre-trained models is catastrophic forgetting. To address this, existing methods can be broadly categorized into three main types: replay meth-ods, regularization methods, and parameter isolation methods. Replay methods involve periodically retraining on portions of upstream task data to help the model maintain memory of previous tasks and balance new and old information [59]. These methods can somewhat mitigate catastrophic forgetting. For instance, some earlier works employed memory-based mechanisms to store portions of upstream task data and peri-odically replay them for training [60]. However, as the scale of pre-trained models and datasets increases, the cost of storing and managing this data becomes substantial, especially when dealing with contemporary large-scale pre-trained models [50]. Regularization methods impose constraints during parameter updates to reduce damage to the original knowledge in the fine-tuning process. For example, the Fisher information ma-trix can be used to limit drastic changes in model parameters [61], or weight decay and L2 regularization can control pa-rameter changes [62]. Although these methods can effectively reduce catastrophic forgetting in certain scenarios, they usually rely on existing optimizers for parameter updates rather than being specifically designed for fine-tuning tasks. Moreover, regularization methods may not perform ideally when dealing with complex downstream tasks [35], [63]. Parameter isolation methods involve introducing independent modules or branches into the pre-trained model to avoid directly modifying the core parameters of the pre-trained model. These methods use adapter modules or low-rank decomposition modules to adapt to downstream tasks [64], [65]. The advantage of this approach is that it preserves the original model structure, but it also introduces additional training parameters, increasing the model’s complexity. Parameter isolation methods typically require multiple rounds of freezing and unfreezing strategies, which adds to the complexity of the training process and the difficulty of hyperparameter tuning [66]. Although these methods partially address catastrophic for-getting, most of them focus on model architecture and data processing rather than exploring the problem from the op-timizer’s perspective. Different from the existing works, this paper proposes a novel optimization framework that introduces real-time layer-wise weight decay for improving convergence when training from scratch and a weight rollback mechanism for mitigating catastrophic forgetting during fine-tuning. By dynamically adjusting optimization strategies for each training paradigm, DualOpt enhances both performance and efficiency. 
+
+B. Optimizers 
+
+Optimizers play a critical role in training deep neural net-works, as their primary task is to iteratively update the model’s parameters to minimize the loss function. Stochastic Gradient Descent (SGD) is one of the earliest and most widely adopted optimization methods. By using gradient estimates from a small random sample in each iteration, it makes the training process more efficient and avoids the high computational costs associated with some global optimization algorithms [67]. Despite its simplicity and effectiveness in practice, SGD often relies on manually adjusting the learning rate and can easily get stuck in local minima or saddle points when optimizing non-convex objectives. Momentum-based gradient descent introduces a momentum term in the update direc-tion, which effectively reduces gradient oscillations and ac-celerates convergence. Nesterov Accelerated Gradient (NAG) [68] further optimizes momentum methods by anticipating the gradient direction and making adjustments in advance, thereby improving convergence efficiency. While momentum methods address some limitations of SGD, the introduction of adaptive optimizers further enhanced optimization efficiency. Adaptive Gradient Method (AdaGrad) [26] is an early adap-tive optimization algorithm that introduces different learning rates for each parameter, allowing for more efficient updates, especially when handling sparse data. However, a major issue with AdaGrad is that the learning rate continuously decreases during training, causing the update steps to become too small in later stages. To address this problem, Adam (Adaptive Moment Estimation) [22] was introduced. Adam combines the advantages of momentum and adaptive learning rates by tracking both the first-order and second-order moments (i.e., the mean and squared gradients) simultaneously, and it has shown strong performance in practical applications. Because Adam adaptively adjusts the learning rate for each parameter, it performs exceptionally well in handling complex deep neural networks and has become the default optimizer in many tasks. However, Adam also has some drawbacks, such as potentially leading to overfitting in some tasks, and instability during training in certain cases. By adjusting the learning rate warm-up period, RAdam [69] avoids over-adjustment in the early stages of training, improving Adam’s convergence. AdaBound [70] combines the advantages of SGD and Adam, using Adam’s adaptive learning rate in the early stages of training and then gradually transitioning to SGD to prevent instability later in the process. Recent robust fine-tuning methods [19], [71] revisit weight decay by introducing adaptive or schedule-based decay coefficients tailored for foundation models. However, existing optimizers often overlook the unique needs of the two different training paradigms: training from scratch and fine-tuning. In training from scratch, model pa-rameters are randomly initialized, and the optimizer’s primary task is to ensure fast convergence while avoiding overfitting. In the fine-tuning process, the model has already learned some general knowledge from pre-training, so the optimizer needs to avoid over-adjusting the pre-trained weights, thereby mitigat-ing the problem of catastrophic forgetting. In this direction, we propose DualOpt, an optimizer specifically designed for these two training paradigms. Unlike existing optimizers, DualOpt introduces a real-time layer-wise weight decay mechanism to improve convergence when training from scratch, and a weight rollback mechanism to reduce catastrophic forgetting during fine-tuning. III. M ETHOD 
+
+In this section, we illustrate DualOpt, a novel optimization framework designed to address the distinct needs of both training from scratch and fine-tuning. The overall architecture IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 4𝜆 1𝜃 𝑡 +1𝜃 𝑡 +1⋅⋅⋅𝜆 𝑖 = 𝜆 𝑖                   
+
+> 𝑛 𝜆 2𝜆 𝑖 𝜆 𝑛 ⋅⋅⋅𝜃 𝑡 ⋅⋅⋅⋅⋅⋅𝜆 𝑖 =𝜄 2+(1−𝑖
+> 𝑛 )(𝜄 1−𝜄 2)𝜆 1𝜆 2𝜆 𝑖 𝜆 𝑛 𝜃 𝑡 +1(𝜃 𝑡 ,𝑔 𝑡 )⋅⋅⋅⋅⋅⋅⋅⋅⋅(𝜃 𝑡 ,𝑔 𝑡 )𝜃 𝑡 +1⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅𝜂 ,𝜆 𝜂 ,𝛾 ,𝜄 1,𝜄 2
+> Fig. 2. Overview of the proposed DualOpt optimization framework. The framework addresses training from scratch with real-time layer-wise weight decay (top pathway), and fine-tuning with weight rollback and layer-wise penalty (bottom pathway). The weight rollback mechanism ensures alignment with pre-trained weights, while the layer-wise penalty adapts the learning intensity across layers based on depth, reducing knowledge forgetting. In addition, popular optimizers such as SGD and Adam are incorporated into DualOpt.
+
+is shown in Fig. 2. DualOpt decouples these two training paradigms by incorporating a real-time layer-wise weight de-cay mechanism for training from scratch and a combination of weight rollback and layer-wise penalty decay for fine-tuning. The proposed method can incorporate popular optimizers such as SGD and Adam, providing flexibility and robustness across different neural networks and tasks, ensuring improved performance. 
+
+A. Real-Time Layer-Wise Weight Decay for From Scratch 
+
+Optimizing neural networks from scratch requires careful consideration of both convergence speed and generalization. Traditional optimizers like SGD and Adam incorporate weight decay as a regularization method to prevent overfitting by penalizing large weight magnitudes. The weight θ updating at time step t can be simplified as: 
+
+θt+1 = θt − ηtU gt − λθ t, (1) where λ represents the weight decay rate, and U gt is the update term calculated from the gradient, then multiplied by the learning rate ηt. However, the application of weight decay typically lags behind the parameter update, introducing a delay that may reduce the regularization’s effectiveness. Specifically, when the condition (θt − ηtU gt − λθ t)2 > (θt − ηtU gt )2 holds, the weight value tends to increase in magnitude, which is contrary to the expected regularization effect. Theoretically, this situation is possible, as proven below: Firstly, expanding the inequality: 
+
+(θt − ηtU gt )2 − 2λθ t(θt − ηtU gt ) + λ2θ2 
+
+> t
+
+> (θt − ηtU gt )2. (2) Then, eliminating identical terms yields: 
+
+−2λθ t(θt − ηtU gt ) + λ2θ2 
+
+> t
+
+> 0. (3) Rearranging the terms, we get: 
+
+−2λθ t(θt − ηtU gt ) > −λ2θ2 
+
+> t
+
+. (4) Finally, dividing both sides by −2λθ t (assuming θt̸ = 0 and 
+
+λ̸ = 0 ) yields: 
+
+θt − ηtU gt < λ
+
+2 θt, (5) which leads to two cases: 
+
+(
+
+ηtU gt <  1 − λ
+
+> 2
+
+ θt, if θt < 0,ηtU gt >  1 − λ
+
+> 2
+
+ θt, if θt > 0. (6) This indicates that under certain conditions as Eq. (6), the application of weight decay can lead to weight increases, countering the expected regularization effect. To address the above question, we simultaneously decays both the current weights and the update term. This can be expressed as 
+
+θt+1 = θt − ηtU gt − λ(θt − ηtU gt ). (7) It guarantees that as λ → 1, the weights θt are driven towards zero, thereby enhancing the stability and generalization of the model. The proof is as follows: First, expand the left-hand side to get: 
+
+(θt − ηtU gt − λ(θt − ηtU gt )) 2 = ( θt − ηtU gt )2(1 − λ)2. (8) The right-hand side is: 
+
+(θt − ηtU gt )2. (9) Thus, the inequality transforms into: 
+
+(θt − ηtU gt )2(1 − λ)2 ≤ (θt − ηtU gt )2. (10) Since (θt − ηtU gt )2 is non-negative, we can safely divide by it to get: 
+
+(1 − λ)2 ≤ 1. (11) Therefore, the inequality holds for all λ ∈ (0 , 1] .In addition to real-time application, we further enhance this mechanism by making the decay rate layer-specific. Deep neural networks have a hierarchical structure, where shallow IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 5
+
+Algorithm 1 Real-Time Layer-Wise Weight Decay for Train-ing from Scratch                                                     
+
+> 1: input :η∈R: learning rate, λ∈R: base weight decay factor, n: number of layers 2: initialize :t←0, layer-wise decay factors λi=λ·infor i= 1 , . . . , n
+> 3: repeat
+> 4: t←t+ 1
+> 5: gt← ∇ θft(θt)(Get batch gradient) 6: Ugt←gt
+> 7: ˆθt+1 ←θt−ηtUgt(Gradient update) 8: θt+1 ←ˆθt+1 −λiˆθt+1 (Apply real-time layer-wise weight decay) 9: until stopping criterion is met 10: return optimized parameters θt+1
+
+layers capture low-level features (e.g., edges, textures) with a lower risk of overfitting, and deeper layers capture high-level abstract features (e.g., semantics, object categories) that are more prone to overfitting. To reflect this, we propose a layer-wise weight decay rate: 
+
+λi = λ in , (12) 
+
+θt+1 = θt − ηtU gt − { λiθ(i) 
+
+> t
+
+}ni=1 (θt − ηtU gt ), (13) where λi is the decay rate for layer i, λ is the base decay coefficient, and n is the total number of layers. This design ensures a gradual increase in the decay rate as we move deeper into the network, providing stronger regularization for deeper layers while allowing more flexibility for the shallow layers. Finally, Algorithm 1 illustrates DualOpt Scratch , which integrates real-time weight decay and allows customization of the decay rate for each layer based on its network depth, easily adaptable to various optimizers. 
+
+B. Weight Rollback Mechanism for Fine-Tuning 
+
+The proposed weight rollback mechanism is a dynamic regularization approach designed to enhance fine-tuning by aligning current model weights with pre-trained weights. This mechanism operates in real-time, closely following each weight update to facilitate knowledge retention during the adaptation process. The first step calculates the temporary weight θpre based on the model weights from the previous time step: 
+
+θpre = θt − ηtgt, (14) where θt represents the model weights from the previous step, 
+
+ηt is the learning rate at the current time step, and gt denotes the gradient. Next, we compute the discrepancy ∆d between θpre and the pre-trained weights θ0:
+
+∆d = θpre − θ0. (15) This discrepancy is then incorporated into the weight update process, leading to the adjusted model weights θt+1 :
+
+θt+1 = θt − ηtgt − λ∆d. (16) Substituting Eq. (14) and Eq. (15) into Eq. (16) gives: 
+
+θt+1 = (1 − λ)( θt − ηtgt) + λθ 0. (17) This formulation ensures that as λ approaches 1, the weights 
+
+θt+1 converge to the pre-trained weights θ0, effectively main-taining the balance between learning the current task and retaining prior knowledge. Moreover, since the gradient gt is also penalized, this approach helps mitigate potential issues such as gradient explosions. In summary, the weight rollback mechanism effectively constrains the variation between θt+1 and θ0 at each update step. This not only alleviates the risk of overfitting to the current task but also aids in preserving the knowledge acquired from previous tasks, enhancing the overall performance of the fine-tuning process within the DualOpt F ine −tune framework. 
+
+C. Layer-Wise Penalty for Fine-Tuning 
+
+To further enhance the fine-tuning process, we introduce a layer-wise penalty mechanism. This technique adjusts the penalty applied to the weights based on the layer’s depth in the network, ensuring that shallow layers, which capture basic features, receive less stringent penalties compared to deeper layers, which focus on more abstract representations. Specifically, in deep learning neural networks, each layer can be viewed as a function that processes its input. Given a layer index i, this relationship can be expressed as: 
+
+xi+1 = fi(x∗ 
+
+> i
+
+), (18) where fi denotes the i-th layer. Let xui represent the input to 
+
+fi in upstream tasks with distribution qi(xui ), and xdi represent the input in downstream tasks with distribution pi(xdi ). Since 
+
+qi(xui ) and pi(xdi ) often differ, we first unfreeze all layers to ensure that fi receives sufficient updates to better bridge this gap. Shallow layers are generally responsible for capturing basic features such as color and texture, while deeper layers focus on more complex features like semantic information [72]. This implies that shallow layers are closely tied to data distribution, whereas deep layers align more closely with specific task objectives. A fundamental assumption in transfer learning is that qi(xui ) shares some similarity with pi(xdi ). Thus, shallow layers tend to exhibit similarities across both pre-training and fine-tuning phases, requiring fewer updates compared to deeper layers. Based on these insights, we propose a layer-wise penalty decay mechanism for the weight rollback process. This ap-proach gradually reduces the rollback level as the layer depth increases, encouraging shallow layers to extract more general features in downstream tasks while preserving the model’s overall capacity. The penalty factor λi for any layer at index 
+
+i is calculated using: 
+
+λi = ι2 +
+
+
+
+1 − in
+
+
+
+(ι1 − ι2), (19) where n is the total number of layers in the pre-trained model, and ι1 and ι2 denote the maximum and minimum rollback levels, respectively. Additionally, in different downstream tasks, the objectives may significantly from those of upstream tasks. To accommo-date this variability, we propose to adjust the penalty decay IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 6
+
+Algorithm 2 DualOpt F ine −tune for SGD with Momentum 
+
+1: input :
+
+η ∈ R: Initial learning rate, β ∈ [0 , 1) : momentum factor, θ0: pre-trained weight, ι1, ι 2 ∈ [0 , 1] , ι 1 ≥ ι2: max and min level of weight rollback respectively, γ ∈ R: weight rollback power 2: initialize :
+
+t ← 0: time step, m0 ← 0: initial moment vector, d0 ← 0: initial discrepancy value, λi ← f (λ, i, n, ι 1, ι 2)/η : calculate penalty factor λi
+
+through λi = f (λ, i, n, ι 1, ι 2) = ι2 + (1 − in )γ (ι1 − ι2), then scale it by dividing η to eliminate the scale issue. 3: repeat 
+
+4: t ← t + 1 
+
+5: ηt ←LR Scheduler (ηt−1) (Calculate ηt at timestep t)6: gt ← ∇ θ ft(θt−1) (Get batch gradient at timestep t)7: mt ← βm t−1 + (1 − β)gt (Compute momentum) 8: θt ← θt−1 − ηtλidt−1 − (1 − ηtλi)ηtmt (Update weight) 9: dt ← (1 − ηtλi)( dt−1 − ηtmt) (Update discrepancy) 10: until Stopping condition is met 11: return Parameters θt
+
+Algorithm 3 DualOpt F ine −tune for Adam 
+
+1: input :
+
+η ∈ R: Initial learning rate, β1, β 2 ∈ [0 , 1) : Exponential decay rates for the moment estimates, ϵ: bias, θ0: pre-trained weight, ι1, ι 2 ∈ [0 , 1] , ι 1 ≥
+
+ι2: max and min level of weight rollback respectively, γ ∈ R: weight rollback power 2: initialize :
+
+t ← 0: time step, m0 ← 0: initial first moment vector, v0 ← 0:initial second moment vector, d0 ← 0: initial discrepancy value, 
+
+λi ← f (λ, i, n, ι 1, ι 2)/η : calculate penalty factor λi through λi =
+
+f (λ, i, n, ι 1, ι 2) = ι2 + (1 − in )γ (ι1 − ι2), then scale it by dividing η
+
+to eliminate the scale issue. 3: repeat 
+
+4: t ← t + 1 
+
+5: ηt ←LR Scheduler (ηt−1) (Calculate ηt at timestep t)6: gt ← ∇ ft(θt−1) (Get batch gradient at timestep t)7: mt ← β1mt−1 + (1 − β1)gt (Update first moment vector) 8: vt ← β2vt−1 + (1 − β2)g2 
+
+> t
+
+(Update second moment vector) 9: ˆmt ← mt/(1 − βt
+
+> 1
+
+)
+
+10: ˆvt ← vt/(1 − βt
+
+> 2
+
+)
+
+11: θt ← θt−1 − ηtλidt−1 − (1 −ηtλi)ηt ˆmt 
+
+> (√ˆvt+ϵ)
+
+(Update weight) 12: dt ← (1 − ηtλi)( dt−1 − ηt ˆmt 
+
+> (√ˆvt+ϵ)
+
+) (Update discrepancy) 13: until stopping criterion is met 14: return optimized parameters θt
+
+rate between layers by applying a power exponent γ to the weight rollback value. This adjustment can be expressed as: 
+
+1 − in −→ (1 − in )γ . (20) This dynamic adjustment helps to mitigate the bias arising from a fixed decay rate of the similarities between qi(xui )
+
+and pi(xdi ) across different layer indices i. Consequently, the penalty decay becomes more adaptable and versatile, catering to requirements dictated by various downstream tasks. Finally, we provide specific descriptions in Algorithm 2 and Algorithm 3 to combine the weight rollback mechanism and layer-wise penalty in DualOpt F ine −tune for common optimizers such as SGD and Adam. IV. E XPERIMENT CONFIGURATION 
+
+A. Backbones 
+
+For the training from scratch experiments, we select classic architectures such as ResNet [73] and Inception [74] as backbones. These architectures are well-established in the field and provide a solid foundation for evaluating the performance 
+
+TABLE I DETAILS OF THE USED DATASETS .Dataset Images Categories Type CIFAR-100 [39] 60,000 100 General SVHN [40] 600,000 10 General CUB-200-2011 [41] 11,788 200 Fine-grained Stanford Cars [42] 16,185 196 Fine-grained Places-LT [43] 62,500 365 Long-tailed IP102 [44] 75,222 102 Long-tailed OfficeHome [45] 15,500 4 × 65 Cross-domain PACS [46] 9,991 4 × 7 Cross-domain COCO2017 [47] 163,957 80 Detection ADE20K [48] 27,574 3688 Segmentation 
+
+of our proposed methods without the benefits of pre-trained weights. In our fine-tuning experiments, we utilize both CNN-based ConvNeXt [75] and Transformer-based Vision Transformers (ViT) [76] as backbones for the fine-tuning tasks. These models are selected for their representativeness within their respective categories (CNN-based and ViT-based), as they are the most classic architectures with rich pre-training resources. Specifically, we leverage pre-trained weights sourced from several prominent datasets, including ImageNet-1K (MAE) [77], ImageNet-21K (supervised) [4], and LAION-2B (CLIP) [3]. The weights from ImageNet-21K are derived from super-vised pre-training, while those from the other datasets utilize self-supervised learning techniques. 
+
+B. Benchmarks 
+
+We evaluate our methods across ten widely used visual task datasets, including CIFAR-100 [39], SVHN [40], CUB-200-2011 [41], Stanford Cars [42], Places-LT [43], IP102 [44], OfficeHome [45], PACS [46], COCO2017 [47] and ADE20K [48]. These datasets encompass a variety of tasks such as general classification, fine-grained classification, long-tailed classification, cross-domain classification, object detection, semantic segmentation, and instance segmentation. A detailed overview of these datasets is presented in Table I. 
+
+C. Baselines 
+
+To facilitate a comprehensive evaluation, we select a range of state-of-the-art methods and traditional approaches as base-lines. This includes Full Fine-tuning (Full), Linear Probing (Linear) [78], L2-SP [36], and VPT [37]. Following estab-lished methods [28], we employ the SGD optimizer for CNN-based backbones and the Adam optimizer for Transformer-based architectures. In contrast, for the training-from-scratch experiments, we focus on evaluating the improvements of our proposed method over the original SGD and Adam optimizers. 
+
+D. Implementation Details 
+
+For the training from scratch experiments, the batch size is set to 128, the learning rate is 10 −2, and the training duration is 50 epochs. The weight decay is set to 10 −4.The data preprocessing pipeline includes resizing images to 
+
+224 × 224 , applying random horizontal flips for augmentation. IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 7   
+
+> TABLE II COMPARISON OF TRAINING FROM SCRATCH RESULTS ON VARIOUS TYPES OF CLASSIFICATION DATASETS (GENERAL ,FINE -GRAINED ,LONG -TAILED ,
+> CROSS -DOMAIN ).
+
+General (ID) Fine-Grained (ID) Long-Tailed (OOD) Cross-Domain (OOD) Method Cifar-100 SVHN CUB-200-2011 StanfordCars Places-LT IP102 OfficeHome PACS ResNet-50 Adam 63.47 94.36 28.05 25.05 16.33 50.45 52.88 74.65 
+
+Adam-DualOpt Scratch 64.67 94.96 29.51 26.03 17.60 50.63 51.06 74.96 
+
+SGD 59.93 93.83 15.59 10.57 15.38 49.77 43.81 67.95 
+
+SGD-DualOpt Scratch 60.03 94.19 20.19 10.62 15.60 49.88 42.01 68.78 
+
+Inception Adam 54.48 94.48 26.49 26.45 14.49 47.87 31.15 75.48 
+
+Adam-DualOpt Scratch 56.15 95.99 26.89 24.13 15.23 48.09 42.98 76.48 
+
+SGD 57.08 94.98 19.47 14.18 12.79 44.30 32.93 62.07 
+
+SGD-DualOpt Scratch 58.62 95.15 21.78 17.95 12.90 44.85 35.75 63.58 
+
+For optimizers, we use either SGD with a momentum of 0.9 or AdamW with the same learning rate and weight decay. The experiments are conducted on an NVIDIA GeForce RTX 4090 GPU, using Python 3.8.10, Ubuntu 20.04, and the PyTorch 2.0.0 framework. For the fine-tuning experiments, the input images are resized to 224 × 224 pixels. The batch size is determined by the chosen freezing strategy, with values of 128, 256, and 512 for full unfreezing, parameter isolation, and full freezing methods, respectively. For ConvNeXt backbones, we implement the SGD optimizer with a momentum of 0.9. The learning rates vary based on the freezing strategy, set at 10 −2, 2 × 10 −2,and 4 × 10 −2 for full unfreezing, parameter isolation, and full freezing methods, respectively. For ViT backbones, we utilize the Adam optimizer with momentum parameters (0.9, 0.999), adjusting the learning rates to 10 −4 for full unfreezing, 
+
+2 × 10 −4 for partial unfreezing, and 4 × 10 −4 for full freezing. Training is conducted for 30 epochs on cross-domain datasets and 50 epochs for other datasets. Experiments are conducted on two NVIDIA A5000 GPUs with 24 GB memory each, running on the Ubuntu 20.04 operating system. We utilize Python 3.8.3 as the programming language and the PyTorch 2.0.0 framework for implementation. V. R ESULTS AND DISCUSSIONS 
+
+A. Main Results 1) Results on Classification Tasks: To validate the ef-ficient convergence and robust generalization of DualOpt, we present the results of training from scratch and fine-tuning across 10 popular classification datasets, each with distinct data distributions and characteristics. For the training from scratch experiments, we employ classical backbones and optimizers, specifically ResNet and Inception with Adam and SGD, respectively. During fine-tuning, we utilize ViT-B and ConvNeXt-B as backbones, paired correspondingly with Adam and SGD optimizers. In addition, we also conduct comprehensive comparisons with other state-of-the-art fine-tuning methods. 
+
+a) Training From Scratch: We first evaluate the perfor-mance of DualOpt when training models from scratch on a di-verse set of classification datasets, including general (ID), fine-grained (ID), long-tailed (OOD), and cross-domain (OOD) categories. Table II presents the comparison results using classical architectures, ResNet-50 and Inception, trained with both Adam and SGD optimizers, as well as their enhanced counterparts DualOpt Scratch .Across all datasets and models, DualOpt Scratch consistently outperforms the standard optimizers. For instance, when using ResNet-50 with Adam-DualOpt Scratch , we observe accuracy improvements on CIFAR-100 (from 63.47% to 64.67%) and Places-LT (from 16.33% to 17.60%). Similar enhancements are noted with SGD-DualOpt Scratch , particularly on fine-grained datasets like CUB-200-2011, where the accuracy in-creases from 15.59% to 20.19%. When Inception is used as the backbone, DualOpt Scratch 
+
+also enhances performance across almost all classification tasks, achieving better accuracy than standard Adam and SGD. Notably, on the OfficeHome dataset, the proposed method im-proves the ODD classification accuracy by 11.83% and 2.82% compared to Adam and SGD with Inception, respectively. These results demonstrate that DualOpt effectively enhances convergence and generalization during training from scratch, regardless of the underlying optimizer or network architecture. 
+
+b) Fine-tuning: For fine-tuning tasks, we evaluate our proposed methods, Adam-DualOpt F ine −tune and SGD-DualOpt F ine −tune , against several state-of-the-art fine-tuning baselines pre-trained on ImageNet-21K, including Linear Probing, Full Fine-tuning, L2-SP, VPT, and LoRA. As listed in Table III, our methods achieve new state-of-the-art performance across general, fine-grained, long-tailed, and cross-domain classification tasks. Under the ViT-B Backbone, Adam-DualOpt F ine −tune con-sistently significantly outperforms all baseline methods. Specifically, it achieves accuracies of 92.89% on CIFAR-100 and 97.35% on SVHN in general ID datasets, surpassing VPT by 1.40% and 2.98%, respectively. In fine-grained ID datasets, it reaches 84.84% on CUB-200-2011 and 82.02% on IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 8    
+
+> TABLE III COMPARISON OF FINE -TUNING RESULTS ON VARIOUS TYPES OF CLASSIFICATION DATASETS (GENERAL ,FINE -GRAINED ,LONG -TAILED ,CROSS -DOMAIN ).
+
+General (ID) Fine-Grained (ID) Long-Tailed (OOD) Cross-Domain (OOD) Method Cifar-100 SVHN CUB-200-2011 StanfordCars Places-LT IP102 OfficeHome PACS ViT-B Backbone Linear 72.50 58.79 75.01 38.03 31.95 64.93 79.96 71.88 Full 87.76 97.27 81.34 75.55 31.59 74.09 84.39 87.79 L2-SP 88.17 97.12 81.65 75.55 31.22 73.75 84.74 87.74 VPT 91.49 94.37 81.86 58.24 37.02 70.41 86.48 77.44 LoRA 87.03 96.69 77.20 76.13 33.30 69.16 84.65 90.48 
+
+Adam-DualOpt F ine −tune 92.89 97.35 84.84 82.02 38.07 75.34 89.05 94.38 
+
+ConvNeXt-B Backbone Linear 81.70 69.21 87.85 50.21 36.41 70.77 92.40 93.46 Full 92.72 96.97 88.59 88.67 38.61 75.01 91.78 95.51 L2-SP 92.84 97.01 88.82 88.83 38.52 75.20 90.61 95.90 VPT 88.71 81.58 87.88 51.58 36.32 71.22 92.31 93.75 LoRA 89.37 96.86 86.16 48.82 37.11 74.10 87.65 93.70 
+
+SGD-DualOpt F ine −tune 92.86 97.12 89.47 88.99 39.36 75.44 92.59 96.63 
+
+StanfordCars, improving over L2-SP by 3.98% and 6.47%. For long-tailed OOD datasets, Places-LT and IP102 see ac-curacies of 38.07% and 75.34%, outperforming VPT and L2-SP by 1.05% and 1.59%, respectively. In cross-domain OOD datasets, OfficeHome and PACS achieve 89.05% and 94.38%, representing gains of 2.57% and 6.59% over the best baselines (VPT and Full Fine-tuning, respectively). LoRA, as a representative parameter-efficient fine-tuning method, shows competitive performance on several datasets while requiring substantially fewer trainable parameters. However, its overall performance remains consistently below that of DualOpt, indicating that fully leveraging backbone adaptation remains critical for achieving optimal performance across diverse and challenging fine-tuning scenarios. Since the pre-trained ConvNeXt model is more sta-ble than the ViT structure, there is not much difference between different methods in fine-tuning. However, our SGD-DualOpt F ine −tune still consistently improves fine-tuning accuracy across all datasets. These results demonstrate the robustness and effectiveness of the proposed DualOpt in various tasks. 
+
+2) Results on Large-Scale Dataset Classification Tasks: To evaluate the effectiveness of DualOpt on large-scale datasets, we conducted experiments on ImageNet using two repre-sentative transformer-based backbones: ViT-B and Swin-B. As lited in Table IV, DualOpt consistently improves Top-1 accuracy compared to the original optimizers. Specifically, for ViT-B, DualOpt achieves an accuracy of 82.58%, surpassing the baseline by 1.24%. Similarly, for Swin-B, it improves accuracy from 83.05% to 83.89%. These results demonstrate that DualOpt also effectively enhances performance on large-scale datasets, with the potential to provide significant im-provements over pre-trained baseline models in deep learning. 
+
+3) Results on Detection and Segmentation Tasks: In addi-tion to classification tasks, we evaluate the performance of our DualOpt on object detection, instance segmentation, and semantic segmentation tasks. Due to the complexity of these      
+
+> TABLE IV RESULTS OF DUAL OPT FOR MODEL TRAINING FROM SCRATCH ON
+> IMAGE NET .
+
+Method Model Dataset Top-1 Acc Origin ViT-B ImageNet 81.34 
+
+DualOpt ViT-B ImageNet 82.58 
+
+Origin Swin-B ImageNet 83.05 
+
+DualOpt Swin-B ImageNet 83.89   
+
+> TABLE V RESULTS OF OBJECT DETECTION AND INSTANCE SEGMENTATION USING THE CONV NEXT-B AS BACKBONE .
+
+Method Model Dataset Bbox m Segm m
+
+Full Mask R-CNN COCO2017 40.20 36.00 
+
+DualOpt Mask R-CNN COCO2017 41.10 36.90 
+
+tasks, the common practice is to import pre-trained weights followed by full fine-tuning. However, our DualOpt approach can easily be applied when integrated with the optimizers. Tables V and VI summarize the results of these experiments. For object detection and instance segmentation, we utilize the Mask R-CNN model on the COCO2017 dataset. As listed in Table V, the proposed DualOpt, using ConvNeXt-B as the backbone, achieves a noticeable improvement over the Full Fine-tuning baseline. Specifically, DualOpt improves the bounding box mean Average Precision (Bbox mAP) from 40.20% to 41.10%, and the instance segmentation mAP from 36.00% to 36.90%. These results highlight the effectiveness   
+
+> TABLE VI RESULTS OF SEMANTIC SEGMENTATION USING THE VIT-B AS BACKBONE .
+
+Method Model Dataset IOU m
+
+Full UperNet ADE20K 43.65 
+
+DualOpt UperNet ADE20K 44.62 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 9  
+
+> TABLE VII COMPARISON OF METHOD EFFICIENCY ON BASE AND LARGE BACKBONES .
+
+ViT-B Backbone ViT-L Backbone Method Params (M) FLOPs Tr FLOPs Inf Mem Tr Mem Inf Params (M) FLOPs Tr FLOPs Inf Mem Tr Mem Inf 
+
+Linear 85.69 2156.57 2156.54 1.98 1.83 303.40 7634.73 7634.72 2.85 2.84 LoRA 88.63 6425.17 2159.72 9.95 1.83 308.65 22844.97 7864.99 25.25 2.84 VPT 85.78 2482.22 2265.26 6.63 2.12 303.42 24813.32 8271.11 17.25 2.91 Full 85.69 6469.62 2156.54 10.45 1.83 303.40 22884.43 7634.72 25.95 2.84 L2-SP 85.69 6469.77 2156.54 11.08 1.83 303.40 22884.43 7634.72 27.73 2.84 DualOpt 85.69 6470.22 2156.54 10.90 1.83 303.40 22884.43 7634.72 27.11 2.84 
+
+of DualOpt in enhancing object detection and segmentation performance. Moreover, we employ the UperNet model on the ADE20K dataset for semantic segmentation. As indicated in Table VI, DualOpt with the ViT-B backbone surpasses the Full Fine-tuning baseline, achieving an improvement in mean Inter-section over Union from 43.65% to 44.62%. This consistent improvement in segmentation performance demonstrates the adaptability and robustness of DualOpt across different visual tasks and model architectures. Overall, these results demonstrate that DualOpt not only excels in classification tasks but also provides substantial improvements in object detection, instance segmentation, and semantic segmentation, demonstrating its versatility and effec-tiveness in more complex scenarios. 
+
+B. Analysis and Discussion 1) Efficiency and Complexity Analysis: In deep learning networks, the computational cost is primarily determined by the forward and backward processes of the network. For DualOpt during training from scratch, the optimization steps and coefficients are adjusted within the optimizer, which does not introduce any additional overhead. The proposed DualOpt in the fine-tuning version introduces only a minimal computational overhead by adding a review step in the parameter update function of the optimizer during training. This addition maintains theoretical complexity at 
+
+O(N ), ensuring negligible overhead relative to the O(N 2)
+
+complexity of forward and backward operations in most net-works, and introduces no additional overhead during inference. As summarized in Table VII, we analyze the computational efficiency of different fine-tuning methods on both base and large backbones under a unified experimental setting with a batch size of 128. Compared with the baseline Full Fine-tuning method, DualOpt introduces only 0.04% extra FLOPs and 4.30% additional memory usage during training on the base backbone, while incurring 0.00% extra overhead during inference. A similar efficiency pattern is consistently ob-served when scaling to the large backbone, demonstrating that DualOpt preserves its efficiency advantages across different model scales. Although freeze-based methods such as Linear and VPT are more efficient in terms of computational resources, they fall significantly short in performance compared to unfreeze-based methods such as Full Fine-tuning, L2-SP, and DualOpt. For example, while Linear and VPT reduce FLOPs and memory consumption, their fine-tuning performance is substantially lower (as reported in Table III), highlighting the trade-off between efficiency and performance in fine-tuning tasks. Overall, DualOpt achieves a favorable balance between efficiency and effectiveness by maintaining competitive com-putational efficiency while consistently delivering superior fine-tuning performance across different backbone scales. 
+
+2) Analysis of Performance Across Using Different Large-scale Pre-Trained Models When Fine-tuning: To analyze the compatibility of DualOpt with different pretraining paradigms, we conduct experiments using three distinct ViT-B models pre-trained with large-scale datasets: ImageNet-21K using supervised pretraining, LAION-2B using OpenCLIP with con-trastive self-supervised pretraining, and ImageNet-1K using MAE with masked self-supervised pretraining. All models are fine-tuned on the challenging PACS dataset to evaluate how different fine-tuning methods adapt to diverse pre-trained representations. As listed in Table VIII, the proposed DualOpt method out-performs other methods across all pre-trained models. Specif-ically, DualOpt achieves improvements of 6.59%, 0.64%, and 3.47% over the best-performing baselines when using the Supervised, OpenCLIP, and MAE models, respectively. This consistent superiority indicates that DualOpt adapts more ef-fectively to various pre-trained models, whereas other methods exhibit greater variability in performance. The versatility of DualOpt underscores its robustness and potential for broader application across different pre-training paradigms.   
+
+> TABLE VIII PERFORMANCE COMPARISON OF DIFFERENT FINE -TUNING METHODS USING VARIOUS PRE -TRAINED MODELS ON THE PACS DATASET .
+
+Method Supervised (ImageNet-21K) Self-supervised (OpenCLIP) Self-supervised (MAE) Linear 71.88 95.61 36.72 Full 87.79 47.17 84.18 L2-SP 87.74 45.56 85.79 VPT 77.44 97.46 50.54 
+
+DualOpt 94.38 98.10 89.26 
+
+3) Performance and Convergence Analysis When Training from Scratch: When training from scratch, we theoretically expect improvements in both the efficiency and stability of convergence, along with performance gains. To evaluate the impact of the proposed DualOpt, we compare the number IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 10  
+
+> Fig. 3. Comparison of epochs and accuracy improvement between standard and DualOpt-enhanced optimizers across different datasets. The left panel shows results for Adam versus Adam-DualOpt, while the right panel displays comparisons for SGD versus SGD-DualOpt. These results highlight DualOpt’s ability to significantly reduce training epochs while improving model accuracy.
+
+of epochs required for convergence and the performance improvements when integrated with the Adam and SGD optimizers. As illustrated in Fig 3, when comparing Adam to Adam-DualOpt, our method notably reduces the number of epochs needed for convergence while consistently improving accu-racy. This indicates a significant boost in training efficiency and demonstrates the effectiveness of DualOpt in optimizing the training process. Similarly, for SGD and SGD-DualOpt, DualOpt not only shortens convergence times in most cases but also consistently leads to stable performance improvements. Notably, despite iterating through two additional epochs on the CUB-200-2011 dataset, DualOpt achieved an accuracy improvement of up to 4.6%. These observations indicate that the proposed DualOpt accelerates convergence while also enhancing model accuracy, confirming its potential as an efficient and effective optimiza-tion method for training neural networks from scratch. 
+
+4) Knowledge Forgetting Test for Fine-tuning: To evaluate the impact of DualOpt on mitigating knowledge forgetting, we conduct an experiment on the challenging cross-domain PACS dataset, utilizing ViT-B and the Adam optimizer. The dataset is split into two folds: the first fold ( D1) consists of three domains—cartoon, photo, and sketch—while the second fold (D2) contains data from the art painting domain. During the pre-training stage, the model is trained on D1 and validated on D2 for 100 epochs. In the fine-tuning stage, the model is then fine-tuned using D2 as the training set and D1 as the validation set for 30 epochs. As shown in Fig. 4, the Full Fine-tuning baseline im-proves performance on the downstream task ( D2) but suffers a significant drop in accuracy on upstream domains ( D1), demonstrating severe knowledge forgetting. In contrast, the proposed DualOpt achieves the best performance on D2                   
+
+> Fig. 4. Knowledge forgetting test on PACS. The first fold is used for pre-training, while the second fold is used for validation during pre-training, and splits are reversed during fine-tuning. DualOpt achieves the best downstream performance while minimizing knowledge forgetting on upstream tasks. 10 410 310 210 110 0
+> 1
+> 85
+> 90
+> 95
+> 100
+> Top1-accuracy  Cifar-100
+> 10 410 310 210 110 0
+> 1
+> 80
+> 90
+> 100
+> Top1-accuracy  PACS
+> =1 =2 =4
+> Fig. 5. Hyperparameter exploration experiments in DualOpt fine-tuning mode using ViT-B and Adam on Cifar-100 (left) and PACS (right).
+
+while substantially reducing the accuracy drop on D1. This result confirms that DualOpt effectively preserves upstream knowledge during fine-tuning and maximizing downstream performance. 
+
+5) Hyper-Parameter Exploration: To explore the most suit-able hyper-parameters of DualOpt for different types of tasks in fine-tuning, we conduct a comprehensive study on both IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 11 DualOpt   
+
+> (Acc: 94.38%)
+> Full
+> (Acc: 87.79%)
+> L2-SP
+> (Acc: 87.74%)
+> VPT
+> (Acc: 77.44%)
+> Linear
+> (Acc: 71.88%) Dog
+> Elephant
+> Giraffe
+> Guitar
+> Horse
+> House
+> Person
+> Fig. 6. The t-SNE visualization of the feature distributions on the PACS test set using ViT-B and Adam. The extracted features are color-coded by class, and the accuracy is reported for each method. DualOpt achieves the best feature separation with compact intra-class distances and maximized inter-class distances, resulting in the highest accuracy, while other methods exhibit more overlap between feature clusters and lower accuracy.
+
+Cifar-100 (ID) and PACS (OOD) datasets. Typically, deeper layers in neural networks require signif-icant updates to effectively extract features relevant to the downstream task. Therefore, we simplify the hyperparameter space by setting the minimum rollback level ι2 = 0, al-lowing us to focus on tuning two key hyperparameters: the maximum rollback level ι1 and the rollback power γ. The effect of these parameters is explored by setting ι1 in the set ι1 ∈ { 0.0001 , 0.0005 , 0.001 , 0.005 , 0.01 , 0.05 , 0.1, 0.5, 1},and γ ∈ { 1, 2, 4}.Fig. 5 shows the results of our hyper-parameter search on Cifar-100 and PACS. We observe that smaller values of γ are preferable when the downstream task is similar to the pre-training task, as this allows for more gradual and controlled updates to the deeper layers. Conversely, higher values of γ
+
+are beneficial when the task distribution changes significantly, allowing the model to adapt more aggressively to new feature distributions. Similarly, for ι1, larger values are effective when the downstream task’s data distribution aligns closely with the upstream task, as they help retain more pre-trained knowledge while fine-tuning. These findings suggest that the choice of hyper-parameters plays a crucial role in determining the success of fine-tuning, and adjusting ι1 and γ according to task similarity and data distribution can significantly improve performance. 
+
+6) Feature Quality and Visualization Analysis: To further evaluate the quality of feature separation and representation learned, we conduct a t-SNE visualization for all fine-tuning methods on the PACS test set based on ViT-B and Adam. As shown in Fig. 6, DualOpt exhibits superior feature separation compared to the previous methods. The features extracted by DualOpt form well-defined, distinct clusters, with minimal overlap between different classes. This clear separa-tion of feature clusters corresponds to an accuracy of 94.38%, outperforming all other methods. In contrast, the Full Fine-tuning and L2-SP methods show moderate clustering but still exhibit significant overlap between certain classes, resulting in lower accuracies of 87.79% and 87.74%, respectively. VPT and Linear Probing, on the other hand, exhibit poorly separated feature clusters, where the features are highly mixed and result in much lower accuracy. These results demonstrate that DualOpt improves fine-tuning performance in terms of accuracy and facilitates bet-ter feature learning and representation. The well-separated clusters suggest that DualOpt preserves important pre-trained knowledge while adapting to downstream tasks, enabling the model to capture more task-relevant features. 
+
+> TABLE IX ABLATION STUDY OF LAYER -WISE WEIGHT DECAY STRATEGIES .
+
+Method Eq. (12) Adam SGD Uniform Decay λi = λ 63.47 59.93 Proposed Decay λi = λ in 64.67 60.03 
+
+Inverse Proposed Decay λi = λ(1 − in ) 62.61 59.67 
+
+7) Impact of Layer-Wise Weight Decay in From-Scratch Training: In Section III-A, we analyzed the structural char-acteristics of neural networks during training from scratch. Specifically, shallow layers should use smaller weight decay rates, while deeper layers require larger decay rates. Based on this theory, we proposed a layer-wise weight decay rate 
+
+λi = λ in in Eq. (12). To evaluate its effectiveness, we conduct an ablation study on the CIFAR-100 dataset using ViT-B with both Adam and SGD optimizers. The results are summarized in Table IX. The proposed decay strategy consistently achieves the best performance, with accu-racies of 64.67% and 60.03% for Adam and SGD, respectively. Notably, when using the inverse strategy, where the weight decay rate is larger for shallow layers and smaller for deeper layers, the performance is even worse than the baseline uni-form decay. This experiment validates the effectiveness of the proposed layer-wise weight decay mechanism, demonstrating the importance of correctly assigning layer-specific decay rates tailored to the network’s depth significantly. 
+
+8) Effect of Each Component: In the Method Section, we introduce DualOpt, specifically designed to address the distinct needs of both training from scratch and fine-tuning. The fine-tuning component of DualOpt incorporates several key innovations, including the weight rollback mechanism,  
+
+> TABLE X ABLATION STUDY OF PROPOSED COMPONENTS FOR DUAL OPT .
+
+Baseline Weight Rollback Layer-wise Penalty Diversified Decay Rate Accuracy 
+
+✓ 87.79 
+
+✓ 93.41 
+
+✓ ✓ 93.70 
+
+✓ ✓ ✓ 94.38 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 12 
+
+layer-wise penalty, and diversified decay rate. To evaluate the independent and combined contributions of these components to the overall performance, we conduct an ablation study on the PACS dataset based on Vit-B and Adam. The results are summarized in Table X. The baseline method, representing standard full fine-tuning without the DualOpt components, achieves an accuracy of 87.79%. When the weight rollback mechanism is introduced, we observe a substantial improvement in accuracy to 93.41%, demonstrating the effectiveness of this component in mitigat-ing knowledge forgetting and preserving pre-trained knowl-edge. The weight rollback mechanism ensures that the model retains essential information from the pre-training stage, al-lowing it to adapt to new tasks while preventing overfitting to the fine-tuning data. Adding the layer-wise penalty mechanism to the weight roll-back further enhances performance, increasing the accuracy to 93.70%. This improvement highlights the role of layer-wise penalty in balancing the regularization across different network layers. By applying a more nuanced penalty to different layers based on their depth, the model is better able to adjust to the unique characteristics of downstream tasks. Shallow layers retain more generalized features, while deeper layers are fine-tuned more aggressively, leading to better overall task adaptation. Finally, incorporating the diversified decay rate results in the best performance, with an accuracy of 94.38%. The diversified decay rate adjusts the penalty applied to each layer based on the similarity between the pre-training and fine-tuning tasks, further enhancing the model’s ability to generalize across different domains. The total improvement of 6.59% demonstrates that combining all components enables DualOpt to fully leverage pre-trained knowledge while adapting to the specific requirements of downstream tasks. VI. C ONCLUSION 
+
+In this paper, we proposed DualOpt, a novel optimization framework designed to address the distinct needs of both training from scratch and fine-tuning in neural networks. Unlike traditional optimization methods that treat these two paradigms uniformly, DualOpt decouples the optimization process by introducing specialized strategies for each scenario. For training from scratch, we implemented a real-time layer-wise weight decay mechanism, which dynamically adjusts the decay rates across different layers to enhance convergence speed and generalization. For fine-tuning, we integrated a weight rollback mechanism and a layer-wise penalty decay, en-suring that pre-trained knowledge is preserved while adapting to downstream tasks. Through extensive experiments on a wide range of visual tasks, including general, fine-grained, long-tailed, cross-domain image classification, object detection, and semantic segmentation, our DualOpt achieves state-of-the-art performance. Extensive validation experiments and ablation analysis demonstrate the effectiveness of the proposed method. 
+
+Limitations and Future Work . While DualOpt demonstrates strong empirical performance on a variety of vision tasks, its applicability to other domains, such as large-scale language models or reinforcement learning, has not been fully explored, which remains an interesting direction for future work. REFERENCES [1] Q. Li, X. Huang, B. Fang, H. Chen, S. Ding, and X. Liu, “Embracing large natural data: Enhancing medical image analysis via cross-domain fine-tuning,” IEEE Journal of Biomedical and Health Informatics , 2023. [2] X. Huang, Q. Li, X. Li, and X. Gao, “One step learning, one step review,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 38, no. 11, 2024, pp. 12 644–12 652. [3] C. Schuhmann, R. Beaumont, R. Vencu, C. Gordon, R. Wightman, M. Cherti, T. Coombes, A. Katta, C. Mullis, M. Wortsman et al. , “Laion-5B: An open large-scale dataset for training next generation image-text models,” ArXiv Preprint arXiv:2210.08402 , 2022. [4] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh, S. Ma, Z. Huang, A. Karpathy, A. Khosla, M. Bernstein et al. , “ImageNet large scale visual recognition challenge,” International Journal of Computer Vision , vol. 115, pp. 211–252, 2015. [5] C. Schuhmann, R. Vencu, R. Beaumont, R. Kaczmarczyk, C. Mullis, A. Katta, T. Coombes, J. Jitsev, and A. Komatsuzaki, “Laion-400M: Open dataset of clip-filtered 400 million image-text pairs,” ArXiv Preprint arXiv:2111.02114 , 2021. [6] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal, G. Sastry, A. Askell, P. Mishkin, J. Clark et al. , “Learning transferable visual models from natural language supervision,” in International Conference on Machine Learning . PMLR, 2021, pp. 8748–8763. [7] K. He, X. Chen, S. Xie, Y. Li, P. Doll´ ar, and R. Girshick, “Masked au-toencoders are scalable vision learners,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 16 000–16 009. [8] H. Bao, L. Dong, S. Piao, and F. Wei, “Beit: Bert pre-training of image transformers,” ArXiv Preprint arXiv:2106.08254 , 2021. [9] T. Mensink, J. Uijlings, A. Kuznetsova, M. Gygli, and V. Ferrari, “Factors of influence for transfer learning across diverse appearance domains and task types,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 44, no. 12, pp. 9298–9314, 2022. [10] Z. Wu, Z. Weng, W. Peng, X. Yang, A. Li, L. S. Davis, and Y.-G. Jiang, “Building an open-vocabulary video clip model with better architectures, optimization and data,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 46, no. 7, pp. 4747–4762, 2024. [11] Q. Li, X. Huang, Z. Wan, L. Hu, S. Wu, J. Zhang, S. Shan, and Z. Wang, “Data-efficient masked video modeling for self-supervised action recognition,” in Proceedings of the 31st ACM International Conference on Multimedia , 2023, pp. 2723–2733. [12] Q. Li, X. Huang, H. Chen, F. He, Q. Chen, and Z. Wang, “Advancing micro-action recognition with multi-auxiliary heads and hybrid loss optimization,” in Proceedings of the 32nd ACM International Conference on Multimedia , 2024. [13] B. Zou, Z. Guo, J. Chen, J. Zhuo, W. Huang, and H. Ma, “Rhythm-former: Extracting patterned rppg signals based on periodic sparse attention,” Pattern Recognition , vol. 164, p. 111511, 2025. [14] X. Li, Z. Wang, B. Zhang, F. Sun, and X. Hu, “Recognizing object by components with human prior knowledge enhances adversarial robust-ness of deep neural networks,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 45, no. 7, pp. 8861–8873, 2023. [15] R. Azad, E. K. Aghdam, A. Rauland, Y. Jia, A. H. Avval, A. Bozorgpour, S. Karimijafarbigloo, J. P. Cohen, E. Adeli, and D. Merhof, “Medical image segmentation review: The success of u-net,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2024. [16] Z. Xie, L. Yuan, Z. Zhu, and M. Sugiyama, “Positive-negative momen-tum: Manipulating stochastic gradient noise to improve generalization,” in Proc. International Conference on Machine Learning , 2021, pp. 11 448–11 458. [17] A. Kosson, B. Messmer, and M. Jaggi, “Rotational equilibrium: How weight decay balances learning across neural networks,” 2024. [Online]. Available: https://arxiv.org/abs/2305.17212 [18] S. Hanson and L. Pratt, “Comparing biases for minimal network construction with back-propagation,” vol. 1, 1988. [19] M. A. Ghiasi, A. Shafahi, and R. Ardekani, “Improving robustness with adaptive weight decay,” Proc. Neural Information Processing System ,vol. 36, 2024. [20] M. De Lange, R. Aljundi, M. Masana, S. Parisot, X. Jia, A. Leonardis, G. Slabaugh, and T. Tuytelaars, “A continual learning survey: Defying forgetting in classification tasks,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 44, no. 7, pp. 3366–3385, 2021. IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 13 
+
+[21] N. S. Keskar and R. Socher, “Improving generalization performance by switching from adam to sgd,” ArXiv Preprint arXiv:1712.07628 , 2017. [22] D. P. Kingma, “Adam: A method for stochastic optimization,” arXiv preprint arXiv:1412.6980 , 2014. [23] T. Ergen, H. I. Gulluk, J. Lacotte, and M. Pilanci, “Globally optimal training of neural networks with threshold activation functions,” 2023. [Online]. Available: https://arxiv.org/abs/2303.03382 [24] P. Stock, B. Graham, R. Gribonval, and H. J´ egou, “Equi-normalization of neural networks,” 2019. [Online]. Available: https://arxiv.org/abs/ 1902.10416 [25] D. E. Rumelhart, G. E. Hinton, and R. J. Williams, “Learning repre-sentations by back-propagating errors,” nature , vol. 323, no. 6088, pp. 533–536, 1986. [26] J. Duchi, E. Hazan, and Y. Singer, “Adaptive subgradient methods for online learning and stochastic optimization.” Journal of Machine Learning Research , vol. 12, no. 7, 2011. [27] A. Krogh and J. Hertz, “A simple weight decay can improve general-ization,” Advances in Neural Information Processing Systems , vol. 4, 1991. [28] N. Carion, F. Massa, G. Synnaeve, N. Usunier, A. Kirillov, and S. Zagoruyko, “End-to-end object detection with transformers,” in 
+
+European Conference on Computer Vision . Springer, 2020, pp. 213– 229. [29] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” 
+
+ArXiv Preprint arXiv:1711.05101 , 2017. [30] L. Guan, “Weight prediction boosts the convergence of adamw,” in 
+
+Pacific-Asia Conference on Knowledge Discovery and Data Mining .Springer, 2023, pp. 329–340. [31] S.-A. Rebuffi, A. Kolesnikov, G. Sperl, and C. H. Lampert, “icarl: Incremental classifier and representation learning,” in Proceedings of the IEEE conference on Computer Vision and Pattern Recognition , 2017, pp. 2001–2010. [32] D. Rolnick, A. Ahuja, J. Schwarz, T. Lillicrap, and G. Wayne, “Expe-rience replay for continual learning,” Advances in Neural Information Processing Systems , vol. 32, 2019. [33] X. Liu, C. Wu, M. Menta, L. Herranz, B. Raducanu, A. D. Bagdanov, S. Jui, and J. v. de Weijer, “Generative feature replay for class-incremental learning,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops , 2020, pp. 226– 227. [34] G. Merlin, V. Lomonaco, A. Cossu, A. Carta, and D. Bacciu, “Practical recommendations for replay-based continual learning methods,” in In-ternational Conference on Image Analysis and Processing . Springer, 2022, pp. 548–559. [35] J. Kirkpatrick, R. Pascanu, N. Rabinowitz, J. Veness, G. Desjardins, A. A. Rusu, K. Milan, J. Quan, T. Ramalho, A. Grabska-Barwinska 
+
+et al. , “Overcoming catastrophic forgetting in neural networks,” Pro-ceedings of the National Academy of Sciences , vol. 114, no. 13, pp. 3521–3526, 2017. [36] L. Xuhong, Y. Grandvalet, and F. Davoine, “Explicit inductive bias for transfer learning with convolutional networks,” in International Conference on Machine Learning . PMLR, 2018, pp. 2825–2834. [37] M. Jia, L. Tang, B.-C. Chen, C. Cardie, S. Belongie, B. Hariharan, and S.-N. Lim, “Visual prompt tuning,” in European Conference on Computer Vision . Springer, 2022, pp. 709–727. [38] K. Sohn, H. Chang, J. Lezama, L. Polania, H. Zhang, Y. Hao, I. Essa, and L. Jiang, “Visual prompt tuning for generative transfer learning,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2023, pp. 19 840–19 851. [39] A. Krizhevsky, G. Hinton et al. , “Learning multiple layers of features from tiny images,” 2009. [40] Y. Netzer, T. Wang, A. Coates, A. Bissacco, B. Wu, and A. Y. Ng, “Reading digits in natural images with unsupervised feature learning,” 2011. [41] C. Wah, S. Branson, P. Welinder, P. Perona, and S. Belongie, “The caltech-ucsd birds-200-2011 dataset,” 2011. [42] J. Krause, M. Stark, J. Deng, and L. Fei-Fei, “3D object representations for fine-grained categorization,” in Proceedings of the IEEE Interna-tional Conference on Computer Vision Workshops , 2013, pp. 554–561. [43] B. Zhou, A. Lapedriza, J. Xiao, A. Torralba, and A. Oliva, “Learning deep features for scene recognition using places database,” Advances in Neural Information Processing Systems , vol. 27, 2014. [44] G. Patterson, C. Xu, H. Su, and J. Hays, “The sun attribute database: Be-yond categories for deeper scene understanding,” International Journal of Computer Vision , vol. 108, pp. 59–81, 2014. [45] H. Venkateswara, J. Eusebio, S. Chakraborty, and S. Panchanathan, “Deep hashing network for unsupervised domain adaptation,” in Pro-ceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2017, pp. 5018–5027. [46] D. Li, Y. Yang, Y.-Z. Song, and T. M. Hospedales, “Deeper, broader and artier domain generalization,” in Proceedings of the IEEE International Conference on Computer Vision , 2017, pp. 5542–5550. [47] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ramanan, P. Doll´ ar, and C. L. Zitnick, “Microsoft coco: Common objects in context,” in Computer Vision–ECCV 2014: 13th European Conference, Zurich, Switzerland, September 6-12, 2014, Proceedings, Part V 13 .Springer, 2014, pp. 740–755. [48] B. Zhou, H. Zhao, X. Puig, T. Xiao, S. Fidler, A. Barriuso, and A. Torralba, “Semantic understanding of scenes through the ade20k dataset,” International Journal of Computer Vision , vol. 127, pp. 302– 321, 2019. [49] Y. LeCun, Y. Bengio, and G. Hinton, “Deep learning,” nature , vol. 521, no. 7553, pp. 436–444, 2015. [50] T. B. Brown, “Language models are few-shot learners,” arXiv preprint arXiv:2005.14165 , 2020. [51] J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei, “Imagenet: A large-scale hierarchical image database,” in 2009 IEEE conference on computer vision and pattern recognition . Ieee, 2009, pp. 248–255. [52] A. Kuznetsova, H. Rom, N. Alldrin, J. Uijlings, I. Krasin, J. Pont-Tuset, S. Kamali, S. Popov, M. Malloci, A. Kolesnikov et al. , “The open images dataset v4: Unified image classification, object detection, and visual relationship detection at scale,” International journal of computer vision ,vol. 128, no. 7, pp. 1956–1981, 2020. [53] J. Dodge, M. Sap, A. Marasovi´ c, W. Agnew, G. Ilharco, D. Groeneveld, M. Mitchell, and M. Gardner, “Documenting large webtext corpora: A case study on the colossal clean crawled corpus,” arXiv preprint arXiv:2104.08758 , 2021. [54] Y. Zhu, “Aligning books and movies: Towards story-like visual ex-planations by watching movies and reading books,” arXiv preprint arXiv:1506.06724 , 2015. [55] J. Devlin, “Bert: Pre-training of deep bidirectional transformers for language understanding,” arXiv preprint arXiv:1810.04805 , 2018. [56] C. Raffel, N. Shazeer, A. Roberts, K. Lee, S. Narang, M. Matena, Y. Zhou, W. Li, and P. J. Liu, “Exploring the limits of transfer learning with a unified text-to-text transformer,” Journal of machine learning research , vol. 21, no. 140, pp. 1–67, 2020. [57] B. Zou, Z. Guo, X. Hu, and H. Ma, “Rhythmmamba: Fast, lightweight, and accurate remote physiological measurement,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 39, no. 10, 2025, pp. 11 077–11 085. [58] R. Bommasani, D. A. Hudson, E. Adeli, R. Altman, S. Arora, S. von Arx, M. S. Bernstein, J. Bohg, A. Bosselut, E. Brunskill et al. ,“On the opportunities and risks of foundation models,” arXiv preprint arXiv:2108.07258 , 2021. [59] Y. Wu, Y. Chen, L. Wang, Y. Ye, Z. Liu, Y. Guo, Z. Zhang, and Y. Fu, “Incremental classifier learning with generative adversarial networks,” 
+
+arXiv preprint arXiv:1802.00853 , 2018. [60] Y. Hsu, “Re-evaluating continual learning scenarios: A categorization and case for strong baselines,” arXiv preprint arXiv:1810.12488 , 2018. [61] F. Zenke, B. Poole, and S. Ganguli, “Continual learning through synaptic intelligence,” in International conference on machine learning . PMLR, 2017, pp. 3987–3995. [62] Z. Li and D. Hoiem, “Learning without forgetting,” IEEE transactions on pattern analysis and machine intelligence , vol. 40, no. 12, pp. 2935– 2947, 2017. [63] A. Rannen, R. Aljundi, M. B. Blaschko, and T. Tuytelaars, “Encoder based lifelong learning,” in Proceedings of the IEEE International Conference on Computer Vision , 2017, pp. 1320–1328. [64] N. Houlsby, A. Giurgiu, S. Jastrzebski, B. Morrone, Q. De Laroussilhe, A. Gesmundo, M. Attariyan, and S. Gelly, “Parameter-efficient transfer learning for nlp,” in International Conference on Machine Learning .PMLR, 2019, pp. 2790–2799. [65] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen, “Lora: Low-rank adaptation of large language models,” 
+
+arXiv preprint arXiv:2106.09685 , 2021. [66] J. Pfeiffer, A. Kamath, A. R¨ uckl´ e, K. Cho, and I. Gurevych, “Adapter-fusion: Non-destructive task composition for transfer learning,” arXiv preprint arXiv:2005.00247 , 2020. [67] H. Robbins and S. Monro, “A stochastic approximation method,” The Annals of Mathematical Statistics , pp. 400–407, 1951. IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 14 
+
+[68] I. Sutskever, J. Martens, G. Dahl, and G. Hinton, “On the importance of initialization and momentum in deep learning,” in International Conference on Machine Learning . PMLR, 2013, pp. 1139–1147. [69] L. Liu, H. Jiang, P. He, W. Chen, X. Liu, J. Gao, and J. Han, “On the variance of the adaptive learning rate and beyond,” arXiv preprint arXiv:1908.03265 , 2019. [70] L. Luo, Y. Xiong, Y. Liu, and X. Sun, “Adaptive gradient methods with dynamic bound of learning rate,” arXiv preprint arXiv:1902.09843 ,2019. [71] J. Tian, C. Huang, and Z. Kira, “Rethinking weight decay for robust fine-tuning of foundation models,” Advances in Neural Information Processing Systems , vol. 37, pp. 22 418–22 440, 2024. [72] T.-Y. Lin, P. Doll´ ar, R. Girshick, K. He, B. Hariharan, and S. Belongie, “Feature pyramid networks for object detection,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2017, pp. 2117–2125. [73] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image recognition,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2016, pp. 770–778. [74] C. Szegedy, W. Liu, Y. Jia, P. Sermanet, S. Reed, D. Anguelov, D. Erhan, V. Vanhoucke, and A. Rabinovich, “Going deeper with convolutions,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2015, pp. 1–9. [75] Z. Liu, H. Mao, C.-Y. Wu, C. Feichtenhofer, T. Darrell, and S. Xie, “A convnet for the 2020s,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 11 976–11 986. [76] A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. Dehghani, M. Minderer, G. Heigold, S. Gelly et al. ,“An image is worth 16x16 words: Transformers for image recognition at scale,” ArXiv Preprint arXiv:2010.11929 , 2020. [77] J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei, “ImageNet: A large-scale hierarchical image database,” in 2009 IEEE Conference on Computer Vision and Pattern Recognition . Ieee, 2009, pp. 248–255. [78] R. Zhang, P. Isola, and A. A. Efros, “Split-brain autoencoders: Unsu-pervised learning by cross-channel prediction,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2017, pp. 1058–1067. IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. XX, NO. XX, MONTH 202X 15 
+
+Xin Ning (Senior Member, IEEE) received the B.S. degree in software engineering from Xinjiang University in 2012, and the Ph.D. degree in com-puter vision from university of Chinese Academy of Sciences, in 2017. He is currently a Professor with the AnnLab, Institute of Semiconductors, Chinese Academy of Sciences. His current research interests include neural networks, intelligent systems and computer vision. He is working as Guest Editor, Associate Editor in SCI and various other reputed journals (IEEE, Elsevier, Springer & Wiley). His Google Scholar total citation reached 4500+, with an H-index of 40. He has been featured in the list of top 2% scientist/researcher database in the world in 2022 and 2023. He has published by first or corresponding author more than 80 papers in journals and refereed conferences. He served as senior member of IEEE/CCF/CAAI/CSIG. He serves as Aare Editor in the Information Fusion and Associate Editor in the IEEE TCSVT, Pattern Recognition, Applied Soft Computing, Engineering Applications of Artificial Intelligence and Signal Processing journal. And he also serves as the Young Associate Editor of CAAI Transactions on Intelligent Systems, the Guest Editor of IEEE TCE, Image and Vision Computing et al. He was the Website Chair of the IEEE HPBD&IS 2020, and the Publication Chair of the IEEE HPBD&IS 2021, HDIS 2022 and HDIS 2023. 
+
+Qiankun Li (Member, IEEE) received the Ph.D. degree in Pattern Recognition and Intelligent Sys-tems from the University of Science and Tech-nology of China (USTC), in 2025, where he was with the National Engineering Research Center of Speech and Language Information Processing (NERC-SLIP), Department of Automation. He is currently a Research Fellow at Imperial Global Sin-gapore (IGS), an affiliation of Imperial College Lon-don (IC). Prior to this, he was a Research Fellow at the College of Computing and Data Science (CCDS) at Nanyang Technological University (NTU). His research interests include human-centered AI, particularly AI for healthcare (AI4Health), multimodal large model reasoning and hallucination mitigation, and cross-domain model generalization. He has published several papers in prestigious journals and conference proceedings such as ICML, NeurIPS, CVPR, AAAI, ACM MM, IEEE T-PAMI, IEEE T-IP, IEEE T-FS, IEEE T-ITS, PR, and INFFUS, etc. 
+
+Xiaolong Huang is currently pursuing a Master’s degree at the Gina Cody School of Engineering and Computer Science, Concordia University, Montreal, QC, Canada. He is also affiliated with the Mila-Quebec AI Institute, Montreal, Canada. His research interests generally lie in machine learning and com-puter vision. 
+
+Qiupu Chen received the Ph.D. degree in Pattern Recognition and Intelligent Systems from the Uni-versity of Science and Technology of China (USTC), in 2025. He is currently an Assistant Professor with the School of Artificial Intelligence, Henan Univeristy. His research interests include human-centered AI, open-world recognition, particularly AI for healthcare (AI4Health), and cross-domain model generalization. He has published several papers such as CVPR, ACM MM, T-PAMI, T-FS, T-ASLP, PR, EAAI, and JBHI, etc. 
+
+Feng He is pursuing a master’s degree at the University of Science and Technology of China (USTC) in China. His main research interests lie in multimodal learning and makeup transfer. Prior to this, he graduated from the School of Computer Science at Yangtze University in June 2023. 
+
+Weijun Li (Senior Member, IEEE) received the Ph.D. degree from the Institute of Semiconductors, Chinese Academy of Sciences (ISCAS), Beijing, China, in 2004.,He is currently a Professor of arti-ficial intelligence with the Institute of Semiconduc-tors, ISCAS and the University of Chinese Academy of Sciences, Beijing. He is an In Charge with the Artificial Intelligence Research Center, ISCAS and the Director of the Laboratory of Highspeed Circuits Neural Networks, ISCAS. His research interests in-clude deep modeling, machine art, pattern recogni-tion, artificial neural networks, and intelligent systems. 
+
+Prayag Tiwari (Senior Member, IEEE) received his Ph.D. degree from the University of Padova, Italy. He is currently working as a Senior Lecturer at Halmstad University, Sweden. Previously, he worked as a Postdoctoral Researcher at the Aalto Univer-sity, Finland, and Marie Curie Researcher at the University of Padova, Italy. His name has appeared in the World’s Top 2% of Scientists released by Stanford university and Elsevier. He received the 2022 Best Paper Award for a paper published in Neural Networks, Elsevier. His papers were also awarded as one of the Highly Cited Papers published in journals like applied sciences, measurements, etc. He has several publications in top journals and conferences, including Neural Networks, Journal of Physics A, Information Fusion, Knowledge-Based Systems, International Journal of Computer Vision, IEEE TNNLS, IEEE TFS, IEEE JBHI, IEEE TAI, IEEE IoTJ, IEEE BIBM, ACM TOIT, ACM CSUR, CIKM, SIGIR, AAAI, ECIR, ECML, ACL, etc. His research interests include Artificial Intelligence, Quantum Machine Learning, Deep Learning, Healthcare, Bioinformatics, NLP, Computer vision, Intelligent Transport, and IoT. 
+
+Xinwang Liu (Senior Member, IEEE) received the PhD degree from the National University of Defense Technology (NUDT), China. He is now professor with the School of Computer, NUDT. His current research interests include kernel learning and unsu-pervised feature learning. He has published more than 60 peer-reviewed papers, including those in highly regarded journals and conferences such as IEEE Transactions on Pattern Analysis and Machine Intelligence, IEEE Transactions on Knowledge and Data Engineering, IEEE Transactions on Image Pro-cessing, IEEE Transactions on Neural Networks and Learning Systems, IEEE Transactions on Multimedia, IEEE Transactions on Information Forensics and Security, ICML, NeurIPS, ICCV, CVPR, AAAI, IJCAI, etc. He serves as the associated editor of IEEE Transactions on Neural Networks and Learning Systems, IEEE Transactions on Cybernetics and Information Fusion Journal. More information can be found at https://xinwangliu.github.io/.

@@ -1,0 +1,1074 @@
+Title: Improving reproducibility by controlling random seed stability in machine learning based estimation via bagging
+
+URL Source: https://arxiv.org/pdf/2604.17694v1
+
+Published Time: Tue, 21 Apr 2026 02:00:01 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+> preprint (2026), xx , x, p. 1
+
+# Improving reproducibility by controlling random seed stability in machine learning based estimation via bagging 
+
+By N. WILLIAMS 
+
+Division of Biostatistics, University of California, Berkeley, California, U.S.A. 
+
+nicholaswilliams@berkeley.edu 
+
+and A. SCHULER 
+
+Division of Biostatistics, University of California, Berkeley, California, U.S.A. 
+
+alejandro.schuler@berkeley.edu 
+
+Summary 
+
+Predictions from machine learning algorithms can vary across random seeds, inducing instabil-ity in downstream debiased machine learning estimators. We formalize random seed stability via a concentration condition and prove that subbagging guarantees stability for any bounded-outcome regression algorithm. We introduce a new cross-fitting procedure, adaptive cross-bagging, which simultaneously eliminates seed dependence from both nuisance estimation and sample splitting in debiased machine learning. Numerical experiments confirm that the method achieves the targeted level of stability whereas alternatives do not. Our method incurs a small computational penalty relative to standard practice whereas alternative methods incur large penalties. 
+
+> Some key words : Algorithmic Stability, Reproducibility, Bagging, Debiased Machine Learning
+
+1. Introduction 
+
+The use of machine learning in semiparametric estimation is becoming more common. How-ever, cautionary warnings have appeared that such estimators may suffer from “random seed dependence”: running the same estimator on the same data yields a different result each time (Schader et al., 2024; Naimi et al., 2024). To illustrate, consider a trial statistician who pre-specifies a machine learning method for covariate adjustment to improve power (Williams et al., 2022). The drug shows no effect. Knowing the estimator has stochastic dependence, the statis-tician sets a new seed, reruns the analysis, finds a significant effect, and submits those results. Clearly, such a scenario is a form of “p-hacking” and should be prevented. Prior study of random seed stability has, to our knowledge, been limited to Monte Carlo experimentation under arbitrary data generating processes. While informative, such results have limited generalizability and offer no theoretical guarantees. That being said, the broad conclusion across this literature is consistent: aggregate over enough seeds (Chernozhukov et al., 2018; Schader et al., 2024; Naimi et al., 2024) and use enough folds (Williams et al., 2025; Zivich, 2024)—but without ever addressing what constitutes enough. There are two sources of random seed dependence in causal machine learning: (i) the stochastic nature of the machine learning algorithms used to estimate nuisance parameters, and (ii) randomness induced by sample splitting 
+
+> arXiv:2604.17694v1 [stat.ME] 20 Apr 2026
+
+2 N. Williams et al. 
+
+for cross-fitting (Naimi et al., 2024). The primary focus of this paper is the former, and we show that bagging can eliminate stochastic dependence from the algorithms themselves. However, because bagging operates through resampling, it also provides a natural mechanism for cross-fitting without explicit sample splitting, which addresses the second source as well. In this paper, we study the problem of random seed dependence through the lens of algorithmic stability. We first introduce a formal definition of random seed stability in the form of a concen-tration condition on the probability that the difference in predictions from the same supervised learning algorithm trained on the same data using different seeds exceeds some threshold. We then build on previous work that shows that bootstrap aggregating (bagging) provides algorithmic stability guarantees (Soloff et al., 2024). Our contributions are as follows: 1. we prove that with enough bags the subbagged version of any machine learning algorithm satisfies our definition of being seed stable, 2. we prove that a generic real-valued function of bagged predictions is itself seed stable under regularity conditions, and 3. we introduce a new cross-fitting algorithm, adaptive cross-bagging, that guarantees seed stability. 
+
+2. Defining random seed stability 
+
+Let 𝑧 𝑖 = (𝑥 𝑖 , 𝑦 𝑖 ), where 𝑥 𝑖 ∈ X ⊆ R𝑑 and 𝑦 𝑖 ∈ R. Let 𝑧 1, 𝑧 2, . . . be a deterministic sequence, and let D𝑛 = {𝑧 𝑖 }𝑛 𝑖 =1 so that D𝑛 ⊂ D 𝑛 +1; D𝑛 is a fixed training dataset of 𝑛 observations. Because 
+
+D𝑛 is finite and fixed, {𝑦 𝑖 }𝑛 𝑖 =1 is bounded and, without loss of generality, we rescale 𝑦 𝑖 ∈ [ 0, 1]
+
+via min-max scaling. Let T ⊂ X with |T | = 𝑘 be a held-out set of 𝑘 predictor values. Let 
+
+S = {1, . . . , 𝑀 int } where 𝑀 int is the largest integer that can be represented on a machine; define 
+
+PS := Unif (S) . Let 𝔉 denote a generic supervised machine learning algorithm (referred to as a regression algorithm throughout) and 𝔉 (D 𝑛 , 𝑠 ) : X → [ 0, 1] be a realized prediction function, where 𝑠 ∈ S is a random seed. Throughout, a subscript on 𝐸 or pr indicates expectation or probability over that variable alone, with all other quantities fixed (e.g., pr 𝑠 is taken with respect to PS ). We let 1[ 𝐴 ] be the indicator function that returns one when event 𝐴 occurs and zero otherwise, and 1𝑉 be a vector of ones with size 𝑉 .
+
+Definition 1. A regression algorithm 𝔉 is random seed (𝜖, 𝛿 )-stable on training data D𝑛 and testing set T if for all values 𝑥 ∈ T 
+
+pr 𝑠,𝑠 ′ (| 𝔉 (D 𝑛 , 𝑠 )( 𝑥 ) − 𝔉 (D 𝑛 , 𝑠 ′)( 𝑥 )| ≥ 𝜖 ) ≤ 𝛿. 
+
+Definition 1 aligns with practical application: an analyst sets a seed 𝑠 , trains the machine learning algorithm, and predicts on a new data point(s). Furthermore, Definition 1 mirrors classical notions of algorithmic stability (Shalev-Shwartz et al., 2010), which bound the effect of perturbing the training data; here, the perturbation is instead to the seed. If the variance of predictions across seeds is small enough then the algorithm will be seed stable. 
+
+Lemma 1. Assume 𝔉 is a regression algorithm such that for any dataset D and seed 𝑠 , the fitted function 𝔉 (D , 𝑠 ) takes values in [0, 1]. Define the idealized point-wise prediction function over all seeds as 
+
+𝔉 ∞ (D 𝑛 )( 𝑥 ) = 𝐸 𝑠 [𝔉 (D 𝑛 , 𝑠 )( 𝑥 )] ,Controlling random seed stability via bagging 3
+
+and the point-wise prediction variance over seeds is 
+
+𝜎 2 (𝑥 ; D𝑛 ) = 𝐸 𝑠 
+
+h
+
+(𝔉 (D 𝑛 , 𝑠 )( 𝑥 ) − 𝔉 ∞ (D 𝑛 )( 𝑥 )) 2i
+
+.
+
+Then regression algorithm 𝔉 is random seed (𝜖, 𝛿 )-stable on training data D𝑛 and test set T
+
+whenever 
+
+max   
+
+> 𝑥 ∈ T
+
+𝜎 2 (𝑥 ; D𝑛 ) ≤ 𝜖 
+
+4
+
+ 𝜖 
+
+log (2𝑘 /𝛿 ) − 23
+
+
+
+.
+
+Lemma 1 tells us that seed stability reduces to controlling 𝜎 2 (𝑥 ; D𝑛 ): if the variance of predictions over seeds is sufficiently small, stability is guaranteed. If we suppose that 𝜎 2 (𝑥 ; D𝑛 ) → 
+
+0 as 𝑛 → ∞ point-wise over 𝑥 , then the bound in Lemma 1 is eventually satisfied for any (𝜖, 𝛿 )
+
+pair. Therefore any sensible regression algorithm should be seed (𝜖, 𝛿 )-stable on prediction set 
+
+T given the training data D𝑛 is large enough. However, the rate at which 𝜎 2 (𝑥 ; D𝑛 ) decays at any test point 𝑥 depends on the algorithm and the training data, and will generally be unknown. In the following sections, we instead show that any bounded regression algorithm can be made seed stable with bagging. 
+
+3. Bagging and random seed stability 
+
+Bagging is an ensemble method that broadly refers to the practice of repeatedly resampling training data, training regression algorithm 𝔉 on each resample (called “bags”), and averaging the models (Breiman, 1996a,b). Bagging was originally implemented using the nonparametric bootstrap (Efron, 1979) by drawing 𝑚 = 𝑛 resamples with replacement. We focus on the subbag-ging variant (Andonova et al., 2002), which is more computationally tractable and guarantees a fixed number of held-out observations which we will make use of in §4. However, our results hold for other bagging variants as well. 3.1 . Subbagging controls random seed stability 
+
+Let 𝜌 ∈ ( 0, 1) be a fixed constant, 𝑚 = ⌊𝜌𝑛 ⌋, and 𝐵 𝑗 𝑚 = {𝑖 1, . . . , 𝑖 𝑚 } ⊂ [ 𝑛 ] where 1 ≤ 𝑚 ≤ 𝑛 
+
+denote an 𝑚 -size index subsample constructed without replacement. There are then 𝐾 = 𝐶 (𝑛, 𝑚 )
+
+possible subsamples; denote the collection of all the 𝑚 -size subsamples as B𝑚 = {𝐵 1
+
+> 𝑚
+
+, . . . , 𝐵 𝐾 𝑚 };define PB = Unif (B 𝑚 ). Let D𝑛 (𝐵 𝑗 𝑚 ) be the sub-dataset consisting of the observations of D𝑛 
+
+indexed by 𝐵 𝑗 𝑚 . We then define 𝔉 (D 𝑛 (𝐵 𝑗 𝑚 ), 𝑠 ) as the algorithm trained on the 𝐵 𝑗 𝑚 subsample and seed 𝑠 . Let PS ⊗ P B be the product measure induced by S × B . For 𝑉 < 𝐾 , define 𝜁 =(𝑠 1, 𝐵 1
+
+> 𝑚
+
+), . . . , (𝑠 𝑉 , 𝐵 𝑉 𝑚 ) as the set of 𝑉 independent seed-and-bag pairs each drawn from PS ⊗PB . A subbagged realization of algorithm 𝔉 is then given by ¯𝔉 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 ) = 1
+
+𝑉 
+
+> 𝑉
+
+∑︁ 
+
+> 𝑣 =1
+
+𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 ).
+
+Theorem 1. Assume 𝔉 is a regression algorithm such that for any dataset D and seed 𝑠 ,the fitted function 𝔉 (D , 𝑠 ) takes values in [0, 1]. Define the idealized subbagged point-wise prediction function over all bags and seeds as 
+
+¯𝔉 ∞ (D 𝑛 , 𝜌 )( 𝑥 ) = 𝐸 (𝑠,𝐵 𝑚 ) [𝔉 (D 𝑛 (𝐵 𝑚 ), 𝑠 )( 𝑥 )] ,
+
+and the point-wise prediction variance over bags and seeds as 
+
+𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) = 𝐸 (𝑠,𝐵 𝑚 )
+
+h 𝔉 (D 𝑛 (𝐵 𝑚 ), 𝑠 )( 𝑥 ) − ¯𝔉 ∞ (D 𝑛 , 𝜌 )( 𝑥 )2i
+
+.4 N. Williams et al. 
+
+Since the 𝑉 bags are drawn independently, the variance of the subbagged average prediction is 
+
+𝜈 2 (𝑥 ; D𝑛 , 𝜌 )/ 𝑉 . Then a subbagged version of regression algorithm 𝔉 is random seed (𝜖, 𝛿 )-stable on training data D𝑛 and test set T when 
+
+𝑉 ≥ max  
+
+> 𝑥 ∈ T
+
+log (2𝑘 /𝛿 )
+
+𝜖 2
+
+
+
+4 𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) + 23 𝜖 
+
+
+
+.
+
+Similar to Lemma 1, Theorem 1 is derived from an application of Bernstein’s inequality. The key insight is that 𝑉 is a free parameter so that any bounded regression algorithm, regardless of its seed stability, can be made seed (𝜖, 𝛿 )-stable by choosing 𝑉 sufficiently large. By Popoviciu’s inequality (Popoviciu, 1935), since 𝑦 𝑖 ∈ [ 0, 1], 𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) ≤ 1/4; therefore the worst-case upper bound on the number of bags required for seed (𝜖, 𝛿 )-stability can always be calculated for a regression algorithm bounded in [0, 1]. However, if we again assume that 𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) → 0 as 𝑛 → ∞ 
+
+point-wise then the number of bags required for (𝜖, 𝛿 )-stability will decrease with larger training data. 
+
+4. Implications for debiased machine learning 
+
+Presume we are now interested in a scalar mapping of 𝑝 different estimated prediction functions. Let 𝜂 𝑠 = {𝜂 𝑠,𝑙 }𝑝 𝑙 =1, where 𝜂 𝑠,𝑙 = {𝔉 𝑙 (D 𝑛 , 𝑠 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 } is a vector of 𝑛 predictions from the 
+
+𝑙 th prediction function generated under seed 𝑠 . Here, unlike in previous sections, predictions are evaluated on the training data such that T = D𝑛 . Let Ψ(D 𝑛 , 𝜂 𝑠 ) ∈ R be a debiased machine learning estimator (e.g., augmented inverse probability weighting [AIPW], targeted minimum loss-based estimation [TMLE], or double machine learning [DML]) (Robins et al., 1994; van der Laan & Rubin, 2006; Chernozhukov et al., 2018) that maps the data D𝑛 and nuisance predictions 𝜂 𝑠 to a real-valued estimate of a target parameter 𝜓 0.
+
+Definition 2. A scalar-valued function Ψ(D 𝑛 , 𝜂 ) is random seed (𝜖, 𝛿 )-stable on D𝑛 if 
+
+pr 𝑠,𝑠 ′ (| Ψ(D 𝑛 , 𝜂 𝑠 ) − Ψ(D 𝑛 , 𝜂 𝑠 ′ )| ≥ 𝜖 ) ≤ 𝛿. 
+
+Consider the AIPW estimator for the average treatment effect (ATE). Here 𝑧 𝑖 = (𝑥 𝑖 , 𝑎 𝑖 , 𝑦 𝑖 ),where 𝑎 𝑖 ∈ { 0, 1} is a binary exposure and 𝑦 𝑖 ∈ { 0, 1} is a binary outcome. We have 𝑝 = 3with 𝔉 1 (D 𝑛 , 𝑠 )( 𝑥 ) predicting pr ( 𝐴 = 1 | 𝑋 = 𝑥 ), 𝔉 2 (D 𝑛 , 𝑠 )( 𝑥 ) predicting pr (𝑌 = 1 | 𝐴 = 1, 𝑋 =
+
+𝑥 ), and 𝔉 3 (D 𝑛 , 𝑠 )( 𝑥 ) predicting pr (𝑌 = 1 | 𝐴 = 0, 𝑋 = 𝑥 ). We write 𝜂 𝑠 = {𝜋 𝑠 , 𝜇 1 
+
+> 𝑠
+
+, 𝜇 0 
+
+> 𝑠
+
+}, where 
+
+𝜋 𝑠 = {𝔉 1 (D 𝑛 , 𝑠 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 }, 𝜇 1 
+
+> 𝑠
+
+= {𝔉 2 (D 𝑛 , 𝑠 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 }, and 𝜇 0 
+
+> 𝑠
+
+= {𝔉 3 (D 𝑛 , 𝑠 )( 𝑥 𝑖 ) :
+
+𝑧 𝑖 ∈ D 𝑛 }. The AIPW estimator of the ATE is 
+
+Ψ(D 𝑛 , 𝜂 𝑠 ) = 1
+
+𝑛 
+
+> 𝑛
+
+∑︁ 
+
+> 𝑖 =1
+
+ 𝑎 𝑖 
+
+𝜋 𝑠,𝑖 
+
+− 1 − 𝑎 𝑖 
+
+1 − 𝜋 𝑠,𝑖 
+
+ 
+
+𝑦 𝑖 − 𝜇 𝑎 𝑖 
+
+> 𝑠,𝑖
+
+
+
++ 𝜇 1 
+
+> 𝑠,𝑖
+
+− 𝜇 0 
+
+> 𝑠,𝑖
+
+.
+
+Conditional on D𝑛 , the only source of randomness in Ψ(D 𝑛 , 𝜂 𝑠 ) is from seed dependence in the training of the models for generating nuisance predictions 𝜂 𝑠 . While Theorem 1 guarantees seed 
+
+(𝜖, 𝛿 )-stability for each set of the component predictions separately, it does not automatically imply that Ψ is seed (𝜖, 𝛿 )-stable on D𝑛 . Furthermore, such estimators often require the use of a sample splitting procedure called cross-fitting to avoid imposing a condition that the space of functions 𝔉 searches over is 𝑃 -Donsker (Zheng & van der Laan, 2011; Chernozhukov et al., 2018), which is typically unjustified if machine learning algorithms are used. The standard cross-fitting procedure uses 𝑉 -fold cross-validation. Although technically only 2 folds are required to eliminate the Donsker condition, how to choose the number of folds to optimize finite-sample performance Controlling random seed stability via bagging 5
+
+remains an open question. Leave-one-out (LOO) cross-fitting is guaranteed to eliminate the variability induced by sample splitting, but there is no guarantee it sufficiently controls the remaining variability due to seed stochasticity in the nuisance models themselves. Moreover, the standard proof that a DML estimator with cross-fitting is asymptotically normal without a Donsker condition does not extend to LOO cross-fitting, leaving the asymptotic normality of such estimators without theoretical justification. Denote bagged nuisance predictions ¯ 𝜂 𝜁 = { ¯𝜂 𝜁 ,𝑙 }𝑝 𝑙 =1 where ¯ 𝜂 𝜁 ,𝑙 = { ¯𝔉 𝑙 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 }
+
+is a vector of 𝑛 predictions from the 𝑙 th bagged prediction function generated under seed and bag pairs 𝜁 . The following corollary establishes a sufficient condition on 𝑉 for the function Ψ(D 𝑛 , ¯𝜂 𝜁 )
+
+to be seed (𝜖, 𝛿 )-stable on D𝑛 .
+
+Corollary 1. Suppose the conditions of Theorem 1 hold and function Ψ(D 𝑛 , 𝜂 ) ∈ R is Lips-chitz continuous in 𝜂 with Lipschitz constant 𝐿 with respect to ∥ · ∥ ∞. Then Ψ(D 𝑛 , ¯𝜂 𝜁 ) is random seed (𝜖, 𝛿 )-stable on D𝑛 whenever 
+
+𝑉 ≥ max    
+
+> 𝑧 𝑖 ∈ D 𝑛 ,𝑙 ∈ [ 𝑝 ]
+
+log (2𝑛𝑝 /𝛿 )(𝜖 /𝐿 )2
+
+
+
+4𝜈 2 
+
+> 𝑙
+
+(𝑥 𝑖 ; D𝑛 , 𝜌 ) + 23
+
+𝜖 𝐿 
+
+
+
+,
+
+where the point-wise prediction variance over bags and seeds 𝜈 2 
+
+> 𝑙
+
+(𝑥 ; D𝑛 , 𝜌 ) for the 𝑙 th prediction function is defined in Theorem 1. 
+
+The Lipschitz condition will hold whenever all of the partial derivatives of Ψ(D 𝑛 , 𝜂 ) with respect to estimated nuisance parameters 𝜂 exist and are bounded. For example, it trivially holds for the AIPW estimator of the ATE when 𝑐 < 𝜋 𝑖 < 1 − 𝑐 for some 𝑐 > 0. However, there are a variety of conditions under which the Lipschitz condition could hold. Existing approaches have targeted seed stability by averaging over final estimates (Cher-nozhukov et al., 2018; Schader et al., 2024), on the grounds that averaging over nuisance param-eters would not account for variance induced by sample splitting, and that repeated cross-fitting would be prohibitively computationally expensive (Schader et al., 2024). We propose a new cross-fitting procedure, cross-bagging, that simultaneously eliminates seed dependence arising from both machine learning estimation of nuisance parameters and sample splitting. The algorithm is as follows: 1. Fix 𝜌 ∈ ( 0, 1) and choose 𝑉 large enough to satisfy Corollary 1. 2. Construct 𝜁 : Draw 𝑚 = ⌊𝜌𝑛 ⌋-sized subsamples of indices from PB until each observation is OOB at least 𝑉 times. Denote the total number of subsamples as 𝑉 †. Further draw 𝑉 † seeds from PS to pair with each bag. 3. For (𝑣, 𝑙 ) ∈ [ 𝑉 †] × [ 𝑝 ], train 𝔉 𝑙 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 ).4. Define matrix 𝑀 ∈ { 0, 1}𝑛 ×𝑉 †
+
+where 𝑀 𝑖𝑣 = 1[𝑖 ∉ 𝐵 𝑣 𝑚 ], and 𝐶 = 𝑀 1𝑉 † . For (𝑧 𝑖 , 𝑙 ) ∈ D 𝑛 ×[ 𝑝 ], pool OOB nuisance estimates: ¯𝔉 𝑙 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 ) = 1
+
+𝐶 𝑖 𝑉 †∑︁ 
+
+> 𝑣 =1
+
+𝑀 𝑖𝑣 𝔉 𝑙 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ).
+
+5. Let ¯ 𝜂 𝜁 = { ¯𝜂 𝜁 ,𝑙 }𝑝 𝑙 =1 where ¯ 𝜂 𝜁 ,𝑙 = { ¯𝔉 𝑙 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 }. The cross-bagged estimator is 
+
+Ψ(D 𝑛 , ¯𝜂 𝜁 ).The practical utility of this algorithm is limited as it either requires knowledge of 𝜈 2 
+
+> 𝑙
+
+(𝑥 𝑖 ; D𝑛 , 𝜌 )
+
+or assuming the upper bound for 𝜈 2 
+
+> 𝑙
+
+(𝑥 𝑖 ; D𝑛 , 𝜌 ). Further, while the bound on 𝑉 in Corollary 1 is sufficient for seed (𝜖, 𝛿 )-stability, it is not necessary; it may be prohibitively large and we 6 N. Williams et al. 
+
+expect the required number of bags to be substantially smaller in practice. In principle, this can be iterated: run the algorithm on many seeds with an initial 𝑉 , estimate the probability that two estimates differ by more than 𝜖 , and increase the number of bags until this probability falls below 𝛿 . However, this approach is computationally expensive. Instead, progress can be made by quantifying the seed variability and simultaneously incrementing both the number of seeds and the number of bags while recycling previous predictions until the seed stability condition is met. 
+
+Theorem 2. Assume Ψ(D 𝑛 , 𝜂 ) is differentiable with respect to 𝜂 . Let 𝜁 and 𝜁 ′ be sets of independent draws of random seed-and-bag pairs from PS ⊗ P B , and ¯𝜂 𝜁 and ¯𝜂 𝜁 ′ be nuisance predictions obtained via cross-bagging. Then as 𝑉 → ∞ 
+
+𝑉 1/2  Ψ(D 𝑛 , ¯𝜂 𝜁 ) − Ψ(D 𝑛 , ¯𝜂 𝜁 ′ ) ⇝ N ( 0, 2𝜏 2),
+
+where 𝜏 2 is the asymptotic variance of 𝑉 1/2 (Ψ(D 𝑛 , ¯𝜂 𝜁 ) − Ψ(D 𝑛 , ¯𝜂 ∞)) as 𝑉 → ∞ and can be consistently estimated by 
+
+ˆ𝜏 2 = 1
+
+𝑉 (1 − 𝑚 /𝑛 )2
+
+> 𝑉
+
+∑︁ 
+
+> 𝑣 =1
+> 𝑝
+
+∑︁ 
+
+> 𝑙 =1
+
+" 𝑛 ∑︁ 
+
+> 𝑖 =1
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 𝜁 )
+
+𝜕 ¯𝜂 𝜁 ,𝑙,𝑖 
+
+𝑀 𝑖𝑣 
+
+  𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 𝜁 ,𝑙,𝑖 
+
+# ! 2
+
+Theorem 2 is an asymptotic statement about the number of bags, not the sample size used for training the nuisance models. Equipped with ˆ 𝜏 2, we may adaptively cross-bag until a desired level of seed stability is reached. 1. Fix 𝜌 ∈ ( 0, 1) and an initial target OOB threshold 𝑉 > 1. Let 𝑚 = ⌊𝜌𝑛 ⌋. Construct 𝜁 , train nuisance models, compute pooled OOB predictions ¯ 𝜂 𝜁 , and form the cross-bagged estimator 
+
+Ψ(D 𝑛 , ¯𝜂 𝜁 ) as in the cross-bagging procedure above. 2. Estimate ˆ 𝜏 2 using the variance estimator in Theorem 2. 3. Let 𝑡 𝑉 † −1,1− 𝛿 /2 be the 1 − 𝛿 /2 quantile of the 𝑡 -distribution with 𝑉 † − 1 degrees of freedom. If 
+
+𝑡 𝑉 † −1,1− 𝛿 /2
+
+ 2 ˆ 𝜏 2
+
+𝑉 †
+
+1/2
+
+≤ 𝜖, 
+
+return Ψ(D 𝑛 , ¯𝜂 𝜁 ). Otherwise, draw additional seed-and-bag pairs, append them to 𝜁 , update 
+
+𝑉 †, recompute the pooled OOB predictions ¯ 𝜂 𝜁 and the estimator Ψ(D 𝑛 , ¯𝜂 𝜁 ), and return to step 2. The adaptive cross-bagging algorithm constructs a 1 − 𝛿 confidence interval around 
+
+𝐸 𝜁 ,𝜁 ′ [Ψ(D 𝑛 , ¯𝜂 𝜁 ) − Ψ(D 𝑛 , ¯𝜂 𝜁 ′ )] = 0 and iteratively checks that this interval is contained in 
+
+[− 𝜖, 𝜖 ]. The gradient in Theorem 2 can easily be calculated using standard automatic differ-entiation software without deriving the analytic form. 
+
+5. Numerical experiments 
+
+The primary aim of our numerical simulation is to (i) show that bagging stabilizes a seed-unstable algorithm 𝔉 given sufficiently many bags 𝑉 , and (ii) compare our adaptive cross-bagging algorithm for controlling (𝜖, 𝛿 )-stability of Ψ(D 𝑛 , 𝜂 ) against na¨ ıve averaging and increased cross-fitting folds. For the first goal, we generate a random data generating process (DGP) with one binary outcome 
+
+𝑌 and 20 features 𝑋 using Claude Opus 4.6 (Anthropic, 2025); the DGP may be found in the supplementary materials. We then simulate one dataset ( 𝑛 = 100) and a single test observation, Controlling random seed stability via bagging 7
+
+Fig. 1: Empirical seed (𝜖, 𝛿 )-stability. Left: single layer neural network predictions. The red line corresponds to no bagging and the black line to subbagging using the estimated minimum 𝑉 -bags for seed (0.1, 0.1)-stability (dashed line). Right: AIPW estimator for the ATE. The blue, red, and green lines correspond to 2-fold, 10-fold, and LOO cross-fitting respectively; the black line corresponds to adaptive cross-bagging for seed (0.01 , 0.01 )-stability. Dashed lines correspond to no seed averaging, while dotted lines correspond to averaging over 80 seeds. and draw 1000 seeds from Unif (𝑀 int ). For each seed, we train a single layer neural network with 20 neurons (Rumelhart et al., 1986) and a subbagged version of the neural network for pr (𝑌 = 1 | 𝑋 ); we generate a prediction from each model on the same test observation. We use 
+
+𝜌 = 2/3 and 𝑉 = 320 for training the subbagged neural network, where the number of bags is chosen to guarantee seed (0.1, 0.1)-stability under the worst case variance of 𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) = 1/4. For the second aim we use the DGP from Schader et al. (2024); it consists of four confounders 
+
+𝑋 , binary exposure 𝐴 , and binary outcome 𝑌 and may be found in the supplementary materials. The target parameter 𝜓 0 is the ATE of 𝐴 on 𝑌 adjusting for 𝑋 . Again, we simulate a single dataset (𝑛 = 100) and draw 1000 seeds. For each seed, we estimate the ATE using AIPW with (i) 2-fold, 10-fold, and LOO cross-fitting, (ii) the “averaging on final estimate” approach from Schader et al. (2024) and Chernozhukov et al. (2018) with 80 seeds and 2-fold (the parameterization used by Schader et al. (2024)), 10-fold, and LOO cross-fitting, and (iii) with adaptive cross-bagging (𝜌 = 1/2) and stability criterion: (𝜖, 𝛿 ) = (0.01 , 0.01 ). Replicating Schader et al. (2024), we estimate nuisance parameters using a random forest with 500 trees (Breiman, 2001). To avoid cherry-picking the generated datasets, an initial seed was also generated with Claude Opus 4.6 (Anthropic, 2025). All simulations were conducted in R (R Core Team, 2025). Simulation code is available at https://github.com/nt-williams/ bagging-random-seed-stability .5.1 . Results 
+
+Results of the numerical experiments are shown in Figure 1, where we plot an empirical estimate of the seed stability criterion averaged over a large number of seeds ˆ𝛿 𝜖 = 1
+
+ 1000 2
+
+∑︁ 
+
+> 𝑖< 𝑗
+
+1 𝑝 𝑖 − 𝑝 𝑗 > 𝜖  .8 N. Williams et al. 
+
+We assess random-seed stability via 𝑟 ( ˆ𝛿 𝜖 , 𝛿 ) = ˆ𝛿 𝜖 /𝛿 , where 𝑟 ≤ 1 indicates the (𝜖, 𝛿 )-stability criterion is met and larger 𝑟 indicates looser control (e.g., 𝑟 = 10 indicates the empirical stability was 10 times the tolerated level). In simulation 1, the subbagged neural network ( 𝑉 = 320) achieves conservative stability, 𝑟 ( ˆ𝛿 0.1, 0.1) = 0, whereas the neural network without bagging yields 𝑟 ( ˆ𝛿 0.1, 0.1) = 7.5. In simulation 2, AIPW with adaptive cross-bagging controls stability near the target: 𝑟 ( ˆ𝛿 0.01 , 0.01 ) = 1.04. Without averaging, 2-fold cross-fitting gives 𝑟 ( ˆ𝛿 0.01 , 0.01 ) =
+
+90 .5; 10-fold, 79 .12; LOO, 31 .52. Averaging over 80 seeds, these become 90 .35 (2-fold), 78 .33 (10-fold), and 0 (LOO). The median number of bags selected by the adaptive cross-bagging algorithm was 396. On an Apple M3 Max with 36 GB RAM, the adaptive cross-bagging algorithm achieved 
+
+(0.01 , 0.01 )-stability in approximately 20 seconds. The averaging on final estimate approach ran in approximately 11 seconds (2-folds), 1 minute (10-fold), and 10 minutes (LOO). While the averaging on final estimate approach with LOO cross-fitting also achieved (0.01 , 0.01 )-stability, it required roughly 20 times the computation time. 
+
+Declaration of the use of generative AI and AI-assisted technologies 
+
+During the preparation of this work the authors used Claude Opus 4.6 (Anthropic, 2025) in order to generate a data generating process for numerical simulation and to improve clarity of writing. After using this tool/service the author(s) reviewed and edited the content as necessary and take full responsibility for the content of the publication. 
+
+Supplementary material 
+
+The Supplementary Material includes proofs of the results and data generating processes. 
+
+References 
+
+Andonova, S. , Elisseeff, A. , Evgeniou, T. & Pontil, M. (2002). A simple algorithm for learning stable machines. In ECAI .
+
+Anthropic (2025). Claude opus 4.6. https://www.anthropic.com . Large language model. 
+
+Breiman, L. (1996a). Bagging predictors. Machine learning 24 , 123–140. 
+
+Breiman, L. (1996b). Heuristics of instability and stabilization in model selection. The annals of statistics 24 ,2350–2383. 
+
+Breiman, L. (2001). Random forests. Machine Learning 45 , 5–32. 
+
+Chernozhukov, V. , Chetverikov, D. , Demirer, M. , Duflo, E. , Hansen, C. , Newey, W. & Robins, J. (2018). Double/debiased machine learning for treatment and structural parameters. The Econometrics Journal 21 , C1– C68. 
+
+Efron, B. (1979). Bootstrap methods: Another look at the jackknife. The Annals of Statistics 7, 1–26. 
+
+Naimi, A. I. , Yu, Y.-H. & Bodnar, L. M. (2024). Pseudo-random number generator influences on average treatment effect estimates obtained with machine learning. Epidemiology 35 , 779–786. 
+
+Popoviciu, T. (1935). Sur les ´ equations alg´ ebriques ayant toutes leurs racines r´ eelles. Mathematica 9, 20. 
+
+R Core Team (2025). R: A Language and Environment for Statistical Computing . R Foundation for Statistical Computing, Vienna, Austria. 
+
+Robins, J. M. , Rotnitzky, A. & Zhao, L. P. (1994). Estimation of regression coefficients when some regressors are not always observed. Journal of the American statistical Association 89 , 846–866. 
+
+Rumelhart, D. E. , Hinton, G. E. & Williams, R. J. (1986). Learning representations by back-propagating errors. 
+
+Nature 323 , 533–536. 
+
+Schader, L. , Song, W. , Kempker, R. & Benkeser, D. (2024). Don’t let your analysis go to seed: on the impact of random seed on machine learning-based causal inference. Epidemiology 35 , 764–778. 
+
+Shalev-Shwartz, S. , Shamir, O. , Srebro, N. & Sridharan, K. (2010). Learnability, stability and uniform conver-gence. The Journal of Machine Learning Research 11 , 2635–2670. 
+
+Soloff, J. A. , Barber, R. F. & Willett, R. (2024). Bagging provides assumption-free stability. Journal of Machine Learning Research 25 , 1–35. Controlling random seed stability via bagging 9
+
+van der Laan, M. J. & Rubin, D. B. (2006). Targeted maximum likelihood learning. The International Journal of Biostatistics 2, Article 11. 
+
+Williams, N. , Rosenblum, M. & D´ ıaz, I. (2022). Optimising precision and power by machine learning in randomised trials with ordinal and time-to-event outcomes with an application to covid-19. Journal of the Royal Statistical Society Series A: Statistics in Society 185 , 2156–2178. 
+
+Williams, N. T. , Hung, A. & Rudolph, K. E. (2025). Re: Don’t let your analysis go to seed: On the impact of random seed on machine learning-based causal inference. Epidemiology 36 , e12–e13. 
+
+Zheng, W. & van der Laan, M. J. (2011). Cross-Validated Targeted Minimum-Loss-Based Estimation . New York, NY: Springer New York, pp. 459–474. 
+
+Zivich, P. N. (2024). Commentary: The seedy side of causal effect estimation with machine learning. Epidemiology 
+
+35 , 787–790. 10 N. Williams et al. 
+
+A. Proofs 
+
+Lemma 1 Proof. Define 𝑅 (𝑥 ) := 𝔉 (D 𝑛 , 𝑠 )( 𝑥 ) − 𝔉 (D 𝑛 , 𝑠 ′)( 𝑥 ), which is a random variable in [− 1, 1]. Because 
+
+𝔉 (D 𝑛 , 𝑠 )( 𝑥 ) and 𝔉 (D 𝑛 , 𝑠 ′)( 𝑥 ) are independent draws from F (D 𝑛 )
+
+Var 𝑠,𝑠 ′ (𝑅 (𝑥 )) = 2𝜎 2 (𝑥 ; D𝑛 ).
+
+In addition, recognize that 𝔉 (D 𝑛 , 𝑠 )( 𝑥 ) and 𝔉 (D 𝑛 , 𝑠 ′)( 𝑥 ) are unbiased for 𝔉 ∞ (D 𝑛 )( 𝑥 ) such that 
+
+𝐸 𝑠,𝑠 ′ [𝑅 (𝑥 )] = 0. Then, by Bernstein’s inequality pr 𝑠,𝑠 ′ (| 𝑅 (𝑥 )| ≥ 𝜖 ) ≤ 2 exp − 𝜖 2
+
+4𝜎 2 (𝑥 ; D𝑛 ) + 23 𝜖 
+
+!
+
+.
+
+Let 𝑘 = |T | . We have pr 𝑠,𝑠 ′
+
+
+
+max   
+
+> 𝑥 ∈ T
+
+|𝑅 (𝑥 )| ≥ 𝜖 
+
+
+
+= pr 𝑠,𝑠 ′
+
+> 𝑘
+
+Ø
+
+> 𝑖 =1
+
+{| 𝑅 (𝑥 𝑖 )| ≥ 𝜖 }
+
+!
+
+≤
+
+> 𝑘
+
+∑︁ 
+
+> 𝑖 =1
+
+pr 𝑠,𝑠 ′ (| 𝑅 (𝑥 𝑖 )| ≥ 𝜖 )≤ 𝑘 max   
+
+> 𝑥 ∈ T
+
+pr 𝑠,𝑠 ′ (| 𝑅 (𝑥 )| ≥ 𝜖 ) .
+
+Therefore, to control pr 𝑠,𝑠 ′ (max 𝑥 ∈ T |𝑅 (𝑥 )| ≥ 𝜖 ) with probability 𝛿 , it suffices to control all point-wise predictions with probability 𝛿 /𝑘 . Setting the right-hand side of the Bernstein inequality to less than or equal to 𝛿 /𝑘 and solving for 𝜎 2 (D 𝑛 , T ) = max 𝑥 ∈ T 𝜎 2 (𝑥 ; D𝑛 ) yields 
+
+𝜎 2 (D 𝑛 , T ) ≤ 𝜖 
+
+4
+
+ 𝜖 
+
+log (2𝑘 /𝛿 ) − 23
+
+
+
+.
+
+Theorem 1 Proof. Recall that 𝑚 = ⌊𝜌𝑛 ⌋ for 𝜌 ∈ ( 0, 1), and that (𝑠, 𝐵 ) ∼ P S ⊗ P B . Define 
+
+𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) = Var (𝑠,𝐵 ) (𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 )) .
+
+Define 𝑆 (𝑥 ) := ¯𝔉 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 ) − ¯𝔉 (D 𝑛 , 𝜌, 𝜁 ′)( 𝑥 ). Recognize that 𝐸 𝜁 ,𝜁 ′ [𝑆 (𝑥 )] = 0, Var 𝜁 ,𝜁 ′ (𝑆 (𝑥 )) =
+
+2𝜈 2 (𝑥 ; D𝑛 , 𝜌 )/ 𝑉 , and 𝑆 (𝑥 ) ∈ [− 1, 1]. Therefore, by Bernstein’s inequality pr 𝜁 ,𝜁 ′ (| 𝑆 (𝑥 )| ≥ 𝜖 ) ≤ 2 exp − 𝑉𝜖 2
+
+4𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) + 23 𝜖 
+
+!
+
+.
+
+Again, this point-wise bound can be made uniform over finite T ⊂ X , 𝑘 = |T | with a union bound. Setting the right-hand side of the inequality less than or equal to 𝛿 /𝑘 and solving for 𝑉 yields 
+
+𝑉 ≥ log (2𝑘 /𝛿 )
+
+𝜖 2
+
+
+
+4𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) + 23 𝜖 
+
+
+
+,
+
+which holds for all 𝑥 ∈ T if 
+
+𝑉 ≥ max  
+
+> 𝑥 ∈ T
+
+log (2𝑘 /𝛿 )
+
+𝜖 2
+
+
+
+4𝜈 2 (𝑥 ; D𝑛 , 𝜌 ) + 23 𝜖 
+
+
+
+.
+
+Corollary 1 Proof. Denote bagged nuisance predictions ¯ 𝜂 𝜁 = { ¯𝜂 𝜁 ,𝑙 }𝑝 𝑙 =1 where ¯ 𝜂 𝜁 ,𝑙 = { ¯𝔉 𝑙 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 }
+
+is a vector of 𝑛 bagged predictions from the 𝑙 th regression algorithm generated under seed and bag pairs Controlling random seed stability via bagging 11 
+
+𝜁 . Let ¯𝜂 𝜁 ∞ = max 𝑖 (max 𝑙 (| ¯𝔉 𝑙 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 )|)) . Suppose that Ψ(D 𝑛 , 𝜂 ) is Lipschitz continuous in 𝜂 so that there is a constant 𝐿 such that 
+
+|Ψ(D 𝑛 , ¯𝜂 𝜁 ) − Ψ(D 𝑛 , ¯𝜂 ′ 
+
+> 𝜁
+
+)| ≤ 𝐿 ¯𝜂 𝜁 − ¯𝜂 ′  
+
+> 𝜁 ∞
+
+.
+
+Then, pr 𝜁 ,𝜁 ′
+
+
+
+Ψ(D 𝑛 , ¯𝜂 𝜁 ) − Ψ(D 𝑛 , ¯𝜂 ′ 
+
+> 𝜁
+
+) ≥ 𝜖 
+
+
+
+≤ pr 𝜁 ,𝜁 ′
+
+
+
+𝐿 ¯𝜂 𝜁 − ¯𝜂 ′  
+
+> 𝜁 ∞
+
+≥ 𝜖 
+
+
+
+= pr 𝜁 ,𝜁 ′
+
+
+
+¯𝜂 𝜁 − ¯𝜂 ′  
+
+> 𝜁 ∞
+
+≥ 𝜖 𝐿 
+
+
+
+≤
+
+> 𝑛
+
+∑︁ 
+
+> 𝑖 =1
+> 𝑝
+
+∑︁ 
+
+> 𝑙 =1
+
+pr 𝜁 ,𝜁 ′
+
+
+
+¯𝜂 𝜁 ,𝑙,𝑖 − ¯𝜂 𝜁 ′ ,𝑙,𝑖 ≥ 𝜖 𝐿 
+
+
+
+,
+
+Therefore to control pr 𝜁 ,𝜁 ′
+
+
+
+¯𝜂 𝜁 − ¯𝜂 ′  
+
+> 𝜁 ∞
+
+≥ 𝜖 𝐿 
+
+
+
+with probability 𝛿 , it suffices to control the random seed stability of all point-wise bagged predictions on D𝑛 with probability 𝛿 /( 𝑛𝑝 ). From the previous proof we have pr 𝜁 ,𝜁 ′
+
+
+
+¯𝜂 𝜁 ,𝑙,𝑖 − ¯𝜂 𝜁 ′ ,𝑙,𝑖 ≥ 𝜖 𝐿 
+
+
+
+≤ 2 exp − 𝑉 (𝜖 /𝐿 )2
+
+4𝜈 2 
+
+> 𝑙
+
+(𝑥 𝑖 ; D𝑛 , 𝜌 ) + 23 (𝜖 /𝐿 )
+
+!
+
+.
+
+Setting the right-hand side less than or equal to 𝛿 /( 𝑛𝑝 ) and solving for 𝑉 𝑉 ≥ log (2𝑛𝑝 /𝛿 )(𝜖 /𝐿 )2
+
+
+
+4𝜈 2 
+
+> 𝑙
+
+(𝑥 𝑖 ; D𝑛 , 𝜌 ) + 23
+
+𝜖 𝐿 
+
+
+
+,
+
+which holds simultaneously when 
+
+𝑉 ≥ max   
+
+> 𝑙 ∈ [ 𝑝 ],𝑧 𝑖 ∈ D 𝑛
+
+log (2𝑛𝑝 /𝛿 )(𝜖 /𝐿 )2
+
+
+
+4𝜈 2 
+
+> 𝑙
+
+(𝑥 𝑖 ; D𝑛 , 𝜌 ) + 23
+
+𝜖 𝐿 
+
+
+
+.
+
+Theorem 2 Proof. Let 1𝑉 be a vector of ones with length 𝑉 . Define matrix 𝑀 ∈ { 0, 1}𝑛 ×𝑉 where 𝑀 𝑖𝑣 = 1[𝑖 ∉ 𝐵 𝑣 𝑚 ],and 𝐶 = 𝑀 1𝑉 . Cross-bagged predictions of algorithm 𝔉 on data D𝑛 are then given by ¯𝔉 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 ) = 1
+
+𝐶 𝑖 ∑︁ 𝑣 
+
+𝑀 𝑖,𝑣 𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) = 1/𝑉 Í𝑣 𝑀 𝑖,𝑣 𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 )
+
+𝐶 𝑖 /𝑉 ,
+
+The numerator is a sample average of i.i.d terms and therefore the central limit theorem may be applied. Note that as 𝑉 → ∞ , 𝐶 𝑖 /𝑉 𝑝 
+
+→ ( 1 − 𝑚 /𝑛 ) ≠ 0. Therefore, by Slutsky’s theorem, √𝑉   ¯𝔉 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 ) − ¯𝔉 ∞ (D 𝑛 , 𝜌 )( 𝑥 𝑖 ) also converges to a normal distribution as 𝑉 → ∞ . Define ¯𝜂 𝜁 =  ¯𝔉 (D 𝑛 , 𝜌, 𝜁 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 , ¯𝜂 ∞ =  ¯𝔉 ∞ (D 𝑛 , 𝜌 )( 𝑥 𝑖 ) : 𝑧 𝑖 ∈ D 𝑛 
+
+Then by the multivariate central limit theorem, 
+
+√𝑉   ¯𝜂 𝜁 − ¯𝜂 ∞ ⇝ N ( 0, Σ).
+
+Suppose the function Ψ(D 𝑛 , 𝜂 ) is differentiable in 𝜂 . Then by the delta method, 
+
+√𝑉  Ψ(D 𝑛 , ¯𝜂 𝜁 ) − Ψ(D 𝑛 , ¯𝜂 ∞) ⇝ N ( 0, 𝜏 2)
+
+where the asymptotic variance 𝜏 2 = ∇𝜂 Ψ(D 𝑛 , ¯𝜂 ∞)′Σ∇𝜂 Ψ(D 𝑛 , ¯𝜂 ∞). Recognize that 𝜏 2 is the asymptotic variance of the first order Taylor expansion 𝑉 1/2 (Ψ(D 𝑛 , ¯𝜂 𝜁 ) − Ψ(D 𝑛 , ¯𝜂 ∞)) ≈ 𝑉 1/2∇𝜂 Ψ(D 𝑛 , ¯𝜂 ∞)′ ( ¯𝜂 𝜁 −12 N. Williams et al. 
+
+¯𝜂 ∞). Expressed algebraically, we have: 
+
+∇𝜂 Ψ(D 𝑛 , ¯𝜂 ∞)′ ( ¯𝜂 𝜁 − ¯𝜂 ∞) =∑︁ 
+
+> 𝑖
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 ∞)
+
+𝜕 ¯𝜂 ∞
+
+> 𝑖
+
+( ¯𝜂 𝜁 ,𝑖 − ¯𝜂 ∞ 
+
+> 𝑖
+
+)
+
+=∑︁ 
+
+> 𝑖
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 ∞)
+
+𝜕 ¯𝜂 ∞
+
+> 𝑖
+
+1
+
+𝐶 𝑖 ∑︁ 𝑣 
+
+𝑀 𝑖,𝑣 𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 ∞
+
+> 𝑖
+
+!
+
+=∑︁ 
+
+> 𝑖
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 ∞)
+
+𝜕 ¯𝜂 ∞
+
+> 𝑖
+
+1
+
+𝐶 𝑖 ∑︁ 𝑣 
+
+𝑀 𝑖,𝑣 𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − 1
+
+𝐶 𝑖 ∑︁ 𝑣 
+
+𝑀 𝑖,𝑣 ¯𝜂 ∞
+
+> 𝑖
+
+!
+
+=∑︁ 
+
+> 𝑣
+
+∑︁ 𝑖 
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 ∞)
+
+𝜕 ¯𝜂 ∞
+
+> 𝑖
+
+𝑀 𝑖,𝑣 
+
+𝐶 𝑖 
+
+  𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 ∞
+
+> 𝑖
+
+
+
+≈∑︁ 
+
+> 𝑣
+
+∑︁ 𝑖 
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 ∞)
+
+𝜕 ¯𝜂 ∞
+
+> 𝑖
+
+𝑀 𝑖,𝑣 
+
+𝑉 (1 − 𝑚 /𝑛 )
+
+  𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 ∞
+
+> 𝑖
+
+
+
+= 1
+
+𝑉 ∑︁ 𝑣 
+
+1
+
+(1 − 𝑚 /𝑛 )∑︁ 𝑖 
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 ∞)
+
+𝜕 ¯𝜂 ∞
+
+> 𝑖
+
+𝑀 𝑖,𝑣 
+
+  𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 ∞
+
+> 𝑖
+
+ ,
+
+where the second approximation uses the fact that as 𝑉 → ∞ , 𝐶 𝑖 /𝑉 𝑝 
+
+→ ( 1 − 𝑚 /𝑛 ). Denote 
+
+𝑈 (𝑀 :,𝑣 , ¯𝜂 𝜁 ) = 1
+
+(1 − 𝑚 /𝑛 )∑︁ 𝑖 
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 𝜁 )
+
+𝜕 ¯𝜂 𝜁 ,𝑖 
+
+𝑀 𝑖,𝑣 
+
+  𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 𝜁 ,𝑖 
+
+ .
+
+Because ¯ 𝜂 𝜁 𝑝 
+
+→ ¯𝜂 ∞ as 𝑉 → ∞ and by the continuous mapping theorem 𝑈 (𝑀 :,𝑣 , ¯𝜂 𝜁 )2 𝑝 
+
+→ 𝑈 (𝑀 :,𝑣 , ¯𝜂 ∞)2 as 
+
+𝑉 → ∞ . Then by the weak law of large numbers and Slutksy’s lemma 1
+
+𝑉 ∑︁ 𝑣 
+
+𝑈 (𝑀 :,𝑣 , ¯𝜂 𝜁 )2 𝑝 
+
+→ 𝐸 [𝑈 (𝑀 :,𝑣 , ¯𝜂 ∞)2].
+
+Using the fact that 𝐸 [𝑈 (𝑀 :,𝑣 , ¯𝜂 ∞)] = 0, a consistent estimator for 𝜏 2 is then ˆ𝜏 2 = 1
+
+𝑉 (1 − 𝑚 /𝑛 )2∑︁ 𝑣  ∑︁ 𝑖 
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 𝜁 )
+
+𝜕 ¯𝜂 𝜁 ,𝑖 
+
+𝑀 𝑖,𝑣 
+
+  𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 𝜁 ,𝑖 
+
+!2
+
+,
+
+which generalizes to the case where 𝜂 has 𝑝 > 1 dimensions: ˆ𝜏 2 = 1
+
+𝑉 (1 − 𝑚 /𝑛 )2∑︁ 𝑣  ∑︁ 𝑙 
+
+"∑︁ 
+
+> 𝑖
+
+𝜕 Ψ(D 𝑛 , ¯𝜂 𝜁 )
+
+𝜕 ¯𝜂 𝜁 ,𝑙,𝑖 
+
+𝑀 𝑖,𝑣 
+
+  𝔉 (D 𝑛 (𝐵 𝑣 𝑚 ), 𝑠 𝑣 )( 𝑥 𝑖 ) − ¯𝜂 𝜁 ,𝑙,𝑖 
+
+# ! 2
+
+.
+
+Miscellanea results 
+
+“For example, it trivially holds for the AIPW estimator of the ATE when 𝑐 < 𝜋 𝑖 < 1 − 𝑐 for some 𝑐 > 0. ”
+
+Proof. We have 
+
+Ψ(D 𝑛 , 𝜂 ) = 1
+
+𝑛 
+
+> 𝑛
+
+∑︁ 
+
+> 𝑖 =1
+
+ 𝑎 𝑖 
+
+𝜋 𝑖 
+
+− 1 − 𝑎 𝑖 
+
+1 − 𝜋 𝑖 
+
+  𝑦 𝑖 − 𝜇 𝑎 𝑖 
+
+> 𝑖
+
+ + 𝜇 1 
+
+> 𝑖
+
+− 𝜇 0 
+
+> 𝑖
+
+.Controlling random seed stability via bagging 13 
+
+Which has partial derivatives with respect to 𝜂 :
+
+𝜕 Ψ(D 𝑛 , 𝜂 )
+
+𝜕𝜋 𝑖 
+
+= − 1
+
+𝑛 
+
+2𝑎 𝑖 − 1
+
+𝜋 2
+
+> 𝑖
+
+(𝑦 𝑖 − 𝜇 𝑎 𝑖  
+
+> 𝑖
+
+)
+
+𝜕 Ψ(D 𝑛 , 𝜂 )
+
+𝜕𝜇 0
+
+> 𝑖
+
+= 1
+
+𝑛 
+
+ 1 − 𝑎 𝑖 
+
+𝜋 𝑖 
+
+− 1
+
+
+
+𝜕 Ψ(D 𝑛 , 𝜂 )
+
+𝜕𝜇 1
+
+> 𝑖
+
+= 1
+
+𝑛 
+
+
+
+1 − 𝑎 𝑖 
+
+𝜋 𝑖 
+
+
+
+A sufficient condition for all partial derivatives to be bounded: 1. 𝜋 𝑖 > 𝑐 > 0, 2. boundedness of 𝜇 𝑎 𝑖 for 𝑎 ∈ { 0, 1}, and 3. boundedness of 𝑦 𝑖 
+
+Conditions 2 and 3 hold by construction. □
+
+B. Simulation details 
+
+Define 0𝑘 and 1𝑘 as vectors of zeros and ones with size 𝑘 , respectively. For the first simulation, we generated data from the following data generating mechanism: 
+
+(𝑊 1, . . . , 𝑊 5)⊤ ∼ N ( 05, Σ1) , [Σ1]𝑗,𝑘 = 0.3 · 1( 𝑗 ≠ 𝑘 ) + 1( 𝑗 = 𝑘 )(𝑊 6, . . . , 𝑊 10 )⊤ ∼ N ( 15, Σ2) , [Σ2]𝑗,𝑘 = 0.2 · 1( 𝑗 ≠ 𝑘 ) + 1( 𝑗 = 𝑘 )
+
+𝑊 11 , . . . , 𝑊 15 iid 
+
+∼ N ( 0, 1.52)
+
+𝑊 16 ∼ Gamma (2, 1)
+
+𝑊 17 = 4(𝐵 − 1), 𝐵 ∼ Beta (2, 5)
+
+𝑊 18 ∼ N ( 0, 4)
+
+𝑊 19 ∼ 𝑡 (df = 5)
+
+𝑊 20 ∼ Uniform (− 2, 2)
+
+logit 𝐸 [𝑌 | 𝑊 ] = −0.5
+
++ 0.5 𝑊 1 − 0.3 𝑊 22 + sin   𝜋  
+
+> 2
+
+𝑊 3
+
+ + 0.4 (𝑊 4)+ − 0.6 |𝑊 5 |+ 0.2 𝑊 6 + 5 𝜙 (𝑊 7; 1 , 0.5) − 0.3 𝑊 8
+
++ 0.5 sign (𝑊 9) log (| 𝑊 9 | + 1) − 0.15 𝑊 10 
+
++ 0.8 1(𝑊 11 > 1) 𝑊 11 − 0.04 𝑊 313 
+
++ 0.3√︁ (𝑊 16 )+ − 0.6 cos (𝑊 18 ) + 0.2 𝑊 20 
+
++ 0.5 𝑊 1𝑊 6 − 0.4 𝑊 2𝑊 3
+
++ 0.6 𝑊 4 · 1(𝑊 7 > 0.5) − 0.3 𝑊 5 sin (𝑊 18 )+ 0.7 𝑊 11 𝑊 16 
+
+1 + | 𝑊 11 | − 0.5 1(𝑊 8 > 0) 1(𝑊 13 > 0)+ 0.4 𝑊 1 𝑊 7 · 1(𝑊 20 > 0)
+
+𝑌 = expit (logit 𝐸 [𝑌 | 𝑊 ]) 
+
+For the second simulation we used the following data generating mechanism from Schader et al. (2024): 14 N. Williams et al. 
+
+𝑊 1 ∼ Uniform (0, 2)
+
+𝑊 2, 𝑊 3, 𝑊 4 iid 
+
+∼ Bernoulli (0.5)
+
+logit pr ( 𝐴 = 1 | 𝑊 ) = 𝑊 1 + 𝑊 2𝑊 3 − 2 𝑊 4
+
+logit pr (𝑌 = 1 | 𝐴, 𝑊 ) = 𝑊 1 + 𝑊 2𝑊 3 − 3.
