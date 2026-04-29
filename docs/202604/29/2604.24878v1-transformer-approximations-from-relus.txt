@@ -1,0 +1,3096 @@
+Title: Transformer Approximations from ReLUs
+
+URL Source: https://arxiv.org/pdf/2604.24878v1
+
+Published Time: Wed, 29 Apr 2026 00:06:57 GMT
+
+Number of Pages: 56
+
+Markdown Content:
+Last Update: April 29, 2026 
+
+# Transformer Approximations from ReLUs 
+
+Jerry Yao-Chieh Hu †∗ 1 Mingcheng Lu ∗2 Yi-Chen Lee ‡3 Han Liu †♯4 
+
+> †
+
+Center for Foundation Models and Generative AI, Northwestern University, Evanston, IL 60208, USA Department of Computer Science, Northwestern University, Evanston, IL 60208, USA  
+
+> ‡
+
+Department of Physics, National Taiwan University, Taipei 10617, Taiwan  
+
+> ♯
+
+Department of Statistics and Data Science, Northwestern University, Evanston, IL 60208, USA 
+
+We provide a systematic recipe for translating ReLU approximation results to softmax attention mechanism. This recipe covers many common approximation targets. Importantly, it yields target-specific, economic resource bounds beyond universal approximation statements. We showcase the recipe on multiplication, reciprocal computation, and min/max primitives. These results provide new analytical tools for analyzing softmax transformer models. 
+
+> 1
+
+jhu@u.northwestern.edu 
+
+> 2
+
+2860215400pp@gmail.com 
+
+> 3
+
+b10202055@ntu.edu.tw 
+
+> 4
+
+hanliu@northwestern.edu 
+
+> *
+
+These authors contributed equally to this work. 
+
+> arXiv:2604.24878v1 [cs.LG] 27 Apr 2026
+
+# Contents 
+
+1 Introduction 12 Related Work 33 Preliminaries 44 Main Result: Translation Theorem 65 Implications of Translation Theorem 8
+
+5.1 Constructive Transformer-Native Universal Approximation . . . . . . . . . . . . 95.2 Approximation of Rational Functions . . . . . . . . . . . . . . . . . . . . . . . . 10 5.3 Additional Target-Specific Approximation by Transformers . . . . . . . . . . . . 13 
+
+6 Proof Sketch of Theorem 4.1 14 7 Concluding Remarks 16 A Proof of Translation Theorem 20 
+
+A.1 Auxiliary Lemmas . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 A.2 Main Proof of Lemma 4.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32 A.3 Main Proof of Theorem 4.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36 
+
+B Constructive Transformer Universal Approximation 39 
+
+B.1 ReLU Network’s Universal Approximation Theorem . . . . . . . . . . . . . . . 39 B.2 Main Proof of Theorem 5.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40 
+
+C Approximation of Rational Functions with Attention Network 42 
+
+C.1 Proof of Proposition 5.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42 C.2 Proof of Proposition 5.2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43 C.3 Proof of Proposition 5.3 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45 
+
+D Proofs of Section 5.3 48 
+
+D.1 Proof of Proposition 5.4 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48 D.2 Proof of Proposition 5.5 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49 D.3 Proof of Proposition 5.6 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50 
+
+# 1 Introduction 
+
+We present a systematic recipe for translating ReLU approximation results to softmax Transform-ers 1. Given a constructive ReLU approximator for a target, we construct an explicit softmax transformer with the same accuracy. The recipe applies to many common approximation targets and yields quantitative resource bounds beyond universal approximation statements. This matters because broad Universal Approximation Properties (UAP) still dominate Trans-former approximation theory. For softmax Transformer, many universality results provide explicit constructions and quantitative resource bounds (e.g., parameters, depth, width...etc) [Yun et al., 2020, Kajitsuka and Sato, 2023, Takakura and Suzuki, 2023, Jiang and Li, 2024, Hu et al., 2025, 
+
+> 1In this work, by Transformers, we mean attention-only Transformers implemented by the softmax attention mechanism [Vaswani et al., 2017].
+
+1Liu et al., 2025]. But these bounds reflect the cost of approximating broad function classes, not the complexity of a specific target. As a result, they are often much looser than what practical sce-narios require. In many applications, the target class is much narrower. So universality-oriented constructions contain high redundancy and provide weak worst-case complexity control (e.g., in statistical estimation analyses). In fact, this is one main reason existing worst-case bounds for practical transformer generative models remain loose [Hu et al., 2024b, Su et al., 2025]. What is missing is a constructive and target-specific approximation theory for softmax attention. On the other hand, ReLU networks already admit a mature target-specific approximation theory. For many concrete targets, one constructs ReLU networks with explicit depth and width as func-tions of approximation precision ϵ [Yarotsky, 2017, Telgarsky, 2017, Petersen and Voigtlaender, 2018, Suzuki, 2018, Schmidt-Hieber, 2020, Nakada and Imaizumi, 2020, Oko et al., 2023, Fu et al., 2024]. Classic examples include multiplication, monomials, and reciprocal maps [Schmidt-Hieber, 2020, Oko et al., 2023, Fu et al., 2024]. These constructions often build a small set of primitives and then compose them, so rates propagate through the pipeline. These nice results motivate us to seek the same style of results for Transformers, with explicit rates and construc-tions. This is timely and of high practical importance since transformers are the core backbone in modern foundation models (LLMs and generative AIs). Therefore, our goal in this paper is to transfer this target-specific ReLU theory to Transformers. To this end, we present a translation theorem to lift these ReLU constructions into softmax-attention Transformers. Given a ReLU approximator, the theorem produces an explicit softmax-attention approximator with the same accuracy and controlled resources. To showcase this the-orem, we illustrate the theorem on several basic targets: multiplication, reciprocal computation, min/max and clipping in Propositions 5.1 to 5.3. 
+
+Contributions. Our contributions are three-fold: • A General Translation Theorem (Theorem 4.1). We prove a constructive reduction from ReLU approximation to softmax-attention Transformer approximation. Given a ReLU ap-proximator, the reduction produces an explicit Transformer approximator with the same target accuracy. Moreover, the obtained resource bounds are more economic than those of universality oriented. • Constructive Transformer Universality (Theorem 5.1 and Table 1). We establish a con-structive transformer-native universal approximation result. More precisely, our comparison point is [Hu et al., 2025, Theorem G.1 in Appendix G]: their transformer-native attention-only universality theorem is obtained via an existence-type ReLU UAP. In contrast, our result makes this route explicit and tracks the resulting architectural and norm resources. 2         
+
+> 2More precisely, Hu et al. [2025] contain two different universality results. Their main-text result ([Hu et al., 2025, Section 3 & 4]) is constructive but uses an attached sequence-wise linear map, and therefore is not transformer-native in the attention-only sense considered here. Their Theorem G.1 in Appendix G gives a transformer-native attention-only universality theorem, but it is derived via an existence-type ReLU UAP. Our Theorem 5.1 makes this latter route constructive and tracks H,W,K,λ,CKQ , and CV.
+
+2• Economic Transformer Constructions for Specific Targets (Propositions 5.1 to 5.3). 
+
+Using our translation framework, we derive new economic transformer constructions for several specific approximation targets. In particular, we obtain economic softmax-attention Transformers to approximate rational functions, to simulate composite ReLU modules, and to implement schedule terms arising in generative models. These case studies illustrate how our recipe yields improved size and depth bounds for transformers on important classes of functions. They mirror the strong approximation results long enjoyed by ReLU networks. 
+
+Organization. Section 2 discusses related work. Section 3 presents preliminaries. Section 4 presents our main result: the ReLU-Transformer approximation translation theorem. Section 5 discusses key implications: a new universal approximation theory (Section 5.1), a parsimonious set of primitives for rational function approximations (Section 5.2), all by attention-only Trans-formers. Section 6 highlights our proof ideas. Section 7 presents concluding remarks. 
+
+# 2 Related Work 
+
+Universal Approximation. For feedforward networks, Pinkus [1999] gives classical universal approximation results with ReLU activation. Attention-based universality results then emerge for Transformer architectures. Yun et al. [2020] prove universality for continuous sequence to sequence maps on compact domains via a contextual mapping construction with positional en-codings. Kajitsuka and Sato [2023] further simplify this route in a one-layer single-head setting. Takakura and Suzuki [2023] show that a one-layer transformer, with attention plus a token-wise FFN and a single embedding layer with positional encoding, approximates shift-equivariant α-smooth functions. Jiang and Li [2024] use the Kolmogorov representation theorem to obtain Jackson-type approximation rates for single-layer single-head transformers under explicit smooth-ness assumptions. Despite these advances, many universality proofs for Transformers still rely on post-attention FFNs to realize token-wise nonlinear transformations. Hu et al. [2025] contain two different universality results. Their main-text theorem is constructive, but it uses an attached sequence-wise linear map and is therefore not transformer-native in our sense. Their Theorem G.1 is transformer-native and attention-only, but it is derived from an existence-type ReLU UAP. In contrast, our Theorem 5.1 below takes [Hu et al., 2025, Theorem G.1] as the direct comparison point and makes that route constructive with explicit resource tracking. 
+
+Target-Specific Approximation with ReLUs. Target-specific ReLU approximation goes be-yond universal approximation by providing explicit constructions with a much lower network complexity. Specifically, Yarotsky [2017], Petersen and Voigtlaender [2018], Schmidt-Hieber [2020] show ReLU networks can approximate monomials with additive error ϵ using only O(1 /ϵ )
+
+nonzero parameters. Telgarsky [2017], Boullé et al. [2020], Oko et al. [2023] analyze low com-plexity ReLU constructions for approximating the reciprocal functions. These primitives form a reusable dictionary that supports statistical guarantees and near minimax rates in applications including nonparametric regression [Suzuki, 2018, Schmidt-Hieber, 2020], diffusion model score estimation [Oko et al., 2023, Fu et al., 2024], and flow matching velocity estimation [Fukumizu 3et al., 2024]. 
+
+Target-Specific Approximation with Attentions. Softmax attention implements target opera-tors through token selection and value aggregation, and a score gap controls the selection error. Edelman et al. [2022] relate the softmax selection error to the attention score gap, and this relation supports quantitative control for lookup type primitives. The one-hot positional codes require a width at least N , whereas almost orthogonal embeddings [Bhattamishra et al., 2024, Sanford et al., 2023, 2024] reduce this to O(log N ) while maintaining index separability. Sanford et al. [2023] use this device to approximate sparse averaging, where an attention head estimates the mean over a selected subset of tokens. Bhattamishra et al. [2024] apply it for index-based retrieval primitives in string equality and nearest neighbor tasks. Sanford et al. [2024] incorporate related routing primitives into larger algorithmic constructions, using gap-controlled softmax attention to route information across positions. Yang et al. [2025] systematize these lookup and averaging modules and summarize the associated gap-based error control heuristics. In contrast, we give target-specific approximation guarantees for continuous primitives, translating low complexity ReLU approximations into attention-based modules with explicit dependence on the approximation er-ror in both architectural complexity and norm control. 
+
+# 3 Preliminaries 
+
+We introduce the two model classes we build on: (i) ReLU networks, and (ii) softmax-attention Transformer networks with explicit norm constraints. 
+
+Notations. For a positive integer n, let [n] := {1, . . . , n }. Denote a length-n input sequence with token dimension d by X := ( x1, . . . , x n) ∈ Rd×n, where xj is the embedding of the j-th token. For a vector a, let aj denote its j-th entry. For a matrix X, let Xi,j denote its (i, j )-th entry. Let ek ∈ Rn
+
+denote the k-th standard basis (i.e., one-hot) vector. For x ∈ Rn, let ∥x∥2 and ∥x∥∞ denote the ℓ2-and ℓ∞-norms. For a matrix A ∈ Rd×n, ∥A∥F denote the Frobenius norm, ∥A∥p,q := sup v̸ =0 
+
+> ∥Av ∥q
+> ∥v∥p
+
+denote the induced operator norm for 1 ≤ p, q ≤ ∞ , and ∥A∥max := max i∈[d],j ∈[n] |Ai,j | denote the entrywise max norm. Finally, for a, b ∈ R, let a ∨ b := max {a, b }.
+
+ReLU Network. We first introduce the standard ReLU network function class. 
+
+Definition 3.1 (K-Layer ReLU Network Class) . Let ReLU( t) := max {t, 0} denote the coordinate-wise ReLU activation for t ∈ R. Fix K, W, S ∈ N, B > 0, input dimension d1 ∈ N,and output dimension dK+1 ∈ N. Define F(K, W, S, B ) as the class of functions 
+
+F(K, W, S, B ) := 
+
+n
+
+f : Rd1 → RdK+1 (AK ReLU[ ·] + bK ) ◦ · · · ◦ (A2ReLU[ ·] + b2) ◦ (A1x + b1)
+
+o
+
+,
+
+4where Ai ∈ Rdi+1 ×di , bi ∈ Rdi+1 for i ∈ [K], and 
+
+max  
+
+> i∈[K+1]
+
+di ≤ W, max 
+
+> i∈[K]
+
+∥Ai∥∞ ∨ ∥ bi∥∞ ≤ B, 
+
+> K
+
+X
+
+> i=1
+
+ ∥Ai∥0 + ∥bi∥0
+
+ ≤ S. 
+
+Here ∥ · ∥ 0 denotes the number of nonzero entries. 
+
+Softmax Attention Network. Let’s start with the softmax function on vectors and matrices. 
+
+Definition 3.2 (Temperature-Scaled Softmax) . For λ > 0 and vector u ∈ Rd, define 
+
+Softmax λ(u)i := exp( λu i)
+
+Pdj=1 exp( λu j ), i ∈ [d].
+
+For matrix X ∈ Rd×n, define the column-wise softmax 
+
+Softmax λ(X):,k := Softmax λ(X:,k ), k ∈ [n].
+
+We next define multi-head self-attention layer. 
+
+Definition 3.3 (Multi-Head Attention Layer) . Fix the number of heads H ∈ N, λ > 0, and dimensions din , d out ∈ N. An H-head self-attention layer is a map Attn : Rdin ×n → Rdout ×n of the form 
+
+Attn( Z) = 
+
+> H
+
+X
+
+> h=1
+
+W (h) 
+
+> V
+
+ZSoftmax λ(( W (h) 
+
+> K
+
+Z)⊤W (h) 
+
+> Q
+
+Z),
+
+where W (h) 
+
+> K
+
+, W (h) 
+
+> Q
+
+∈ Rdh×din , and W (h) 
+
+> V
+
+∈ Rdout ×din for all h ∈ [H]. We omit λ when λ = 1 .When convenient, we write W (h) 
+
+> KQ
+
+= ( W (h) 
+
+> K
+
+)⊤W (h) 
+
+> Q
+
+∈ Rdin ×din .We now define the Transformer function class as compositions of multi-head attention layers 3
+
+Definition 3.4 (Transformer Network Class) . Let X ∈ Rd1×n be the input sequence. Fix 
+
+H, W, K ∈ N, CKQ , C V > 0. Define the Transformer network class 
+
+T (H, W, K, C KQ , C V ) := 
+
+n
+
+τ : Rd1×n → RdK+1 ×n|τ = T ◦ Attn (K) ◦ · · · ◦ Attn (1) ◦ P
+
+o
+
+,
+
+where Attn (j) : Rdj ×n → Rdj+1 ×n is the j-th H-head attention layer for all j ∈ [K], P is a fixed preprocessing layer, T is the truncation layer that deletes the last token and W := max j,h {dh, d j }.
+
+> 3
+
+In this paper, by Transformers, we mean attention-only Transformer networks. Please see Section 7 for discus-sions regrading practical Transformers (including FFNs and residual connections). 
+
+5Further, 
+
+max  
+
+> j,h
+
+∥W (h,j ) 
+
+> V
+
+∥F := CV , max  
+
+> j,h
+
+∥W (h,j ) 
+
+> KQ
+
+∥F := CKQ ,
+
+where W (h,j ) 
+
+> KQ
+
+and W (h,j ) 
+
+> V
+
+are the weight matrices in the h-th head of the j-th attention layer. 
+
+# 4 Main Result: Translation Theorem 
+
+We aim to build transformer approximation theory by reducing it to the mature approximation theory of ReLU networks. The key point is to make this reduction constructive and quantitative. In particular, we track resources such as width, depth, and parameter bounds. This is motivated by a gap in the literature. Existing transformer approximation results are mostly universality-oriented [Suzuki, 2018, Kajitsuka and Sato, 2023, Hu et al., 2025, Cheng et al., 2025]. In contrast, ReLU networks admit much sharper target-specific approximation theory [Yarotsky, 2017, Petersen and Voigtlaender, 2018, Oko et al., 2023, Fu et al., 2024]. As discussed in Section 1, establishing sim-ilarly economic target-specific resource bounds is very useful for analyzing transformer models. To address this gap, we prove a constructive translation from ReLU approximation to softmax-attention approximation. Given any ReLU approximator on a compact domain, we construct a softmax-attention network that approximates the same target. We also obtain quantitative bounds on its architectural and norm resources. Thus, existing ReLU approximation results lead to atten-tion approximation results with controlled overhead. We proceed in two steps. First, Lemma 4.1 gives a fixed-depth translation for a single ReLU layer. Namely, we construct an attention network that approximates a single ReLU layer to arbitrary precision. Then Theorem 4.1 lifts this construc-tion to general-depth ReLU networks by composition. As a result, we obtain the full ReLU-to-softmax-attention translation theorem with explicit approximation and parameter bounds. We begin with the case of approximating one-layer ReLU with Transformer. 
+
+Lemma 4.1 (Constructive Approximation of One-Layer ReLU Networks by Transformer) . Let 
+
+X ⊂ Rd×n be compact. For X = ( x1, . . . , x n) ∈ X , let f : X → Rd×n be defined entry-wise by 
+
+[f (X)] r,i =
+
+> N
+
+X
+
+> k=1
+
+a(r) 
+
+> i,k
+
+ReLU( 
+
+> n
+
+X
+
+> j=1
+
+(w(r) 
+
+> i,k,j
+
+)⊤xj ), r ∈ [d], i ∈ [n],
+
+where a(r) 
+
+> i,k
+
+∈ {− 1, 1} and w(r) 
+
+> i,k,j
+
+∈ Rd. Then, for any 0 < ϵ < 1, there exists a Transformer 
+
+ϕ = T ◦ Attn (3) ◦ Attn (2) ◦ Attn (1) ◦ P, 
+
+such that 
+
+∥ϕ(X) − f (X)∥max ≤ ϵ for all X ∈ X ,
+
+6where P is the preprocessing map that pads one zero token, and T is the truncation map that deletes the last token. Further, suppose X ∈ [−CX , C X ]d×n and ∥w(r) 
+
+> i,k,j
+
+∥∞ ≤ w0 for all i, j ∈
+
+[n], k ∈ [N ], r ∈ [d]. For CX ≥ 1, parameter bounds of constructed Transformer ϕ satisfy 
+
+H = O(N ), W = O(N ), λ = O(N ln( N C X w0/ϵ )
+
+ϵ ),
+
+∥WV ∥F = O(w0
+
+√N ), ∥WKQ ∥F = O(
+
+r
+
+ln N C X w0
+
+ϵ ),
+
+where O(·) hides polynomial factors depending on d and n.
+
+Proof. Please see Section A.2 for a detailed proof. Importantly, Lemma 4.1 does not only prove existence. It quantifies the cost of approximating a one-layer ReLU network by a three-block Transformer network. The head count H measures the parallel routing needed to realize the N hidden units across the d output coordinates. The inverse temperature λ controls how sharply softmax concentrates on the maximal score, and hence how well it approximates hardmax-type routing. Explicit norm bounds on WV and WKQ are also essential. They are needed in the next step, where we compose these modules across layers and control the growth of errors and magnitudes. We then lift the three-block construction in Lemma 4.1 to arbitrary depth by composition. For each ReLU layer, we construct a constant-depth attention-only Transformer to approximate that layer on the relevant compact domain. Stacking these modules gives a Transformer network whose depth scales linearly with Kf .
+
+Theorem 4.1 (Approximating Multi-Layer ReLU Networks by Transformer) . Let X := (x1, . . . , x n) ∈ [−CX , C X ]d×n and vec( X) := (x⊤ 
+
+> 1
+
+, . . . , x ⊤ 
+
+> n
+
+) ∈ [−CX , C X ]dn . For any 
+
+ϵ ∈ (0 , 1) and any ReLU network f ∈ F(Kf , W f , S, B ), there exists a Transformer g ∈T (H, W, K, C KQ , C V ) such that 
+
+∥g(X) − f (vec( X)) ∥max ≤ ϵ
+
+for all X ∈ [−CX , C X ]d×n, where g takes the form g = T ◦ Attn 3Kf ◦ · · · ◦ Attn 1 ◦ P with P the preprocessing layer and T the truncation layer. For CX ≥ 1, the parameters of g satisfy 
+
+H = O(Wf ), W = O(Wf ), K = O(Kf ), CV = O(BpWf ),CKQ = O(
+
+s
+
+Kf ln 
+
+Kf Wf BC X
+
+ϵ
+
+
+
+), λ = O(K2 
+
+> f
+
+W Kf +1  
+
+> f
+
+BKf ln( Kf Wf BC X /ϵ )
+
+ϵ ).
+
+Proof. Please see Section 6 for a proof sketch and Section A.3 for a detailed proof. Here we highlight three key implications of Theorem 4.1: • General Translator. Theorem 4.1 is a compiler from the approximation theory of ReLU networks to that of softmax-attention transformers. Existing transformer universality results 7often target broad function classes, leading to large resource bounds reflecting the cost of universality rather than the complexity of a specific target [Kajitsuka and Sato, 2023, Hu et al., 2025]. By contrast, decades of ReLU approximation theory provide tight, target-adaptive constructions for concrete primitives and structured function families [Yarotsky, 2017, Petersen and Voigtlaender, 2018, Oko et al., 2023, Fu et al., 2024]. Our translation theorem leverages this maturity: once a ReLU approximator with a quantitative guaran-tee is available, Theorem 4.1 converts it into a transformer approximator with controlled overhead, thereby inheriting sharper rates and more informative complexity bounds. • Constructive. A second key feature is that the reduction is constructive and comes with controlled resources. Beyond asserting existence, our proof yields an explicit attention architecture and quantitative bounds on the depth, width, number of heads, inverse temper-ature, and weight norms. Such resource control is indispensable for a quantitative approx-imation theory, as it makes the reduction reproducible, comparable across model classes, and suitable for downstream complexity estimates. Notably, the depth and width scale as 
+
+K = O(Kf ) and W = O(Wf ), so the translation preserves the architectural complexity of the source ReLU network up to constant factors. • Useful Analytic Tool. Finally, Theorem 4.1 has a broad scope. It applies to any ReLU network in F(Kf , W f , S, B ) and therefore extends to any function class with an available ReLU approximation. Any improved ReLU approximation theorem, whether it concerns universal approximation or approximation of specific function classes, yields a correspond-ing transformer approximation theorem by composition with our translation. In Section 5, we demonstrate how to use the translation theorem as a plug-in tool. First, we derive a trans-former universal approximation result with explicit bounds. Second, we translate known ReLU constructions to obtain quantitative approximation guarantees for selected simple target functions. 
+
+# 5 Implications of Translation Theorem 
+
+In this section, we demonstrate Theorem 4.1 as a plug-in tool. It converts ReLU approximation results into softmax-attention Transformer approximation results. This gives two types of con-sequences. First, classical ReLU universal approximation theorems on compact domains lift to softmax-attention Transformers. Second, constructive ReLU designs for standard targets yield constructive Transformer approximators with explicit constructions and resource bounds. We illustrate these consequences in several directions. First, Section 5.1 derives a universal ap-proximation theorem for softmax attention from a classical ReLU universal approximation result. Next, Section 5.2 develops a modular framework for rational approximation based on mono-mial, reciprocal, and clipping/min-max primitives. Finally, Section 5.3 presents additional target-specific attention approximations that arise in practice. 8Table 1: Comparison of Universal Approximation Results Most Relevant to Theorem 5.1. Here “in our class” means belonging to the attention-only softmax Transformer class in Definition 3.3, without post-attention FFNs or other not Transformer-native parts. Equivalently, the approximation capability comes solely from the softmax attention mechanism. Here “constructive” means that the approximating architec-ture is constructed end-to-end. The direct benchmark for Theorem 5.1 is [Hu et al., 2025, Theorem G.1]. 
+
+Result Model class In our class? Constructive? Resource statement 
+
+[Yun et al., 2020] Uses self-attention, FFNs, and positional encodings. ✗ ✓
+
+Gives explicit quantitative UAP, but lies outside our class due to FFNs. [Kajitsuka and Sato, 2023]; [Hu et al., 2024a, Appendix B] Uses one-layer one-head self-attention, together with FFNs for UAP. 
+
+✗ ✗
+
+Gives an existential UAP route via contextual mapping with low-rank attention weights; Hu et al. [2024a] extend to generic weights, but both the UAP still rely on FFNs and are nonconstructive. [Hu et al., 2025, Theorem 3.3] Uses multi-head softmax attention together with attached sequence-wise linear maps. 
+
+✗ ✓
+
+Gives a constructive attention-based UAP, but lies outside our class due to the attached linear maps. [Hu et al., 2025, Theorem G.1] Uses a transformer-native attention-only softmax network. 
+
+✓ ✗
+
+Gives a transformer-native UAP, but obtains it by invoking an existence-type ReLU UAP. Theorem 5.1 Uses a transformer-native attention-only softmax network. 
+
+✓ ✓
+
+Gives a constructive transformer-native UAP with explicit bounds on H, W , K,
+
+λ, CKQ , and CV .
+
+## 5.1 Constructive Transformer-Native Universal Approximation 
+
+We establish a universal approximation theorem for softmax attention with explicit parameter bounds as functions of the approximation error. 
+
+Theorem 5.1 (Constructive Transformer Universal Approximation) . Let n, r ∈ N and let Fn,r 
+
+denote the unit ball of Sobolev space W r, ∞([0 , 1] n) from Definition B.1. Then for any f ⋆ ∈ F n,r 
+
+and any ϵ ∈ (0 , 1) , there exists a Transformer network g ∈ T (H, W, K, C KQ , C V ) such that 
+
+|g(x) − f ⋆(x)| ≤ ϵ
+
+for all x ∈ [0 , 1] n. The network parameters satisfy 
+
+H = O(δn/r ln δ), W = O(δn/r ln δ), K = O(ln δ),CV = O(δ(n+2) /2r√ln δ), CKQ = O(ln δ), λ = O(δpolylog( δ) · ln polylog( δ) δ),
+
+where δ = ϵ−1 and O(·) hides polynomial factors in n, r .9Proof. Please see Section B.2 for a detailed proof. Intuitively, we obtain Theorem 5.1 by combining the classical ReLU universal approximation result of [Yarotsky, 2017] with Theorem 4.1. The key distinction from prior Transformer uni-versality results is that the constructiveness within the transformer-native attention-only route. Specifically, our comparison point is [Hu et al., 2025, Theorem G.1 in Appendix G], which es-tablishes transformer-native attention-only universality via an existence-type ReLU UAP. Here, in contrast, we combine the explicit ReLU construction in [Yarotsky, 2017] with Theorem 4.1. This gives a constructive Transformer network together with explicit dependence on the architectural and norm parameters. Please see Table 1 for an overview. Two more remarks are in order: 
+
+Remark 5.1. Theorem 5.1 extends to sequence-to-sequence maps and general input domain trivially. Please see Remark B.1 for detailed discussion. 
+
+Remark 5.2. Theorem 5.1 provides a guarantee for attention-based approximation over a broad class of target functions. In particular, every bounded and Lipschitz continuous function on com-pact domain belongs to cFn, 1 for some c > 0. Thus, the result already covers a wide range of practically relevant functions. On the other hand, higher Sobolev regularity leads to sharper parameter bounds. This shows that smoother functions admit more efficient Transformer approx-imation. 
+
+## 5.2 Approximation of Rational Functions 
+
+This section gives target-specific approximation results beyond universality. We use Theorem 4.1 to translate sharp ReLU constructions into Transformer networks with explicit resource bounds. Such target-specific constructions may be useful in statistical theory of Transformer models. In the ReLU literature, similar modules lead to adaptive or near-minimax guarantees in applications such as nonparametric regression [Suzuki, 2018, Schmidt-Hieber, 2020], score-matching diffu-sion [Oko et al., 2023, Fu et al., 2024], and flow matching model estimations [Fukumizu et al., 2024]. Many modern generative models now use transformer backbones, including diffusion transformers and related flow-matching variants. Thus, analogous Transformer constructions may provide useful ingredients for future statistical analyses of Transformer-based generative models. We focus on rational function approximation. Many smooth targets reduce to polynomial eval-uation and division on bounded domains. This reduction appears in Taylor expansions and in classical approximation schemes such as splines, wavelets, and kernel methods. Accordingly, we derive Transformer approximations for three basic primitives by Theorem 4.1: • Monomials, • Reciprocal function, • Entry-wise minimum and maximum with clipping, through Propositions 5.1 to 5.3. These primitives are composable. Together they form a small toolkit for approximating rational functions with Transformer. Section 5.3 then gives further examples built from the same recipe. 10 Approximation of Monomials. Monomials are basic building blocks for polynomial and ratio-nal approximation. A highlight of ReLU approximation theory is that it achieves an approximation error ϵ for monomials using only O(ln( ϵ−1)) nonzero network parameters [Yarotsky, 2017, Pe-tersen and Voigtlaender, 2018, Schmidt-Hieber, 2020]. The next proposition translates this type of result to softmax-attention Transformers. 
+
+Proposition 5.1 (Approximation of Monomials) . Let CX ≥ 1 and d, n ∈ N with dn > 2. Then, for any ϵ ∈ (0 , 1) , there exists fmult ∈ T (H, W, K, C KQ , C V ) such that 
+
+fmult (X′) −
+
+> n
+
+Y
+
+> j=1
+> d
+
+Y
+
+> i=1
+
+Xij ≤ ϵ + dnC dn −1 
+
+> X
+
+ϵerror 
+
+for all X ∈ [−CX , C X ]d×n and X′ ∈ Rd×n satisfying ∥X − X′∥∞ ≤ ϵerror . For CX ≥ 1, the network parameters satisfy: 
+
+H = O(1) , W = O(1) , K = O(ln δ), CV = O(Cdn X ),CKQ = O(ln δ), λ = O(δ · ln 3 δ · (dn )polylog( δ)Cpolylog( δ) 
+
+> X
+
+),
+
+where δ = CX /ϵ , polylog( δ) denotes a polynomial in the logarithm of δ and O(·) hides polyno-mial factors depending on d and n.
+
+Proof. Please see Section C.1 for a detailed proof. 
+
+Approximation of Reciprocal Functions. Building on the monomial approximation above, we now turn to the reciprocal map. Monomial approximators let us approximate each term of a polynomial, and summing these terms gives a polynomial approximator. The reciprocal then enables division on domains bounded away from zero. Together, these ingredients form the basis of rational function approximation. The next proposition constructs an explicit softmax-attention Transformer network for approximating x 7 → 1/x on a domain bounded away from zero. It also quantifies the stability of this approximation under input perturbations. 
+
+Proposition 5.2 (Approximation of the Reciprocal Function) . For any approximation error ϵ ∈
+
+(0 , 1) , there exists a Transformer network finv ∈ T (H, W, K, C KQ , C V ) such that 
+
+finv (x′) − 1
+
+x ≤ 2ϵ + |x′ − x|
+
+ϵ2 ,
+
+for all x ∈ [ϵ, 1/ϵ ] and x′ ∈ [−CX , C X ]. For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ), CV = O(δ2
+
+p
+
+ln 3 δ),CKQ = O(
+
+q
+
+ln 2 δ · ln( δC X )) , λ = O(δpolylog( δ) · ln polylog( δ) δ · ln CX ),
+
+where δ = 1 /ϵ and polylog( δ) denotes a polynomial in the logarithm of δ.11 Proof. Please see Section C.2 for a detailed proof. 
+
+Approximation of Min, Max Operation and Clipping. Rational approximation also requires controlling the input range. In many statistical settings, an unbounded input domain invalidates convergence guarantees. In particular, denominators must stay bounded away from zero for the reciprocal module to apply. We therefore introduce entry-wise minimum, maximum, and clipping. These operations enforce the boundedness conditions needed in later constructions. We first formalize the clipping map as follows. 
+
+Definition 5.1 (Clipping Function) . For c ∈ (0 , C X ), we define the scalar clipping map 
+
+clip c(t) := max {− c, min {t, c }} , t ∈ R.
+
+We extend it entry-wise to matrices by 
+
+clip c(X)i,j := clip c(Xi,j ), X ∈ Rd×n.
+
+The next proposition approximates entry-wise minimum, maximum and clipping operations with Transformers to arbitrary precision. 
+
+Proposition 5.3 (Entry-wise Minimum, Maximum and Clipping) . Let 0 < c < C X . For any 
+
+ϵ ∈ (0 , 1) , there exist Transformer networks 
+
+fmax , f min , f clip ∈ T (H, W, K, C KQ , C V )
+
+such that, for all X, Y ∈ [−CX , C X ]d×n,
+
+∥fmax (X, Y ) − max( X, Y )∥max ≤ ϵ, 
+
+∥fmin (X, Y ) − min( X, Y )∥max ≤ ϵ, 
+
+∥fclip (X) − clip c(X)∥max ≤ ϵ, 
+
+where max( ·, ·) and min( ·, ·) denote entry-wise operations. For CX ≥ 1, the network parameters satisfy 
+
+H = O(1) , W = O(1) , K = O(1) ,
+
+and, for fmax and fmin :
+
+CV = O(1) , CKQ = O(pln( δC X )) , λ = O(δ ln( δC X )) ,
+
+for fclip :
+
+CV = O(CX ), CKQ = O(pln( δC X )) , λ = O(δC X ln( δC X )) ,
+
+where δ = 1 /ϵ and O(·) hides polynomial factors depending on d and n.12 Proof. Please see Section C.3 for a detailed proof. To this end, Propositions 5.1 to 5.3 provide a modular toolbox for rational function approximation with Transformers. Monomial modules evaluate numerator and denominator polynomials. Clip-ping keeps the denominator in a valid range. The reciprocal module then implements division. Moving forward, Section 5.3 develops further examples from the same toolkit. 
+
+## 5.3 Additional Target-Specific Approximation by Transformers 
+
+This section presents more examples of target-specific approximation with Transformers from the toolkit in Section 5.2. The point is to show that Theorem 4.1 also applies to concrete operators beyond the basic rational primitives. We focus on two examples: the square-root map and several closed-form time schedules that arise in generative models, e.g., [Fu et al., 2024, Su et al., 2025]. 
+
+Square Root Operator. Besides the monomials and the reciprocal modules (Propositions 5.1 and 5.2), rational function constructions often require the square-root map. This occurs when intermediate expressions involve positive rational quantities. The next proposition constructs an explicit Transformer for approximating x 7 → √x on a domain bounded away from zero. It also quantifies how input perturbations contribute to the approximation error. 
+
+Proposition 5.4 (Approximation of the Square Root) . Let CX > 0. Then, for any ϵ ∈ (0 , 1) ,there exists froot ∈ T (H, W, K, C KQ , C V ) such that 
+
+|froot (x′) − √x| ≤ 2ϵ + |x′ − x|√ϵ , for all x′ ∈ [−CX , C X ], x ∈ [ϵ, 1/ϵ ].
+
+For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ), CV = O(δ
+
+p
+
+ln 3 δ),CKQ = O(
+
+q
+
+ln 2 δ · ln( δC X )) , λ = O(δpolylog( δ) · ln polylog( δ) δ · ln CX ).
+
+where δ = 1 /ϵ and polylog( δ) denotes a polynomial in the logarithm of δ.
+
+Proof. Please see Section D.1 for a detailed proof. 
+
+Closed-Form Time Schedules. Beyond the generic rational primitives above, we also showcase some concrete operators that arise as time schedules in diffusion and flow matching models [Fu et al., 2024, Fukumizu et al., 2024, Oko et al., 2023]. In the typical diffusion setting, the Gaussian forward kernel has mean coefficient αt = exp( −t/ 2) and standard deviation σt = p1 − exp( −t).The next two propositions construct explicit softmax-attention approximators for these two sched-ules. We start with the approximation of αt:
+
+Proposition 5.5 (Approximation of exp( −t/ 2) ). Let CX > 0. Then, for any ϵ ∈ (0 , 1) , there 13 exists fα ∈ T (H, W, K, C KQ , C V ) such that 
+
+|fα(t) − exp 
+
+
+
+− t
+
+2
+
+
+
+| ≤ ϵ for all 0 ≤ t ≤ CX .
+
+For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln δ), W = O(ln δ), K = O(ln 2 δ), CV = exp  O(ln 2 δ) · O(√ln δ),CKQ = O(
+
+q
+
+ln 2 δ · (ln 2 δ + ln CX )) , λ = exp  O(ln 4 δ) · O(ln polylog( δ) δ · ln CX ).
+
+where δ = 1 /ϵ and polylog( δ) denotes a polynomial in the logarithm of δ.
+
+Proof. Please see Section D.2 for a detailed proof. We next treat the standard deviation schedule σt = p1 − exp( −t) in diffusion models. 
+
+Proposition 5.6 (Approximation of p1 − exp( −t)). For any ϵ ∈ (0 , 1) and any CX > ϵ , there exists fσ ∈ T (H, W, K, C KQ , C V ) such that 
+
+|fσ(t) − p1 − exp( −t)| ≤ ϵ for all ϵ ≤ t ≤ CX .
+
+For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ), CV = exp  O(ln 2 δ) · O(
+
+p
+
+ln 3 δ),CKQ = O(
+
+q
+
+ln 2 δ · (ln 2 δ + ln CX )) , λ = exp  O(ln 4 δ) · O(ln polylog( δ) δ · ln CX ).
+
+where δ = 1 /ϵ , polylog( δ) denotes a polynomial in the logarithm of δ and O(·) hides polynomial factors depending on d and n.
+
+Proof. Please see Section D.3 for a detailed proof. These examples demonstrate practical use cases of our translation theorem Theorem 4.1. Such ex-plicit Transformer constructions may also serve as useful ingredients in future statistical analyses of transformer-based diffusion or flow-matching models. 
+
+# 6 Proof Sketch of Theorem 4.1 
+
+We sketch the proof of Theorem 4.1 here and defer detailed proofs to Section A. The main idea is to translate a ReLU network block-by-block into a softmax-attention network, while controlling both the approximation error and the growth of parameter resources. 
+
+Step 1: Attention Primitives. The translation relies on constructive approximations of four fundamental components: 14 • Hardmax Approximation (Lemma A.1). When the inverse temperature is sufficiently large, the softmax concentrates on the maximal entry: if 
+
+λ ≥ ln( n − 1) − ln ϵx1 − max 2≤i≤n xi
+
+,
+
+then 
+
+∥Softmax λ(x) − e1∥∞ ≤ ϵ. 
+
+This prepares all subsequent constructions. • Attention-Based Linear Maps (Lemmas A.2 and A.3). A single-head attention layer, applied to an appropriately augmented input, is able to approximate any column-wise linear transformation ℓ(X) = AXB to arbitrary precision. We derive explicit bounds on ∥WV ∥F
+
+and ∥WKQ ∥F in terms of ∥A∥F , ∥B∥F , and the target accuracy. • Entry-Wise Multiplication (Lemma A.4). A multi-head attention layer is capable of ap-proximating position-dependent element-wise scaling xj 7 → diag( vj ) xj for prescribed vec-tors vj . The required number of heads is O(n).• Soft-ReLU Approximation (Lemma A.5). The function 
+
+ReLU (n)soft (s) := s · σ(λs + ln n),
+
+approximates ReLU( s) uniformly on [−Cs, C s] with error O(ϵrelu ), provided 
+
+λ ≥ ln( Csn/ϵ relu )
+
+ϵrelu 
+
+.
+
+Crucially, we’re capable of realizing this approximation by an attention score computation, since the sigmoid arises naturally from the softmax over two effective logits. 
+
+Step 2: Simulating a Single ReLU Layer (Lemma A.7). Using the primitives from Step 1, we construct a three-block attention network ϕ = T ◦ Attn 3 ◦ Attn 2 ◦ Attn 1 ◦ P that approximates a one-layer ReLU network on a compact domain. The three layers serve distinct roles: 1. Zooming layer ( Attn 1). By Lemma A.4, this layer computes position-dependent scalings 
+
+diag( wi,k,j ) xj for all hidden-unit indices (i, k ) and token positions j, stacking the results into a higher-dimensional representation. 2. Accumulation layer ( Attn 2). By Lemmas A.2 and A.3, this layer forms the pre-activation sums si,k = Pnj=1 w⊤ 
+
+> i,k,j
+
+xj by implementing the required linear combinations through atten-tion over the augmented sequence. 3. Soft-ReLU layer ( Attn 3). This layer applies the soft-ReLU activation (Lemma A.5) to each si,k and aggregates the results P 
+
+> k
+
+ai,k ReLU (n)soft (si,k ) to produce the output. The key mechanism is that the key-query inner product encodes λs i,k , so the softmax weight natu-rally implements the sigmoid gating. A suppression constant C in the score matrix ensures that non-target query positions receive negligible contribution. 15 This construction first produces a vector-valued output for each row index r ∈ [d] (Lemma A.6). To obtain the full matrix output, we introduce selector matrices Qr and organizer matrices Or that extract the r-th block from the stacked representation and embed each per-row output into the correct block location, respectively. Absorbing these into the weight matrices yields a valid multi-head attention layer with H = O(dn 2N ) heads (Lemma A.7). Throughout, we track explicit bounds on H, W , λ, ∥WV ∥F , and ∥WKQ ∥F .
+
+Step 3: Extending to General Depth (Theorem 4.1). To translate a Kf -layer ReLU network 
+
+f = f (Kf ) ◦ · · · ◦ f (1) , we replace each layer f (k) by the three-block attention approximator g(k)
+
+from Step 2, with intermediate preprocessing and truncation layers eliminated by appending an identity-preserving head (Remark A.4). The end-to-end error is controlled via a recursive bound. Since each fk is (Wf B)-Lipschitz under ∥ · ∥ ∞, the composition error satisfies 
+
+ηk ≤ Wf B · ηk−1 + ϵk,
+
+where ηk := ∥gk ◦ · · · ◦ g1(X) − fk ◦ · · · ◦ f1(vec( X)) ∥max . Setting the per-layer tolerance to 
+
+ϵk = ϵKf (Wf B)Kf ,
+
+ensures ηKf ≤ ϵ. Substituting this into the per-layer resource bounds from Step 2 yields the final parameter bounds stated in Theorem 4.1. 
+
+# 7 Concluding Remarks 
+
+This paper provides a recipe to build transformer approximation theory via a constructive reduc-tion to ReLU approximation theory. The main result is a translation theorem Theorem 4.1. This leads to a constructive and quantitative route to approximation theory for softmax Transform-ers by migrating the mature, target-adaptive approximation theory of ReLU networks. Specifi-cally, let F and T denote ReLU and (attention-only) Transformer function classes. Theorem 4.1 compiles any ReLU network f ∈ F (Kf , W f , S, B ) into a Transformer network g ∈ T (·) with 
+
+∥g(X) − f (vec( X)) ∥2 ≤ ϵ on a compact domain. The construction is explicit and tracks 
+
+K, W, H, λ and norm budgets such as CKQ and CV .Technically, Lemma 4.1 simulates one ReLU layer using three attention blocks and quantifies the overhead in head number H and attention (inverse-)temperature λ. Unlike universality-only analyses, this reduction inherits target-specific ReLU guarantees whenever they exist. We show that this translator helps in two complementary ways: universality and target-specific approximation. • For universality, Theorem 5.1 gives a Transformer construction for 
+
+f : [ −CX , C X ]n → Rn, f ∈ W r, ∞([0 , 1] n),
+
+16 with explicit rates for H, W, λ, C KQ , C V as functions of ϵ. This complements [Hu et al., 2025, Theorem G.1 in Appendix G]. Their result gives a transformer-native, attention-only universality theorem via an existence-type ReLU UAP. Our result makes this route con-structive and tracks the resulting resource budgets explicitly. • For target-specific bounds, Section 5.2 isolates three primitives — monomials, reciprocal and min/max clipping — and proves them as Propositions 5.1 to 5.3. These modules form a parsimonious set for composing rational function approximators. For example, they cover concrete operators such as √x and schedule terms like exp( −t/ 2) in diffusion or flow gen-erative models. Together, these examples plot a way to move beyond broad universal ap-proximation and hence sharpen complexity estimates for concrete operator classes. They provide more informative tools for analyzing modern transformer backbones. 
+
+Practicality. Throughout, we define “transformers” as attention-only softmax networks to iso-late attention’s approximation cost. Standard transformer blocks add residual connections and position-wise FFNs and hence subsume this model class. From an approximation standpoint, residual additions are algebraic: if a block outputs X +F (X), we set F to approximate g(X)−X.Our proof already constructs identity-preserving attention heads, so forming g(X) − X is com-patible with our construction. Similarly, including FFNs is straightforward: a standard block can disable the FFN, or treat it as additional ReLU capacity consistent with the ReLU approxima-tor class that our translation theorem compiles from. Therefore, our theorems apply to practical blocks, up to constant bookkeeping in resources. 
+
+Future Directions. Several directions remain open. On the theory side, our bounds make clear that the main overhead of simulating ReLU-style gating concentrates in the number of heads H
+
+and the inverse temperature λ. Tightening these dependencies, and establishing matching lower bounds for specific targets, would further clarify the intrinsic cost of softmax attention approxi-mation. On the modeling side, extending the translation recipe to more realistic transformer com-ponents (e.g., residual connections, normalization, causal masking, cross-attention, and variable-length sequences) would broaden applicability. Finally, connecting these constructive approxi-mations to learning-theoretic questions is a promising avenue for future work. Examples include statistical rates, norm-controlled generalization, and the approximation of operators encountered in generative modeling pipelines. 
+
+# Impact Statement 
+
+By the theoretical nature of this work, we do not anticipate any negative social impact. 
+
+# Acknowledgments 
+
+The authors thank Hong-Yu Chen, Mimi Gallagher, Sara Sanchez, T.Y. Ball, Dino Feng and An-drew Chen for valuable conversations. JH also thanks Hude Liu, Hong-Yu Chen, Po-Chaio Lin, Maojiang Su, Weimin Wu for collaborations on related topics. 17 JH is partially supported by Northwestern University’s Walter P. Murphy Fellowship and Termi-nal Year Fellowship (Paul K. Richter Memorial Award). Han Liu is partially supported by NIH R01LM1372201, NSF AST-2421845, Simons Foundation MPS-AI-00010513, AbbVie , Dolby and Chan Zuckerberg Biohub Chicago Spoke Award. The content is solely the responsibility of the authors and does not necessarily represent the official views of the funding agencies. 18 Appendix 
+
+A Proof of Translation Theorem 20 
+
+A.1 Auxiliary Lemmas . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 A.2 Main Proof of Lemma 4.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32 A.3 Main Proof of Theorem 4.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36 
+
+B Constructive Transformer Universal Approximation 39 
+
+B.1 ReLU Network’s Universal Approximation Theorem . . . . . . . . . . . . . . . 39 B.2 Main Proof of Theorem 5.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40 
+
+C Approximation of Rational Functions with Attention Network 42 
+
+C.1 Proof of Proposition 5.1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42 C.2 Proof of Proposition 5.2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43 C.3 Proof of Proposition 5.3 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45 
+
+D Proofs of Section 5.3 48 
+
+D.1 Proof of Proposition 5.4 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 48 D.2 Proof of Proposition 5.5 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 49 D.3 Proof of Proposition 5.6 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 50 19 A Proof of Translation Theorem 
+
+In this appendix, we provide a complete proof of the translation theorem. Our argument is fully constructive: starting from a given ReLU network, we explicitly build a softmax-attention network that approximates the same target function on a prescribed compact domain while tracking the resulting architectural and norm bounds. The proof proceeds in three stages. We first develop several attention primitives that will serve as reusable building blocks. We then combine these primitives to simulate a single ReLU layer by a constant-depth attention module. Finally, we compose these layer-wise constructions to obtain the approximation result for general-depth ReLU networks. 
+
+Organization . In Section A.1, we introduce the auxiliary lemmas used throughout the proof. Section A.2 establishes the one-layer translation result. Finally, Section A.3 lifts this construction to multi-layer ReLU networks and completes the proof of the main theorem. 
+
+## A.1 Auxiliary Lemmas 
+
+This subsection collects the technical ingredients needed for the proof of the translation theorem Lemma 4.1-Theorem 4.1. Each lemma isolates one basic operation required in the simulation of a ReLU layer by softmax attention. 
+
+Hardmax Approximation by Finite Temperature Softmax. The softmax function with a suf-ficiently large inverse temperature λ concentrates its mass near the coordinate of the maximal entry. The following lemma makes this precise and provides the quantitative threshold on λ re-quired to achieve a given approximation accuracy. 
+
+Lemma A.1 (Approximating Hardmax with Finite-Temperature Softmax, Lemma D.1 of [Hu et al., 2025]) . Let x = [ x1, x 2, . . . , x n] ∈ Rn and ϵ > 0. Define softmax function with tempera-ture Softmax λ(·) as 
+
+Softmax λ(x) := [ exp( λx 1)
+
+Pnj=1 exp( λx j ), . . . , exp( λx n)
+
+Pnj=1 exp( λx j )].
+
+Assume x1 = max 1≤i≤n xi is unique, and x2 = max 2≤i≤n xi. Then, if λ ≥ (ln( n − 1) −
+
+ln( ϵ)) /(x1 − x2), we have: 
+
+∥Softmax λ(x) − e1∥max ≤ ϵ. 
+
+where e1 ∈ Rn is the one-hot vector supported on the index of the maximum. 
+
+Proof. See proof of [Hu et al., 2025, Lemma D.1]. 
+
+Attention Based Simulation of Linear Maps. Given the hardmax primitive, we next show that a single-head attention layer is able to simulate any column-wise linear transformation X →
+
+20 AXB .
+
+Lemma A.2 (Attention simulates column-wise linear transformations, Lemma G.1 of [Hu et al., 2025]) . Let X ∈ Rd×n and define 
+
+ℓ(X) := AXB ∈ Rdout ×n, A ∈ Rdout ×d, B ∈ Rn×n
+
+be a linear map. Assume that all entries of B are larger than 1. Consider the augmented input 
+
+Z := 
+
+
+
+X 0d
+
+In 0n
+
+01×n 1
+
+ ∈ R(d+n+1) ×(n+1) ,
+
+where 0d ∈ Rd×1 be the all-zeros vector. Then for any ϵ > 0, there exists a single-head attention 
+
+Attn( Z) = WV Z · Softmax(( WK Z)⊤(WQZ)) 
+
+such that 
+
+∥Attn( Z) − ℓ(X) 0d+n+1 
+
+ ∥max ≤ ϵ. 
+
+Proof. See proof of [Hu et al., 2025, Lemma G.1]. 
+
+Explicit Norm Bounds for Linear-Map Simulation. While Lemma A.2 asserts existence, the following companion lemma provides the explicit norm bounds on WV and WKQ := W ⊤ 
+
+> K
+
+WQ.
+
+Lemma A.3. Suppose ∥X∥∞ ≤ CX . Let Attn be the single-head attention based approximator constructed in Lemma A.2, satisfying 
+
+Attn( Z) = WV Z · Softmax(( WK Z)⊤(WQZ)) .
+
+Then parameter bounds of the constructed attention network follow: 
+
+∥WV ∥F = O(√n∥A∥F ∥B∥F ),
+
+∥WKQ ∥F = O(∥B∥F
+
+pn ln( nC X ∥A∥max ∥B∥F /ϵ )) .
+
+Proof. The proof is based on proof of [Hu et al., 2025, Lemma G.1]. To avoid overlap, we do not repeat the construction detail. Let Bij denote the (i, j )-th entry of B. We set 
+
+si := 
+
+> n
+
+X
+
+> j=1
+
+Bij , S := ( s1, . . . , s n) ∈ Rn
+
+21 and let 
+
+M := max  
+
+> i∈[n]
+
+si.
+
+Then M ≤ √n∥B∥F . Recall that in proof of [Hu et al., 2025, Lemma G.1], the constructed weight matrices take the form: 
+
+WV := 3M A 0dout ×(n+1) 
+
+ ,WK := 0n×d ln  B⊤ ln  3M 1n − S⊤ ,WQ := 0n×d In T 1n
+
+ ,
+
+where T is a parameter to be determined later. Then we have: 
+
+∥WV ∥F = 3 M ∥A∥F ,
+
+∥WK ∥F ≤
+
+q
+
+∥B∥2 
+
+> F
+
++ n(ln(2 M )) 2,  0 ≤ ln Bij ≤ Bij 
+
+
+
+∥WQ∥F = √T 2 + 1 n. (A.1) The overall approximation error has upper bound 
+
+∥Attn( Z) − ℓ(X) 0d+n+1 
+
+ ∥max ≤ 3M n ∥AX ∥max δ, 
+
+where δ is the approximation error of padding layer. Then it suffices to let δ ≤ ϵ 
+
+> 3M n ∥AX ∥max
+
+to ensure the overall error is less than ϵ. We further determine the value of T to bound δ. Define that 
+
+H(i) := 
+
+(
+
+T Pnr=1 ln Bir , 1 ≤ i ≤ n, T Pnr=1 ln(3 M − sr), i = n + 1 .W (i) := (Softmax H)i.
+
+Then by [Hu et al., 2025], δ has upper bound 
+
+δ ≤ 1 − W (n + 1) 
+
+Since for any i ∈ [n], H(n + 1) − H(i) ≥ T n ln 2 , by Lemma A.1 we get it suffices to let 
+
+T = O(
+
+qln( M n ∥AX ∥max /ϵ ) 
+
+> n
+
+) to ensure δ ≤ ϵ 
+
+> 3M n ∥AX ∥max
+
+. We then simplify (A.1) with the expression of T and δ :
+
+∥WV ∥F ≲ √n∥A∥F ∥B∥F ,
+
+∥WK ∥F ≲ ∥B∥F ,
+
+∥WQ∥F ≲ pn ln( nC X ∥A∥max ∥B∥F /ϵ ),
+
+∥WK WQ∥F ≲ ∥B∥F
+
+pn ln( nC X ∥A∥max ∥B∥F /ϵ ).
+
+22 This completes the proof. 
+
+Remark A.1. Since any matrix B ∈ Rn×n can be written as B = B1 −B2 with B1, B 2 having all entries greater than 1, the norm bounds in Lemma A.2 extend to arbitrary B by using a two-head attention network, one head for B1 and one for B2.
+
+Attention Based Entry-wise Multiplication. The linear-map primitive handles affine oper-ations, but simulating a ReLU layer also requires position-dependent scaling, i.e., computing 
+
+diag( vj ) xj for prescribed vectors vj at each position j. The following lemma shows that an 
+
+(n + 1) -head attention layer is capable of performing all n such scalings in parallel. 
+
+Lemma A.4 (Approximation Theory of Entry-wise Multiplication through Attention Network) .
+
+Fix n ∈ N and d ∈ N. Let X = [ x1, . . . , x n] ∈ Rd×n. Suppose the preprocessed input sequence is in the form 
+
+Xp := 
+
+
+
+X 0d
+
+In 0n
+
+01×n 1
+
+ ∈ R(d+n+1) ×(n+1) ,
+
+where X is the input sequence on a bounded domain, satisfying ∥X∥∞ ≤ CX . Let v1, . . . , v n ∈
+
+Rd be arbitrary vectors satisfying max i∈[n] ∥vi∥∞ ≤ BV . We define the padded block Y (X) as 
+
+Y (X) := diag( v1)x1 · · · diag( vn)xn 0d
+
+ ∈ Rd×(n+1) .
+
+Further, we define the target output Z(X) as 
+
+Z(X) := 
+
+Y (X)
+
+In+1 
+
+
+
+∈ R(d+n+1) ×(n+1) .
+
+Then for any 0 < ϵ < 1, there exists an (n + 1) -head self-attention layer Attn v with temperature 
+
+λ such that for all such X,
+
+∥Attn v(Xp) − Z(X)∥∞ ≤ ϵ. 
+
+Moreover, the parameter bound of constructed network satisfies 
+
+H = O(n), λ = O(ln CX BV nϵ ), ∥WK ∥F = O(√n), ∥WQ∥F = O(n), ∥WV ∥F = O(√dB V + √n).
+
+Proof. We present the construction first, then compute the parameter bound by analyzing the error propagation. 
+
+Construction. 
+
+We define the position selector Spos as 
+
+Spos := 0(n+1) ×d In+1 
+
+ ∈ R(n+1) ×(d+n+1) .
+
+23 Then Spos Xp = In+1 .For each i ∈ [n], we construct an attention head Attn (i) as follows. • Keys. We set keys matrices W (i) 
+
+> K
+
+as WK = Spos .• Queries. We define the routine matrices M (i) as 
+
+M (i) = en+1 . . . en+1 ei en+1 . . . en+1 
+
+ ∈ R(n+1) ×(n+1) ,
+
+where the i-th column equals ei and every other column equals en+1 . We set W (i) 
+
+> Q
+
+=
+
+M (i)Spos .• Values. We set 
+
+W (i) 
+
+> V
+
+=
+
+diag( vi) 0d×(n+1) 
+
+0(n+1) ×d 0(n+1) ×(n+1) 
+
+
+
+.
+
+Altogether, the output of attention head Attn (i) is 
+
+Attn (i)(Xp) = 
+
+diag( vi)X 0d×1
+
+0(n+1) ×n 0(n+1) ×1
+
+
+
+Softmax( βM (i)).
+
+We add an additional attention head Attn n+1 to preserve the In+1 structure in Z(X). Specifically, we let W (n+1)  
+
+> K
+
+= W (n+1)  
+
+> Q
+
+= Spos , and 
+
+W (n+1)  
+
+> V
+
+=
+
+0d×(d+n+1) 
+
+Spos 
+
+
+
+.
+
+Then we have: 
+
+Attn (n+1) (Xp) = 
+
+0d×(n+1) 
+
+In+1 
+
+
+
+Softmax( λI n+1 ).
+
+Finally, we construct the Attn v as 
+
+Attn v(Xp) = 
+
+> n+1
+
+X
+
+> i=1
+
+Attn (i)(Xp).
+
+Error Analysis and Parameter Bound 
+
+Note that the last (n + 1) rows of Pni=1 Attn (i)(Xp) are zero, while the first d rows of 
+
+Attn (n+1) (Xp) are zero. Hence the two error contributions do not overlap in rows. Therefore, we bound error of Pni=1 Attn (i)(Xp) and Attn (n+1) (Xp) separately. • Error Analysis of Pni=1 Attn (i)(Xp).
+
+24 We denote 
+
+diag( vi)X 0d×1
+
+0(n+1) ×n 0(n+1) ×1
+
+
+
+by V (i) for convenience. By Lemma A.1, it suffices to let λ = O(ln( n/ϵ )) to ensure 
+
+∥Softmax( λM (i)) − M (i)∥∞ ≤ ϵ0.
+
+Then we have: 
+
+∥
+
+> n
+
+X
+
+> i=1
+
+Attn (i)(Xp) −
+
+ Y (X)0(n+1) ×(n+1) 
+
+
+
+∥max 
+
+≤
+
+> n
+
+X
+
+> i=1
+
+∥Attn (i)(Xp) − V (i)M (i)∥max 
+
+  Y (X)0(n+1) ×(n+1) 
+
+
+
+= Pni=1 V (i)M (i)
+
+≤
+
+> n
+
+X
+
+> i=1
+
+CX V ϵ  ∥X∥max ≤ CX , max i∈[n] ∥vi∥max ≤ BV
+
+
+
+= nC X V ϵ. 
+
+• Error Analysis of Attn (n+1) (Xp).
+
+By Lemma A.1, it suffices to let λ = O(ln( n/ϵ )) to ensure 
+
+∥Softmax( λI n+1 ) − In+1 ∥max ≤ ϵ. 
+
+Then we have: 
+
+∥Attn (n+1) (Xp) −
+
+0d×(n+1) 
+
+In+1 
+
+
+
+∥max ≤ ϵ. 
+
+Altogether, we have if λ = O(ln( n/ϵ )) , then 
+
+∥Attn v(Xp) − Z(X)∥max = ∥
+
+> n+1
+
+X
+
+> i=1
+
+Attn (i)(Xp) −
+
+Y (X)
+
+In+1 
+
+
+
+∥max ≤ (nC X BV + 1) ϵ. 
+
+Then it suffices to let λ = O(ln CX BV nϵ ) to ensure total error is less than ϵ. By construction of 
+
+W (i) 
+
+> K
+
+, W (i) 
+
+> Q
+
+, W (i) 
+
+> V
+
+, we have: 
+
+H = O(n), ∥WK ∥F = O(√n), ∥WQ∥F = O(n), ∥WV ∥F = O(√dB V + √n).
+
+This completes the proof. 
+
+Soft-ReLU Approximation via Attention Scores. To simulate the ReLU nonlinearity, we ex-ploit the observation that the sigmoid function arises naturally from the softmax. Specifically, we define a smooth approximation to ReLU that is expressible as an attention score computation, and bound its approximation error in terms of the inverse temperature. 25 Lemma A.5 (Soft-ReLU Approximation) . Fix n ≥ 1, Cs > 0 and ϵrelu ∈ (0 , 1) . Define 
+
+ReLU (n)soft (s) := s · ne λs 
+
+ne λs + 1 = s · σ(λs + ln n),
+
+where σ(t) = et/(et + 1) is the sigmoid function. If 
+
+λ ≥ ln( Csn/ϵ relu )
+
+ϵrelu 
+
+,
+
+then for all |s| ≤ Cs:
+
+|ReLU( s) − ReLU (n)soft (s)| ≤ 2ϵrelu .
+
+Proof. We fix δ = ϵrelu and consider three cases. 
+
+Case 1: s ≥ δ.
+
+|ReLU( s) − ReLU (n)soft (s)| = s · 1
+
+ne λs + 1 ≤ s · n−1e−λs ≤ Cs · n−1e−λδ ≤ ϵrelu ,
+
+where the last inequality uses λδ ≥ ln( Csn/ϵ relu ).
+
+Case 2: s ≤ − δ.
+
+|ReLU (n)soft (s)| = |s| · ne λs 
+
+ne λs + 1 ≤ | s| · ne λs ≤ Cs · n · e−λδ ≤ ϵrelu ,
+
+where we used eλs ≤ e−λδ for s ≤ − δ and λδ ≥ ln( Csn/ϵ relu ).
+
+Case 3: |s| < δ . Since 0 ≤ σ(·) ≤ 1 and ReLU( s) ≤ δ:
+
+|ReLU( s) − ReLU (n)soft (s)| ≤ ReLU( s) + |ReLU (n)soft (s)| ≤ δ + δ = 2 δ = 2 ϵrelu .
+
+Combining all three cases completes the proof. 
+
+Single-Layer Translation: Vector Output Case. With all four primitives in place, we now as-semble them into a three-block attention network that approximates a single-layer ReLU network with vector output. The three blocks serve distinct roles: a zooming layer computes position-dependent scalings, an accumulation layer forms the pre-activation sums via linear combinations, and a soft-ReLU layer applies the approximate nonlinearity and aggregates the results. This con-struction is the core building block for the full translation theorem. 
+
+Lemma A.6. Define X ⊂ Rd×n to be a compact domain of input sequences. Let f := 
+
+26 (f1, . . . , f n), f : X → Rn be a ReLU network with the form 
+
+fi =
+
+> N
+
+X
+
+> k=1
+
+ai,k ReLU( 
+
+> n
+
+X
+
+> j=1
+
+w⊤ 
+
+> i,k,j
+
+xj ), a i,k ∈ {− 1, 1}, w i,k,j ∈ Rd.
+
+Suppose ∥wi,k,j ∥∞ ≤ w0 for all i, j ∈ [n], k ∈ [N ]. Then for any ϵ ∈ (0 , 1) , there exists a network 
+
+ϕ composed of multi-head attention layers such that for all X ∈ [−CX , C X ]d×n, it holds: 
+
+∥ϕ(X) − f (X)∥max ≤ ϵ. 
+
+More specifically, ϕ takes the form 
+
+ϕ = T ◦ Attn 3 ◦ Attn 2 ◦ Attn 1 ◦ P, 
+
+where P is the preprocessing layer that pads a zero token with positional coding and T is the trun-cation layer that deletes the last token. Further, For CX ≥ 1 the parameter bounds of constructed network follow 
+
+H = O(n2N ), W = O(dnN ), λ = O(N ln( dnN C X w0/ϵ )
+
+ϵ ),
+
+∥WV ∥F = w0
+
+√dN + n√nd, ∥WKQ ∥F = O(n
+
+r
+
+n ln nN C X w0
+
+ϵ ).
+
+Proof. Preprocessing 
+
+We define the preprocessing layer as 
+
+P (X) := 
+
+
+
+X 0n
+
+In 0n
+
+01×n 1
+
+ .
+
+First Layer: Zooming Layer 
+
+In this layer, we aim to obtain an output consisting of position-dependent element-wise scaling of 
+
+xj by the weight vector wi,k,j for each (i, k ) ∈ Rn × RN . We apply Lemma A.4 to achieve this. Concretely, by Lemma A.4, for each (i, k ), there exists an (n+1) -head self-attention layer Attn (1) 
+
+> i,k
+
+with temperature β such that 
+
+∥Attn (1)  
+
+> i,k
+
+(Xp) − Zi,k (X)∥max ≤ ϵ1,
+
+where the target output is 
+
+Zi,k (X) := 
+
+Yi,k (X)
+
+In+1 
+
+
+
+, Yi,k (X) := diag( wi,k, 1)x1, . . . , diag( wi,k,n )xn, 0d
+
+ ∈ Rd×(n+1) .
+
+27 We stack all nN zooming operations into a single multi-head layer Attn 1. For each (i, k )-th zooming operation, define the organizer matrix 
+
+Oi,k := 
+
+
+
+0(( i−1) N +k−1) d×d
+
+Id
+
+0(nN −(i−1) N −k)d×d
+
+ ∈ RdnN ×d,
+
+which places the d-dimensional output of the (i, k )-th zooming into the correct block of a stacked 
+
+dnN -dimensional vector. We use the same key and query matrix construction as in Lemma A.4 and the position selector 
+
+Spos := [0 (n+1) ×d, I n+1 ] ∈ R(n+1) ×(d+n+1) :
+
+W (i,k,j ) 
+
+> K
+
+= Spos , W (i,k,j ) 
+
+> Q
+
+= M (j)Spos .
+
+The value matrix routes the scaled output to the (i, k )-th block: 
+
+W (i,k,j ) 
+
+> V
+
+:= 
+
+Oi,k diag( wi,k,j ) 0dnN ×(n+1) 
+
+0(n+1) ×d 0(n+1) ×(n+1) 
+
+
+
+∈ R(dnN +n+1) ×(d+n+1) .
+
+We add one additional identity-preserving head to maintain the positional encoding block In+1 in the last (n + 1) rows, following construction in Lemma A.4. The output is approximately 
+
+Z(1) ≈
+
+
+
+Y1,1(X)
+
+Y1,2(X)
+
+...
+
+Yn,N (X)
+
+In+1 
+
+
+
+∈ R(dnN +n+1) ×(n+1) ,
+
+up to error ϵ1. From Lemma A.4 we have the parameter bound: 
+
+H1 = O(n2N ), λ1 = O(ln CX w0nN ϵ1
+
+), ∥W (1)  
+
+> V
+
+∥F = O(√d w 0
+
+√N + √n), ∥W (1) 
+
+> KQ
+
+∥F = O(n3/2).
+
+(A.2) 
+
+Second Layer: Accumulation Layer 
+
+In this layer, we aim to obtain an output consisting of inner products’ accumulation 
+
+si,k := 
+
+> n
+
+X
+
+> j=1
+
+w⊤ 
+
+> i,k,j
+
+xj =
+
+> n
+
+X
+
+> j=1
+> d
+
+X
+
+> m=1
+
+(w⊤ 
+
+> i,k,j
+
+)m(xj )m.
+
+28 Noticing that si,k is a linear combination of xj , we apply Lemma A.2 to construct the layer. We use X′ ∈ RdnN ×n to denote the data block of Z(1) (first dnN rows, first n columns). Define the extraction row vector Ai,k ∈ R1×dnN by 
+
+(Ai,k )ℓ := 
+
+(
+
+1, ℓ ∈ { (( i − 1) N + k − 1) d + 1 , . . . , (( i − 1) N + k)d},
+
+0, otherwise ,
+
+for each (i, k ) ∈ Rn × RN . Then Ai,k selects the d rows corresponding to the (i, k )-th block, and 
+
+Ai,k X′1n =
+
+> n
+
+X
+
+> j=1
+> d
+
+X
+
+> m=1
+
+(wi,k,j )m(xj )m = si,k .
+
+Writing B := 1 n1⊤ 
+
+> n
+
+∈ Rn×n, we have: 
+
+Ai,k X′ B = si,k · 1⊤ 
+
+> n
+
+∈ R1×n.
+
+This is exactly the AX ′B form required by Lemma A.2. Therefore, Lemma A.2 guarantees that there exists a single-head attention Attn (i,k )2 such that 
+
+∥Attn (i,k )2 (Z(1) ) − si,k 1⊤ 
+
+> n
+
+∥max ≤ ϵ2.
+
+Using organizer matrices analogous to Layer 1, each (i, k )-head places the scalar si,k into row 
+
+(i − 1) N + k of the stacked representation. Same as in Layer 1, an additional identity-preserving head maintains In+1 in the last n + 1 rows. The output Z(2) is approximately: 
+
+Z(2) ≈
+
+
+
+s1,1 · 1⊤ 
+
+> n
+
+0
+
+s1,2 · 1⊤ 
+
+> n
+
+0
+
+... ...
+
+sn,N · 1⊤ 
+
+> n
+
+0
+
+In+1 
+
+
+
+∈ R(nN +n+1) ×(n+1) ,
+
+up to error ϵ2. From Lemma A.1 and Lemma A.3 we have: 
+
+H2 = O(nN ), λ2 = O(ln nϵ2
+
+), ∥W (2)  
+
+> V
+
+∥F = O(n√nd ), ∥W (2) 
+
+> KQ
+
+∥F = O(n
+
+s
+
+n ln n2CX w0
+
+ϵ2
+
+).
+
+(A.3) 
+
+Third Layer: Soft-ReLU Approximation Layer 
+
+In this layer, our goal is to construct a multi-head attention layer Attn 3 with temperature λ3 such 29 that the output approximates the 1 × (n + 1) row vector 
+
+(f1, f 2, . . . , f n, 0) , fi =
+
+> N
+
+X
+
+> k=1
+
+ai,k ReLU( si,k ).
+
+For head (i, k ), we set 
+
+W (i,k ) 
+
+> KQ
+
+:= e(i−1) N +ke⊤  
+
+> nN +i
+
++ C · enN +n+1 v⊤ 
+
+> i
+
+∈ R(nN +n+1) ×(nN +n+1) ,
+
+where vi := P  
+
+> j̸=i
+
+enN +j + enN +n+1 ∈ RnN +n+1 selects all positional-encoding entries except the 
+
+i-th, and C > 0 is a suppression constant to be determined. We evaluate the attention score λ3(z(2)  
+
+> p
+
+)⊤W (i,k ) 
+
+> KQ
+
+z(2)  
+
+> q
+
+computed with temperature λ3 between key column p and query column q for each case. • The target query position query q = i.
+
+Since the i-th positional-encoding entry of z(2)  
+
+> i
+
+equals 1, we have v⊤ 
+
+> i
+
+z(2)  
+
+> i
+
+= 0 . Therefore, for data key p ≤ n, score = λ3 · Z(2) (i−1) N +k,p = λ3 · si,k . For reference key p = n + 1 , score 
+
+= λ3 · 0 = 0 . The resulting softmax weights are: 
+
+αp =
+
+
+
+eλ3·si,k 
+
+ne λ3·si,k + 1 , p ≤ n, 
+
+1
+
+ne λ3·si,k + 1 , p = n + 1 .
+
+• Non-target query positions query q̸ = i.
+
+Since only the i-th positional-encoding entry of z(2)  
+
+> q
+
+equals 0, we have v⊤ 
+
+> i
+
+z(2)  
+
+> q
+
+= 1 . Therefore for data key p ≤ n, score = λ3 · C · (z(2)  
+
+> p
+
+)nN +n+1 = 0 . For reference key p = n + 1 , score 
+
+= λ3 · C. The softmax is dominated by the reference key when C is large, because the reference key weight equals eλ3C 
+
+> n+eλ3C
+
+.We set the value matrix as 
+
+W (i,k ) 
+
+> V
+
+:= ai,k (e(nN +n+1) (i−1) N +k )⊤ ∈ R1×(nN +n+1) .
+
+Then for key p ≤ n: W (i,k ) 
+
+> V
+
+z(2)  
+
+> p
+
+= ai,k si,k , and for key p = n + 1 : W (i,k ) 
+
+> V
+
+z(2)  
+
+> n+1
+
+= 0 .For query q = i, the scalar output at i-th column is: 
+
+(Attn (i,k )(Z(2) )) 1,i =
+
+> n
+
+X
+
+> p=1
+
+ai,k si,k · eλ3·si,k 
+
+ne λ3·si,k + 1 + 0 = ai,k si,k · ne λ3·si,k 
+
+ne λ3·si,k + 1 = ai,k ReLU (n)soft (si,k ).
+
+30 For query q̸ = i, the scalar output at q-th column satisfies: 
+
+(Attn (i,k )(Z(2) )) 1,q = ai,k si,k · nn + eλ3C ≤ nC s
+
+eλ3C .
+
+The total suppression error at any non-target column q̸ = i, summed over all nN heads, is bounded by 
+
+> n
+
+X
+
+> i=1
+> N
+
+X
+
+> k=1
+
+nC s
+
+eλ3C = n2N C s
+
+eλ3C .
+
+Setting this less than ϵrelu gives: 
+
+C ≥ ln( n2N C s/ϵ relu )
+
+λ3
+
+.
+
+Summing over all nN heads gives our construction of Layer 3 
+
+Attn 3(Z(2) ) := 
+
+> n
+
+X
+
+> i=1
+> N
+
+X
+
+> k=1
+
+Attn (i,k )(Z(2) ).
+
+Since head (i, k ) writes only to column i of the 1 × (n + 1) output, contributions from different i
+
+do not interfere. The final output row vector is: 
+
+(Attn 3(Z(2) )) 1,j =
+
+
+
+> N
+
+X
+
+> k=1
+
+aj,k ReLU (n)soft (sj,k ) + O(ϵrelu ), j ≤ n, 
+
+0, j = n + 1 .
+
+After truncation by T , we obtain the 1 × n row vector ( bf1, . . . , bfn) approximating (f1, . . . , f n).By Lemma A.5 and our construction above, the parameter bound of Layer 3 satsfies 
+
+H3 = nN, λ3 = O(ln( Csn/ϵ relu )
+
+ϵrelu 
+
+), ∥W (3)  
+
+> V
+
+∥F = 1 , ∥W (3) 
+
+> KQ
+
+∥F = O(C√n). (A.4) 
+
+Error Analysis 
+
+Recall that in output of Layer 1 we have 
+
+∥ bX′ − X′∥max ≤ ϵ1.
+
+Therefore, in Layer 2 we have: 
+
+|bsi,k − si,k | ≤ ∥ Ai,k ( bX′ − X′)B∥max + ϵ2
+
+31 ≤ ∥ Ai,k ∥∞ · ∥ bX′ − X′∥max · ∥ B∥1 + ϵ2
+
+≤ dnϵ 1 + ϵ2.
+
+The actual Layer 3 output at query i is PNk=1 ai,k ReLU (n)soft (bsi,k ), and the target is fi =
+
+PNk=1 ai,k ReLU( si,k ). For each fixed (i, k ), we insert ReLU( bsi,k ) as an intermediate term: 
+
+|ai,k ReLU (n)soft (bsi,k ) − ai,k ReLU( si,k )|≤ | ReLU (n)soft (bsi,k ) − ReLU( bsi,k )| + |ReLU( bsi,k ) − ReLU( si,k )|≤ 2ϵrelu + dnϵ 1 + ϵ2.
+
+The overall error is 
+
+| bfi − fi| ≤ 
+
+> N
+
+X
+
+> k=1
+
+|ai,k ReLU (n)soft (bsi,k ) − ai,k ReLU( si,k )| + (suppression error) 
+
+≤
+
+> N
+
+X
+
+> k=1
+
+(2 ϵrelu + dnϵ 1 + ϵ2) + ϵrelu 
+
+= (2 N + 1) ϵrelu + N dnϵ 1 + N ϵ 2.
+
+Therefore, to achieve precision of ϵ, it suffices to set 
+
+ϵ1 = ϵ
+
+3dnN , ϵ2 = ϵ
+
+3N , ϵrelu = ϵ
+
+6N + 3 .
+
+Finally, by (A.2), (A.3) and (A.4), we get the universal parameter bound of the three-layer atten-tion: 
+
+H = O(n2N ), W = O(dnN ), λ = O(N ln( dnN C X w0/ϵ )
+
+ϵ ),
+
+∥WV ∥F = w0
+
+√dN + n√nd, ∥WKQ ∥F = O(n
+
+r
+
+n ln nN C X w0
+
+ϵ ).
+
+This completes the proof. 
+
+Remark A.2. By letting w′ 
+
+> i,k,j
+
+:= ( wi,k,j , b i,k ) ∈ Rd+1 and x′ = ( x, 1/n ) ∈ Rd+1 , Lemma A.6 also applies to ReLU network with bias in the form 
+
+fi =
+
+> N
+
+X
+
+> k=1
+
+ai,k ReLU( 
+
+> n
+
+X
+
+> j=1
+
+w⊤ 
+
+> i,k,j
+
+xj + bi,k ), a i,k ∈ {− 1, 1}, w i,k,j ∈ Rd, f = ( f1, . . . , f n).
+
+## A.2 Main Proof of Lemma 4.1 
+
+In this section, we present the main proof of Lemma 4.1. We extend Lemma A.6 from the vector-output case to the matrix-output case required in the main text. The key idea is that for each output row, we use the construction of Lemma A.6 and then stack these row-wise approximators into a 32 single attention network by modifying the weight matrices. 
+
+Lemma A.7 (Lemma 4.1 Restated) . Let X ⊂ Rd×n be compact. For X = ( x1, . . . , x n) ∈ X ,let f : X → Rd×n be defined entry-wise by 
+
+[f (X)] r,i =
+
+> N
+
+X
+
+> k=1
+
+a(r) 
+
+> i,k
+
+ReLU( 
+
+> n
+
+X
+
+> j=1
+
+(w(r) 
+
+> i,k,j
+
+)⊤xj ), r ∈ [d], i ∈ [n],
+
+where a(r) 
+
+> i,k
+
+∈ {− 1, 1} and w(r) 
+
+> i,k,j
+
+∈ Rd. Then, for any 0 < ϵ < 1, there exists a Transformer 
+
+ϕ = T ◦ Attn (3) ◦ Attn (2) ◦ Attn (1) ◦ P, 
+
+such that 
+
+∥ϕ(X) − f (X)∥max ≤ ϵ for all X ∈ X ,
+
+where P is the preprocessing map that pads one zero token, and T is the truncation map that deletes the last token. Further, suppose X ∈ [−CX , C X ]d×n and ∥w(r) 
+
+> i,k,j
+
+∥∞ ≤ w0 for all i, j ∈
+
+[n], k ∈ [N ], r ∈ [d]. For CX ≥ 1, the parameter bounds of constructed Transformer network ϕ
+
+satisfy 
+
+H = O(N ), W = O(N ), λ = O(N ln( N C X w0/ϵ )
+
+ϵ ),
+
+∥WV ∥F = O(w0
+
+√N ), ∥WKQ ∥F = O(
+
+r
+
+ln N C X w0
+
+ϵ ),
+
+where O(·) hides polynomial factors depending on d and n.
+
+Proof. Define that f (r) := ( f (r)1 , · · · f (r) 
+
+> n
+
+). For ϵ > 0, by Lemma A.6 there exists a network with three multi-head attention layers ϕ(r), satisfying 
+
+∥ϕ(r)(X) − f (r)(X)∥max ≤ ϵ. 
+
+Our goal is to stack the networks to obtain ϕ =
+
+
+
+ϕ(1) 
+
+...
+
+ϕ(d)
+
+. We construct ϕ by modifying weight matrices. We first recall the intermediate dimensions from the construction of Lemma A.6. Following the proof of Lemma A.6, the three attention layers have the following per-row input/output dimen-sions: • Layer 1 (Zooming Layer): input dimension d0 := d + n + 1 , output dimension d1 := 
+
+dnN + n + 1 , where the zooming outputs Yi,k (X) are stacked for all (i, k ) pairs together with In+1 .33 • Layer 2 (Accumulation Layer): input dimension d1 = dnN + n + 1 , output dimension 
+
+d2 := nN + n + 1 , where the accumulated inner products si,k are stacked together with 
+
+In+1 .• Layer 3 (Soft-ReLU Layer): input dimension d2 = nN + n + 1 , output dimension d3 := 1 ,producing a 1 × (n + 1) row vector approximating (fr, 1, . . . , f r,n , 0) .We then construct selector matrices and organizer matrices accordingly to stack output to obtain a matrix output. 
+
+Selector Matrices. 
+
+For each layer m ∈ { 1, 2, 3} and each r ∈ [d], the selector matrix Q(m) 
+
+> r
+
+extracts the r-th block from the stacked representation at the input of layer m. Since the stacked representation before layer m has row dimension d · dm−1, with each block of dimension dm−1, we define: • For layer 1, the input is P (X) ∈ Rd0×(n+1) with d0 = d + n + 1 . We do not need a selector matrix for layer 1 since we do not stack the preprocessing layer. To keep the form align with other layers, we define 
+
+Q(1)  
+
+> r
+
+:= Id0 , r ∈ [d].
+
+• For layer 2, the input is the stacked output of layer 1 in Rd·d1×(n+1) with d1 = dnN + n + 1 .We define 
+
+Q(2)  
+
+> r
+
+:= 
+
+
+
+0(r−1) d1×d1
+
+Id1
+
+0(d−r)d1×d1
+
+
+
+> ⊤
+
+∈ Rd1×d·d1 , r ∈ [d].
+
+Then Q(2)  
+
+> r
+
+extracts the r-th block of the stacked zooming-layer output. • For layer 3, the input is the stacked output of layer 2 in Rd·d2×(n+1) with d2 = nN + n + 1 .We define 
+
+Q(3)  
+
+> r
+
+:= 
+
+
+
+0(r−1) d2×d2
+
+Id2
+
+0(d−r)d2×d2
+
+
+
+> ⊤
+
+∈ Rd2×d·d2 , r ∈ [d].
+
+Then Q(3)  
+
+> r
+
+extracts the r-th block of the stacked accumulation-layer output. 
+
+Organizer matrices. For each layer m ∈ { 1, 2, 3} and each r ∈ [d], the organizer matrix O(m)
+
+> r
+
+embeds the per-row output of dimension dm into the r-th block of the stacked representation of dimension d · dm. We define 
+
+O(1)  
+
+> r
+
+:= 
+
+
+
+0(r−1) d1×d1
+
+Id1
+
+0(d−r)d1×d1
+
+ ∈ Rd·d1×d1 , r ∈ [d],
+
+34 O(2)  
+
+> r
+
+:= 
+
+
+
+0(r−1) d2×d2
+
+Id2
+
+0(d−r)d2×d2
+
+ ∈ Rd·d2×d2 , r ∈ [d],O(3)  
+
+> r
+
+:= 
+
+
+
+0(r−1) d3×d3
+
+Id3
+
+0(d−r)d3×d3
+
+ ∈ Rd·d3×d3 , r ∈ [d].
+
+For r̸ = r′, the matrices O(m) 
+
+> r
+
+and O(m) 
+
+> r′
+
+have disjoint nonzero row supports. Left-multiplying by 
+
+O(m) 
+
+> r
+
+embeds a dm-dimensional vector into the r-th block of the d·dm-dimensional stacked vector, with zeros elsewhere. 
+
+Final Construction. 
+
+For each layer m ∈ { 1, 2, 3}, suppose the per-row network ϕ(r) has H(m) 
+
+> r
+
+attention heads in its 
+
+m-th layer. Using the selector matrices Q(m) 
+
+> r
+
+∈ Rdm−1×d·dm−1 and organizer matrices O(m) 
+
+> r
+
+∈
+
+Rd·dm×dm defined in Step 3, we construct the m-th global attention layer as 
+
+Attn (m)(Z) = 
+
+> d
+
+X
+
+> r=1
+> H(m)
+> r
+
+X
+
+> h=1
+
+O(m) 
+
+> r
+
+W (h,r,m ) 
+
+> V
+
+Q(m) 
+
+> r
+
+Z Softmax λ(( W (h,r,m ) 
+
+> K
+
+Q(m) 
+
+> r
+
+Z)⊤W (h,r,m ) 
+
+> Q
+
+Q(m) 
+
+> r
+
+Z).
+
+To see that this is indeed a valid multi-head attention layer, we define the modified weight matrices for the global network as 
+
+W (h,r,m ) 
+
+> V
+
+:= O(m) 
+
+> r
+
+W (h,r,m ) 
+
+> V
+
+Q(m) 
+
+> r
+
+, W (h,r,m ) 
+
+> K
+
+:= W (h,r,m ) 
+
+> K
+
+Q(m) 
+
+> r
+
+, W (h,r,m ) 
+
+> Q
+
+:= W (h,r,m ) 
+
+> Q
+
+Q(m) 
+
+> r
+
+.
+
+Then the global layer takes the standard multi-head attention form 
+
+Attn m(Z) = 
+
+> d
+
+X
+
+> r=1
+> H(m)
+> r
+
+X
+
+> h=1
+
+W (h,r,m ) 
+
+> V
+
+Z Softmax λ(( W (h,r,m ) 
+
+> K
+
+Z)⊤W (h,r,m ) 
+
+> Q
+
+Z),
+
+with total number of heads H(m) = Pdr=1 H(m) 
+
+> r
+
+in layer m.Finally, by Lemma A.6, we have the parameter bound of the constructed attention network: 
+
+H = O(dn 2N ), W = O(d2nN ), λ = O(N ln( dnN C X w0/ϵ )
+
+ϵ ),CV = O(w0
+
+√dN + n√nd ), CKQ = O(n
+
+r
+
+n ln nN C X w0
+
+ϵ ).
+
+Dropping polynomial factors depending on d and n completes the proof. 
+
+Remark A.3. The intermediate ReLU functions f that appears in Lemma A.6 is consistent with Definition 3.1 in Section 3. Specifically, fr : Rd×n → Rn belongs to F(2 , W, S, B ) on the 35 vectorized input x = vec( X) ∈ Rdn 
+
+fr(x1, . . . , x n) := ( A2 ReLU[ · ]) ◦ (A1x),
+
+with weight matrix A1 ∈ RnN ×dn in first layer formed by 
+
+(A1)(i−1) N +k, : = (( w(r)
+
+> i,k, 1
+
+)⊤| (w(r)
+
+> i,k, 2
+
+)⊤| · · · | (w(r)
+
+> i,k,n
+
+)⊤) ∈ R1×dn ,
+
+and weight matrix A2 ∈ Rn×nN in second layer with the form 
+
+A2 =
+
+
+
+a(r)1,1 · · · a(r)1,N 0 · · · 0 · · · 00 · · · 0 a(r)2,1 · · · a(r)2,N · · · 0
+
+... ... ... ... . . . ...
+
+0 · · · 0 0 · · · 0 · · · a(r)
+
+> n,N
+
+ .
+
+While the origin output of f is (f ⊤ 
+
+> 1
+
+, · · · , f ⊤ 
+
+> n
+
+)⊤ ∈ Rdn , in this lemma we rearrange the ReLU output to (f1, · · · , f n) ∈ Rd×n for convenience of comparison with output of ϕ.
+
+Remark A.4. In the process of stacking ReLU layers, we are able to remove the pre-processing and truncation layers present in intermediate layers of the constructed attention network through modifications to the attention layers. Consequently, we only keep a single pre-processing layer at the beginning and a single truncation layer at the end of the network. Specifically, the approximation of a composite ReLU function ReLU m ◦ · · · ◦ ReLU 1 simplifies to the form 
+
+T ◦Attn 3m◦· · ·◦ Attn 1◦P , rather than T ◦Attn 3m◦· · ·◦ Attn 3m−2◦P ◦· · ·◦ T ◦Attn 3◦· · ·◦ Attn 1◦P .Concretely, we achieve this by modifying the weight matrices of Attn 3i, 1 ≤ i ≤ m − 1. Notice that output of layer Attn 3i−1, 1 ≤ i ≤ m−1 has positional encoding in last n+1 rows. Therefore, same as the proof of Lemma A.4, adding one additional identity-preserving head and adding organizer matrices in other head maintain In+1 in last n + 1 rows. We denote the output of unmodified Attn 3i as 
+
+h
+
+f (relu i)1 . . . f (relu i) 
+
+> n
+
+0d
+
+i
+
+∈ Rd×(n+1) ,
+
+The output of modified Attn 3i then approximates 
+
+f (relu i)1 . . . f (relu i) 
+
+> n
+
+0d
+
+In+1 
+
+
+
+∈ R(d+n+1) ×(n+1) ,
+
+which is exactly in the form of output of preprocessing layer. Thus, we are able to remove the truncation layer T and preprocessing layer P between Attn 3i and Attn 3i+1 for 1 ≤ i ≤ m − 1.
+
+## A.3 Main Proof of Theorem 4.1 
+
+In this section, we present the main proof of Theorem 4.1, extending the translation theorem to the ReLU network with general depth. For each layer of the ReLU network, we construct a transformer block that approximates the corresponding layer on the relevant compact domain. We 36 then control the approximation error under composition via the Lipschitz continuity of the ReLU network. 
+
+Theorem A.1 (Theorem 4.1 Restated) . Let X := ( x1, . . . , x n) ∈ [−CX , C X ]d×n and vec( X) := (x⊤ 
+
+> 1
+
+, . . . , x ⊤ 
+
+> n
+
+) ∈ [−CX , C X ]dn . For any ϵ ∈ (0 , 1) and any ReLU network f ∈ F (Kf , W f , S, B ),there exists a Transformer g ∈ T (H, W, K, C KQ , C V ) such that 
+
+∥g(X) − f (vec( X)) ∥max ≤ ϵ
+
+for all X ∈ [−CX , C X ]d×n, where g takes the form g = T ◦ Attn 3Kf ◦ · · · ◦ Attn 1 ◦ P with P the preprocessing layer and T the truncation layer. For CX ≥ 1, the parameters of g satisfy 
+
+H = O(Wf ), W = O(Wf ), K = O(Kf ), CV = O(BpWf ),CKQ = O(
+
+s
+
+Kf ln 
+
+Kf Wf BC X
+
+ϵ
+
+
+
+), λ = O(K2 
+
+> f
+
+W Kf +1  
+
+> f
+
+BKf ln( Kf Wf BC X /ϵ )
+
+ϵ ).
+
+Proof. We write f = fKf ◦ · · · ◦ f1, where fk(z) = AkReLU[ z] + bk with Ak ∈ Rdk+1 ×dk ,
+
+∥Ak∥max ≤ B, and dk ≤ Wf for all k. This is consistent with Definition 3.1, since affine map is representable by a one-layer ReLU network. Define the partial compositions f (k) := fk ◦ · · · ◦ f1
+
+and g(k) := gk ◦ · · · ◦ g1, where each gk is the three-attention-layer approximator from Lemma A.7, with intermediate preprocessing and truncation layers eliminated via Remark A.4. We start with bounding intermediate input domain. Since every entry of Ak satisfies |(Ak)ij | ≤ B
+
+and each row of Ak contains at most dk ≤ Wf entries, the induced ℓ∞-operator norm satisfies 
+
+∥Ak∥∞,∞ ≤ Wf B. Combined with the 1-Lipschitz property of ReLU under ∥ · ∥ ∞, this gives 
+
+∥fk(z)∥max ≤ Wf B∥z∥max .
+
+By induction on k, ∥fk(vec( X)) ∥max ≤ (Wf B)kCX for all X ∈ [−CX , C X ]d×n and k ∈ [Kf ].Denote C(k) := ( Wf B)kCX for k = 0 , 1, . . . , K f .Next we consider the pre-layer approximation through Lemma A.7. Fix per-layer tolerances ϵk > 0 to be specified. By Lemma A.7 applied with input-domain bound 
+
+C(k−1) and precision ϵk, for each k ∈ [Kf ] there exists a three-attention-layer network gk such that, for all Z satisfying ∥Z∥max ≤ C(k−1) ,
+
+∥g(k)(Z) − fk(vec( Z)) ∥max ≤ ϵk.
+
+The associated parameter bounds from Lemma A.7 are 
+
+H(k) = O(dn 2Wf ), W (k) = O(d2nW f ), C(k) 
+
+> V
+
+= O(BpdW f + n√nd ),λ(k) = O(Wf ln  dnW f C(k−1) B/ϵ k
+
+
+
+ϵk
+
+), C(k) 
+
+> KQ
+
+= O(n
+
+s
+
+n ln 
+
+nW f C(k−1) Bϵk
+
+
+
+). (A.5) 37 Next, we determine the ϵk. We denote that ηk := ∥g(k)(X) − f (k)(vec( X)) ∥max . By the triangle inequality, 
+
+∥g(k)(X) − f (k)(vec( X)) ∥max ≤ ∥ gk(g(k−1) (X)) − fk(vec( g(k−1) (X))) ∥max 
+
++ ∥fk(vec( g(k−1) (X))) − fk(f (k−1) (vec( X))) ∥max .
+
+The first term satisfies 
+
+∥gk(g(k−1) (X)) − fk(vec( g(k−1) (X))) ∥max ≤ ϵk.
+
+For the second term, we use the identity ∥vec( Z1) − vec( Z2)∥∞ = ∥Z1 − Z2∥max and the (Wf B)-Lipschitz property of fk under ∥ · ∥ ∞ to obtain 
+
+∥fk(vec( g(k−1) (X))) − fk(f (k−1) (vec( X))) ∥max ≤ Wf B · ∥ g(k−1) (X) − f (k−1) (vec( X)) ∥max .
+
+Therefore 
+
+ηk ≤ Bf W · ηk−1 + ϵk
+
+for k ≥ 2, and η1 = ϵ1. To ensure the error ηk less than ϵ for k = Kf , it suffices to set 
+
+ϵk := ϵKf (Wf B)Kf , k ∈ [Kf ]. (A.6) Taking (A.6) into (A.5), we obtain: 
+
+H = O(dn 2Wf ), W = O(d2nW f ), K = O(Kf ),CV = O(BpdW f + n√nd ), CKQ = O(n
+
+s
+
+nK f ln 
+
+nK f Wf BC X
+
+ϵ
+
+
+
+),λ = O(K2 
+
+> f
+
+W Kf +1  
+
+> f
+
+BKf ln( dnK f Wf BC X /ϵ )
+
+ϵ ).
+
+Dropping polynomial factors depending on d and n completes the proof. 38 B Constructive Transformer Universal Approximation 
+
+In this appendix we establish Theorem 5.1 via a two-step reduction. We first invoke a classical ReLU universal approximation result to obtain a quantitative ReLU pproximator for any target in the Sobolev unit ball. We then apply the translation theorem (Theorem 4.1) to lift this ReLU approximator to a softmax-attention network, thereby inheriting both the approximation guarantee and explicit architectural bounds. 
+
+Organization. Section B.1 recalls the Sobolev-space ReLU universal approximation theorem of [Yarotsky, 2017], which supplies the quantitative ReLU constructions used as input to our translation. Section B.2 combines these bounds with Theorem 4.1 to derive the attention-network universal approximation theorem with explicit resource bounds. 
+
+## B.1 ReLU Network’s Universal Approximation Theorem 
+
+We begin by recalling the Sobolev-space framework and the classical ReLU approximation result of [Yarotsky, 2017], which serves as the starting point for our construction. 
+
+Definition B.1 (Sobolev Space) . Let n and r be positive integers. We define W r, ∞([0 , 1] n) to be the set of all functions f : [0 , 1] n → R whose weak derivatives up to order r belong to L∞([0 , 1] n).We define its norm by 
+
+∥f ∥W r, ∞([0 ,1] n) = max    
+
+> α∈{ 0,1,2,... }n,|α|≤ r
+
+ess sup x∈[0 ,1] n |Dαf (x)|.
+
+We further define the unit ball by 
+
+Fn,r = {f ∈ W r, ∞([0 , 1] n) : ∥f ∥W r, ∞([0 ,1] n) ≤ 1}.
+
+Lemma B.1 (Theorem 1 of [Yarotsky, 2017]) . Let n and r be positive integers. Let ϵ ∈ (0 , 1) .Then for every f ⋆ ∈ F n,r there exists a ReLU network fReLU ∈ F (Kf , W f , S f , B ) such that 
+
+sup 
+
+> x∈[0 ,1] n
+
+|fReLU (x) − f ⋆(x)| ≤ ϵ. 
+
+Moreover, the parameters satisfy 
+
+Kf = O(ln  ϵ−1), W f = O(ϵ−n/r ln  ϵ−1),Sf = O(ϵ−n/r (ln ϵ−1)) , B = O(ϵ−1/r ),
+
+where O(·) hides polynomial factors in n, r .
+
+Proof. See proof of [Yarotsky, 2017, Theorem 1]. 39 B.2 Main Proof of Theorem 5.1 
+
+In this subsection we prove Theorem 5.1 by combining the quantitative ReLU approximation from Section B.1 with the translation theorem developed in Section A. 
+
+Theorem B.1 (Theorem 5.1 Restated, Attention network’s Universal Approximation Theory) .
+
+Let n and r be positive integers. Suppose f ⋆ ∈ F n,r , where Fn,r is the unit ball of Sobolev space 
+
+W r, ∞([0 , 1] n) following Definition B.1. Then for any ϵ ∈ (0 , 1) , there exists an attention network 
+
+g ∈ T (H, W, K, C KQ , C V ) such that 
+
+|g(x) − f ⋆(x)| ≤ ϵ
+
+for all x ∈ [0 , 1] n. The network parameters satisfy 
+
+H = O(δn/r ln δ), W = O(δn/r ln δ), K = O(ln δ),CV = O(δ(n+2) /2r√ln δ), CKQ = O(ln δ),λ = O(δpolylog( δ) · ln polylog( δ) δ),
+
+where δ = ϵ−1 and O(·) hides polynomial factors in n, r .
+
+Proof. Fix ϵ ∈ (0 , 1) . Applying Lemma B.1 with target accuracy ϵ/ 2, we obtain that there exists a ReLU network fReLU ∈ F (Kf , W f , S f , B f ) such that 
+
+sup 
+
+> x∈[0 ,1] n
+
+|fReLU (x) − f ⋆(x)| ≤ ϵ/ 2.
+
+We apply Theorem 4.1 with CX = 1 and target tolerance ϵ/ 2 to the ReLU network fReLU . Then there exists g ∈ T (H, W, K, C KQ , C V ) such that 
+
+|g(x) − fReLU (x)| ≤ ϵ/ 2,
+
+for all X ∈ [0 , 1] n. Hence, by triangle inequality we have 
+
+|g(x) − f ⋆(x)| ≤ | g(x) − fReLU (x)| + |fReLU (x) − f ⋆(x)|≤ ϵ/ 2 + ϵ/ 2= ϵ. 
+
+Following Theorem 4.1, the parameter bound satisfies 
+
+H = O(δn/r ln δ), W = O(δn/r ln δ), K = O(ln δ),CV = O(δ(n+2) /2r√ln δ), CKQ = O(ln δ),λ = O(δpolylog( δ) · ln polylog( δ) δ),
+
+where δ = ϵ−1 and O(·) hides polynomial factors in n, r . This completes the proof. 40 Remark B.1. The same argument extends to vector-valued targets and general bounded do-mains. More precisely, let CX > 0 and let 
+
+f ⋆ = ( f ⋆ 
+
+> 1
+
+, . . . , f ⋆m) : [ −CX , C X ]n → Rm.
+
+Assume that after the affine normalization 
+
+f ⋆j (u) = f ⋆j (2 CX u − CX 1n), u ∈ [0 , 1] n,
+
+each coordinate function f ⋆j belongs to Fn,r . Then one first approximates each coordinate by Lemma B.1, stacks the resulting ReLU networks in parallel, and finally applies Theorem 4.1. This yields an attention network g satisfying 
+
+∥g(X) − f ⋆(X)∥max ≤ ϵ
+
+for all X ∈ [−CX , C X ]1×n. More generally, for sequence-to-sequence targets in the Sobolev class 
+
+Fd×n,r , the same construction applies and all parameter bounds remain valid with the dimension 
+
+n replaced by the total sequence dimension dn .
+
+41 C Approximation of Rational Functions with Attention Net-work 
+
+In this section, we leverage translation theorems in Section 4 to derive target-specific approxima-tion with attention networks. In each case, we first recall a quantitative ReLU construction from the literature, then apply Theorem 4.1 to translate it into an attention-based approximator with explicit bounds. 
+
+Organization. Section C.1, Section C.2, and Section C.3 incorporate our translation results (Lemma 4.1 and Theorem 4.1) and the ReLU approximation for the minimum/maximum opera-tion, the monomials, and the reciprocal functions, respectively. 
+
+## C.1 Proof of Proposition 5.1 
+
+We start with recalling the ReLU approximation result for monomials established in [Oko et al., 2023]. 
+
+Lemma C.1 (ReLU Approximation of Monomials, Lemma F.6 of [Oko et al., 2023]) . Let d ≥
+
+2, CX ≥ 1, and 0 ≤ ϵerror < 1. For any ϵ ∈ (0 , 1) , there exists a ReLU network fmult ∈F(Kf , W f , S, B ) such that 
+
+|fmult (x′) −
+
+> d
+
+Y
+
+> i=1
+
+xi| ≤ ϵ + d C d−1 
+
+> X
+
+ϵerror 
+
+for all x ∈ [−CX , C X ]d and x′ ∈ Rd with ∥x − x′∥∞ ≤ ϵerror . The network parameters satisfy 
+
+Kf = O(ln d · (ln ϵ−1 + d ln CX )) , Wf = 48 d, S = O(d ln ϵ−1 + d ln CX ), B = CdX ,
+
+where O(·) hides polynomial factors in d.
+
+Proof. See proof of [Oko et al., 2023, Lemma F.6]. We now present the formal proof of Proposition 5.1. 
+
+Proposition C.1 (Proposition 5.1 Restated, Approximation of Monomials) . Let CX ≥ 1 and 
+
+d, n ∈ N with dn > 2. Then, for any ϵ ∈ (0 , 1) , there exist fmult ∈ T (H, W, K, C KQ , C V ) such that 
+
+fmult (X′) −
+
+> n
+
+Y
+
+> j=1
+> d
+
+Y
+
+> i=1
+
+Xij ≤ ϵ + dnC dn −1 
+
+> X
+
+ϵerror 
+
+for all X ∈ [−CX , C X ]d×n and X′ ∈ Rd×n satisfying ∥X − X′∥∞ ≤ ϵerror . For CX ≥ 1, the 42 network parameters satisfy: 
+
+H = O(1) , W = O(1) , K = O(ln δ),CV = O(Cdn X ), CKQ = O(ln δ),λ = O(δ · ln 3 δ · (dn )polylog( δ)Cpolylog( δ) 
+
+> X
+
+),
+
+where δ = CX /ϵ , polylog( δ) denotes a polynomial in the logarithm of δ and O(·) hides polyno-mial factors depending on d and n.
+
+Proof. By Lemma C.1 applied with dimension dn and precision ϵ/ 2, there exists fmult ∈F(Kf , W f , S, B ) with 
+
+Kf = O(dn ln CX
+
+ϵ ), Wf = 48 dn, B = Cdn X ,
+
+such that 
+
+|fmult (x′) −
+
+> n
+
+Y
+
+> j=1
+> d
+
+Y
+
+> i=1
+
+Xij | ≤ ϵ
+
+2 + dn C dn −1 
+
+> X
+
+ϵerror . (C.1) Applying Theorem 4.1 with input domain CX and precision ϵ/ 2, we obtain gmult ∈ T (·) satisfying 
+
+∥gmult (X′) − fmult (x′)∥max ≤ ϵ
+
+2.
+
+The triangle inequality and (C.1) then give 
+
+|gmult (X′) − Y
+
+> j,i
+
+Xij | ≤ ϵ
+
+2 + ϵ
+
+2 + dn C dn −1 
+
+> X
+
+ϵerror = ϵ + dn C dn −1 
+
+> X
+
+ϵerror .
+
+Following Theorem 4.1, the parameter bound satisfies 
+
+H = O(1) , W = O(1) , K = O(ln δ),CV = O(Cdn X ), CKQ = O(ln δ),λ = O(δ · ln 3 δ · (dn )polylog( δ)Cpolylog( δ) 
+
+> X
+
+),
+
+where δ = CX 
+
+> ϵ
+
+, polylog( δ) denotes a polynomial in the logarithm of δ and O(·) hides polynomial factors depending on d and n.This completes the proof. 
+
+## C.2 Proof of Proposition 5.2 
+
+We first recall the ReLU approximation result for the reciprocal function established in [Oko et al., 2023]. 43 Lemma C.2 (ReLU Approximation of Reciprocal Function, Lemma F.7 of [Oko et al., 2023]) .
+
+For any 0 < ϵ < 1, there exists ϕrec ∈ F (L, W, S, B ) with 
+
+L = O(ln 2 ϵ−1), ∥W ∥∞ = O(ln 3 ϵ−1), S = O(ln 4 ϵ−1), B = O(ϵ−2)
+
+such that 
+
+ϕrec (x′) − 1
+
+x ≤ ϵ + |x′ − x|
+
+ϵ2 ,
+
+for all x ∈ [ϵ, ϵ −1] and x′ ∈ R.
+
+Proof. See proof of [Oko et al., 2023, Lemma F.7]. We now present the formal proof of Proposition 5.2. 
+
+Proposition C.2 (Proposition 5.2 Restated, Approximation of Reciprocal Function) . For any approximation error ϵ ∈ (0 , 1) , there exist network finv ∈ T (H, W, K, C KQ , C V ) such that 
+
+|finv (x′) − 1/x | ≤ 2ϵ + |x′ − x|
+
+ϵ2
+
+for all x ∈ [ϵ, 1/ϵ ] and x′ ∈ [−CX , C X ]. For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ),CV = O(δ2
+
+p
+
+ln 3 δ), CKQ = O(
+
+q
+
+ln 2 δ · ln( δC X )) ,λ = O(δpolylog( δ) · ln polylog( δ) δ · ln CX ),
+
+where δ = 1 /ϵ and polylog( δ) denotes a polynomial in the logarithm of δ.
+
+Proof. By Lemma C.2 applied with precision ϵ, there exists g ∈ F (Kf , W f , S, B ) with 
+
+Kf = O(ln 2 δ), Wf = O(ln 3 δ), B = O(δ2),
+
+such that 
+
+|g(x′) − 1 
+
+> x
+
+| ≤ ϵ + |x′ − x|
+
+ϵ2 . (C.2) Applying Theorem 4.1 with input domain CX and precision ϵ, we obtain finv ∈ T (·) satisfying 
+
+|finv (x′) − g(x′)| ≤ ϵ. 
+
+Combining with (C.2) via the triangle inequality gives 
+
+|finv (x′) − 1 
+
+> x
+
+| ≤ 2ϵ + |x′ − x|
+
+ϵ2 .
+
+44 Following Theorem 4.1, the parameter bound satisfies 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ),CV = O(δ2
+
+p
+
+ln 3 δ), CKQ = O(
+
+q
+
+ln 2 δ · ln( δC X )) ,λ = O(δpolylog( δ) · ln polylog( δ) δ · ln CX ),
+
+where δ = 1 /ϵ .This completes the proof. 
+
+## C.3 Proof of Proposition 5.3 
+
+We first establish that we’re capable of implementing entry-wise minimum, maximum and clip-ping operations through a single-layer ReLU network. 
+
+Lemma C.3 (ReLU Realization of Entry-wise Minimum, Maximum and Clipping Operations) .
+
+For any d, n ∈ N, we’re capable of implementing the entry-wise maximum and minimum of two matrices X, Y ∈ Rd×n by one layer ReLU networks gmax , g min ∈ F (Kf , W f , S, B ) with 
+
+Kf = 1 , Wf = O(dn ), S = O(dn ), B = O(1) .
+
+Moreover, for any c ∈ (0 , C X ), we’re capable of implementing the entry-wise clipping map clip c :
+
+Rd×n → Rd×n by a one-layer ReLU network gclip ,c ∈ F (Kf , W f , S, B ) with 
+
+Kf = 1 , Wf = O(dn ), S = O(dn ), B = O(CX ).
+
+Proof. Noticing that for a, b, t ∈ R, c > 0, it holds 
+
+max {a, b } = ReLU( a − b) + ReLU( b) − ReLU( −b),
+
+min {a, b } = ReLU( a) − ReLU( −a) − ReLU( a − b),
+
+clip c(t) = ReLU( t + c) − ReLU( t − c) − c. 
+
+Applying these identities entry-wise and concatenating inputs yields the following constructions. 
+
+Entry-wise maximum. With input z := (vec( X)⊤, vec( Y )⊤)⊤ ∈ R2dn , we define 
+
+gmax (z) = Amax 2 ReLU( Amax 1 z + bmax 1 ) + bmax 2 ,
+
+where 
+
+Amax 1 =
+
+
+
+Idn −Idn 
+
+0 Idn 
+
+0 −Idn 
+
+ ∈ R3dn ×2dn , bmax 1 = 0 ∈ R3dn ,Amax 2 = Idn Idn −Idn 
+
+ ∈ Rdn ×3dn , bmax 2 = 0 ∈ Rdn .
+
+45 Entry-wise minimum. With input z := (vec( X)⊤, vec( Y )⊤)⊤ ∈ R2dn , we define 
+
+gmin (z) = Amin 2 ReLU( Amin 1 z + bmin 1 ) + bmin 2 ,
+
+where 
+
+Amin 1 =
+
+
+
+Idn 0
+
+−Idn 0
+
+Idn −Idn 
+
+ ∈ R3dn ×2dn , bmin 1 = 0 ∈ R3dn ,Amin 2 = Idn −Idn −Idn 
+
+ ∈ Rdn ×3dn , bmin 2 = 0 ∈ Rdn .
+
+Clipping Function. With input vec( X)⊤ ∈ Rdn , we define 
+
+gclip (z) = Aclip 2 ReLU( Aclip 1 z + bclip 1 ) + bclip 2 ,
+
+where 
+
+Aclip 1 =
+
+Idn 
+
+Idn 
+
+
+
+∈ R2dn ×dn , bclip 1 =
+
+ c1dn 
+
+−c1dn 
+
+
+
+∈ R2dn ,Aclip 2 = Idn −Idn 
+
+ ∈ Rdn ×2dn , bclip 2 = −c1dn ∈ Rdn .
+
+Then gmax , g min , g clip implements entry-wise maximum, minimum and clipping operations respec-tively. Parameter bounds follow directly by computation. Then we present the proof of Proposition 5.3. 
+
+Proposition C.3 (Proposition 5.3 Restated, Element-wise Minimum, Maximum and Clipping) .
+
+Let 0 < c < C X . For any ϵ ∈ (0 , 1) , there exist attention networks 
+
+fmax , f min , f clip ∈ T (H, W, K, C KQ , C V )
+
+such that, for all X, Y ∈ [−CX , C X ]d×n,
+
+∥fmax (X, Y ) − max( X, Y )∥max ≤ ϵ, 
+
+∥fmin (X, Y ) − min( X, Y )∥max ≤ ϵ, 
+
+∥fclip (X) − clip c(X)∥max ≤ ϵ, 
+
+where max( ·, ·) and min( ·, ·) denote entry-wise operations. For CX ≥ 1, the network parameters satisfy 
+
+H = O(1) , W = O(1) , K = O(1) ,
+
+46 and, for fmax and fmin :
+
+CV = O(1) , CKQ = O(pln( δC X )) , λ = O(δ ln( δC X )) ,
+
+for fclip :
+
+CV = O(CX ), CKQ = O(pln( δC X )) , λ = O(δC X ln( δC X )) ,
+
+where δ = 1 /ϵ and O(·) hides polynomial factors depending on d and n.
+
+Proof. We prove the bound for fmax ; the arguments for fmin and fclip are identical in structure, differing only in the weight-norm parameter B.By Lemma C.3, there exists gmax ∈ F (Kf , W f , S, B ) with Kf = 1 , Wf = O(1) , B = O(1) that implements the entry-wise maximum of X and Y on [−CX , C X ]d×n.Applying Theorem 4.1 to gmax with input-domain bound CX and target accuracy ϵ yields an attention-only network fmax ∈ T (H, W, K, C KQ , C V ) satisfying 
+
+∥fmax (X, Y ) − gmax (z)∥max ≤ ϵ. 
+
+The triangle inequality then gives 
+
+∥fmax (X, Y ) − max( X, Y )∥max ≤ ϵ. 
+
+Substituting Kf = 1 , Wf = O(1) , B = O(1) into the parameter bounds of Theorem 4.1 gives 
+
+H = O(1) , W = O(1) , K = O(1) ,CV = O(1) , CKQ = O(pln( δC X )) ,λ = O(δ ln( δC X )) ,
+
+where δ = 1 /ϵ and O(·) hides polynomial factors depending on d and n.This completes the proof. 47 D Proofs of Section 5.3 
+
+In this section, we provide the proofs of the target-specific approximation results stated in Sec-tion 5.3. 
+
+Organization. Section D.1 proves the attention-based approximation of the square root. In addi-tion, Section D.2 and Section D.3 prove the approximation results for closed-form time schedules. 
+
+## D.1 Proof of Proposition 5.4 
+
+We first recall the ReLU approximation result for the square root function, obtained by composing the reciprocal and monomial ReLU constructions via Newton iteration. 
+
+Lemma D.1 (ReLU Approximation of the Square Root; Lemma F.7 of [Fu et al., 2024]) . For any ϵ ∈ (0 , 1) , there exists groot ∈ F (Kf , W f , S, B ) with 
+
+Kf = O(ln 2 ϵ−1), Wf = O(ln 3 ϵ−1), S = O(ln 4 ϵ−1), B = O(ϵ−1),
+
+such that 
+
+|groot (x′) − √x | ≤ ϵ + |x′ − x|√ϵ ,
+
+for all x ∈ [ϵ, ϵ −1] and x′ ∈ R.
+
+Proof. See proof of [Fu et al., 2024, Lemma F.7]. We now present the formal proof of Proposition 5.4. 
+
+Proposition D.1 (Approximation of the Square Root; Proposition 5.4 Restated) . Let CX > 0.Then, for any ϵ ∈ (0 , 1) , there exists froot ∈ T (H, W, K, C KQ , C V ) such that 
+
+|froot (x′) − √x| ≤ 2ϵ + |x′ − x|√ϵ , for all x′ ∈ [−CX , C X ], x ∈ [ϵ, 1/ϵ ].
+
+For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ),CV = O(δ
+
+p
+
+ln 3 δ), CKQ = O(
+
+q
+
+ln 2 δ · ln( δC X )) ,λ = O(δpolylog( δ) · ln polylog( δ) δ · ln CX ).
+
+where δ = 1 /ϵ and polylog( δ) denotes a polynomial in the logarithm of δ.
+
+Proof. By Lemma D.1 applied with precision ϵ, there exists groot ∈ F (Kf , W f , S, B ) with 
+
+Kf = O(ln 2 δ), Wf = O(ln 3 δ), B = O(δ),
+
+48 such that 
+
+|groot (x′) − √x| ≤ ϵ + |x′ − x|√ϵ . (D.1) Applying Theorem 4.1 with input domain CX and precision ϵ, we obtain froot ∈ T (·) satisfying 
+
+|froot (x′) − groot (x′)| ≤ ϵ. 
+
+Combining with (D.1) via the triangle inequality gives 
+
+|froot (x′) − √x| ≤ | froot (x′) − groot (x′)| + |groot (x′) − √x| ≤ 2ϵ + |x′ − x|√ϵ .
+
+Following Theorem 4.1, the parameter bound satisfies 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ),CV = O(δ
+
+p
+
+ln 3 δ), CKQ = O(
+
+q
+
+ln 2 δ · ln( δC X )) ,λ = O(δpolylog( δ) · ln polylog( δ) δ · ln CX ).
+
+This completes the proof. 
+
+## D.2 Proof of Proposition 5.5 
+
+We first recall the ReLU approximation result for exp( −t/ 2) , obtained via Taylor polynomial approximation composed with monomial ReLU constructions. 
+
+Lemma D.2 (ReLU Approximation of exp( −t/ 2) ; Lemma F.8 of [Fu et al., 2024]) . Let Ct > 0.For any ϵ ∈ (0 , 1) , there exists gα ∈ F (Kf , W f , S, B ) with 
+
+Kf = O(ln 2 ϵ−1), Wf = O(ln ϵ−1), S = O(ln 2 ϵ−1), B = exp  O(ln 2 ϵ−1),
+
+such that 
+
+|gα(t) − exp( −t/ 2) | ≤ ϵ for all t ≥ 0.
+
+Proof. See proof of [Fu et al., 2024][Lemma F.8]. We now present the formal proof of Proposition 5.5. 
+
+Proposition D.2 (Approximation of exp( −t/ 2) ; Proposition 5.5 Restated) . Let CX > 0. Then, 49 for any ϵ ∈ (0 , 1) , there exists fα ∈ T (H, W, K, C KQ , C V ) such that 
+
+|fα(t) − exp( −t/ 2) | ≤ ϵ for all 0 ≤ t ≤ CX .
+
+For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln δ), W = O(ln δ), K = O(ln 2 δ),CV = exp  O(ln 2 δ) · O(√ln δ), CKQ = O(
+
+q
+
+ln 2 δ · (ln 2 δ + ln CX )) ,λ = exp  O(ln 4 δ) · O(ln polylog( δ) δ · ln CX ).
+
+where δ = 1 /ϵ and polylog( δ) denotes a polynomial in the logarithm of δ.
+
+Proof. By Lemma D.2 applied with precision ϵ/ 2, there exists gα ∈ F (Kf , W f , S, B ) with 
+
+Kf = O(ln 2 δ), Wf = O(ln δ), B = exp  O(ln 2 δ),
+
+such that 
+
+|gα(t) − exp( −t/ 2) | ≤ ϵ
+
+2 for all 0 ≤ t ≤ CX . (D.2) Applying Theorem 4.1 with input domain CX and precision ϵ/ 2, we obtain fα ∈ T (·) satisfying 
+
+|fα(t) − gα(t)| ≤ ϵ
+
+2.
+
+Combining with (D.2) via the triangle inequality gives 
+
+|fα(t) − exp( −t/ 2) | ≤ | fα(t) − gα(t)| + |gα(t) − exp( −t/ 2) | ≤ ϵ. 
+
+Following Theorem 4.1, the parameter bounds satisfy 
+
+H = O(ln δ), W = O(ln δ), K = O(ln 2 δ),CV = exp  O(ln 2 δ) · O(√ln δ), CKQ = O(
+
+q
+
+ln 2 δ · (ln 2 δ + ln CX )) ,λ = exp  O(ln 4 δ) · O(ln polylog( δ) δ · ln CX ).
+
+This completes the proof. 
+
+## D.3 Proof of Proposition 5.6 
+
+We first recall the ReLU approximation result for p1 − exp( −t), obtained by composing the ReLU approximations of exp( −t) and the square root. 50 Lemma D.3 (ReLU Approximation of p1 − exp( −t); Lemma F.10 of [Fu et al., 2024]) . For any ϵ ∈ (0 , 1) and any CX > ϵ , there exists gσ ∈ F (Kf , W f , S, B ) with 
+
+Kf = O(ln 2 ϵ−1), Wf = O(ln 3 ϵ−1), S = O(ln 4 ϵ−1), B = exp  O(ln 2 ϵ−1),
+
+such that 
+
+|gσ(t) − p1 − exp( −t)| ≤ ϵ for all ϵ ≤ t ≤ CX .
+
+Proof. See proof of [Fu et al., 2024, Lemma F.10]. We now present the formal proof of Proposition 5.6. 
+
+Proposition D.3 (Approximation of p1 − exp( −t); Proposition 5.6 Restated) . For any ϵ ∈
+
+(0 , 1) and any CX > ϵ , there exists fσ ∈ T (H, W, K, C KQ , C V ) such that 
+
+|fσ(t) − p1 − exp( −t)| ≤ ϵ for all ϵ ≤ t ≤ CX .
+
+For CX ≥ 1, the network parameters satisfy: 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ),CV = exp  O(ln 2 δ) · O(
+
+p
+
+ln 3 δ), CKQ = O(
+
+q
+
+ln 2 δ · (ln 2 δ + ln CX )) ,λ = exp  O(ln 4 δ) · O(ln polylog( δ) δ · ln CX ).
+
+where δ = 1 /ϵ , polylog( δ) denotes a polynomial in the logarithm of δ and O(·) hides polynomial factors depending on d and n.
+
+Proof. By Lemma D.3 applied with precision ϵ/ 2, there exists gσ ∈ F (Kf , W f , S, B ) with 
+
+Kf = O(ln 2 δ), Wf = O(ln 3 δ), B = exp  O(ln 2 δ),
+
+such that 
+
+|gσ(t) − p1 − exp( −t)| ≤ ϵ
+
+2 for all ϵ ≤ t ≤ CX . (D.3) Applying Theorem 4.1 with input domain CX and precision ϵ/ 2, we obtain fσ ∈ T (·) satisfying 
+
+|fσ(t) − gσ(t)| ≤ ϵ
+
+2.
+
+Combining with (D.3) via the triangle inequality gives 
+
+|fσ(t) − p1 − exp( −t)| ≤ | fσ(t) − gσ(t)| + |gσ(t) − p1 − exp( −t)| ≤ ϵ. 
+
+51 Following Theorem 4.1, the parameter bounds satisfy 
+
+H = O(ln 3 δ), W = O(ln 3 δ), K = O(ln 2 δ),CV = exp  O(ln 2 δ) · O(
+
+p
+
+ln 3 δ), CKQ = O(
+
+q
+
+ln 2 δ · (ln 2 δ + ln CX )) ,λ = exp  O(ln 4 δ) · O(ln polylog( δ) δ · ln CX ).
+
+This completes the proof. 52 References 
+
+Satwik Bhattamishra, Michael Hahn, Phil Blunsom, and Varun Kanade. Separations in the repre-sentational capabilities of transformers and recurrent architectures. Advances in Neural Infor-mation Processing Systems , 37:36002–36045, 2024. Nicolas Boullé, Yuji Nakatsukasa, and Alex Townsend. Rational neural networks. Advances in neural information processing systems , 33:14243–14253, 2020. Jingpu Cheng, Ting Lin, Zuowei Shen, and Qianxiao Li. A unified framework for establishing the universal approximation of transformer-type architectures. In The Thirty-ninth Annual Confer-ence on Neural Information Processing Systems , 2025. Benjamin L Edelman, Surbhi Goel, Sham Kakade, and Cyril Zhang. Inductive biases and variable creation in self-attention mechanisms. In International Conference on Machine Learning , pages 5793–5831. PMLR, 2022. Hengyu Fu, Zhuoran Yang, Mengdi Wang, and Minshuo Chen. Unveil conditional diffusion mod-els with classifier-free guidance: A sharp statistical theory. arXiv preprint arXiv:2403.11968 ,2024. Kenji Fukumizu, Taiji Suzuki, Noboru Isobe, Kazusato Oko, and Masanori Koyama. Flow match-ing achieves minimax optimal convergence. arXiv e-prints , pages arXiv–2405, 2024. Jerry Yao-Chieh Hu, Wei-Po Wang, Ammar Gilani, Chenyang Li, Zhao Song, and Han Liu. Fun-damental limits of prompt tuning transformers: Universality, capacity and efficiency. arXiv preprint arXiv:2411.16525 , 2024a. Jerry Yao-Chieh Hu, Weimin Wu, Zhuoru Li, Sophia Pi, Zhao Song, and Han Liu. On statistical rates and provably efficient criteria of latent diffusion transformers (dits). Advances in Neural Information Processing Systems , 37:31562–31628, 2024b. Jerry Yao-Chieh Hu, Hude Liu, Hong-Yu Chen, Weimin Wu, and Han Liu. Universal approxima-tion with softmax attention. arXiv preprint arXiv:2504.15956 , 2025. Haotian Jiang and Qianxiao Li. Approximation rate of the transformer architecture for sequence modeling. Advances in Neural Information Processing Systems , 37:68926–68955, 2024. Tokio Kajitsuka and Issei Sato. Are transformers with one layer self-attention using low-rank weight matrices universal approximators? arXiv preprint arXiv:2307.14023 , 2023. Hude Liu, Jerry Yao-Chieh Hu, Zhao Song, and Han Liu. Attention mechanism, max-affine partition, and universal approximation. In Advances in Neural Information Processing Systems (NeurIPS) , 2025. 53 Ryumei Nakada and Masaaki Imaizumi. Adaptive approximation and generalization of deep neural network with intrinsic dimensionality. Journal of Machine Learning Research , 21(174): 1–38, 2020. Kazusato Oko, Shunta Akiyama, and Taiji Suzuki. Diffusion models are minimax optimal dis-tribution estimators. In International Conference on Machine Learning , pages 26517–26582. PMLR, 2023. Philipp Petersen and Felix Voigtlaender. Optimal approximation of piecewise smooth functions using deep relu neural networks. Neural Networks , 108:296–330, 2018. Allan Pinkus. Approximation theory of the mlp model in neural networks. Acta numerica , 8: 143–195, 1999. Clayton Sanford, Daniel J Hsu, and Matus Telgarsky. Representational strengths and limitations of transformers. Advances in Neural Information Processing Systems , 36:36677–36707, 2023. Clayton Sanford, Daniel Hsu, and Matus Telgarsky. Transformers, parallel computation, and logarithmic depth. arXiv preprint arXiv:2402.09268 , 2024. Johannes Schmidt-Hieber. Nonparametric regression using deep neural networks with relu ac-tivation function. The Annals of Statistics , 48(4), August 2020. ISSN 0090-5364. doi: 10.1214/19-aos1875. URL http://dx.doi.org/10.1214/19-AOS1875. Maojiang Su, Mingcheng Lu, Jerry Yao-Chieh Hu, Shang Wu, Zhao Song, Alex Reneau, and Han Liu. A theoretical analysis of discrete flow matching generative models. arXiv preprint arXiv:2509.22623 , 2025. Taiji Suzuki. Adaptivity of deep relu network for learning in besov and mixed smooth besov spaces: optimal rate and curse of dimensionality. arXiv preprint arXiv:1810.08033 , 2018. Shokichi Takakura and Taiji Suzuki. Approximation and estimation ability of transformers for sequence-to-sequence functions with infinite dimensional input. In International Conference on Machine Learning , pages 33416–33447. PMLR, 2023. Matus Telgarsky. Neural networks and rational functions. In International Conference on Machine Learning , pages 3387–3393. PMLR, 2017. Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. Advances in neural information processing systems , 30, 2017. Andy Yang, Christopher Watson, Anton Xue, Satwik Bhattamishra, Jose Llarena, William Merrill, Emile Dos Santos Ferreira, Anej Svete, and David Chiang. The transformer cookbook. arXiv preprint arXiv:2510.00368 , 2025. 54 Dmitry Yarotsky. Error bounds for approximations with deep relu networks. Neural networks ,94:103–114, 2017. Chulhee Yun, Srinadh Bhojanapalli, Ankit Singh Rawat, Sashank J. Reddi, and Sanjiv Kumar. Are transformers universal approximators of sequence-to-sequence functions? In International Conference on Learning Representations , 2020. 55

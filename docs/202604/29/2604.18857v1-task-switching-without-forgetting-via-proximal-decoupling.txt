@@ -1,0 +1,529 @@
+Title: Task Switching Without Forgetting via Proximal Decoupling
+
+URL Source: https://arxiv.org/pdf/2604.18857v1
+
+Published Time: Wed, 22 Apr 2026 00:24:49 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+> IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, DECEMBER 2025 1
+
+# Task Switching Without Forgetting via Proximal Decoupling 
+
+Pourya Shamsolmoali, Senior Member, IEEE, Masoumeh Zareapoor, Member, IEEE, Eric Granger, Member, IEEE, William A. P. Smith and Yue Lu, Senior Member, IEEE 
+
+Abstract —In continual learning, the primary challenge is to learn new information without forgetting old knowledge. A common solution addresses this trade-off through regularization, penalizing changes to parameters critical for previous tasks. In most cases, this regularization term is directly added to the training loss and optimized with standard gradient descent, which blends learning and retention signals into a single update and does not explicitly separate essential parameters from redundant ones. As task sequences grow, this coupling can over-constrain the model, limiting forward transfer and leading to inefficient use of capacity. We propose a different approach that separates task learning from stability enforcement via operator splitting. The learning step focuses on minimizing the current task loss, while a proximal stability step applies a sparse regularizer to prune unnecessary parameters and preserve task-relevant ones. This turns the stability-plasticity into a negotiated update between two complementary operators, rather than a conflicting gradient. We provide theoretical justification for the splitting method on the continual-learning objective, and demonstrate that our proposed solver achieves state-of-the-art results on standard benchmarks, improving both stability and adaptability without the need for replay buffers, Bayesian sampling, or meta-learning components. 
+
+Index Terms —Continual Learning, Selective Regularization, Splitting Techniques. 
+
+✦
+
+1 INTRODUCTION 
+
+# IN many real-world settings, learning is sequential rather than static. For example, an image recognition system may need to add new object categories over time without revisiting earlier data. Continual learning (CL) formalizes this setting by training models on a stream of tasks while aiming to preserve performance on previous ones. A central challenge in this setting is catastrophic forgetting, where updates for new tasks degrade earlier knowledge [1]–[5]. This behavior occurs because parameter updates that sup-port new learning can interfere with parameters that are important for previous tasks, producing the well-known stability-plasticity dilemma (Fig. 1(c)). In essence, a model must remain plastic enough to learn new knowledge, while stable enough to preserve what it has already learned. To ad-dress this challenge, a broad set of CL strategies have been proposed, each introducing trade-offs that limit robustness and scalability. Memory-based (rehearsal) methods [6]–[11] mitigate forgetting by storing or synthesizing samples from previous tasks and replaying them during training. While effective at preserving past knowledge, their memory and computational cost grows with the number of tasks. Ar-chitectural methods [12]–[14] add task-specific modules or subnetworks, which prevents interference with past tasks, but leads to growth in model size, making it impractical for long-term continual learning. Meta-learning or hybrid approaches [15]–[18] frame CL as a bi-level optimization problem, learning update rules that generalize across tasks. 
+
+P. Shamsolmoali and W. Smith are with the Department of Computer Science, University of York, UK ( {pshams55@gmail.com, william.smith@york.ac.uk) M. Zareapoor is with the SEIEE, Shanghai Jiao Tong University, China (mzarea222@gmail.com). E. Granger is with LIVIA, Dept. of Systems Engineering, ETS Montreal, Canada (eric.granger@etsmtl.ca). Y. Lu is with the School of Communication and Electronic Eng., East China Normal University, China (ylu@cee.ecnu.edu.cn). 
+
+These methods can improve adaptability, but they rely on expensive meta-training process [19]. Bayesian CL [9], [19]–[21] maintains parameter uncertainty via approximate posteriors, but typically relies on complex inference machin-ery. Fig. 1 compares representative CL strategies on label-permuted EMNIST (80 tasks) and input-permuted CIFAR-10 (200 tasks). Although these methods reduce forgetting com-pared to naive SGD, their average accuracy still degrades as more tasks are seen, and they incur growing costs in memory, model size, or training complexity [22]. Among these strategies, regularization-based methods [23]–[26] are particularly attractive because they operate within a single model without replay buffers or architectural expansion. They preserve prior knowledge by augmenting the task loss with a penalty on deviations from previously learned parameters, LTotal = LNew + Ω Old , where ΩOld is an ℓ2-based constraint. When optimized with standard gradient descent (e.g., SGD), this formulation blends learning and retention into a single update direction [8], [14], [19], as illustrated in Fig. 2. This gradient blending reduces forgetting but enforces a non-selective trade-off in which all parameters are treated uniformly, limiting the model’s ability to adapt even in directions that would not harm prior performance. Effective CL therefore requires selective knowledge preservation, recognizing that not all parameters need to be constrained equally when learning new tasks. Ideally, the model should be able to decide which parts of the network remain plastic and which become stable. This motivates sparsity-based regularization, such as ℓ1, which induces sparse deviations from previously learned solutions. By restricting changes to task-relevant parameters (those con-tributing to prior tasks), the model can preserve existing knowledge while keeping unused capacity available for future tasks. However, the ℓ1 penalty is difficult to handle  
+
+> arXiv:2604.18857v1 [cs.LG] 20 Apr 2026 2IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, DECEMBER 2025
+
+Fig. 1: Stability-plasticity trade-off in continual learning. Left: Average accuracy vs. average forgetting on the label-permuted EMNIST. An ideal model achieves both higher accuracy and lower forgetting. Middle: Long-term stability on input-permuted CIFAR-10, where SGD and EWC gradually degrade as forgetting accumulates (dropping > 8 − 13% ). Right: Illustration of the plasticity-stability dilemma. Under naive gradient descent, learning a new task (red) increases the loss on the old task (blue). With selective stability, the old task’s loss remains low while the new task is learned. with standard gradient solvers [27]–[29]. As a result, existing methods often favor smoother ℓ2, not because they are opti-mal, but because it is easier to optimize in practice. We ad-dress this limitation by adopting an ℓ1 retention mechanism that promotes sparse updates: many parameters, particu-larly those critical for past tasks, remain unchanged, while adaptation is concentrated on a subset of parameters whose updates do not interfere with past knowledge. To make this formulation tractable, we use the Douglas-Rachford Splitting (DRS) [30], [31] to decouple task learning from non-smooth regularization. In our setting, DRS is applied to objectives of the form min( f (x) + g(x)) , where f (x) is a task loss and g(x) is a non-smooth regularizer with a simple proximal operator. By alternating between a plasticity step, which adapts the model to the current task, and a stability step, which enforces sparse retention via the proximal map of g, DRS avoids gradient blending and yields selective parameter updates. This guided interaction produces solu-tions in a less redundant parameter subspace that supports both knowledge retention and forward transfer (see Fig. 4). Our model offers three advantages: 1 Rather than relying on replay, architectural expansion, or complex Bayesian approximations, we formulate stability and plasticity as two interacting operators computed via an operator-splitting framework. 2 DRS enables ℓ1-based selective knowledge retention, which is difficult to realize with standard gradient descent. 3 By decoupling learning and preservation, the stability step shapes the parameter space in a way that fa-cilitates adaptation to new tasks, yielding continual learners that maintain stability while promoting forward transfer. 
+
+2 RELATED WORK 
+
+2.1 The Need for Continual Learning 
+
+CL enables AI to learn from a stream of tasks/skills over time, accumulating new knowledge without forgetting what was learned previously [5], [32]. In the open world, this adaptability offers substantial benefits, e.g., a medical diag-nostic tool must identify novel virus strains without losing the ability to detect common illnesses, or a service robot should add new cleaning routines to its repertoire with-out unlearning how to navigate a room [22], [33]. How-ever, standard neural networks struggle with this due to catastrophic forgetting: learning new tasks often overwrites parameters important for past ones. This creates a difficult trade-off between plasticity (learning new things) and sta-bility (remembering old things) [34]. Existing approaches address this dilemma through varying strategies. 
+
+Stability-centric methods: They aim to prevent forgetting, either by freezing parameters or replaying past data. Pa-rameter isolation methods, such as dynamic architecture expansion, freeze parts of the model or allocate task-specific parameters [13], [35]–[39]. While effective in retention, they scale poorly as memory and compute grow with the number of tasks. Rehearsal-based methods store a buffer of past samples or use generative models for replay during training [10], [11], [40], [41]. Though they improve stability, they raise concerns about storage and scalability. Regularization-based methods extend the loss function with penalty terms to restrict updates on important parameters [2], [9], [23], [42]. These models are scalable and replay-free. Innovations such as SFSVI [40] extend this idea to function space regulariza-tion. However, most use ℓ2 penalties, which act as passive constraints, preserving all parameters uniformly without encouraging selective retention or generalization [8], [33]. 
+
+Plasticity-centric methods: Recent works have highlighted that CL failures are not only due to forgetting but also to a loss of learning capacity over time [14], [43], [44]. Repre-sentative solutions include continual neuron reinitialization [33], network expansion [45], activation reshaping [46], and regularization toward initialization [10], [20]. Meta-learning and Bayesian posterior updates are also widely used to improve plasticity [6], [17], [19], [42], [47]. While these mod-els enable fast adaptation, most of them either (i) sacrifice stability unless combined with replay, or (ii) require task boundaries or heavy architectural changes. 
+
+Targeting both stability and plasticity: A third line of methods explicitly balances stability and plasticity objec-tives. For example, UPGD balances the two objectives by weighting parameter updates according to their estimated utility [8]. BECAME employs a Bayesian merging strategy to retain informative posterior distributions during adaptation [19]. Other approaches, such as Flashback learning [48], employ task-targeted rehearsals, while dual-memory sys-tems [49] use separate subnetworks for new and previous tasks, coupled with consolidation mechanisms. Bayesian learners [9], [21] further leverage uncertainty estimates SHAMSOLMOALI et al. TASK SWITCHING WITHOUT FORGETTING: THE ARCHITECTURE OF SEQUENTIAL LEARNING 3(overwritten parameter) 
+
+Fig. 2: Catastrophic forgetting in CL can be understood as an optimization conflict: gradients computed for the current task t often point in directions that increase the loss of previously learned tasks t − 1.to balance consolidation with flexibility. While promising, these approaches often add complexity, rely on explicit task boundaries, or require memory-intensive replay buffers [22]. In contrast, regularization-based methods offer a more scalable and memory-efficient alternative [33], [50]–[52]. By encoding prior knowledge as a penalty term within the loss function, they preserve past information without expanding the model or storing large datasets. However, their stan-dard reliance on dense ℓ2 regularization imposes a uniform constraint across all parameters, reinforcing the stability-plasticity trade-off. Because such penalties act globally over the parameter space, they fail to differentiate between task-essential and redundant weights, leading to interference that limits adaptability and forward transfer [7], [32]. We argue that CL models should instead focus on selective preservation, protecting essential weights while pruning redundant ones to free capacity for future tasks. This mo-tivates our focus on non-smooth regularizers ℓ1 [27], which is non-differentiable at zero and thus promotes sparsity. 
+
+2.2 Operator Splitting Solvers 
+
+Douglas-Rachford Splitting (DRS) [30], [53] is a classical operator-splitting algorithm for minimizing composite ob-jectives min x f (x) + g(x), where f and g are two dis-tinct functions. In our setting, this formulation represents the two key objectives of CL: f captures plasticity (task learning) and g enforces stability (knowledge retention). Unlike gradient-based training, DRS does not merge these objectives into a single loss. Instead, it allows each to compute independently and then reconciles them through a consensus step. This redefines CL as a negotiation be-tween two objectives rather than a compromise within one gradient. A key advantage of DRS is its ability to handle non-smooth or constrained functions via proximal operators [54]–[57]. This makes it particularly suitable for problems involving non-differentiable regularizers such as the ℓ1 [27] or indicator functions, where standard gradient-based solvers are not applicable [28], [29]. Because of these strengths, DRS has been adopted across domains such as signal processing, control, and machine learning [55], [57]– [62], where it enables modular optimization of data-fitting and regularization components within a unified framework. Some prior work has explored the decoupling strategy in CL objective ( [7], [32], [63]), within replay or Bayesian settings. In contrast, we employ DRS to decouple the two objectives of CL, interpreting f as the task-learning term and g as the stability-preserving regularizer. This is achieved without relying on replay buffers or architectural modifications. 
+
+2.3 Decoupled vs. Fused Optimization 
+
+Our framework differs from existing continual-learning ap-proaches in both its optimization strategy and preservation mechanism (see Fig. 3). Unlike prior work like, SGP [13], UPGD [8], UCL [51], BAN [9], POCL [6], MESU [21], and SB-MCL [18], which fuse task and stability objectives into a single loss, our model uses a DRS solver to decouple them. This formulation negotiates between plasticity and stability, reaching a consensus solution that satisfies both goals, while mitigating gradient interference. In addition, while recent works such as BECAME [19], CAI [39], and STAR [10] encourage sparsity through Bayesian pruning, masking, or replay buffers, our model embeds sparse selectivity directly into the optimizer via an ℓ1 proximal operator. This mecha-nism enables the solver to identify and preserve a minimal subset of parameters through the solver’s iterations. 
+
+3 OUR PROPOSED APPROACH 
+
+3.1 Optimization Challenges in Continual Learning 
+
+In continual learning, the objective is to minimize the cumulative loss over a sequence of tasks 1, . . . , T :
+
+min x
+
+PTt=1 Lt(x). However, in many realistic settings, data from previous tasks ( D1: t−1) is unavailable when learning task t, making it infeasible to compute the total loss directly. A common workaround is to regularize the current task loss 
+
+min  
+
+> x
+
+Lt(x) + λ Ω( x; xt−1), (1) where xt−1 represents the parameters learned up to the previous task. Fig. 2 illustrates how minimizing Lt alone can degrade performance on Lt−1. Despite the variety of existing penalties Ω, [6], [8], [14], [23], this surrogate objec-tive faces two limitations. 1) Lack of parameter selectivity : most methods use an ℓ2-based penalty, where Ω ∝ ∥ x − xt−1∥22,and ∇Ω( x) = 2( x − xt−1). This penalty applies a nonzero update to every parameter where xi̸ = ( xt−1)i, regardless of its importance to past tasks [27]. When computing the totall update via gradient descent 
+
+∆x ∝ − (∇L t(x) + λ∇Ω( x)) , (2) the learning signal ( ∇L t) and the retention constraint ( ∇Ω)are combined into a single update vector [19], [33]. This results in global, non-selective updates, limiting the model’s ability to preserve important parameters from previous tasks while adapting others to new tasks. 2) Incompatibility between sparse regularizer and standard solvers : Ideally, con-tinual learning should permit only a subset of parameters to change per task, while preserving the rest ( ∆xi = 0 ). Sparse regularizers (i.e., ℓ1) can encourage this behavior [27], [28]: Ω = ∥F ⊙ (x − xt−1)∥1, where F is an importance weight matrix and ⊙ denotes elementwise multiplication. Unlike ℓ2, the ℓ1 norm encourages exact zeros in parameter updates, supporting selective learning [27]. However, ℓ1 is non-differentiable at zero and thus incompatible with stan-dard gradient solvers like SGD [27], [29]. While subgradient and proximal methods exist, they are rarely applied in deep 4 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, DECEMBER 2025 A. DRS Solver Process 
+
+Dense proposal 
+
+Reflected 
+
+point 
+
+Sparse proposal xk+1zk+1yk = 2xk+1 − yk
+
+1. Plasticity Step xk+1 = prox γf yk ≈ 𝐿 𝑛𝑒𝑤 
+
+Learning proposal 
+
+(minimizing loss) yk+1 = yk + (zk+1 − xk+1) Resolve conflict 
+
+B. Parameter Space 
+
+Initialization y k
+
+y0=xold 
+
+3. Consensus Update 
+
+Previous 
+
+task 
+
+solution 
+
+(xold )
+
+2. Stability Step zk+1 = prox γg yk = S𝜏 (yk )
+
+Selective retention     
+
+> Soft -thresholding
+> Plasticity loss
+> contours f(x)
+> Parameter Δx1Pruned subspace ( ΔXi =0)
+> xk+1 (Dense
+> proposal)
+> Parameter Δx2Plasticity pull
+> Pruning action
+> Stability region
+> g(x)
+
+xold 
+
+zk+1 yk
+
+yk+1   
+
+> yk(current
+> consensus)
+> z*Final sparse
+> solution
+
+Optimal solution z* 
+
+(new xold )Iterate 𝑘 → 𝑘 + 1
+
+> DRS iteration 1
+> 0
+> |y k+1  – yk|
+
+C. Convergence 
+
+Selective and Dense update      
+
+> Plastic Zero weights
+> Dense update (x k+1 -yk) =
+> Sparse retained update (x k+1 -xold )
+
+Fig. 3: Illustration of the continual learner based on DRS in parameter update space (where ∆x1, ∆x2 denote representative update directions). Learning is decomposed into a plasticity step f (blue), which generates a dense proposal by minimizing the task loss Lnew , and a stability step g (orange), which enforces knowledge retention via a non-smooth proximal operator. At the start of each task, the solver is initialized at the previous solution y0 = xold ; the plasticity step xk+1 is reflected (˜yk) and passed to the stability step, where an ℓ1 proximal mapping applies soft-thresholding to induce sparsity in ∆x by setting some components to zero (task-essential) while allowing others to change ( ∆x2̸ = 0 ). The consensus variable is updated ( yk → yk+1 ), to resolve conflicts between the competing objective until the solver converges to an optimal solution 
+
+z⋆ that is used as the parameter state for the next task. Our proposed model is detailed in Algorithm 1 and Sec. 3.3. continual learning due to computational challenges [32], [64]. These limitations highlight a mismatch between the optimization methods used in CL and the regularizers best suited for selective learning. To address this gap, we adopt an optimization strategy based on the DRS algorithm, a proximal method designed to minimize composite objec-tives involving both task loss and non-smooth regulariza-tion. Although classical DRS requires exact proximal opera-tors (intractable for deep networks), we follow [58], [59], [65] that apply approximate variants in deep learning settings. This yields a tractable solver that avoids gradient blending and enables selective parameter updates (see Fig. 3). 
+
+3.2 DRS-based Continual Learner 
+
+To address the lack of parameter selectivity in continual learning, we propose a proximal update scheme inspired by DRS algorithm. Specifically, our formulation decouples task learning ( f , plasticity) and knowledge retention ( g, stability) into two distinct components. We model continual learning as a negotiation between two components. For each task t,the learner minimizes the following objective 
+
+min 
+
+x { L t(x; Dt)
+
+| {z }
+
+> plasticity
+
+,f (x)
+
++λ · X
+
+i
+
+Fi|xi − xold ,i |
+
+| {z }
+
+> stability
+
+,g (x)
+
+}, (3) where xold are the parameters from the previous task t − 1,and Fi > 0 represents the importance weight (e.g., diagonal Fisher information computed after task t−1). The ℓ1 penalty on parameter differences encourages sparse changes, im-plicitly partitioning the parameters into 
+
+S = {i : xi = xold ,i } (stable parameters) ,
+
+P = {i : xi̸ = xold ,i } (plastic parameters) . (4) since the regularizer g(x) is non-smooth, standard gradient descent struggles with this composite structure. Instead, we adopt approximate DRS and introduce an auxiliary variable 
+
+yk (consensus anchor), initialized as y0 = xold . At each iteration k = 0 , 1, . . . , we perform the following three steps (also shown in Fig. 4). Auxiliary update                       
+
+> Initialization Plasticity step
+> Iterate until
+> convergence
+> y0= x old (previous task weights) Stability step
+> Compute prox f: minimize task loss
+> Compute prox gyk
+> Reflect point : zk+1,i=xold ,i+Sτi(yk,i−𝑥 𝑜𝑙𝑑 ,𝑖 )
+> yk+1 = y k+ (z k+1 -xk+1 )
+> 2x k+1 + y k𝑥 ⋆=𝑝𝑟𝑜 𝑥 𝑓 𝑦 ⋆
+> (balanced weights) Final convergence
+> Consensus
+> xk+1 = prox f(y k)
+
+Fig. 4: Processing steps of the DRS continual learner. 
+
+3.2.1 Plasticity Proposal 
+
+We first generate a task-specific proposal xk+1 that focuses on learning the current task. Here, yk serves as the input anchor for both learning and stability 
+
+xk+1 = prox γf (yk) = arg min 
+
+x {L t(x) + 12γ ∥x − yk∥2} (5) This step seeks a parameter vector that improves perfor-mance on the current task while remaining close to yk.
+
+Computation: Solving (5) exactly is intractable for deep networks. We therefore approximate the proximal step with a gradient descent update [55], [62], xk+1 ≈ yk − η ·∇L t(yk, D t), where η is the step size (we set η = γ). This step allows the model to adapt to task t, but produces dense updates, affecting all parameters regardless of their relevance to prior tasks. In the next step, this candidate is refined by the stability mechanism. SHAMSOLMOALI et al. TASK SWITCHING WITHOUT FORGETTING: THE ARCHITECTURE OF SEQUENTIAL LEARNING 5Reflection 
+
+> Stability
+> update
+> Plasticity
+> update
+> xk+1
+> zk+1
+> yk
+> yk
+> ~
+
+Fig. 5: Alternating proximal operators between the task loss and regularizer. The consensus variable yk is updated iteratively to balance learning and retention, converging to a stable solution. On right, the reflected point ˜yk amplifies the learning proposal xk+1 , creating a parameter-space de-viation where the stability update zk+1 can selectively pre-serve or prune weights. This reflection enables the stability mechanism to identify which parameters conflict with prior knowledge, guiding the model toward an optimal solution. 
+
+3.2.2 Stability Filter 
+
+To preserve knowledge from earlier tasks, we apply the exact proximal operator of the sparsity-inducing regularizer 
+
+g(x) to the reflected point ˜yk = 2 xk+1 − yk, which captures the deviation introduced by the plasticity 
+
+zk+1 = prox γg (˜ yk), (6) where g(x) = P 
+
+> i
+
+Fi|xi − xold ,i |.
+
+Computation: Since g(x) is a positive weighted ℓ1 norm, this proximal operator has a closed-form solution based on soft-thresholding [27], [29], which is computed as 
+
+zk+1 ,i = xold ,i + Sτi (˜ yk,i − xold ,i ) with τi = γλF i (7) where Sτ (u) = sign (u) · max( |u| − τ, 0) . This operator suppresses small, unimportant updates (based on Fi) while allowing significant ones to proceed ( ∆i = ˜ yk,i − xold ,i ), partitioning parameters into stable and plastic subsets  
+
+> •
+
+Retention: If |∆i| < τ i, then zk+1 ,i = xold ,i . The pro-posed change is rejected and the parameter remains fixed at its previous value.  
+
+> •
+
+Adaptation: If |∆i| ≥ τi, then zk+1 ,i ̸ = xold ,i . The task pressure is high enough to justify a change, and the parameter is allowed to adapt to the current task. Indeed, the stability step filters the dense task-driven pro-posal xk+1 , ensuring that only important updates (relative to importance Fi) are retained. This ensures that adaptation occurs in regions where it is most beneficial for the current task and least damaging to prior. The regularizer g(x) is closed and convex, as it is a positive weighted ℓ1 norm [56], [65], also shown in propositions 3.1 - 3.2). 
+
+3.2.3 Consensus Update 
+
+After computing the plasticity proposal and the stability filter we update the auxiliary variable y via a correction step 
+
+yk+1 = yk + ( zk+1 − xk+1 )
+
+| {z }
+
+> correction vector
+
+(8) This step propagates the disagreement between the plastic-ity and stability components into the next iteration. When the two updates agree (i.e., zk+1 ≈ xk+1 ), the consensus stabilizes and yk+1 ≈ yk. Otherwise ( zk+1 ̸ = xk+1 ), the correction vector stores the conflict between plasticity and stability, and the next anchor yk+1 is shifted to resolve that conflict. This process generates a sequence ( y0, y 1, . . . , y k)that continues until the conflict is minimized ( ∥yk+1 −yk∥ ≈ 
+
+0). While standard DRS convergence is proven under con-vexity and exact proximal updates, our setting follows [58], [59], [62], [65] and approximate gradient-based proximal step, ensuring the final solution x⋆ is a verified intersection between stability and plasticity (see Theorem 3.1). 3.2.3.1 Discussion.: This procedure separates task adaptation from memory preservation by decoupling the updates for Lt and Ω. It avoids gradient blending and enables parameter-level selectivity, which is key challenges in continual learning. We note that our approach is an approximate version of DRS, following [55], [59], [65]. TABLE 1: Summary of notation.                                      
+
+> Symbol Description
+> Ttask index (1 to T)
+> Dtdataset for task t(with input-label pairs {(ui, v i)})
+> x∈Rdneural network parameters (model weights)
+> Lttask-specific loss function (plasticity objective)
+> Sold subspace of previous tasks ( 1. . . t −1)
+> kDRS iteration index (1 to K)
+> x(k)plasticity/learning variable at solver iteration kz(k)stability variable, which is the output of the proximal step
+> y(k)anchor point between the split steps, tracking the gap ( x−z)
+> λregularization strength (for ℓ1penalty)
+> γstep size for the splitting algorithm
+> ∆xupdate vector ( xt−xt−1) constrained to the null space prox γf proximal operator associated with function f
+> ∥ · ∥ 1ℓ1-norm used to induce sparsity
+> ∇L stochastic gradient of the loss function
+> ⟨· ,·⟩ inner product operator
+
+3.2.4 Task-to-Task Transition 
+
+The sequence y0 → y1 → · · · → yk integrates both forces, converges to a fixed point y⋆ that balances task performance and stability constraints. Importantly, to ensure the model benefits from selective retention, we adopt the output of the stability step, z⋆, as the final model parameters for task t.This guarantees that the sparsity constraints are respected, i.e., parameters important to prior tasks remain unchanged (xi = xold ,i for all i ∈ S ). As a result, unnecessary updates are pruned, and the model remains in a compact subspace that preserves unused capacity for future learning. Once task t is complete, the retained parameters z⋆ become the 
+
+xold for task t + 1 , and the importance weights F are recomputed based on the updated model. 
+
+Theorem 3.1. At convergence, the solution z⋆ is guaranteed to satisfy the stability condition |z⋆i − xold ,i | = 0 for all parameters i
+
+where the difference between the reflected anchor and the previous parameters is smaller than the importance threshold: |2xi,k +1 −
+
+yi,k − xold ,i | < τ i =⇒ zi,k +1 = xold ,i .
+
+This result shows that if the plasticity proposal does not push a parameter beyond its importance weight (which is defined by τi = γλF i), then the stability operator will return that parameter to its previous value. Compared to standard proximal gradient methods [56], [61], [65], which apply soft-thresholding directly to the gradient step, our DRS formu-lation uses a reflected point in step 2, 2x − y = x + ( x − y),that amplifies disagreement over time. If a proposed up-date conflicts with the stability constraint, the correction 6 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, DECEMBER 2025 
+
+Algorithm 1 Our proposed DRCL. A summary of the key notations used throughout this work is provided in Table 1. 
+
+Require: current task data T , inner iterations Imax , importance 
+
+F , learning rate η, sparsity weight λ, past parameters xold .
+
+for each task/dataset in T do 
+
+Compute Fisher information Fi based on xold 
+
+Set consensus (anchor point) y0 ← xold 
+
+for iteration k = 0 → MaxIter do 1. Plasticity pull (prox f )
+
+Compute gradient gk = ∇L t(yk ; Dt)
+
+xk+1 ← yk − γ · gk (learning proposal) 
+
+2a. Reflection 
+
+˜yk ← 2xk+1 − yk
+
+2b. Stability prox g (pruning) 
+
+Compute thresholds τ = γλF zk+1 ← xold + soft threshold (˜ yk − xold , τ )
+
+3. Consensus update 
+
+yk+1 ← yk + ( zk+1 − xk+1 )
+
+end for end forreturn z⋆ (Final Sparse Weights) 
+
+term accumulates in the auxiliary variable y, increasing the likelihood that the soft-thresholding operator will reject the update. This mechanism ensures that the optimization converges only when plasticity updates do not interfere with parameters critical to previous tasks. Consequently, the final solution z⋆ achieves sparsity in its updates, enabling task adaptation while preserving prior knowledge. 
+
+Proposition 3.1. The ℓ1 penalty enforces structural sparsity in parameter updates, where non-essential changes ( ∆xi) are set to zero. This property is necessary to maximize plasticity by preserving the network available capacity. 
+
+The stability objective g(x) is a ℓ1 norm, which is a closed and convex function [55], [62], [65]. The optimality condi-tion for the objective is given by 0 ∈ ∇ if (x⋆) + ∂g i(x⋆),where ∂g i is the subdifferential. For the non-smooth ℓ1, the gradient at the point of zero change ( ∆xi = 0 ) is the interval 
+
+[−λF i, λF i]. Consequently, a parameter remains unchanged from its previous state ( x⋆i = xold ,i ) if |∇ if (x⋆)| ≤ λF i.This condition demonstrates that the optimal solution x⋆
+
+achieves sparsity ( ∆xi = 0 ) even when the task-loss gra-dient ∇if is non-zero. This mechanism enables selective retention: parameters where the task-learning pressure is lower than the importance threshold ( |∇ if | ≤ λF i) are kept stable, while adaptation is restricted to parameters where the gradient exceeds the regularization strength. In contrast, smooth ℓ2 lack this property; the optimality condition for 
+
+ℓ2 requires ∆xi to be non-zero whenever ∇if is non-zero, leading to dense updates that overwrite prior knowledge across the entire parameter space. 
+
+Proposition 3.2. The stability is computationally efficient be-cause the proximal operator of the ℓ1 objective, prox γg , admits a, closed-form solution. This eliminates the requirement for gradient-based optimization on non-smooth properties. 
+
+The proximal operator prox γg (y) requires solving a mini-mization that is separable across each parameter dimension 
+
+i: prox tg (y)i = arg min xi {λF i|xi − xold ,i | + 12t (xi − yi)2}.By performing a change of variables ui = xi − xold ,i and defining the threshold τi = γλF i, the objective takes the form of the canonical soft operator Sτi [27]. The optimal solution is thus given by x⋆i = xold ,i + Sτi (yi − xold ,i ). The existence of this exact solution ensures that the stability component of the DRS solver is calculated via simple al-gebraic operations. This resolves the inherent challenge of non-differentiability that prevents the direct integration of 
+
+ℓ1 penalties into standard gradient descent pipelines. 
+
+3.3 DRCL Implementation 
+
+The core implementation of our model reformulates the stability-plasticity as a decoupled optimization problem. Exiting regularization methods sum gradients ( ∇L + λ∇Ω), which causes direct vector interference. In contrast, our model decomposes these forces into independent proximal operations. The task-specific adaptation occurs in step 1, while the structural preservation is enforced via the prox-imal operator in step 2. The consensus step then recon-ciles these outputs without the interference associated with scalarized objective functions. This decomposition enables the uses of ℓ1 for selective parameter preservation. Each DRS iteration follows the sequence: yk → xk+1 (plasticity proposal) → ˜yk (reflection) → zk+1 (stability filtering) 
+
+→ yk+1 (auxiliary correction). For each task, we initialize the consensus anchor y0 = xold . To enable selective retention, we propose the reflected point ˜yk = 2 xk+1 − yk, where it doubles the perceived distance between the task proposal and the previous state. This amplification allows the sta-bility operator to distinguish between negligible parameter shifts and critical task adaptations. The filtering result zk+1 ,ensures that small deviations are pruned ( ∆xi = 0 ) and only essential updates are retained. The discrepancy is then stored in the auxiliary variable yk+1 (Eq. 8), which biases the search space for the subsequent iteration. We observe that setting the γ equal to the learning rate η ensures conver-gence within a small number of iterations. At convergence, the final parameters x⋆ reside at the intersection of the task-loss and the sparsity-constrained space. 
+
+4 EXPERIMENTS 
+
+Backbone and Datasets: We evaluate our model using two backbones: ResNet-18 [66] and a 5-layer AlexNet [67]. Following the class-incremental learning (CIL) setting, each task is assigned a separate classifier head. We use standard CL benchmarks including CIFAR-100 [68], EMNIST [69], CelebA [70], TinyImageNet [71] and ImageNet [72]. These datasets are divided into T sequential tasks; e..e, we eval-uate on CIFAR100 10-split (10 tasks, 10 classes each) and 20-Split (20 tasks, 5 classes each). For datasets with low resolution (e.g., 32 × 32 for CIFAR-100), we replace the initial 7 × 7 conv (stride 2) and max-pooling with a 3 × 3
+
+conv (stride 1). This modification prevents information loss in the early layers by preserving the spatial dimensions of the feature maps. For the first task ( T1), training is similar to the corresponding backbone (with no stability, λ = 0 ). For subsequent tasks ( Tt, t ≥ 2), the auxiliary variable y
+
+is initialized from the final weights of the previous task 
+
+yt 
+
+> 0
+
+= xt−1 
+
+> old
+
+. The plasticity step requires one backpropagation pass, while the stability step is an element-wise vector (O(d)). Similarly, the consensus update is a simple vector addition of O(d). Consequently, the per-iteration computa-tional overhead is negligible compared to standard SGD. SHAMSOLMOALI et al. TASK SWITCHING WITHOUT FORGETTING: THE ARCHITECTURE OF SEQUENTIAL LEARNING 7
+
+Disjoint Tasks (class-split) Joint Tasks Method CIFAR-100 [10] CIFAR-100 [20] TinyImgNet [20] ImgNet [100] Avg. CelebA [20] EMNIST [20] Avg. Multi-task 76 .1 ± 0.3 79 .3 ± 0.5 60 .5 ± 1.2 63 .9 ± 0.5 69.9 88 .2 ± 0.2 87 .9 ± 0.8 88.0 Baseline 54 .9 ± 2.1 56 .2 ± 0.7 42 .2 ± 0.8 34 .7 ± 0.9 46.5 84 .6 ± 1.2 86 .5 ± 0.4 85.6 A-GEM 54 .4 ± 1.0 57 .8 ± 3.5 42 .7 ± 1.2 35 .2 ± 1.1 47.5 83 .7 ± 1.6 87 .1 ± 0.5 85.4 EWC 63 .5 ± 0.8 62 .5 ± 1.7 42 .9 ± 0.9 29 .6 ± 0.9 49.4 86 .3 ± 0.9 86 .9 ± 0.6 86.6 BAN 71 .6 ± 0.5 78 .9 ± 0.8 58 .5 ± 0.4 56 .0 ± 0.5 66.5 86 .5 ± 0.7 87 .3 ± 0.2 87.1 SB-MCL 72 .3 ± 0.3 78 .1 ± 0.7 58 .2 ± 0.5 56 .5 ± 0.6 66.3 86 .9 ± 0.5 87 .5 ± 0.3 87.0 HAT 63 .9 ± 0.5 73 .1 ± 0.8 53 .2 ± 1.6 47 .6 ± 1.5 59.4 82 .5 ± 0.6 84 .6 ± 0.8 83.5 SGP 72 .0 ± 0.3 77 .8 ± 0.6 59 .4 ± 0.3 57 .8 ± 0.5 66.7 87 .3 ± 0.2 87 .9 ± 0.5 87.7 IBPCL 69 .3 ± 0.9 76 .3 ± 0.7 57 .1 ± 0.6 54 .8 ± 0.8 64.3 87 .1 ± 0.3 87 .8 ± 0.4 87.5 UCL 65 .7 ± 0.7 74 .9 ± 0.5 55 .2 ± 0.5 40 .0 ± 0.7 58.9 86 .3 ± 0.5 85 .2 ± 1.2 85.7 UPGD 71 .6 ± 0.2 78 .0 ± 0.9 59 .7 ± 0.4 58 .2 ± 0.5 66.9 87 .0 ± 0.3 87 .6 ± 0.3 87.3 POCL 71 .2 ± 0.4 77 .9 ± 0.8 58 .2 ± 0.6 56 .7 ± 0.6 66.0 85 .7 ± 0.9 86 .7 ± 0.4 86.2 TAG 62 .4 ± 0.6 69 .3 ± 0.7 49 .6 ± 0.5 45 .8 ± 0.3 56.8 78 .3 ± 1.4 83 .9 ± 0.5 81.1 WSN 70 .2 ± 0.2 78 .2 ± 0.6 58 .5 ± 0.5 53 .2 ± 0.4 65.0 84 .6 ± 0.7 86 .0 ± 0.2 85.3 Ours 71 .9 ± 0.2 78 .5 ± 0.6 61 .3 ± 0.4 60 .4 ± 0.5 68.0 87 .8 ± 0.3 88 .5 ± 0.2 88.2 
+
+TABLE 2: Accuracy (%) on task-incremental setting for disjoint (split class) and joint (multi-attribute/domains) tasks. Values represent mean ± standard deviation over 3 runs. Baseline denotes a naive model that learns a new task without considering the previous tasks, and multi-task trains all the tasks together. Our model outperforms regularization and projection baselines across most settings. Bold text represents the best results.                                                                                                  
+
+> Disjoint tasks Joint tasks Method C-[10] C-[20] TinyINet [20] INet [100] Avg. Celeb [20] EMNIST [20] Avg. A-GEM -10.5 -17.6 -9.8 -14.2 -13.1 -0.4 +0.6 +0.1 EWC -6.8 -11.2 -7.6 -17.4 -10.7 +1.2 +0.3 +0.7 BAN -3.3 -4.0 -4.7 -3.5 -3.9 +2.6 +1.4 +2.0 SB-MCL -3.8 -4.3 -4.8 -3.9 -4.2 +2.3 +0.7 +1.5 SGP -4.2 -5.1 -3.6 -2.4 -3.8 +2.9 +0.8 +1.9 IBPCL -6.4 -9.5 -8.6 -7.9 -8.1 +0.9 +0.3 +0.6 UCL -7.2 -9.3 -7.7 -11.6 -8.9 +2.6 +1.8 +2.2 UPGD -3.1 -4.6 -3.7 -2.7 -3.5 +2.5 +0.9 +1.7 POCL -4.5 -5.6 -5.8 -4.1 -5.9 +1.8 +0.7 +1.3 TAG -1.2 -2.8 -1.4 -2.0 -1.8 +0.3 +0.1 +0.2 Ours -2.8 -3.2 -2.5 -1.7 -2.5 +3.7 +1.9 +2.8
+
+TABLE 3: Backward transfer result. Lower values indicate forgetting, and positive values indicate improvement due to knowledge transfer. TAG has almost no forgetting, but its forward transfer is limited, resulting in poor final accuracy (Table 2). Our model achieves the best average knowledge transfer on joint tasks and minimizes forgetting on disjoint tasks. Bold text represents the best results. 
+
+Fig. 6: Average accuracy shows the plasticity-stability dilemma (right), and accuracy change of the categories learned in the 1st task (left), during sequential learning (Task 1 → · · · → Task 10 ). 
+
+Hyperparameters: Following the completion of each task t − 1, the importance weights Fi are computed using a diagonal approximation of the Fisher Information matrix, averaged over 1,000 random samples [23]. These weights are mean-normalized. We maintain the step size γ equal to the learning rate ( η = γ). For the tasks t ≥ 2 we use η = 5 × 10 −3, and λ = 10 . The resulting threshold is τi = 0.05 Fi, which can effectively filters non-critical parameter updates. We also execute the DRS negotiation for 
+
+k = 5 iterations. This process allows the auxiliary variable y
+
+to reach a balance between plasticity and stability. Ablation results demonstrate that k = 1 (single-loop) is insufficient to prevent memory degradation over long sequences. 
+
+Baselines: We use different CL methods as baseline: EWC [23], IBPCL [20], A-GEM [11], SB-MCL [18], UCL [51], TAG [38], EVCL [44], UPGD [8], POCL [6], HAT [67], BAN [9], SGP [13], BECAME [19], STAR [10], MESU [21], and WSN [37]. All results are averaged over 5 random seeds. 
+
+4.1 Comparison with State-of-the-Art Methods 
+
+Table 2 summarizes the performance of different methods on task-incremental learning benchmarks using an AlexNet backbone. We evaluate models on five datasets: CIFAR-100 (10 and 20 splits), Tiny-ImageNet (20 tasks), ImageNet-100 (100 tasks), CelebA (20 binary attributes), and EMNIST (20 tasks). In the disjoint settings (CIFAR and ImageNet), catastrophic forgetting is the primary challenge due to non-overlapping label spaces. In contrast, the joint task settings (CelebA and EMNIST) share label spaces, emphasizing the importance of knowledge transfer. Average accuracy across all learned tasks is used as the evaluation metric, defined as 
+
+1/T PTt=1 αTt , where αji denotes the test accuracy on task 
+
+i after completing task j. The naive baseline, which lacks a forgetting prevention mechanism, performs poorly in dis-joint settings due to parameter interference and feature drift. While regularization methods like EWC improve this, they fail on longer task sequences. Notably, our model outper-forms recent high-performing projection methods such as SGP and UPGD. The limitation of projection-based methods lies in their restrictive nature; they block gradient updates that intersect with previous tasks, which can hurt plasticity. Our model, replaces rigid blocking with a decoupled nego-tiation mechanism. By utilizing the auxiliary variable y and the DRS solver, the model identifies specific parameters that can be modified or shared without compromising existing knowledge. On CIFAR-100, our model remains competitive, 8 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, DECEMBER 2025 
+
+Fig. 7: Parameter update magnitudes ( ∆x) across 20 tasks. DRS produces sparse, selective updates per task, preserving most parameters (i.e., keeps many updates close to zero, which shows as dark blue regions). By contrast, EWC and SGD update a broader set of parameters per task, indicating weaker or no retention. 
+
+Fig. 8: Granular forgetting over 100 sequential tasks on CASIA-HWDB1.0. The plots illustrate the accumulated forgetting for specific task groups (e.g., tasks 1-10) as the model learns subsequent tasks. The x-axis represents the learning timeline (tasks 0-100) for each group. The average confirms that our model reduces the mean forgetting rate across the entire 100-tasks compared to other CL strategies. though it is slightly outperformed by SB-MCL in the 10-task and BAN in the 20-task. In these lower-resolution, shorter-sequence regimes, Bayesian or Meta-learning priors can provide an advantage in handling uncertainty. However, as task complexity and diversity increase, our proposed strategy becomes the decisive factor. Indeed, meta-learning approaches (SB-MCL) are sensitive to task distributions; when tasks become diverse (as seen in our joint tasks), the meta-prior can become a constraint. The results in Table 3 provide further insight via backward transfer. While TAG achieves minimal forgetting by locking the model’s param-eters, this rigidity leads to poor forward transfer, as seen by its lower final accuracy. In contrast, our model achieves comparable stability through iterative DRS negotiation. This stability is further illustrated in Fig. 6. In the left panel, we track the accuracy of the initial task ( T1) as subsequent tasks are introduced. While traditional regularization methods experience a significant decay in T1 performance, our model maintains a stable profile. This validates our use of sparsity gate ( τ ); that prevent the erasure of foundational knowl-edge. The right panel demonstrates that this stability does not come at the cost of plasticity, as our model achieves the highest accuracy across the 10-task sequence, outperforming state-of-the-art projection and meta-learning baselines. 
+
+4.2 Selective Plasticity and Retention 
+
+Fig.7 visualizes the parameter update intensity across a 20-task sequence on CIFAR-100, comparing our model with EWC and SGD. Each heatmap illustrates the magnitude of parameter shifts, defined as ∆x = |xt − xt−1| per task, where bright regions denote large updates and dark blue is zero change. SGD is saturated with bright values, indicating that every new task overwrites the parameter space, which confirms the catastrophic forgetting seen in the stability plots (Fig. 6). While EWC reduces this intensity, it still shows low-magnitude updates across the network. Our heatmap is dominated by blue regions (zero update). By enforcing a threshold of τ , the stability agent locks the majority of parameters, allowing only sparse, task-critical updates. 
+
+4.3 Efficacy of Subspace Pruning 
+
+The core component of our model is the enforcement of a sparsity gate through the ℓ1 proximal operator. Fig. 10 analyzes our model’s stability and training convergence SHAMSOLMOALI et al. TASK SWITCHING WITHOUT FORGETTING: THE ARCHITECTURE OF SEQUENTIAL LEARNING 9
+
+Fig. 9: Evolution of parameter updates across tasks. The top row shows dense learning proposals from minimizing the current task loss, while the bottom row shows the corresponding updates after ℓ1-based selective retention. As the task index increases, updates become increasingly sparse, confining adaptation to a smaller subset of parameters. 
+
+Fig. 10: Comparison of parameter magnitude between DRS with ℓ1 and ℓ2, against EWC. Our proposed DRS-l1 shows the best concentration near zero, indicating minimal disrup-tion to pre-trained parameters. DRS-l2 provides moderate regularization, while EWC allows the largest changes. on CIFAR-100 (20 tasks) using a ResNet-18 backbone. In DRS-L1 (ours), the density of weight changes is mostly concentrated at the origin ( |∆x| ≈ 0). Because, by enforcing 
+
+|∆x| = prox γλ ∥·∥ 1 (x), we create a dead zone where param-eters with gradient updates below the threshold τ remain unchanged. DRS-L2 and EWC demonstrate a wider spread. This is because L2 applies a smooth penalty that lacks a thresholding mechanism. This widespread nudging of all parameters is the direct cause of the parameter drift that degrades accuracy across the task sequence. The training loss plot (right) highlights the efficiency of the decoupled DRS negotiation. Our model achieves the lowest training loss in fewer iterations compared to EWC, SPG, and even the L2 variant of our model. This rapid descent proves that the reflection step ( 2x − y) can navigate the intersection between the new task loss and the stability constraint. Even when the regularization is reduced ( λ = 1), our model remains more efficient than the baselines, proving that the DRS itself is superior to standard coupled optimizers. 
+
+4.4 Stability-Plasticity Analysis 
+
+We further analyze the class-incremental learning using a ResNet-18 backbone to assess robustness against inter-task interference. While Table 2 reports the final snapshot accuracy, Fig. 11 visualizes the maintenance of knowl-edge throughout the entire learning process. We report two metrics derived from the test accuracy matrix Ri,j 
+
+(accuracy on task j after learning task i): Average forget-ting, FT ↓, measures the average performance drop on previously learned tasks by the end of training, FT = 
+
+> 1
+> T−1
+
+PT −1 
+
+> j=1
+
+max l<T (Rl,j − RT,j ); Average incremental ac-curacy ( AInc ↑) that captures the area under the learning curve by averaging the mean accuracies at each incremental step t, AInc = 1
+
+> T
+
+PTt=1 
+
+ 1
+
+> t
+
+Ptj=1 Rt,j 
+
+
+
+. High AInc not only learn new tasks effectively (plasticity) but also maintains high performance on all preceding tasks at every inter-mediate step. Baseline SGD displays severe forgetting on the S-TinyImageNet ( FT = 0 .78 ), resulting in a negligible incremental accuracy of AInc = 0 .23 . This indicates that the learning of new task completely overwrites the parameter of previous tasks. While EWC reduces forgetting to FT = 0 .55 ,its reliance on a rigid penalty limits the model’s plasticity (AInc = 0 .35 ). Our model demonstrates superior stability-plasticity balance, achieving significantly lower forgetting (FT = 0 .26 ) and the highest recorded incremental accuracy (0.59 ). The results confirm that the DRS framework outper-forms even replay-based baselines like A-GEM and STAR without requiring the retention of raw training samples. 
+
+4.5 Long-Sequence Stability Analysis 
+
+To evaluate the stability of our model against catastrophic forgetting, we conducted a large-scale class-incremental learning experiment using the CASIA-HWDB1.0 dataset [73] with ResNet-18 backbone. This benchmark is partic-ularly challenging due to its fine-grained inter-class sim-ilarity. To construct a long-horizon learning scenario, we 10 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, DECEMBER 2025 
+
+curated a subset of 3,700 classes (randomly discarding 55 rare classes from the original 3,755) and divided them into 100 disjoint tasks ( T = 100 ), with 37 classes per task. The model is trained sequentially on D1, . . . , D 100 . To achieve a granular forgetting, we measure the group forgetting FG(t)
+
+for a specific task cluster G (e.g., tasks 1-10) at step t:
+
+FG(t) = 1
+
+> |G|
+
+P 
+
+> k∈G
+
+max j∈{ k,...,t −1}(Ak,j − Ak,t ), where Ak,j 
+
+is the accuracy on task k after learning task j (where j ≥ k). This metric tracks the degradation of specific task as the model encounters new task distributions. Fig. 8 visualizes this through consecutive 10-task blocks and the cumulative average forgetting for all 100 tasks. As observed, while baseline models have a linear accumulation of forgetting, our DRS learner maintains a flat trend. 
+
+4.6 Plasticity and Network Stiffness Analyses 
+
+To evaluate long-term learning, we conduct a 400-task ex-periment using a permuted label protocol ( [8], [14], [33], [46]) on TinyImageNet. Unlike standard continual learning, which focuses on memory, this experiment assesses whether a model is able to adapt to new data after hundreds of previous tasks (which also known as maintaining plasticity). We simulate a continuous environment by cycling through Tiny-ImageNet, where label mappings are randomly per-muted every ∆ = 2 , 500 steps. This creates extreme gradient interference, forcing the network to map identical visual features to different semantic categories sequentially. We then track task accuracy (learning capability) and network stiffness (average update magnitude ∆|| x|| 2). The results in Fig. 12 show most continual learning models fail in long sequences. In SGD and SI, plasticity drops sharply within the first 50 tasks. This is caused by weight saturation, where the cumulative gradients push parameters into dead zones of the loss landscape, making them unresponsive to new task signals. Moreover, as shown in Fig. 12(right), EWC, SI and BECAME suffer from a stiffening effect where the update magnitude approaches zero. This indicates a total loss of plasticity; the constraints have effectively frozen the parameters, preventing the model from adapting to more number of tasks. SGD stays high and erratic. Because it lacks stabilization, moving every weight and overwriting old knowledge. Our model maintains a stable, non-zero profile. While its magnitude is lower than SGD, reflecting the efficiency of our ℓ1 sparsity gate. Indeed, the reflection step ( 2x − y) in the DRS solver acts as a buffer for gradient conflict. Instead of rigidly locking every weight, the decou-pled negotiation allows the model to reconfigure the feature manifold without destroying the past representations, en-suring the network is functional across long-task horizon. 
+
+4.7 Ablation Studies 
+
+Effect of structural sparsity: The effective stability is evaluated across 20 sequential tasks on split CIFAR-100 in Fig. 14, using ResNet-18. We define effective stability as the percentage of parameters that remain stationary ( |∆w||w| < ϵ )after learning a new task. By identifying and freezing ≈ 83% 
+
+of the network by task 20, our model (DRS + ℓ1) protects the representations of prior tasks. Unlike EWC, which treats the regularization as a smooth gradient, the DRS solver uses the proximal operator and solves the inclusion condition 
+
+Fig. 11: Stability-Plasticity in class-incremental learning. Most baselines (e.g., EWC, SI) fail to scale to complex mani-folds (TinyImageNet), demonstrating both high forgetting and reduced plasticity. In contrast, our model decouples these objectives. It achieves retention (low forgetting) with-out compromising the learning potential (high plasticity). 
+
+Fig. 12: Long-horizon plasticity analysis. Our model main-tains a consistent upward trend with reduced variance, showing its ability to preserve prior knowledge while ef-fectively adapting to new tasks. 
+
+0 ∈ ∇L + ∂∥w∥1. This creates a hard filter; it evaluates the learning proposal generated by the task loss and forces non-essential parameters to zero (i.e., ϵ ≈ 0.05 ). This prevents the gradient drift observed in the SGD and EWC, where un-used parameters fluctuate randomly due to stochastic noise (∇L̸ = 0 ), and leads to catastrophic forgetting. While UPGD also employs hard constraints via gradient projection, it is lower than our model by a margin of ≈ 12 −34% . Our model locks low-level features in early tasks (tasks 1-8), requiring fewer parameter updates as the sequence progresses. 
+
+Interpretation of selective plasticity: Our model decouples learning and retention by separating the dense learning proposal from the sparse retention step. At each task t,minimizing the task loss produces a dense learning proposal in parameter space. This proposal is defined by the shift between the proximal update and the consensus point, as ∆x = yk+1 − yk. The ℓ1 proximal operator acts as a sparsity gate. It evaluates the proposal and forces non-essential parameter updates to zero while allowing critical updates to proceed. Fig. 9 visualizes the evolution of these parameter updates across a sequence of tasks on CIFAR-100 using ResNet-18. The top row confirms that plasticity is not suppressed throughout the task sequence, while the bottom row shows the effective updates after applying the proposed 
+
+ℓ1-based retention mechanism. As more tasks are learned, parameters that are important for previous tasks receive a larger weight Fi. The ℓ1 regularizer penalizes these im-portant weights, suppressing any new updates that would cause forgetting. Parameters with low importance weights remain free to adapt to the current task. The figures confirm SHAMSOLMOALI et al. TASK SWITCHING WITHOUT FORGETTING: THE ARCHITECTURE OF SEQUENTIAL LEARNING 11 
+
+Fig. 13: Selective DRS vs. Dense DRS on the fine-grained CUB-200 dataset. (Left) We report after-one-epoch accuracy across tasks. Both models start from the same accuracy at task 1, as no forgetting has yet occurred. As more tasks are added, DRS-ℓ1
+
+maintains a higher AOA than DRS-ℓ2. The middle panel shows the convergence residual across DRS iterations. Our model converges faster and to a lower point, and efficiently solve conflict between task loss and stability constraints. The right panel decomposes per-task training cost relative to standard SGD. Our model introduces only a marginal computational overhead ( 1.16 ×) due to inexpensive proximal and bookkeeping operations. 
+
+Fig. 14: Effect of sparsity constraint λ on average accuracy and forgetting on CIFAR100 data. Forgetting decreases with larger, but with diminishing adaptation after λ > 10 .that learning continues with a consistent update magnitude but is restricted to a smaller subset of parameters. 
+
+Convergence analysis of the DRS solver: The DRS solver seeks a fixed point where the auxiliary sequence yk sta-bilizes, meaning yk+1 → yk. We monitor this progress using the residual rk = ∥yk+1 − yk∥, which measures the agreement between plasticity (task loss) and stability (regu-larization) updates. As shown in Fig. 13(Left), both ℓ1 and 
+
+ℓ2 confirm the stable convergence, but the ℓ1-based solver converges faster and reaches a lower residual within fewer iterations. The ℓ2 variant converges more gradually because it preserves dense parameter updates, which slows fixed-point stabilization. We evaluate the real-world impact of this convergence on the CUB-200 dataset across 20 sequential tasks. We compare dense DRS ( ℓ2) against our selective DRS (ℓ1) in terms of After-One-Epoch Accuracy (AOA). Both models achieve identical accuracy on the first task, as no stability exist yet. As the task sequence progresses, dense DRS provides performance fluctuations and lower AOA, indicating that uniform ℓ2 shrinkage restricts adaptation even for task-irrelevant parameters. In contrast, our model maintains higher AOA throughout the task sequence. 
+
+4.7.1 Computational Cost 
+
+We analyze the computational overhead of the proposed learner on CUB-200 (20 tasks) using a ResNet-18 backbone, as shown in Fig.13(Right). While our model uses inner splitting iterations to balance plasticity and stability, the total training cost is slightly longer to simpler baselines (EWC, SI). Unlike Bayesian methods that require expensive variational inference or Meta-learning approaches that rely on second-order derivatives (Hessians), each DRS iteration is computationally thin. The proximal operator for the ℓ1
+
+is a soft-thresholding, which admits a closed-form solution, and its computation is a simple element-wise comparison with O(d) complexity, where d is the number of parameters. Indeed, a unique advantage of the DRS solver is its rapid stabilization of the auxiliary sequence yk. By monitoring the residual ∥yk+1 − yk∥, we apply an early-stopping rule that reduces the average iteration count from 9 to 6 per task. This optimization lowers the training time to ∼ 1.16 × of the SGD baseline, but with significantly higher accuracy reten-tion. Importantly, our model has zero inference overhead. Because DRS operates within the optimization phase to find a sparse parameter configuration, it does not alter the final network architecture or introduce task-specific modules. 
+
+5 CONCLUSION 
+
+Continual learning is often described as a tension between stability and plasticity, where improving one dimension comes at the expense of the other. Most existing solu-tions address this by modifying the model itself, such as, storing past examples, expanding architectures, or intro-ducing complex training schemes. In this work, we took a different route and revisit the optimization process in-stead. By formulating task learning and knowledge reten-tion as two complementary operators and solving them jointly using a Douglas-Rachford scheme, we showed that sparse, parameter-level selectivity can be enforced with-out replay buffers or architectural changes. The result-ing learner achieves strong continual-learning performance across long task sequences while remaining within a simple regularization-based framework. 
+
+REFERENCES         
+
+> [1] Michael McCloskey and Neal J Cohen. Catastrophic interference in connectionist networks: The sequential learning problem. In
+> Psychology. Learn. Motiv. , volume 24, pages 109–165. 1989. [2] Rahaf Aljundi, Francesca Babiloni, Mohamed Elhoseiny, Marcus Rohrbach, and Tinne Tuytelaars. Memory aware synapses: Learn-ing what (not) to forget. In Eur. Conf. Comput. Vis. , pages 139–154, 2018. [3] Jiahua Dong, Hongliu Li, Yang Cong, Gan Sun, Yulun Zhang, and Luc Van Gool. No one left behind: Real-world federated class-incremental learning. Trans. Pattern Anal. Mach. Intell. , 46(4):2054– 2070, 2023. 12 IEEE TRANSACTIONS ON PATTERN ANALYSIS AND MACHINE INTELLIGENCE, VOL. X, NO. X, DECEMBER 2025
+
+[4] Wenshui Luo, Shuo Chen, Tao Zhou, and Chen Gong. A theoret-ical perspective on streaming noisy data with distribution shift. 
+
+Trans. Pattern Anal. Mach. Intell. , 2025. [5] Robert M French. Catastrophic forgetting in connectionist net-works. Trends Cogn. Sci. , 3(4):128–135, 1999. [6] Yichen Wu, Hong Wang, Peilin Zhao, Yefeng Zheng, Ying Wei, and Long-Kai Huang. Mitigating catastrophic forgetting in online continual learning by modeling previous task interrelations via pareto optimization. In Int. Conf. Mach. Learn. , 2024. [7] Jason Yoo, Yunpeng Liu, Frank Wood, and Geoff Pleiss. Layerwise proximal replay: A proximal point method for online continual learning. Int. Conf. Mach. Learn. , 2024. [8] Mohamed Elsayed and A Rupam Mahmood. Addressing loss of plasticity and catastrophic forgetting in continual learning. Int. Conf. Learn. Represent. , 2024. [9] Jeevan Thapa and Rui Li. Bayesian adaptation of network depth and width for continual learning. In Int. Conf. Learn. Represent. ,2024. [10] Masih Eskandar, Tooba Imtiaz, Davin Hill, Zifeng Wang, and Jen-nifer Dy. Star: Stability-inducing weight perturbation for continual learning. Int. Conf. Mach. Learn. , 2025. [11] Arslan Chaudhry, Marc’Aurelio Ranzato, Marcus Rohrbach, and Mohamed Elhoseiny. Efficient lifelong learning with a-gem. Int. Conf. Learn. Represent. , 2019. [12] Andrei A Rusu, Neil C Rabinowitz, Guillaume Desjardins, Hubert Soyer, James Kirkpatrick, Koray Kavukcuoglu, Razvan Pascanu, and Raia Hadsell. Progressive neural networks. arXiv preprint arXiv:1606.04671 , 2016. [13] Gobinda Saha and Kaushik Roy. Continual learning with scaled gradient projection. In Proc. AAAI Conf. Artif. Intell. , volume 37, pages 9677–9685, 2023. [14] Clare Lyle, Zeyu Zheng, Khimya Khetarpal, Hado van Hasselt, Razvan Pascanu, James Martens, and Will Dabney. Disentangling the causes of plasticity loss in neural networks. arXiv preprint arXiv:2402.18762 , 2024. [15] Khurram Javed and Martha White. Meta-learning representations for continual learning. Adv. Neural Inform. Process. Syst. , 32, 2019. [16] Ronald Kemker, Marc McClure, Angelina Abitino, Tyler Hayes, and Christopher Kanan. Measuring catastrophic forgetting in neural networks. In Proc. AAAI Conf. Artif. Intell. , volume 32, 2018. [17] Soochan Lee, Jaehyeon Son, and Gunhee Kim. Recasting continual learning as sequence modeling. Adv. Neural Inform. Process. Syst. ,36, 2023. [18] Soochan Lee, Hyeonseong Jeon, Jaehyeon Son, and Gunhee Kim. Learning to continually learn with the bayesian principle. Int. Conf. Mach. Learn. , 2024. [19] Mei Li, Yuxiang Lu, Qinyan Dai, Suizhi Huang, Yue Ding, and Hongtao Lu. Became: Bayesian continual learning with adaptive model merging. Int. Conf. Mach. Learn. , 2025. [20] Abhishek Kumar, Sunabha Chatterjee, and Piyush Rai. Bayesian structural adaptation for continual learning. In Int. Conf. Mach. Learn. , pages 5850–5860, 2021. [21] Djohan Bonnet, Kellian Cottart, Tifenn Hirtzlin, Tarcisius Januel, Thomas Dalgaty, Elisa Vianello, and Damien Querlioz. Bayesian continual learning and forgetting in neural networks. arXiv preprint arXiv:2504.13569 , 2025. [22] Gido M Van de Ven, Nicholas Soures, and Dhireesha Kudithipudi. Continual learning and catastrophic forgetting. arXiv preprint arXiv:2403.05175 , 2024. [23] James Kirkpatrick, Razvan Pascanu, Neil Rabinowitz, Joel Veness, Guillaume Desjardins, Andrei A Rusu, Kieran Milan, John Quan, Tiago Ramalho, Agnieszka Grabska-Barwinska, et al. Overcoming catastrophic forgetting in neural networks. Proc. Natl. Acad. Sci. U.S.A. , 114(13):3521–3526, 2017. [24] Yan Shen, Zhanghexuan Ji, Chunwei Ma, and Mingchen Gao. Continual domain adversarial adaptation via double-head dis-criminators. In Int. Conf. Artif. Intell. Stat. , pages 2584–2592, 2024. [25] Haytham M Fayek, Lawrence Cavedon, and Hong Ren Wu. Progressive learning: A deep learning framework for continual learning. Neural Net. , 128:345–357, 2020. [26] German I Parisi, Ronald Kemker, Jose L Part, Christopher Kanan, and Stefan Wermter. Continual lifelong learning with neural networks: A review. Neural Net. , 113:54–71, 2019. [27] Liu Ziyin and Zihao Wang. spred: Solving l1 penalty with sgd. In 
+
+Int. Conf. Mach. Learn. , pages 43407–43422, 2023. [28] Larry Wasserman. All of statistics: a concise course in statistical inference . Springer Science & Business Media, 2004. [29] Yijun Sun, Jin Yao, and Steve Goodison. Feature selection for nonlinear regression and its application to cancer research. In Proc. SIAM Int. Conf. Data Min. , pages 73–81. SIAM, 2015. [30] Jim Douglas and Henry H Rachford. On the numerical solution of heat conduction problems in two and three space variables. Trans. Amer. Math. Soc. , 82(2):421–439, 1956. [31] Jonathan Eckstein and Dimitri P Bertsekas. On the dou-glas—rachford splitting method and the proximal point algorithm for maximal monotone operators. Math. Program. , 55:293–318, 1992. [32] Nicholas G Polson, Brandon T Willard, and Massoud Heidari. A statistical theory of deep learning via proximal splitting. arXiv preprint arXiv:1509.06061 , 2015. [33] Shibhansh Dohare, J Fernando Hernandez-Garcia, Qingfeng Lan, Parash Rahman, A Rupam Mahmood, and Richard S Sutton. Loss of plasticity in deep continual learning. Nature , 632:768–774, 2024. [34] Martial Mermillod, Aur´ elia Bugaiska, and Patrick Bonin. The stability-plasticity dilemma: Investigating the continuum from catastrophic forgetting to age-limited learning effects. Front. Psy-chol. , 4:504, 2013. [35] Tao Feng, Hangjie Yuan, Mang Wang, Ziyuan Huang, Ang Bian, and Jianzhou Zhang. Progressive learning without forgetting. 
+
+arXiv preprint arXiv:2211.15215 , 2022. [36] Jaehong Yoon, Eunho Yang, Jeongtae Lee, and Sung Ju Hwang. Lifelong learning with dynamically expandable networks. Int. Conf. Learn. Represent. , 2018. [37] Haeyong Kang, Rusty John Lloyd Mina, Sultan Rizky Hikmawan Madjid, Jaehong Yoon, Mark Hasegawa-Johnson, Sung Ju Hwang, and Chang D Yoo. Forget-free continual learning with winning subnetworks. In Int. Conf. Mach. Learn. , pages 10734–10750, 2022. [38] Pranshu Malviya, Balaraman Ravindran, and Sarath Chandar. Tag: Task-based accumulated gradients for lifelong learning. In Conf. Lifelong Learn. Agents , pages 366–389, 2022. [39] Rizhao Cai, Yawen Cui, Zitong Yu, Xun Lin, Changsheng Chen, and Alex Kot. Rehearsal-free and efficient continual learning for cross-domain face anti-spoofing. Trans. Pattern Anal. Mach. Intell. ,2025. [40] Tim GJ Rudner, Freddie Bickford Smith, Qixuan Feng, Yee Whye Teh, and Yarin Gal. Continual learning via sequential function-space variational inference. In Int. Conf. Mach. Learn. , pages 18871– 18887, 2022. [41] Tyler L Hayes, Kushal Kafle, Robik Shrestha, Manoj Acharya, and Christopher Kanan. Remind your neural network to prevent catastrophic forgetting. In Eur. Conf. Comput. vis. , pages 466–483, 2020. [42] Ben Batten, Mehran Hosseini, and Alessio Lomuscio. Tight verifi-cation of probabilistic robustness in bayesian neural networks. In 
+
+Int. Conf. Artif. Intell. Stat. , pages 4906–4914, 2024. [43] Shibhansh Dohare, Richard S Sutton, and A Rupam Mahmood. Continual backprop: Stochastic gradient descent with persistent randomness. arXiv preprint arXiv:2108.06325 , 2021. [44] Hunar Batra and Ronald Clark. Evcl: Elastic variational continual learning with weight consolidation. Int. Conf. Mach. Learn. , 2024. [45] Evgenii Nikishin, Junhyuk Oh, Georg Ostrovski, Clare Lyle, Raz-van Pascanu, Will Dabney, and Andr´ e Barreto. Deep reinforcement learning with plasticity injection. Adv. Neural Inform. Process. Syst. ,36:37142–37159, 2023. [46] Zaheer Abbas, Rosie Zhao, Joseph Modayil, Adam White, and Marlos C Machado. Loss of plasticity in continual deep reinforce-ment learning. In Conf. Lifelong Learn. Agents , pages 620–636, 2023. [47] Thomas L Lee and Amos Storkey. Approximate bayesian class-conditional models under continuous representation shift. In Int. Conf. Artif. Intell. Stat. , pages 3628–3636, 2024. [48] Leila Mahmoodi, Peyman Moghadam, Munawar Hayat, Christian Simon, and Mehrtash Harandi. Flashbacks to harmonize stability and plasticity in continual learning. Neural Net. , page 107616, 2025. [49] Sanghwan Kim, Lorenzo Noci, Antonio Orvieto, and Thomas Hofmann. Achieving a better stability-plasticity trade-off via auxiliary networks in continual learning. In IEEE Conf. Comput. Vis. Pattern Recog. , pages 11930–11939, 2023. [50] Clare Lyle and Razvan Pascanu. Switching between tasks can cause ai to lose the ability to learn. Nature , 2024. [51] Hongjoon Ahn, Sungmin Cha, Donggyu Lee, and Taesup Moon. Uncertainty-based continual learning with adaptive regulariza-tion. Adv. Neural Inform. Process. Syst. , 32, 2019. SHAMSOLMOALI et al. TASK SWITCHING WITHOUT FORGETTING: THE ARCHITECTURE OF SEQUENTIAL LEARNING 13 
+
+[52] Pei-Hung Chen, Wei Wei, Cho-Jui Hsieh, and Bo Dai. Overcoming catastrophic forgetting by bayesian generative regularization. In 
+
+Int. Conf. Learn. Represent. , pages 1760–1770, 2021. [53] Daniel Gabay and Bertrand Mercier. A dual algorithm for the solution of nonlinear variational problems via finite element ap-proximation. Comput. Math. Appl. , 2(1):17–40, 1976. [54] Raied Aljadaany, Dipan K Pal, and Marios Savvides. Douglas-rachford networks: Learning both the image prior and data fidelity terms for blind image deconvolution. In IEEE Conf. Comput. Vis. Pattern Recog. , pages 10235–10244, 2019. [55] Bartolomeo Stellato, Goran Banjac, Paul Goulart, Alberto Bempo-rad, and Stephen Boyd. Osqp: An operator splitting solver for quadratic programs. Math. Program. Comput. , 12(4):637–672, 2020. [56] Michael Garstka, Mark Cannon, and Paul Goulart. Cosmo: A conic operator splitting method for convex conic problems. J. Optim. Theory Appl. , 190(3):779–810, 2021. [57] Vien V Mai, Jacob Lindb¨ ack, and Mikael Johansson. A fast and accurate splitting method for optimal transport: Analysis and implementation. Int. Conf. Learn. Represent. , 2022. [58] Quoc Tran Dinh, Nhan H Pham, Dzung Phan, and Lam Nguyen. Feddr–randomized douglas-rachford splitting algorithms for non-convex federated composite optimization. Adv. Neural Inform. Process. Syst. , 34:30326–30338, 2021. [59] Guoyin Li and Ting Kei Pong. Douglas–rachford splitting for nonconvex optimization with application to nonconvex feasibility problems. Math. Program. , 159(1):371–401, 2016. [60] Masoumeh Zareapoor and Pourya Shamsolmoali. Rethinking fast adversarial training: A splitting technique to overcome catas-trophic overfitting. In Eur. Conf. Comput. Vis. , pages 34–51, 2024. [61] Anshika Anshika, Jiaxing Li, Debdas Ghosh, and Xiangxiong Zhang. A three-operator splitting scheme derived from three-block admm. Optimization and Engineering , 2025. [62] Ibrahim K Ozaslan and Mihailo R Jovanovi´ c. Accelerated forward–backward and douglas–rachford splitting dynamics. Au-tomatica , 175:112210, 2025. [63] Zhen Zhao, Zhizhong Zhang, Xin Tan, Jun Liu, Yanyun Qu, Yuan Xie, and Lizhuang Ma. Rethinking gradient projection continual learning: Stability/plasticity feature space decoupling. In IEEE Conf. Comput. Vis. Pattern Recog. , pages 3718–3727, 2023. [64] Johannes Hertrich. Proximal residual flows for bayesian inverse problems. In Int. Conf. Scale Space Var. Methods Comput. Vis. , pages 210–222, 2023. [65] Francisco J Arag ´ on Artacho, Rub´ en Campoy, and Matthew K Tam. The douglas–rachford algorithm for convex and nonconvex feasibility problems. Math. Methods Oper. Res. , 91(2):201–240, 2020. [66] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In IEEE Conf. Comput. Vis. Pattern Recog. , pages 770–778, 2016. [67] Joan Serra, Didac Suris, Marius Miron, and Alexandros Karat-zoglou. Overcoming catastrophic forgetting with hard attention to the task. In Int. Conference Mach. Learn. , pages 4548–4557, 2018. [68] Alex Krizhevsky and Geoffrey Hinton. Learning multiple layers of features from tiny images. Ph.D. dissertation, University of Toronto ,2009. [69] Gregory Cohen, Saeed Afshar, Jonathan Tapson, and Andre Van Schaik. Emnist: Extending mnist to handwritten letters. In 
+
+Int. Joint Conf. Neural Netw. , pages 2921–2926, 2017. [70] Yandong Guo, Lei Zhang, Yuxiao Hu, Xiaodong He, and Jianfeng Gao. Ms-celeb-1m: A dataset and benchmark for large-scale face recognition. In Eur. Conf. Comput. Vis. , pages 87–102, 2016. [71] Jiayu Wu, Qixiang Zhang, and Guoxi Xu. Tiny imagenet challenge. 
+
+Technical report , 2017. [72] Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In IEEE Conf. Comput. Vis. Pattern Recog. , pages 248–255, 2009. [73] Cheng-Lin Liu, Fei Yin, Da-Han Wang, and Qiu-Feng Wang. Casia online and offline chinese handwriting databases. In Int. Conf. Doc. Anal. Recognit. , pages 37–41, 2011. 
+
+Pourya Shamsolmoali (Senior Member, IEEE) received the PhD degree in computer science from Shanghai Jiao Tong University. He has been a visiting researcher with Link ¨ oping Uni-versity, INRIA-France, and ETS-Montreal. He is currently a lecturer at the University of York. His main research focuses on machine learning, computer vision, and image processing. 
+
+Masoumeh Zareapoor (Member, IEEE) re-ceived the PhD degree in computer science from Jamia University, India. She is an associate re-searcher at Shanghai Jiao Tong University and was a research engineer at Huawei and NWPU Xi’an. Her main research focuses on machine learning and computer vision. 
+
+Eric Granger (Member, IEEE) received a Ph.D. degree in electrical engineering from Ecole Polytechnique de Montreal, Canada, in 2001. He joined the Dept. of Systems Engineering at ´Ecole de technologie sup ´ erieure ( ´ ETS) in Montr ´ eal, in 2004, where he is currently a Pro-fessor and the Director of LIVIA. He is ETS Industrial Research Co-Chair in Embedded Neu-ral Networks for Intelligent Connected Buildings (Distech Controls Inc.) and former FRQS Co-Chair in AI and Health (2021-24), with research interests in pattern recognition, machine learning, information fusion, and computer vision. 
+
+William A. P. Smith received the BSc degree in computer science and the PhD degree from the University of York. He is currently a Pro-fessor with the Department of Computer Sci-ence, University of York. He holds a Royal Academy of Engineering/The Leverhulme Trust Senior Research Fellowship. His research fo-cuses on shape and appearance modelling and model-based supervision. 
+
+Yue Lu (Senior Member, IEEE) is a Professor and Dean of the School of Communication and Electronic Engineering at East China Normal University. He received his B.S. and M.S. from Zhejiang University in telecommunications and electronic systems, respectively, and his Ph.D. in pattern recognition and intelligent systems from Shanghai Jiao Tong University. Previously, he was a research fellow at the National University of Singapore, department of computer science.
