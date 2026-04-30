@@ -1,0 +1,1001 @@
+Title: Concept Graph Convolutions: Message Passing in the Concept Space
+
+URL Source: https://arxiv.org/pdf/2604.20082v1
+
+Published Time: Thu, 23 Apr 2026 00:20:36 GMT
+
+Number of Pages: 21
+
+Markdown Content:
+# Concept Graph Convolutions: Message Passing in the Concept Space 
+
+Lucie Charlotte Magister 
+
+University of Cambridge Cambridge, UK 
+
+lcm67@cam.ac.uk 
+
+Pietro Liò 
+
+University of Cambridge Cambridge, UK 
+
+pl219@cam.ac.uk 
+
+Abstract 
+
+The trust in the predictions of Graph Neural Networks is limited by their opaque reasoning process. Prior methods have tried to explain graph networks via concept-based explanations extracted from the latent representations obtained after message passing. However, these explanations fall short of explaining the message passing process itself. To this aim, we propose the Concept Graph Convolution, the first graph convolution designed to operate on node-level concepts for improved interpretability. The proposed convolutional layer performs message passing on a combination of raw and concept representations using structural and attention-based edge weights. We also propose a pure variant of the convolution, only operating in the concept space. Our results show that the Concept Graph Convolution allows to obtain competitive task accuracy, while enabling an increased insight into the evolution of concepts across convolutional steps. 
+
+1 Introduction 
+
+The opaque reasoning process of Graph Neural Networks (GNN, [ 1]) impedes human trust in their predic-tions [ 2 ], motivating a line of research focused on increasing their explainability and interpretability [ 2– 4]. A subset of this research has focused on extracting concept-based explanations from the latent space of GNNs [ 5–7 ], based on the natural clustering observed in the node representations after message passing [5 ]. While these explanations provide an insight into the latent space after message passing, they fail to explain the reasoning process performed during message passing itself. Specifically, what makes message passing unintepretable is the representation of nodes, computed via neighbourhood aggregation [ 8]. The simple averaging of surrounding neighbours obscures the meaning of the nodes’ representations. While attention-based graph convolutions [ 9 –11 ] improve this by weighting the contribution of neighbouring nodes based on attention, the node vector itself still remains uninterpretable. For a full understanding of GNNs, it is therefore desirable for a graph convolutional layer to operate on human interpretable concepts. To this aim, we introduce the Concept Graph Convolution (CGC). To the best of our knowledge, the CGC is the first graph convolution designed around operating on node-level concepts for improved interpretability. The CGC achieves this by representing nodes via both raw latent representations and concept representations. Both representations share a single linear transformation, projecting them into the same space. The learned scalar η is then used to mix the representations and obtain a message for neighbourhood aggregation. Edge weights for neighbourhood aggregation are derived based on the graph structure and attention between the concept representations of two neighbouring nodes, inspired by the attention mechanism [ 11 ]. A learnable scalar γ mixes the concept-based attention weights with the standard structural GCN weights. Finally, we obtain a valid concept representation again after message passing by applying a normalised softmax function to the resulting embedding. This design allows the CGC to perform message passing over both raw latent representations and concept representations for improved interpretability. We also propose the pure CGC, which discards the raw latent representations 
+
+> V2.
+> arXiv:2604.20082v1 [cs.LG] 22 Apr 2026
+
+Concept Graph Convolution    
+
+> + Edges
+> Node Embedding
+> Concept Embedding
+> Node Embedding
+> Concept Embedding
+> Node Embs.
+> Concept Embs.
+> η
+> (1 - η)
+> Message Passing
+> using graph structure
+> and attention
+> Concept Distillation
+> Aggregate
+> ew1
+> ew2
+> ew=(1−γ)Ãij +γαij
+> Pure
+
+Figure 1: Visualisation of the processing steps of the CGC. The graph convolution combines raw and concept embeddings via a learned weighted scalar and then performs message passing, where edge weights are computed from the graph structure and attention. Finally, the convolution distils a new concept representation. The pure variant of the CGC does not rely on node embeddings but simply uses concept embeddings. and purely performs message passing in the concept space. Most notably, the CGC layer provides interpretability through three distinct design features: (i) message passing in the concept space, (ii) a learned scalar explaining the importance of graph structure versus neighbouring concepts and (iii) concept attention. Figure 1 visually summarizes the CGC and the pure CGC variant. The remainder of this paper is structured as follows. In Section 2, we review the related literature before introducing the Concept Graph Convolution in Section 3. We then detail our experimental setup and present experimental results in Sections 4 and 5, respectively. Finally, we conclude with a discussion and conclusion in Sections 6 and 7. 
+
+2 Related Work 
+
+Graph convolutions A number of prominent graph convolutional layers exist [ 12 – 15 , 11 , 9 ]. The most prominent graph convolutional layer is the layer introduced in the Graph Convolution Network (GCN, [ 12 ]), which performs a weighted sum of the features of neighbouring nodes based on the graph structure. A number of graph convolutions can be deemed to make message passing more interpretable. For example, the layer introduced in the Graph Attention Network (GAT, [ 11 ]) proposes to use attention to learn importance weights over neighbouring nodes. Transformed node features of a source node and neighbouring node are concatenated and passed through a feed-forward layer to get a raw attention score, which is then normalized across all neighbours of a node to obtain an attention score reflecting relative importance. Note, that the attention score is static, which means that the ranking of neighbours is independent of the source node. In contrast, the GATv2 [ 9] modifies the original architecture of the GAT to use dynamic attention for improved expressivity. Dynamic attention allows a relative ranking of neighbours by changing the ordering of the attention operations. The Attention-based Graph Neural Network (AGNN, [ 16 ]) also uses dynamic attention implemented via cosine similarity, however, is limited in expressivity. In contrast, the Self-Supervised Graph Attention Network (SuperGAT, [ 17 ]) learns attention scores via learning to predict edges in a self-supervised manner. This strongly aligns attention weights with the graph structure, making them more interpretable. Graph Stochastic Attention (GSAT, [ 10 ]) directly aims to improve interpretability by injecting random noise into the attention weights of a GNN to learn salient subgraph structures. In contrast, the Simple Graph Convolution (SGC, [ 18 ]) removes non-linearities between GCN layers and only applies a single softmax function at the end. While the simplified design makes feature attribution easier, the SGC suffers from oversmoothing and limited expressivity [ 19 ]. In contrast, the recent work SYMGraph [ 8 ] directly aims to make graph convolutions more interpretable by replacing message passing with discrete structural hashing and topological role-based aggregation. While the aforementioned works increase transparency to a certain extent, they fail to make the hidden representations of nodes more interpretable, which we tackle with CGCs by operating in the concept space. 
+
+Message passing in the concept space Only two other works have focused on performing message passing directly on concepts, namely Relational Concept Bottleneck Models (R-CBMs, [ 20 ]) and Causal Concept Graph Models (Causal CGMs, [ 21 ]). R-CBMs map input entities into the concept embedding 2space and then perform message passing on the structure of the graph, after which a final prediction is extracted. While R-CBMs operate in the concept space, the goal of R-CBMs is slightly different. R-CBMs are a full relational architecture following the concept bottleneck principle, which means that the concepts extracted are directly used for prediction. While this improves the transparency of the interaction between concepts, it does not explain how the concepts arise. In contrast, CGCs are a convolutional layer architecture designed to trace the evolution and interplay of concepts. Causal CGMs [ 21 ] extend the notion of R-CBMs by not assuming that concepts are independent, but rather causal. The graph convolutional layers in the model operate on nodes representing concepts and edges representing causal relationships. Operating in the concept representation space is a parallel of these two works and our work. However, there is one crucial difference. Both R-CBMs and Causal CGMs perform message passing on already embedded concepts and form a full model architecture. In contrast, CGC is a graph convolutional layer which extracts these concept representations as part of message passing, tackling the challenge of making graph convolutions more transparent. To the best of our knowledge, CGCs are the first graph convolutional layer to operate in the concept space and extract concepts at every convolutional step. 
+
+Attention as explanation A number of aforementioned graph convolutional works rely on the attention mechanism to increase the interpretability of GNNs [ 9, 16 , 11 ]. This is based on attention weights providing an intuitive signal of which elements a model uses for prediction. However, it is contested whether attention actually provides valid explanations [ 22 , 23 ]. In particular, Jain and Wallace [23] find that attention is often not correlated with feature importance scores determined by gradient-based techniques on natural language processing (NLP) tasks. They show that varying attention masks can lead to the same prediction. In contrast, Wiegreffe and Pinter [24] argue that whether attention can be seen as a form of explanation depends on the evaluation criteria, such as comparing model performance when using uniform attention or comparing the attention maps learned by the model when trained with different seeds. Bai et al. [25] approach the debate from a different angle. They argue that attention weights encode information beyond importance, which makes it unclear how to interpret them. To mitigate this issue, they propose random attention pretraining and instance weighting for mask-neutral learning. In contrast, Akula and Zhu [26] perform a human study to investigate how useful attention is as an explanation mechanism, specifically focusing on whether it increases human trust. They find that attention does not increase human trust compared to other non-attention baselines. However, the paper does not investigate whether attention faithfully reflects the model’s underlying computation, a much stronger requirement for explanation. In conclusion, it is debated whether attention can be considered as explanation and we therefore must treat it with care, considering its limits and context in the design of the CGC. 
+
+3 Concept Graph Convolution 
+
+We propose the Concept Graph Convolution (CGC), the first interpretable graph convolution designed to incorporate node concept representations. At a high-level, the CGC works across both raw and concept representations. It first projects the raw and concept representations into the same latent space via a shared linear transformation. The resulting embeddings are then combined via a learned scalar η for neighbourhood aggregation. For this, the CGC uses the standard GCN edge weights [ 12 ] to discover structural properties, as well as single-headed attention between neighbouring concept representations, inspired by the interpretability of the GAT [ 11 ]. The layer combines these weights via the learnable scalar 
+
+γ. To also obtain valid concept representations after neighbourhood aggregation, the CGC reapplies a normalised softmax function, as proposed in Concept Graph Networks (CGNs, [ 6 ]). This design allows increased insight into the evolution of concepts and the influence of neighbouring concepts on one another throughout a block of graph convolutional layers. We also propose the pure CGC, which discards raw latent representations and only considers concept representations in message passing. For ease of explanation, we will first discuss how we compute the edge weights, before describing how we perform message passing in the concept space. 
+
+Computing edge weights An integral part of the interpretability of the CGC is the computation of edge weights. We compute two types of edge weights based on experimental observations. First, we compute a set of structural weights to capture the connectivity of the graph. We use the normalized adjacency weights for this, as proposed by Kipf and Welling [12] : ˜Aij = Aij 
+
+√didj
+
+, where Aij is the adjacency matrix 3with self-loops and di is the degree of node i. Using these structural edge weights prevents from feature scaling due to node degree. In parallel, we also compute attention-based edge weights to capture the interplay between concepts. Inspired by the GAT [ 11 ], we compute the attention weights as: αij = softmax j (eij ) where eij =
+
+LeakyReLU  a⊤[qi ∥ qj ], and qi and qj are the fuzzy concept encoding vectors of nodes i and j,obtained via a scaled softmax function [ 6]. Note, that the main difference to attention in GATs [ 11 ]is that we directly operate on concept vectors in order to capture semantic similarity. We also restrict ourselves to single-headed attention as this is the most interpretable. We do not use dynamic attention as proposed by Brody et al. [9] , because static attention is more easily interpretable. Static attention globally ranks the importance of nodes, while dynamic attention is based on the source node. While this makes dynamic attention more expressive, it also makes the computation more complex. We then combine the structural and attention-based edge weights in the following way: wij = (1 −
+
+γ) ˜Aij + γα ij , where γ ∈ (0 , 1) is a learned scalar parameter, which controls the trade-off between structural and attention weights. We opt for combining the two types of edge weights because preliminary experiments using pure attention on node concept vectors did not capture graph structure effectively. We make the active design choice to make γ a learnable parameter in order to not restrict the network’s capacity. However, we do encourage attention to be used as much as possible through the following 
+
+L2 loss term [ 27 ]: Lgamma = λa
+
+P
+
+> ℓ
+
+(γ − γ0)2, where γ0 is a target value and λa controls how strongly the network is regularized. In our experiments, we set the target γ0 to 0.8 to encourage reliance on attention-based propagation. The motivation for this is that we want to learn which concepts are important for one another. 
+
+Concept-based message passing Given the combined edge weights, we then perform message passing between nodes. Note, that in the CGC, we have two types of node representations: (1) the raw latent representation denoted by uli and (2) a fuzzy concept embedding vector, which we denote by qli, where i
+
+is a node and l is the current layer. We first perform a shared linear transformation on the two types of representations for a node: hlui = uliW l and hlqi = qliW l, where W l is a learnable weight matrix, and 
+
+hlui and hlqi are the resulting node embeddings projected into a shared space. We then combine the two embeddings in the following way: hli = (1 − η)hlui + ηh lqi , where η is a learned scalar. Notice, that hlqi 
+
+is not in the concept space anymore, as we have linearly transformed it. However, applying this linear transformation allows us to combine both raw and concept representations and improves the model’s expressivity. Similar to our regularization of γ, we apply a L2 loss on η: Leta = λb
+
+P
+
+> ℓ
+
+(η − η0)2, where 
+
+η0 is a target value and λb controls how strongly the network is regularized. In our experiments, we also set the target η0 to 0.8 to encourage reliance on the concept representations. We then perform message passing on the enriched representation. Using the mixed latent embedding hli, we then compute the message for message passing between nodes 
+
+i and j by scaling hli by the computed edge importance [ 28 ]: mlij = wlij hli, where wlij is the combined structural and attention-based edge weights and mlij the resulting message from node i to node j at layer l. To obtain the updated representation for node j after message passing, we perform a simple sum over the messages and add a learnt bias term: zl+1  
+
+> j
+
+= P 
+
+> i∈N (j)∪{ j}
+
+ mlij 
+
+ + bl, where zl+1  
+
+> j
+
+is the resulting node representation of node j after aggregating across the neighbouring nodes, scaled by the edge weights computed. In this equation, bl is a learnt bias term, that provides a baseline activation. It can be interpreted as how important a concept is even if there is no evidence for the concept from neighbours. Furthermore, the bias term breaks symmetry and allows to prefer a concept globally to another one. It can be interpreted as a global prior over concepts, telling us whether a concept is preferred or dispreferred. Finally, we cast the aggregated node representation zl+1  
+
+> j
+
+back into the concept space by applying a normalized softmax function, as introduced by [ 6 ], yielding ql+1  
+
+> j
+
+. This allows us to operate in the concept space across graph convolutions and track the evolution of concepts. Note that only in the first layer the input to the CGC are not concept embeddings, but the raw node features. 
+
+Pure Concept Graph Convolution We note that while combining raw latent representations and concept representations may improve the model’s expressivity, it hampers interpretability to a certain extent. To this end, we propose the pure CGC. The pure CGC discards the raw latent representation and simply operates on the concept representation. We will demonstrate the performance of both layers. 4Adapting the definition of concept completeness for graph classification Concept completeness measures how representative the discovered set of concepts is for predicting the final task label [ 29 ]. Yeh et al. [29] propose computing concept completeness by training a classifier, such as a decision tree [ 30 ], to predict the task label from a given concept encoding for the input instance. In the context of graph classification, Magister et al. [5] propose predicting the graph label from the node-level concept. However, graph classification requires reasoning across multiple nodes, which a node-level concept cannot represent well. To this aim, we propose a new computation of the concept completeness score for graph classification. Specifically, we propose to aggregate across the concepts discovered to represent the graph. As concept labels are a binarization of the fuzzy encoding vector, we propose representing a graph as a frequency vector of the associated concepts. An alternative design to a frequency vector is a one-hot encoding of the present concepts, however, some graph classification tasks may rely on the frequency of a certain concept being present, wherefore, a frequency vector is more suitable. 
+
+4 Experiments 
+
+Our experiments focus on answering the following research questions: (i) what is the impact of our approach on the generalization error of a GNN?, (ii) is the identified concept set complete with respect to the task? and (iii) are the concepts discovered coherent? how does a node concept evolve across convolutional layers? We hypothesize that our approach can: (i) obtain on par task accuracy with respect to a standard GCN [ 12 ] and GAT [ 11 ]; (ii) identify a complete set of concepts, (iii) extract ground truth graph concepts aligned with human expectations, and (iv) showcase the evolution of node concepts throughout a graph convolutional block. 
+
+Metrics We measure the performance and interpretability of the CGC on two key metrics. To be able to answer our first research question, we measure model performance via classification accuracy. To answer our second research question on explanation performance, we compute the concept completeness score of individual layers. Lastly, we examine concept interpretability by qualitatively examining the concepts discovered and their evolution across convolutional layers. 
+
+Datasets We perform the experiments on datasets for node classification and graph classification. Specifically, we use the same set of node and graph classification datasets as GNNExplainer [ 31 ], as subsequent research establishes these as benchmarks [ 32 , 33 , 5, 7, 34 ]. However, we further expand the set of graph classification datasets used to allow for a more insightful qualitative comparison. For this, we rely on datasets proposed by Longa et al. [35]. 
+
+Node classification We use the five synthetic node classification datasets proposed by Ying et al. [31] .We select these datasets, because they have a ground truth motif encoded, allowing for a rich analysis of the concepts discovered. The first dataset is BA-Shapes, which consists of a Barabási-Albert (BA) graph [ 36 ] to which 80 house motifs and 70 random edges are attached. The goal of the dataset is to identify a node belonging to one of four classes: (1) the base graph, (2) the top of a house, (3) the middle of a house and (4) the bottom of a house. The second dataset BA-Community extends this task by forming a union of two BA-Shapes graphs and asking to classify the node into one of eight classes, which represent the structural role and graph membership. Similarly, the BA-Grid dataset is also based on a BA graph [ 36 ], but has 80 3-by-3 grid structures attached to it, with the similar goal of identifying the node belonging to the base graph or grid structure. In contrast, the Tree-Grid and Tree-Cycles datasets are formed by binary trees of depth 8 with 80 3-by-3 grid structures and 6 node cycle structures attached, respectively. Again, the classification task here is to identify nodes belonging to the base graph or the attached motif. 
+
+Graph classification We also test the performance of the CGC on four synthetic graph classification tasks and two real-world graph classification tasks. The four synthetic graph classification datasets are the Grid, Grid-House, Stars and House-Colour dataset, introduced by Longa et al. [35] for evaluating the explainability of GNNs. Inspired by the node classification datasets introduced by Ying et al. [31] ,these datasets encode ground truth motifs for analysis. The Grid dataset consists of 1000 BA graphs of which half have a 3-by-3 grid structure attached. The task is to predict whether the grid structure is present. In contrast, the Grid-House dataset attaches both grid and house structures, where the task is to predict whether one of the motifs or both motifs are present. The STARS benchmark is a collection of random graphs generated by the Erd˝ os–Rényi (ER) random graph model [ 37 ] with one to four star-shaped structures attached. The task is to count the number of star structures attached, with classes corresponding 5to 1, 2 or 3-4 stars being attached. Finally, the House-Colour dataset introduces node features. The dataset consists of BA base graphs to which one to three coloured house structures are attached. Here, a blue house indicates the positive class, while a green house indicates a negative class. The remaining houses have randomly coloured nodes. We also include two real-world datasets to evaluate the performance of the CGC on less structured graph classification data. For this, we employ the Mutagenicity [ 38 ] dataset, which is a collection of graphs representing mutagenic and non-mutagenic molecules. The task is to identify whether a molecule is mutagenic or not. The second real-world dataset is Reddit-Binary [ 38 ], which is a collection of graphs representing Reddit discussion threads. Here a node represents a user and an edge the interaction between users. The challenge of evaluating these datasets is that there is no ground truth motif beyond the ring structure and nitrogen dioxide compound in Mutagenicity, and the star-like structure in Reddit-Binary, as suggested by Ying et al. [31] . We refer the reader to Appendix A for statistics on the datasets, such as the number of graphs, average graph size and number of classes. 
+
+Baselines and setup To the best of our knowledge, the CGC is the first concept-based graph convolution of its kind. This makes it difficult to select an appropriate baseline. We choose to compare our approach with a standard GCN [ 12 ] and a GAT [ 11 ] for two key reasons. First, this selection of baselines allows us to validate that our model achieves on par task accuracy. Second, the comparison to the standard GCN and GAT allows us to validate our design choices in using edge weights from both the graph structure and attention. We make one key modification to the GCN and GAT to allow for improved comparison. Namely, we insert a normalized softmax after the graph convolutional layers of the models, as proposed in CGNs [ 6], to extract node-level concepts and allow comparing the networks. We maintain the same set of hyperparameters across models to allow fair comparison. We refer the reader to Appendix 4 for a summary of the model hyperparameters, inspired by the settings used by Magister et al. [6] and Longa et al. [35] . While R-CBMs [ 20 ] are a full relational architecture, we compare our approach to them because they operate in the concept space and provide a more recent, interpretable baseline. Note, that we do not compare our approach to interpretable models such as the ProtGNN [ 39 ] or MEGAN [ 40 ], because they simply use standard graph convolutional layers and do not enlighten the graph convolutional process via concepts. We also do not compare to SYMGraph [ 8 ] or the work of He et al. [41] analysing gradients, because the works were released after we conducted our experiments. Moreover, we do not compare to post-hoc explainability methods, such as GNNExplainer [ 31 ], GLGExplainer [ 7] or LeArn Removal-based Attribution (LARA, [ 42 ]), as the methods are post-hoc and do not explain what individual graph convolutional layers have learned. 
+
+5 Results 
+
+Concept graph convolutions allow for networks as accurate as standard graph convolutions The CGC layer allows to construct GNNs as accurate as standard graph convolutions, like the GCN [ 12 ]and GAT [ 11 ] layers, as shown by our results in Table 1. Across both node and graph classification tasks, the model using the CGC achieves competitive task accuracy. Specifically, we find the CGC to outperform the GCN and GAT convolution on all synthetic datasets. The poor performance of the GAT may be attributed to all synthetic datasets, except for the House-Colour dataset, relying on structure alone. Node features are initialized to a vector of ones, which hampers the learning of the GAT as initially all node representations look alike. However, this validates our design of computing both structural and attention-based edge weights. We also find that mixing latent and concept representations is beneficial for task accuracy, as the models using the CGC layer outperform the models using the pure CGC layer on 7 out of 11 datasets. The pure CGC variant only significantly outperforms the CGC layer on the BA-Community dataset, achieving an accuracy of 82.69% compared to 69.56%. All models perform badly on the Grid-House dataset, with the GCN achieving the highest accuracy at 63%. For brevity, we refer the reader to Appendix I for a comparison to R-CBMs. Overall, we observe that the CGC and pure CGC layer allow for models as performant as models relying on standard, non-interpretable graph convolutional layers. This shows that we can avoid the accuracy-interpretability trade-off [ 43 ] too the extent of the interpretability provided by the CGC layer. 
+
+Concept graph convolutions discover a complete set of node concepts Table 2 summarizes the concept completeness scores at the final convolutional layer of the models trained to allow comparison across architectures. The pure CGC is the best performing model on 4 out of 5 node classification tasks, achieving the highest completeness scores. Only the full CGC outperforms it on the BA-Shapes dataset. 6Model Accuracy (%) CGC Pure CGC GCN GAT BA-Shapes 98.86 (98.37, 99.34) 98.71 (97.56, 99.87) 96.86 (95.02, 98.70) 47.14 (47.14, 47.14) 
+
+BA-Community 69.56 (66.17, 72.95) 82.69 (77.51, 87.88) 70.55 (62.65, 78.45) 65.86 (57.28, 74.44) 
+
+BA-Grid 99.90 (99.63, 100.00) 99.90 (99.63, 100.00) 98.82 (97.90, 99.75) 71.27 (66.30, 76.25) 
+
+Tree-Cycle 97.69 (95.17, 100.00) 96.98 (93.80, 100.00) 84.62 (76.94, 92.31) 50.55 (46.45, 54.66) 
+
+Tree-Grid 99.43 (98.59, 100.00) 99.19 (98.25, 100.00) 85.99 (78.75, 93.23) 59.35 (56.04, 62.66) 
+
+Grid 99.15 (97.73, 100.00) 97.90 (97.01, 98.79) 87.60 (85.57, 89.63) 50.00 (50.00, 50.00) 
+
+Grid-House 55.40 (48.88, 61.92) 55.50 (49.71, 61.29) 63.00 (62.56, 63.44) 50.00 (50.00, 50.00) 
+
+STARS 98.93 (98.75, 99.12) 98.80 (98.57, 99.03) 97.80 (97.57, 98.03) 33.33 (33.33, 33.33) 
+
+House-Colour 98.40 (96.73, 100.00) 97.40 (95.37, 99.43) 98.5 (97.62, 99.38) 98.20 (96.52, 99.88) 
+
+Mutagenicity 77.40 (73.62, 81.17) 77.67 (75.28, 80.06) 75.58 (73.17, 77.99) 76.59 (73.91, 79.27) 
+
+Reddit-Binary 87.55 (84.36, 90.74) 84.75 (80.42, 89.08) 72.95 (70.43, 75.47) 48.05 (45.67, 50.43) 
+
+Table 1: Model accuracy for models trained with Concept Graph Convolution (CGC), pure CGC, Graph Convolution Network (GCN, [12]) and Graph Attention Network (GAT, [11]) layers. When we review the graph classification tasks, recall that we proposed a new computation of concept completeness for graph classification. The CGC, pure CGC and GCN perform similarly across the Grid, STARS and House-Colour datasets. All models have a poor concept completeness on the Grid-House dataset, as all models failed to learn the task well. The CGC, pure CGC and GCN also perform similarly in terms of concept completeness on the Mutagenicity and Reddit-Binary dataset. However, the concept completeness score at the final layer does not accurately capture the added benefit of the CGC and pure CGC, which is the increased model insight we gain across layers. Specifically, the CGC and pure CGC allow to also measure concept completeness at earlier layers of the model.                                                
+
+> Concept Completeness (%) CGC Pure CGC GCN GAT BA-Shapes 96.71 (94.16, 99.27) 84.57 (78.94, 90.20) 95.29 (90.44, 100.00) 47.14 (47.14, 47.14)
+> BA-Community 67.24 (63.64, 70.83) 74.15 (68.83, 79.46) 60.99 (53.80, 68.18) 62.79 (56.26, 69.32)
+> BA-Grid 99.41 (98.09, 100.00) 100.00 (100.00, 100.00) 94.02 (90.31, 97.73) 71.27 (66.30, 76.25)
+> Tree-Cycle 92.26 (85.60, 98.93) 95.68 (92.80, 98.56) 77.49 (57.53, 97.45) 50.25 (46.09, 54.41)
+> Tree-Grid 93.85 (87.94, 99.76) 96.92 (93.32, 100.00) 83.97 (78.14, 89.79) 59.35 (56.04, 62.66)
+> Grid 99.05 (97.59, 100.00) 97.70 (96.47, 98.93) 91.40 (82.14, 100.00) 49.75 (49.75, 49.75)
+> Grid-House 50.00 (50.00, 50.00) 50.00 (50.00, 50.00) 50.3 (49.47, 51.13) 50.00 (50.00, 50.00)
+> STARS 98.47 (97.51, 99.42) 98.20 (96.63, 99.77) 97.07 (95.53, 98.60) 54.67 (54.67, 54.67)
+> House-Colour 97.10 (94.21, 99.99) 96.40 (95.88, 96.92) 97.8 (96.24, 99.36) 97.20 (94.89, 99.51)
+> Mutagenicity 71.68 (68.78, 74.58) 71.54 (70.12, 72.96) 72.51 (68.92, 76.11) 71.36 (68.71, 74.01)
+> Reddit-Binary 84.45 (81.93, 86.97) 80.90 (75.67, 86.14) 79.6 (75.83, 83.37) 68.95 (66.44, 71.46)
+
+Table 2: Concept completeness at the final convolutional layer of models trained with Concept Graph Convolution (CGC), pure CGC, Graph Convolution Network (GCN, [ 12 ]) and Graph Attention Network (GAT, [11]) layers. 
+
+Concept graph convolutions allow to track concept evolution We can track concept evolution over the CGC and pure CGC layers, as shown in Figures 2 and 5. In reference to Figure 2, we see that the ability to discriminate the final node classification task via the concept representation increases with every layer in the network. This indicates that the increased receptive field of deeper layers is important for the task and allows us to distil better representations. For brevity, we refer the reader to Appendix C for the analysis of concept evolution in graph classification tasks. For brevity, we refer the reader to Appendix D and E for an analysis of concepts with oversmoothing and over training time, respectively. 
+
+Structure versus concept attention in message passing The learned mixing parameter γ determines the trade-off between structure versus concept attention in CGC layers. A small γ value means that the model focuses mostly on neighbourhood structure, rather than attention scores for neighbouring concepts. Figure 3 shows the gamma value for different layers in the models trained across the node and graph classification datasets. In reference to Figure 3a, we observe fairly low γ values across graph convolutional layers. Specifically, γ < 0.4 for most layers in the models trained on the BA-Shapes, BA-Community, Tree-Grid and Tree-Cycle datasets. In contrast, only the γ value for the model trained on BA-Grid takes a value of ∼ 0.60 in the final CGC layer. The low values for γ make intuitive sense, as the graph structure is the most important element for predicting the node classification tasks. For example, in the BA-Shapes dataset the task is to identify certain nodes in the house structure. All tasks 71 2 3 4 5 6 7
+
+> Layer Number
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> 100
+> Concept Completeness (%)
+> Concept Completeness Score over CGC Layers
+> for Node Classification Tasks
+> BA-Shapes
+> BA-Community
+> BA-Grid
+> Tree-Cycle
+> Tree-Grid
+
+(a) Concept Completeness Score over CGC Layers for Node Classification 1 2 3 4 5 6 7
+
+> Layer Number
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> 100
+> Concept Completeness (%)
+> Concept Completeness Score over Pure CGC Layers
+> for Node Classification Tasks
+> BA-Shapes
+> BA-Community
+> BA-Grid
+> Tree-Cycle
+> Tree-Grid
+
+(b) Concept Completeness Score over Pure CGC Layers for Node Classification 
+
+Figure 2: Concept completeness measured across Concept Graph Convolution (CGC) and pure CGC layers trained on different node classification tasks. We can observe that concept completeness increases across layers in the model, indicating that the size of the receptive field matters to the task and produces improved concepts. except BA-Community are purely structural. BA-Community is also structural but relies on the node features to encode the node belonging to a certain community. Overall, it can be state that the value of γ
+
+increases with deeper CGC layers, indicating that the model first pays attention to structure and then focuses more on node concepts. This is aligned with the observation that the set of concepts distilled in later layers is more representative and meaningful, wherefore attention on concepts is more meaningful. However, we do not observe the same trend for pure CGC layers, whose γ values are depicted in Figure 3b. In contrast, the γ values seem to climb more steeply in early layers but then decline in the last layer, except for the model trained on the Tree-Grid dataset. The steeper rise in the γ value may stem from the pure CGC layer operating purely in the concept space, where simply aggregating the sparse vectors via structure may not create a meaningful signal and attention becomes more important until later layers, which may have more disentangled concept representations. The decline in the γ value in the last pure CGC layers could indicate that a shallower model would be more desirable here. This is in line with our observation that a shallower network is more desirable for improved concept completeness in the BA-Shapes dataset in Appendix D. For brevity, we refer the reader to Appendix F for an analysis of γ
+
+across layers in graph classification models. We refer the reader to Appendix G for an analysis of CGC reliance on node embeddings versus concept embeddings. 1 2 3 4 5 6 7
+
+> Layer Number
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Gamma Value
+> Gamma Value learned in CGC Layers
+> for Node Classification Tasks
+> BA-Shapes
+> BA-Community
+> BA-Grid
+> Tree-Cycle
+> Tree-Grid
+
+(a) Gamma across layers for CGC layers in node classification models 1 2 3 4 5 6 7
+
+> Layer Number
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Gamma Value
+> Gamma Value learned in Pure CGC Layers
+> for Node Classification Tasks
+> BA-Shapes
+> BA-Community
+> BA-Grid
+> Tree-Cycle
+> Tree-Grid
+
+(b) Gamma across layers for pure CGC layers in node classification models 
+
+Figure 3: We plot the learned γ value of Concept Graph Convolution (CGC) and pure CGC layers across the models trained for node classification. 
+
+5.0.1 Visualisation of concept-based message passing 
+
+Finally, we can provide a deeper insight into the model via more elaborate visualizations of how concepts arise. We can visualize the concept found at a given layer and how the concepts are the previous layer contribute to its computation. Figure 4 visualizes the concept representing a bottom-of-the-house node in the BA-Shapes dataset found in the second pure CGC layer. Three nodes contribute to the computation of the new concept representation for the clustered node shown in orange. Specifically, the two adjacent nodes part of the house-structure are considered important, receiving an attention score of 0.48 and 0.34, respectively. In comparison, the third node, part of the base structure, receives a lower attention score at 0.18. This shows that the GNN correctly pays attention to neighbouring concepts that identify the house 8structure. When we examine the concept encoding vector, we can see that all three nodes are assigned the same concept. While this is correct for the first two nodes (nodes 478 and 476) as they are both part of the house structure, node 243 should not have the same concept vector assigned. However, this is aligned with the concept completeness score at second layer for the model trained on the BA-Shapes dataset (Figure 2b) only being ∼ 78% , which means the set of concepts is not complete and requires further disentanglement via more unique concept representations. We also must consider the value of γ
+
+that indicates that the message constructed based on attention is only mixed into the message computed based on structure with γ = 0 .10 . While the assigned attention scores are reasonable, all three concept encodings are the same, thus only aggregating over this would not improve our concept representation, wherefore, the structural bias is needed to also incorporate other nodes which may change the concept encoding. Moreover, we must consider that the low focus on the attention scores indicating by γ may mean that the scores are not well calibrated and should be interpreted with care. Overall, the design of the pure CGC layer provides an improved ability to trace the reasoning process of the GNN, making GNNs more interpretable by design. We refer the reader to Appendix H for further concept visualisations. 0         
+
+> 66
+> 170
+> 78
+> 243
+> 23
+> 475
+> 476
+> 477
+> 478
+> 479
+> Node 477
+> Current layer's concept encoding
+> [1, 0, 1, 1, 0, 1, 0, 0, 0, 0]
+
+# }                                 
+
+> 475
+> 477
+> 478
+> Node 478
+> Previous layer's concept encoding Attention score
+> [1, 1, 1, 0, 0, 0, 1, 0, 1, 0] 0.48
+> 475
+> 476
+> 477
+> 479
+> Node 476
+> [1, 1, 1, 0, 0, 0, 1, 0, 1, 0] 0.34
+> 0
+> 66 170
+> 78
+> 243
+> 23 477
+> Node 243
+> [1, 1, 1, 0, 0, 0, 1, 0, 1, 0] 0.18
+> Concept 3 | Node 477 | Class 2 | = 0.10
+
+Figure 4: A concept discovered for the BA-Shapes dataset at the second pure Concept Graph Convolution (CGC) layer of the model. The graph on the left visualises the concept discovered, while the graphs on the right are the expanded graphs of the adjacent nodes in the previous layer. The orange node is the node assigned to the concept, while the green nodes are the respective neighbour in question and the blue nodes represent the other neighbours. 
+
+6 Discussion 
+
+The CGC is the first concept-based graph convolution, allowing to monitor the refinement of concepts as the receptive field of the computation for the node state grows. A core limitation of the SCN is that it repeatedly uses a scaled softmax function [ 6] to encourage clustering in the model’s latent space. While this is a simple solution to encouraging clustering, it can lead to information loss and vanishing gradients as the embeddings are repeatedly scaled. This drawback is an interesting area for future work. Nevertheless, in our experiments we do not find the repeated use of the softmax function to be an issue. A strength of the CGC is its simplicity: a slight modification of the traditional GCN [ 12 ] architecture has allowed a deeper insight into the processing of the GNN. 
+
+7 Conclusion 
+
+We show that CGCs allow us to successfully follow the evolution of concepts across layers. Specifically, we show that CGC layers do not deteriorate task accuracy, while providing an improved insight into the reasoning process of GNNs. We show that a main benefit of CGCs is that we can track concept evolution across multiple layers, providing subgraph explanations at different levels of granularity. Moreover, we find that the pure CGC performs similarly in regard to task accuracy compared to the relaxed variant. It can be argued that a model using pure CGC layers is more interpretable, as it forces the reasoning into the concept space. In contrast, the relaxed CGC layer also incorporates raw latent embeddings into the computation, slightly improving task accuracy. However, it still discerns the model’s reliance on the less restricted representations over the concept representations. Overall, the CGC allows a deeper analysis of a model’s reasoning process compared to standard graph convolutions, while maintaining predictive accuracy. 9References 
+
+[1] Franco Scarselli, Marco Gori, Ah Chung Tsoi, Markus Hagenbuchner, and Gabriele Monfardini. The graph neural network model. IEEE transactions on neural networks , 20(1):61–80, 2008. [2] Mauparna Nandan, Soma Mitra, and Debashis De. Graphxai: a survey of graph neural networks (gnns) for explainable ai (xai). Neural Computing and Applications , 37(17):10949–11000, 2025. URL https://doi.org/10.1007/s00521-025-11054-3 .[3] Gabriele Corso, Hannes Stark, Stefanie Jegelka, Tommi Jaakkola, and Regina Barzilay. Graph neural networks. Nature Reviews Methods Primers , 4(1):17, 2024. [4] Yang Ji, Ying Sun, Yuting Zhang, Zhigaoyuan Wang, Yuanxin Zhuang, Zheng Gong, Dazhong Shen, Chuan Qin, Hengshu Zhu, and Hui Xiong. A comprehensive survey on self-interpretable neural networks. Proceedings of the IEEE , 2025. [5] Lucie Charlotte Magister, Dmitry Kazhdan, Vikash Singh, and Pietro Liò. Gcexplainer: Human-in-the-loop concept-based explanations for graph neural networks. arXiv preprint arXiv:2107.11889 ,2021. [6] Lucie Charlotte Magister, Pietro Barbiero, Dmitry Kazhdan, Federico Siciliano, Gabriele Ciravegna, Fabrizio Silvestri, Mateja Jamnik, and Pietro Liò. Concept distillation in graph neural networks. In 
+
+World Conference on Explainable Artificial Intelligence , pages 233–255. Springer, 2023. [7] Steve Azzolin, Antonio Longa, Pietro Barbiero, Pietro Liò, and Andrea Passerini. Global explain-ability of gnns via logic combination of learned concepts. In International Conference on Learning Representations . PMLR, 2023. [8] Chuqin Geng, Li Zhang, Haolin Ye, Ziyu Zhao, Yuhe Jiang, Tara Saba, Xinyu Wang, and Xujie Si. Beyond message passing: A symbolic alternative for expressive and interpretable graph learning. 
+
+arXiv preprint arXiv:2602.16947 , 2026. [9] Shaked Brody, Uri Alon, and Eran Yahav. How attentive are graph attention networks? arXiv preprint arXiv:2105.14491 , 2021. [10] Siqi Miao, Mia Liu, and Pan Li. Interpretable and generalizable graph learning via stochastic attention mechanism. In International conference on machine learning , pages 15524–15543. PMLR, 2022. [11] Petar Veliˇ ckovi´ c, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Liò, and Yoshua Bengio. Graph Attention Networks. International Conference on Learning Representations , 2018. URL https://openreview.net/forum?id=rJXMpikCZ .[12] Thomas N. Kipf and Max Welling. Semi-Supervised Classification with Graph Convolutional Networks. In 5th International Conference on Learning Representations, ICLR 2017 - Conference Track Proceedings , pages 11313–11320. International Conference on Learning Representations, ICLR, sep 2016. URL http://arxiv.org/abs/1609.02907 .[13] William L. Hamilton, Rex Ying, and Jure Leskovec. Inductive representation learning on large graphs. In Proceedings of the 31st International Conference on Neural Information Processing Systems , NIPS’17, page 1025–1035, Red Hook, NY, USA, 2017. Curran Associates Inc. ISBN 9781510860964. [14] Keyulu Xu, Weihua Hu, Jure Leskovec, and Stefanie Jegelka. How powerful are graph neural networks? arXiv preprint arXiv:1810.00826 , 2018. [15] Michaël Defferrard, Xavier Bresson, and Pierre Vandergheynst. Convolutional neural networks on graphs with fast localized spectral filtering. In Proceedings of the 30th International Conference on Neural Information Processing Systems , NIPS’16, page 3844–3852, Red Hook, NY, USA, 2016. Curran Associates Inc. ISBN 9781510838819. [16] Kiran K Thekumparampil, Chong Wang, Sewoong Oh, and Li-Jia Li. Attention-based graph neural network for semi-supervised learning. arXiv preprint arXiv:1803.03735 , 2018. 10 [17] Dongkwan Kim and Alice Oh. How to find your friendly neighborhood: Graph attention design with self-supervision. arXiv preprint arXiv:2204.04879 , 2022. [18] Felix Wu, Amauri Souza, Tianyi Zhang, Christopher Fifty, Tao Yu, and Kilian Weinberger. Sim-plifying graph convolutional networks. In International conference on machine learning , pages 6861–6871. Pmlr, 2019. [19] Chaoqi Yang, Ruijie Wang, Shuochao Yao, Shengzhong Liu, and Tarek Abdelzaher. Revisiting over-smoothing in deep gcns. arXiv preprint arXiv:2003.13663 , 2020. [20] Pietro Barbiero, Francesco Giannini, Gabriele Ciravegna, Michelangelo Diligenti, and Giuseppe Marra. Relational concept bottleneck models. Advances in Neural Information Processing Systems ,37:77663–77685, 2024. [21] Gabriele Dominici, Pietro Barbiero, Mateo Espinosa Zarlenga, Alberto Termine, Martin Gjoreski, Giuseppe Marra, and Marc Langheinrich. Causal concept graph models: Beyond causal opacity in deep learning. In The Thirteenth International Conference on Learning Representations, ICLR 2025, Singapore, April 24-28, 2025 , 2025. [22] Adrien Bibal, Rémi Cardon, David Alfter, Rodrigo Wilkens, Xiaoou Wang, Thomas François, and Patrick Watrin. Is attention explanation? an introduction to the debate. In Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (volume 1: long papers) , pages 3889–3900, 2022. [23] Sarthak Jain and Byron C Wallace. Attention is not explanation. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers) , pages 3543–3556, 2019. [24] Sarah Wiegreffe and Yuval Pinter. Attention is not not explanation. In Proceedings of the 2019 conference on empirical methods in natural language processing and the 9th international joint conference on natural language processing (EMNLP-IJCNLP) , pages 11–20, 2019. [25] Bing Bai, Jian Liang, Guanhua Zhang, Hao Li, Kun Bai, and Fei Wang. Why attentions may not be interpretable? In Proceedings of the 27th ACM SIGKDD conference on knowledge discovery & data mining , pages 25–34, 2021. [26] Arjun R Akula and Song-Chun Zhu. Attention cannot be an explanation. arXiv preprint arXiv:2201.11194 , 2022. [27] Gary C McDonald. Ridge regression. Wiley Interdisciplinary Reviews: Computational Statistics , 1 (1):93–100, 2009. [28] Michael M. Bronstein, Joan Bruna, Taco Cohen, and Petar Veliˇ ckovi´ c. Geometric deep learning: Grids, groups, graphs, geodesics, and gauges, 2021. URL https://arxiv.org/abs/2104. 13478 .[29] Chih-Kuan Yeh, Been Kim, Sercan Ö Arık, Chun-Liang Li, Tomas Pfister, and Pradeep Ravikumar. On Completeness-aware Concept-Based Explanations in Deep Neural Net-works. In Advances in Neural Information Processing Systems 33 (NeurIPS 2020) , vol-ume 33, pages 20554–20565, 2020. URL https://papers.nips.cc/paper/2020/hash/ ecb287ff763c169694f682af52c1f309-Abstract.html .[30] L Breiman, JH Friedman, R Olshen, and CJ Stone. Classification and Regression Trees . Wadsworth, 1984. [31] Zhitao Ying, Dylan Bourgeois, Jiaxuan You, Marinka Zitnik, and Jure Leskovec. Gnnexplainer: Generating explanations for graph neural networks. Advances in neural information processing systems , 32, 2019. [32] Dongsheng Luo, Wei Cheng, Dongkuan Xu, Wenchao Yu, Bo Zong, Haifeng Chen, and Xiang Zhang. Parameterized explainer for graph neural network. Advances in neural information processing systems , 33:19620–19631, 2020. [33] Minh Vu and My T Thai. Pgm-explainer: Probabilistic graphical model explanations for graph neural networks. Advances in neural information processing systems , 33:12225–12235, 2020. 11 [34] Han Xuanyuan, Pietro Barbiero, Dobrik Georgiev, Lucie Charlotte Magister, and Pietro Liò. Global concept-based interpretability for graph neural networks via neuron analysis. In Proceedings of the AAAI conference on artificial intelligence , volume 37, pages 10675–10683, 2023. [35] Antonio Longa, Steve Azzolin, Gabriele Santin, Giulia Cencetti, Pietro Lio, Bruno Lepri, and Andrea Passerini. Explaining the explainers in graph neural networks: a comparative study. ACM Computing Surveys , 57(5):1–37, 2025. [36] Albert-László Barabási and Réka Albert. Emergence of scaling in random networks. science , 286 (5439):509–512, 1999. [37] Paul L. Erdos and Alfréd Rényi. On the evolution of random graphs. Transactions of the Amer-ican Mathematical Society , 286:257–257, 1984. URL https://api.semanticscholar.org/ CorpusID:6829589 .[38] Christopher Morris, Nils M Kriege, Franka Bause, Kristian Kersting, Petra Mutzel, and Marion Neumann. Tudataset: A collection of benchmark datasets for learning with graphs. arXiv preprint arXiv:2007.08663 , 2020. [39] Zaixi Zhang, Qi Liu, Hao Wang, Chengqiang Lu, and Cheekong Lee. Protgnn: Towards self-explaining graph neural networks. In Proceedings of the AAAI Conference on Artificial Intelligence ,volume 36, pages 9127–9135, 2022. [40] Jonas Teufel, Luca Torresi, Patrick Reiser, and Pascal Friederich. Megan: Multi-explanation graph attention network. arXiv preprint arXiv:2211.13236 , 2022. [41] Jesse He, Akbar Rafiey, Gal Mishne, and Yusu Wang. Explaining gnn explanations with edge gradients. In Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining V. 2 , pages 884–895, 2025. [42] Yao Rong, Guanchu Wang, Qizhang Feng, Ninghao Liu, Zirui Liu, Enkelejda Kasneci, and Xia Hu. Efficient gnn explanation via learning removal-based attribution. Acm Transactions on Knowledge Discovery from Data , 19(2):1–23, 2025. [43] Mateo Espinosa Zarlenga, Pietro Barbiero, Gabriele Ciravegna, Giuseppe Marra, Francesco Gian-nini, Michelangelo Diligenti, Zohreh Shams, Frederic Precioso, Stefano Melacci, Adrian Weller, Pietro Lio, and Mateja Jamnik. Concept embedding models: beyond the accuracy-explainability trade-off. In Proceedings of the 36th International Conference on Neural Information Processing Systems , NIPS ’22, Red Hook, NY, USA, 2024. Curran Associates Inc. ISBN 9781713871088. [44] Qianxiao Li, Cheng Tai, and Weinan E. Stochastic modified equations and adaptive stochastic gradi-ent algorithms. In Doina Precup and Yee Whye Teh, editors, Proceedings of the 34th International Conference on Machine Learning , volume 70 of Proceedings of Machine Learning Research , pages 2101–2110. PMLR, 06–11 Aug 2017. URL https://proceedings.mlr.press/v70/li17f. html .[45] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, et al. Pytorch: An imperative style, high-performance deep learning library. arXiv preprint arXiv:1912.01703 , 2019. [46] Bolei Zhou, Aditya Khosla, Agata Lapedriza, Aude Oliva, and Antonio Torralba. Learning deep features for discriminative localization. In 2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , pages 2921–2929, 2016. doi:10.1109/CVPR.2016.319. [47] Ramprasaath R. Selvaraju, Michael Cogswell, Abhishek Das, Ramakrishna Vedantam, Devi Parikh, and Dhruv Batra. Grad-cam: Visual explanations from deep networks via gradient-based localiza-tion. In 2017 IEEE International Conference on Computer Vision (ICCV) , pages 618–626, 2017. doi:10.1109/ICCV.2017.74. [48] Parniyan Farvardin and David Chapman. End-to-end feature alignment: A simple cnn with intrinsic class attribution. arXiv preprint arXiv:2603.25798 , 2026. [49] Lei Yang, Lingmeng Lu, Chao Liu, Jian Zhang, Kehua Guo, Ning Zhang, Fangfang Zhou, and Ying Zhao. Interactive exploration of cnn interpretability via coalitional game theory. Scientific Reports ,15(1):9261, 2025. 12 A Dataset statistics 
+
+Table 3 collates different statistics on the node and graph classification datasets used, such as the number of graphs, average graph size and number of classes. 
+
+Dataset Classification Problem Number of Graphs Average Graph Size Number of Features Number of Classes BA-Shapes Node 1 700 1 4
+
+BA-Community Node 1 1400 1 8
+
+BA-Grid Node 1 1020 1 2
+
+Tree-Cycles Node 1 871 1 2
+
+Tree-Grid Node 1 1231 1 2
+
+Grid Graph 2000 22.17 1 2
+
+Grid-House Graph 1000 122.82 1 2
+
+STARS Graph 1500 63.92 1 3
+
+House-Colour Graph 1000 46.95 3 2
+
+Mutagenicity Graph 4337 30.32 14 2
+
+Reddit-Binary Graph 2000 429.63 1 2Table 3: An overview of key markers of the datasets. 
+
+B Model training 
+
+Table 4 summarizes the model hyperparameters, following the settings proposed by Magister et al. [6] and Longa et al. [35] . We train all models using stochastic gradient descent [ 44 ] across five different seeds to allow reporting confidence intervals. Our implementation is in PyTorch [45].                                                                    
+
+> Dataset Number of Graph Conv. Number of Hidden Units Node Concept Encoding Size Learning Rate Batch Size Number of Epochs BA-Shapes 410 10 0.001 -7000
+> BA-Grid 410 10 0.001 -3000
+> Tree-Grid 720 20 0.0001 -20000
+> Tree-Cycle 310 10 0.001 -7000
+> BA-Community 620 20 0.001 -10000
+> Grid 520 10 0.001 16 300
+> Grid-House 420 10 0.001 16 2000
+> STARS 210 40.001 16 300
+> House-Colour 210 10 0.001 16 300
+> Mutagenicity 340 10 0.001 16 1000
+> Reddit-Binary 332 10 0.001 16 1000
+
+Table 4: A summary of the model architecture and training hyperparameters for each dataset, following recommendations of Magister et al. [6] and Longa et al. [35] . These parameters are kept the same between all models trained. 
+
+C Concept evolution in graph classification 
+
+We also observe an increase in the concept completeness scores across CGC layers in graph classification tasks, as shown in Figure 5. We can see for simpler tasks like the STARS dataset, concept completeness is very high from the start, validating the shallow network design. In contrast, we do not observe any significant improvement in concept completeness with model depth for the Mutagenicity and Reddit-Binary datasets. This could potentially indicate that the correct number of layers has been used or that a wider network may be needed to represent a more nuanced concept space to increase concept completeness and model accuracy. 13 1 2 3 4 5
+
+> Layer Number
+> 50
+> 60
+> 70
+> 80
+> 90
+> 100
+> Concept Completeness (%)
+> Concept Completeness Score over CGC Layers
+> for Graph Classification Tasks
+> Grid
+> Grid-House
+> Stars
+> House-Colour
+> Mutagenicity
+> Reddit-Binary
+
+(a) Concept Completeness Score over CGC Layers for Node Classification 1 2 3 4 5
+
+> Layer Number
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> 100
+> Concept Completeness (%)
+> Concept Completeness Score over Pure CGC Layers
+> for Graph Classification Tasks
+> Grid
+> Grid-House
+> Stars
+> House-Colour
+> Mutagenicity
+> Reddit-Binary
+
+(b) Concept Completeness Score over Pure CGC Layers for Node Classification 
+
+Figure 5: Concept completeness measured across Concept Graph Convolution (CGC) and pure CGC layers trained on different graph classification tasks. We can observe that concept completeness increases with model depth, indicating that the concepts representing a greater receptive field more accurately represent the task. On the Reddit-Binary and Mutagenicity dataset, we can observe a slight decline of concept completeness with model depth. 
+
+D Effects of oversmoothing on the concept space 
+
+We observe that concepts distilled from later convolutional layers are more representative of the final task. This leads us to question how oversmoothing affects the concept space. It can be hypothesized that concept completeness declines with oversmoothing for two reasons: (i) task accuracy declines and concept completeness is bounded by it [ 5] and (i) representations collapse as the receptive field grows. To explore this, we train models with an increasing number of layers for the BA-Shapes dataset and observe the behaviour of concept completeness across layers. Figure 6 shows concept completeness across model layers, as well task accuracy for models with a varying number of layers. We find that task accuracy declines for models with more than 5 layers, which is mirrored by the deterioration of the concept completeness score. Moreover, we observe that concept completeness at early layers in these models generally is lower than in more shallow networks, which can be attributed to shallow layers receiving less of an update during gradient descent. Most notably, we also observe that concept completeness is highest for the model with three layers, while accuracy peaks with the model using 5 layers. This indicates that more shallow networks may provide the best trade-off between high accuracy and strong concept completeness. This is further underlined by the confidence interval on the concept completeness score for the model with only 3 layers being much lower in the final layers than the other models. While representations may not be oversmoothed, the set of concepts discovered by the shallower model is more complete, providing an improved insight at only a loss of 0.5% accuracy points. 1 2 3 4 5 6 7 8   
+
+> Layer Number
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> 100
+> Concept Completeness (%)
+> 70.9%
+> 92.6% 92.7%
+> 97.3% 96.4%
+> 92.6% 91.1%
+> 82.7%
+> Concept Completeness by Layer for Each Model
+> 1 Layers
+> 2 Layers
+> 3 Layers
+> 4 Layers
+> 5 Layers
+> 6 Layers
+> 7 Layers
+> 8 Layers
+
+(a) Concept Completeness across an increasing number of CGC layers 1 Layers 2 Layers 3 Layers 4 Layers 5 Layers 6 Layers 7 Layers 8 Layers     
+
+> Model
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Accuracy (%)
+> 73.7%
+> 97.4% 98.1% 98.0% 98.6% 94.6%
+> 92.9%
+> 87.9%
+> Test Accuracy by Number of Layers
+
+(b) Model Accuracy for models with an increasing number of CGC layers 
+
+Figure 6: We measure concept completeness across models with an increasing number of Concept Graph Convolution (CGC) layers, trained on the BA-Shapes node classification dataset. 14 E Concept evolution over training time 
+
+We also observe the concept completeness score over training epochs. We are interested to confirm the observation by Xuanyuan et al. [34] , which finds that the interpretability of a model decreases after a certain point in model training. Figure 7 plots the concept completeness score of different layers across epochs, as well as the accuracy of a model trained on the Tree-Cycles dataset with CGC and pure CGC layers, respectively. In Figure 7a, we observe that the concept completeness of the CGC layers increases for ∼ 1500 epochs, after which we observe a collapse in concept completeness in Layer 0, while concept completeness for other layers remains stable and accuracy increases (Figure 7b). While the concept completeness of the remaining layers remains high, we can see this collapse in the concept completeness score of Layer 0 as interpretability declining with more epochs. We would therefore recommend selecting a checkpoint before epoch 1500, as both model accuracy and interpretability are high. In general, we observe that concept completeness at later layers and model accuracy are tied. The sharp drop in accuracy at epoch ∼ 4000 is mirrored in a decline in concept accuracy in the last layer. However, concept completeness in the first layer appears to jump up indicating that the model may have reached an suboptimal concept representation state for layer 0. Figures 7c and 7d, depict concept completeness and accuracy across epochs for a model using pure CGC layers. Overall, the training of the model using pure CGC layers appears more stable. Nevertheless, concept completeness for Layer 0 also remains low here. 0 1000 2000 3000 4000 5000 6000 7000   
+
+> Epoch
+> 0.5
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+> Concept Completeness
+> Concept Completeness Score per Layer during Training
+> Layer 0 Layer 1 Layer 2
+
+(a) Concept completeness of the CGC layers across epochs 
+
+(b) CGC model accuracy across epochs 0 1000 2000 3000 4000 5000 6000 7000   
+
+> Epoch
+> 0.5
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> Concept Completeness
+> Concept Completeness Score per Layer during Training
+> Layer 0 Layer 1 Layer 2
+
+(c) Concept completeness of the pure CGC layers across epochs 
+
+(d) Pure CGC model accuracy across epochs 
+
+Figure 7: Concept completeness and accuracy measured across training epochs for a model using Concept Graph Convolution (CGC) and pure CGC layers for classifying the Tree-Cycle dataset. We observe fluctuations in concept completeness during training, related to fluctuations in accuracy. 
+
+F Behaviour of γ in models trained for graph classification 
+
+In Figure 8, we see a stronger upwards trend in the value of γ across CGC layers in models for graph classification. For example, Figure 8a plots the γ value of CGC layers across models trained on different graph classification tasks. Across the datasets, we can observe an upwards trend in the γ value with all models having γ value greater than 0.5 in the final layer. This means that the attention on only a 15 few neighbouring concepts becomes increasingly important as the receptive field grows. Here, simple structural aggregation may drown out the signal of important concepts, as we use sparse, fuzzy concept representations. We do not observe a trend as strong for the pure CGC layer plotted in Figure 8b, as the 
+
+γ value fluctuates more between layers. Moreover, for the Mutagenicity and House-Colour dataset, we observe a decline in the γ value in the last layer in line with our observations for the pure GCG layer when used for node classification. Overall, our analysis supports that a learned γ parameter allows the model the required flexibility for aggregating sparse concept representations. 1 2 3 4 5
+
+> Layer Number
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Gamma Value
+> Gamma Value in CGC Layers
+> for Graph Classification Tasks
+> Grid
+> Grid-House
+> Stars
+> House-Colour
+> Mutagenicity
+> Reddit-Binary
+
+(a) Gamma across layers for CGC layers in graph classification models 1 2 3 4 5
+
+> Layer Number
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Gamma Value
+> Gamma Value in Pure CGC Layers
+> for Graph Classification Tasks
+> Grid
+> Grid-House
+> Stars
+> House-Colour
+> Mutagenicity
+> Reddit-Binary
+
+(b) Gamma across layers for pure CGC layers in graph classification models 
+
+Figure 8: We plot the learned γ value of Concept Graph Convolution (CGC) and pure CGC layers across the models trained for graph classification. 
+
+G Reliance on node embeddings versus concept embeddings 
+
+While the pure CGC layer only operates in the node concept space, the CGC layer also learns a mixing parameter η for determining the mixing of the raw node representations with the concept node representations. Figure 9 plots the value of η across model layers in models for node and graph classification, respectively. We find that eta remains fairly stable in node classification, with four out of five tasks having η < 0.5, focusing more on the raw node representations. However, η does not fall below 
+
+∼ 0.25 in node classification, indicating that the model relies both on the unconstrained and concept latent space. We observe a similar trend across the models trained for graph classification. Only the Grid-House dataset appears to have a higher η value, however, the model does not learn to predict the task well and this η value my only indicate that the model learns to increase η to decrease the loss, as we regularize for a higher η for improved interpretability. Overall, it can be argued that the pure CGC layer is more interpretable as the network’s computation is not obscured by raw latent representations as in the GCG layer, which appears to be influenced slightly more by raw latent representations than the concept representations. 1 2 3 4 5 6 7
+
+> Layer Number
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Eta Value
+> Eta Value learned in CGC Layers
+> for Node Classification Tasks
+> BA-Shapes
+> BA-Community
+> BA-Grid
+> Tree-Cycle
+> Tree-Grid
+
+(a) Eta across layers for CGC layers in node classification models 1 2 3 4 5
+
+> Layer Number
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Eta Value
+> Eta Value in CGC Layers
+> for Graph Classification Tasks
+> Grid
+> Grid-House
+> Stars
+> House-Colour
+> Mutagenicity
+> Reddit-Binary
+
+(b) Eta across layers for CGC layers in graph classification models 
+
+Figure 9: We plot the learned η value of Concept Graph Convolution (CGC) and pure CGC layers across the models trained for node and graph classification. 
+
+H Concept visualisations 
+
+The CGC layers allow us to visualize concepts discovered at different stages of the receptive fields of a GNN, as we can extract concepts per layer. A benefit of extracting concepts across layers is that 16 we can examine the evolution of concepts, specifically how a concept morphs into a larger concept, as the receptive field grows. We visualize concepts as proposed by Magister et al. [5] via the p-hop neighbourhood of the clustered nodes, where p is the appropriate layer depth. For example, Figure 10 shows an early concept discovered for the STARS dataset, showing a node connected to to exactly two other nodes. When we examine Figure 11 in relation to it, we can see that we have now discovered the larger concept for these nodes. Notice, how both concepts highlight the same nodes in Graph 1214, which have a mirrored structure. While the concept extracted at the first layer only showed that these nodes have exactly two neighbours, the concept extracted at the second layer shows that these nodes all attach to the same two star structures. As all three visualizations come from the same graph, we can identify this as a rare, fine-grained concept. Note, that the concept label between layers changes, as we extract it from the binarized vector. 20 
+
+> 22
+> 37
+> Graph 1214 | Node 22 | Label 2
+> 20
+> 37
+> 52
+> Graph 1214 | Node 52 | Label 2
+> 20
+> 37
+> 48
+> Graph 1214 | Node 48 | Label 2
+> Concept 0 in Layer 1
+
+Figure 10: A concept discovered in the first layer of a model using pure Concept Graph Convolution (CGC) layers, trained on the STARS dataset. The orange nodes represent the nodes belonging to the concept, while the blue nodes are the expanded neighbourhood. 2         
+
+> 20
+> 21
+> 22
+> 23 24
+> 25
+> 26
+> 27
+> 28
+> 29
+> 30
+> 31
+> 32
+> 33
+> 34
+> 35 36
+> 37
+> 38
+> 39
+> 40
+> 41
+> 42
+> 43 44
+> 45
+> 46
+> 47
+> 48
+> 49 50
+> 51
+> 52
+> 53
+> Graph 1214 | Node 22 | Label 2
+> 2
+> 20
+> 21
+> 22
+> 23 24
+> 25
+> 26
+> 27
+> 28
+> 29
+> 30
+> 31
+> 32
+> 33
+> 34
+> 35 36
+> 37
+> 38
+> 39
+> 40
+> 41
+> 42
+> 43 44
+> 45
+> 46
+> 47
+> 48
+> 49 50
+> 51
+> 52
+> 53
+> Graph 1214 | Node 52 | Label 2
+> 2
+> 20
+> 21
+> 22
+> 23 24
+> 25
+> 26
+> 27
+> 28
+> 29
+> 30
+> 31
+> 32
+> 33
+> 34
+> 35 36
+> 37
+> 38
+> 39
+> 40
+> 41
+> 42
+> 43 44
+> 45
+> 46
+> 47
+> 48
+> 49 50
+> 51
+> 52
+> 53
+> Graph 1214 | Node 48 | Label 2
+> Concept 3 in Layer 2
+
+Figure 11: A concept discovered in the second layer of a model using pure Concept Graph Convolution (CGC) layers, trained on the STARS dataset. The orange nodes represent the nodes belonging to the concept, while the blue nodes are the expanded neighbourhood. We also successfully learn fine-grained and rare concepts across layers in models for other datasets. For example, Figure 12 shows that we can distil fine-grained concepts with the CGC, like the bottom node of a house structure at the far side of the middle node attached to the base structure for the BA-Shapes dataset. We observe that we can also identify fine-grained concepts with the pure CGC implementation, as shown in Figure 13, depicting a concept representing the middle node of the house opposite to the bottom node attached to the base graph in the BA-Shapes dataset. Lastly, we can also identify rare concepts, which are concepts with only a small number of nodes assigned. For example, Figure 14 shows a singular house structure with unique random colouring in the House-Colour dataset. Another benefit of extracting concepts at different layers is that earlier layers aggregate a smaller receptive field, wherefore, the p-hop neighbourhood visualized for the concept is smaller. The concepts extracted at earlier layers can potentially be easier to reason about, because of their smaller size, however, they may not present the full picture. For example, Figure 15 shows a concept discovered for the Mutagenicity 17 3  
+
+> 8
+> 16
+> 20 24
+> 29
+> 30
+> 44
+> 51
+> 61
+> 76
+> 79
+> 85
+> 87
+> 99 121
+> 145
+> 156
+> 237
+> 269 296
+> 695
+> 696
+> 697
+> 698
+> 699
+> Node 698 | Label 2
+> 1
+> 3
+> 11
+> 16
+> 32
+> 78
+> 135
+> 143
+> 206
+> 243
+> 375
+> 376
+> 377
+> 378
+> 379
+> Node 378 | Label 2
+> 3
+> 4
+> 5
+> 10
+> 25
+> 37
+> 87
+> 119
+> 173
+> 185
+> 217
+> 268
+> 685
+> 686
+> 687
+> 688
+> 689
+> Node 688 | Label 2
+> Concept 14 in Layer 4
+
+Figure 12: A concept discovered in the fourth layer of a model using Concept Graph Convolution (CGC) layers, trained on the BA-Shapes dataset. The orange nodes represent the nodes belonging to the concept, while the blue nodes are the expanded neighbourhood. 0 
+
+> 23
+> 66
+> 78
+> 170
+> 243
+> 475
+> 476
+> 477
+> 478
+> 479
+> Node 475 | Label 1
+> 60
+> 146
+> 170
+> 193
+> 231
+> 240 278
+> 565
+> 566
+> 567
+> 568
+> 569
+> Node 566 | Label 1
+> 23
+> 42
+> 104
+> 118
+> 193
+> 198
+> 680
+> 681
+> 682
+> 683
+> 684
+> Node 680 | Label 1
+> Concept 0 in Layer 4
+
+Figure 13: A concept discovered in the fourth layer of a model using pure Concept Graph Convolution (CGC) layers, trained on the BA-Shapes dataset. The orange nodes represent the nodes belonging to the concept, while the blue nodes are the expanded neighbourhood. dataset at layer 2, showing a clearly repeated substructure across different molecules. Notice, that this seems to be a concept shared across mutagenic and non-mutagenic molecules, since these subgraphs are found in graphs of both classes. Furthermore, we are able to discover the desired set of concepts with the CGC. For example, Figure 16 shows the concept identifying the N O 2 structure, defined as a desirable motif for the dataset for predicting molecules as mutagenic. Notice, that we discover the motif in the second layer of a model with three layers. We do not find this structure represented in the concept discovered in the third layer, which may be explained by the receptive field being larger, drowning out the contribution of the small structure. This highlights that it is desirable to understand the GNN at different stages of the message passing process, as it identifies different substructures as a cluster, representing a concept. Overall, concept distillation at every neighbourhood aggregation step of the model is required for a holistic understanding of the model and its focus at different layers, similar to convolutional layers in CNNs being described as learning specific features important for prediction via filters [46–49]. Despite the low γ values, we observe attention scores aligned with ground-truth structural importance across the other datasets. For example, Figure 17 shows a concept distilled in layer 3, representing the top node of a house structure in the BA-Community dataset. The subgraphs displayed to the left in the figure, highlight that the important nodes identified by attention are the two middle nodes of the house structure. Both nodes receive a similar attention value of 0.55 and 0.45. The node receiving an attention score of only 0.45 is the node attached to the base structure. This makes intuitive sense, as the other middle of the house node is a cleaner representation of the house structure, while the node also attaching to the base graph is influenced by the representations of the nodes not belonging to the house structure. Examining the concept encoding vector, we can see that the encoding is slightly different, with the last value being 0 for the node only attached to other house-structure nodes. In contrast, it is 1 for the node also attaching to the base graph. This shows that the two nodes are close in the concept latent space, but have slightly different encodings due to the difference in neighbours, leading to slightly different 18 60 
+
+> 61
+> 62
+> 63
+> 64
+> Graph 416 | Node 60 | Label 0
+> Concept 10 in Layer 2
+
+Figure 14: A rare concept discovered in the second layer of a model using pure Concept Graph Convolution (CGC) layers, trained on the House-Colour dataset. The orange node represent the node belonging to the concept, while the other nodes are coloured in accordance with the dataset. C
+
+> C
+> C
+> C
+> H
+> H
+> H
+> H
+> H
+> Graph 4241 | Node 12 | Label 1
+> C
+> C
+> C
+> C
+> H
+> H
+> H
+> H
+> H
+> Graph 3507 | Node 8 | Label 1
+> C
+> C
+> C
+> C
+> H
+> H
+> H
+> H
+> H
+> Graph 3772 | Node 7 | Label 0
+> Concept 1 in Layer 2
+
+Figure 15: A concept discovered in the second layer of a model using Concept Graph Convolution (CGC) layers, trained on the Mutagenicity dataset. The orange nodes represent the nodes belonging to the concept, while the blue nodes are the expanded neighbourhood. Node labels correspond to the atom label. attention scores. We would like to note though, that we do not find the positions of the concept encoding vectors to encode any further conceptual meaning, but simply identify the location of the cluster in the concept latent space. In contrast, Figure 18 explains the computation of a concept representing the middle node of the grid structure in the BA-Grid dataset. Here, all nodes receive the same amount of attention, which can be explained by the grid structure being symmetrical across this middle node. When we examine the concept encoding vectors, we find that all nodes are assigned the same concept encoding vector. This can be attributed to each of the nodes being the same node in the graph structure, namely the middle node on the outside of the grid. Examining the attention scores in relation to the γ value of 0.56, we can interpret the representations to be equally influenced by structure and concept attention as they encode the same information, due to the symmetry of the grid structure. The benefit of the structural edge weights here, is that they account for one of the corner nodes in the grid structure being attached to the base graph, influencing the neighbouring middle nodes. This analysis of the concepts and their computation is enabled by the concept-focused architecture of CGC layer, providing an increased insight into the reasoning of GNNs and what is important for them. 
+
+I Comparison to relational concept bottleneck models 
+
+We compare our method to R-CBMs [ 20 ], because R-CBMs also perform message passing in the concept space. Table 5 summarizes the predictive accuracy of GNN models using CGC and pure CGC layers versus R-CBMs. Overall, R-CBMs exhibit better predictive accuracy than models using CGC and pure CGC layers. Most notably, R-CBMs achieve an accuracy of 92.2% on the BA-Community dataset, while a GNN using pure CGC layers only achieves an accuracy of 82.69%. However, the insight gained into the model is different. In the node classification case, the node features inputted to R-CBMs are initialized with the embeddings of two GCN [ 12 ] layers. This means that the concept atoms used are the outputs of 19 C
+
+> N
+> C
+> N
+> O
+> O
+> Graph 3775 | Node 5 | Label 0
+> C
+> N
+> N
+> C
+> O
+> O
+> Graph 1139 | Node 4 | Label 0
+> C
+> N
+> N
+> C
+> O
+> O
+> Graph 1801 | Node 8 | Label 0
+> Concept 125 in Layer 2
+
+Figure 16: A concept discovered in the second layer of a model using Concept Graph Convolution (CGC) layers, trained on the Mutagenicity dataset. The concept identifies the desirable N O 2 structure, predictive for the mutagenic class. The orange nodes represent the nodes belonging to the concept, while the blue nodes are the expanded neighbourhood. Node labels correspond to the atom label. 132             
+
+> 5
+> 6
+> 133 8
+> 17
+> 18
+> 24
+> 159
+> 35
+> 167
+> 66
+> 1358
+> 83
+> 340
+> 341 342
+> 343
+> 344
+> 100
+> 127
+> Node 344
+> Current layer's concept encoding
+> [0, 0, 0, 1, 0, ..., 0, 0, 0, 0, 0]
+
+# }                              
+
+> 340
+> 341 342
+> 343
+> 344 24
+> Node 341
+> Previous layer's concept encoding Attention score
+> [1, 1, 0, 1, 0, ..., 0, 0, 0, 0, 0] 0.55
+> 132
+> 5
+> 6
+> 133 817 18 24 159
+> 35
+> 167
+> 66
+> 1358
+> 83 340 341 342 343 344 100
+> 127
+> Node 340
+> [1, 1, 0, 1, 0, ..., 0, 0, 0, 0, 1] 0.45
+> Concept 0 | Node 344 | Class 3 | = 0.53
+
+Figure 17: A concept discovered for the BA-Community dataset at the third pure Concept Graph Convolution (CGC) layer of the model. The graph on the left visualises the concept discovered, while the graphs on the right are the expanded graphs of the adjacent nodes in the previous layer. The orange node is the node assigned to the concept, while the green nodes are the respective neighbour in question and the blue nodes represent the other neighbours. the GCN layer, which we consider not interpretable. In contrast, the CGC aims to replace GCN layers and directly operates in the concept space. This highlights a core difference between the proposed graph convolution and R-CBMs. CGCs aim to make message passing itself more interpretable. In contrast, R-CBMs are a variant of concept bottleneck models, which only aim to make a subsection of the model more interpretable. Moreover, the explanations extracted from R-CBMs are logic sentences combining the concept atoms. In contrast, the explanations extracted from CGC layers are intermediate node-level concept representations, wherefore, we do not compare them. 
+
+Model Accuracy (%) CGC Pure CGC R-CBMs BA-Shapes 98.86 (98.37, 99.34) 98.71 (97.56, 99.87) 100.00 (100.00, 100.00) BA-Community 69.56 (66.17, 72.95) 82.69 (77.51, 87.88) 92.2 (88.92, 95.51) BA-Grid 99.90 (99.63, 100.00) 99.90 (99.63, 100.00) 100.00 (100.00, 100.00) Tree-Cycle 97.69 (95.17, 100.00) 96.98 (93.80, 100.00) 100.00 (100.00, 100.00) Tree-Grid 99.43 (98.59, 100.00) 99.19 (98.25, 100.00) 99.92 (99.69, 100.00) 
+
+Table 5: Model accuracy for graph neural networks using Concept Graph Convolution (CGC) and pure CGC layers compared to Relational Concept Bottleneck Models (R-CBMs, [20]). 20 503  
+
+> 263
+> 190
+> 18
+> 498
+> 499
+> 500
+> 501
+> 502
+> 504
+> 505
+> 506
+> 277
+> 84 126
+
+Node 502 
+
+Current layer's concept encoding 
+
+[0, 1, 1, 0, 1, 0, 1, 0, 1, 1] 
+
+# }   
+
+> 498
+> 499
+> 500 501
+> 502
+> 503 504 505 506
+
+Node 499 
+
+Previous layer's concept encoding Attention score 
+
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1] 0.25    
+
+> 498
+> 499
+> 500 501
+> 502
+> 503 504 505 506
+
+Node 501 
+
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1] 0.25      
+
+> 263
+> 505
+> 190 498 499 500
+> 277
+> 502
+> 503
+> 504 501 506 18 84 126
+
+Node 503 
+
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1] 0.25      
+
+> 263
+> 504
+> 190 498 499 18
+> 501
+> 502
+> 503
+> 277 505 506 500 84 126
+
+Node 505 
+
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1] 0.25 
+
+Concept 0 | Node 502 | Class 1 | = 0.56 Figure 18: A concept discovered for the BA-Grid dataset at the second Concept Graph Convolution (CGC) layer of the model. The graph on the left visualises the concept discovered, while the graphs on the right are the expanded graphs of the adjacent nodes in the previous layer. The orange node is the node assigned to the concept, while the green nodes are the respective neighbour in question and the blue nodes represent the other neighbours. 21

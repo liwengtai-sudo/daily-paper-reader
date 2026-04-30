@@ -1,0 +1,713 @@
+Title: Accuracy and stability of Artificial Neural Networks for HP-Splines frequency parameter selection
+
+URL Source: https://arxiv.org/pdf/2604.20991v1
+
+Published Time: Fri, 24 Apr 2026 00:05:38 GMT
+
+Number of Pages: 22
+
+Markdown Content:
+# Accuracy and stability of Artificial Neural Networks for HP-Splines frequency parameter selection 
+
+## Vittoria Bruni 2, Paola Erminia Calabrese 1, Rosanna Campagna 1, and Domenico Vitulano 21Department of Mathematics and Physics, University of Campania “L. Vanvitelli”, Italy 
+
+2Dept. of Basic and Applied Sciences for Engineering, Sapienza University of Rome, Italy 
+
+Abstract 
+
+This paper explores the use of artificial neural networks for the stable and data-driven selection of the frequency parameter in hyperbolic polynomial penal-ized splines (HP-splines). This parameter defines the underlying spline space and is essential for adapting the model to exponential patterns in the data, such as those encountered in signal processing. The theoretical approximation properties of deep neural network architectures are investigated to establish a connection be-tween classical spline-based regression and modern data-driven learning methods. Based on this analysis, a neural network is designed to predict optimal HP-spline parameters by balancing approximation accuracy, stability analysis, and complexity control, thereby producing neural architectures that are both expressive and sta-ble. Numerical experiments confirm that the proposed approach achieves both high accuracy and stable performance, validating the theoretical findings. 
+
+Keywords: HP-splines; adaptive parameter estimation; foundations of neural networks; explainable learning; stability of Artificial Neural Networks. 
+
+# 1 Introduction 
+
+Multiexponential analysis is a fundamental tool for various research fields and appli-cation domains, including remote sensing, antenna design, digital imaging [5, 6], and Nuclear Magnetic Resonance analysis [4, 16]. Regularization techniques are usually re-quired when estimating multiexponential decay models to address ill-conditioning, espe-cially in the presence of noise. In this context, regression models based on exponential polynomial splines [17] have been shown to provide stable and flexible approximations. 1
+
+> arXiv:2604.20991v1 [math.NA] 22 Apr 2026
+
+Hyperbolic-Polynomial Penalized splines (HP-splines) [1, 2] were specifically designed for data exhibiting exponential trends. They extend the polynomial space of the widely used regression P-spline [14] to a hyperbolic-polynomial space defined by a frequency param-eter α. This parameter defines the underlying spline space E4,α and acts as a shape parameter for the resulting approximation. Indeed, the choice of α directly influences the ability of the hyperbolic B-spline basis (HB-splines) to reproduce exponential trends and to adapt to the structural behavior suggested by the data. As a consequence, dif-ferent values of α may lead to significantly different approximations. On the one hand, 
+
+α controls the expressiveness of the approximation space; on the other hand, it affects the numerical stability and sensitivity of the associated penalized least-squares problem. These aspects are closely related, as inappropriate values of α may lead to poor data fitting or excessive amplification of data perturbations [8, 9]. This motivates the need for reliable and efficient strategies for its selection. In [3], a data-driven algorithm is proposed for selecting the HP-spline frequency parameter based on the fitting dataset. The algo-rithm relies on conditioning and stability results, choosing α by minimizing an estimate of the condition number associated with the Tikhonov formulation of the penalized model. This approach exploits explicit bounds on the sensitivity of the solution with respect to data perturbations, leading to an efficient criterion that simultaneously select α and the regularization parameter. While effective, this procedure requires repeated evaluations over a predefined range of candidate frequencies and relies on model-dependent analyt-ical estimates. These challenges become more pronounced in bivariate multiexponential analysis [6], particularly when extending P-splines via tensor products [10]. In this set-ting, penalty and frequency parameters must be selected along each orthogonal grid line, and estimating frequency parameters in multiple directions significantly increases com-putational cost and complexity compared to the univariate case. These issues motivate the development of alternative strategies for frequency parameter selection, capable of reducing the computational burden while enhancing flexibility. Neural networks provide a reliable approach for estimating parameters that charac-terize functional spaces [23, 24]. Building on approximation results for shallow and deep networks with piecewise linear activation functions [12, 13], we model the frequency pa-rameter as a multivariate function of the data and design a neural network to approximate it, with complexity tuned to achieve a prescribed accuracy. In particular, the network depth and size are selected according to a specified approximation error in the underlying functional space. We also derive bounds for the resulting HP-spline approximation and analyze the stability of the learning process. Generalization results and a wavelet-based Lipschitz constant for the overall system are given. Numerical experiments confirm the theoretical findings. The paper is organized as follows. Section 2 briefly reviews the HP-spline formalism, along with key definitions and results on function approximation using ReLU -based deep networks. The proposed model is then presented. In Section 3, we derive upper bounds for the HP-spline approximation error when the frequency parameter is predicted by the artificial neural network, under suitable assumptions on the functional space of the multi-variate α function. This analysis enhances the interpretability of the network [25]. Section 4 introduces stability results for a two-stage estimation model, in which a neural network 2predicts the parameters of a secondary parametric model. A wavelet-based generalization bound is derived via uniform stability, and the effective Lipschitz constant of the overall system is computed explicitly. The resulting stability theorem is then stated. Section 5 presents extended numerical experiments confirming the reliability of the proposed frame-work for frequency parameter estimation and HP-spline reconstruction. Comparisons are performed with the deterministic estimation algorithm in [3]. Conclusions and directions for future research close the paper. 
+
+# 2 Problem Formulation 
+
+This section introduces the proposed model for estimating the HP-spline frequency pa-rameter. We first recall the definition and main properties of HP-splines, together with basic notions on neural network complexity and relevant function approximation results. 
+
+## 2.1 HP-splines basics 
+
+Following the construction proposed in [1], we briefly give the definition of hyperbolic B-spline bases and the associated HP-spline model. 
+
+Definition 1 (Hyperbolic B-spline basis) . Let {ξ1, . . . , ξ m} be a uniform knot sequence with step size h, and let α ∈ R. The hyperbolic B-spline basis {Bαj }m+1  
+
+> j=0
+
+is defined as a set of compactly supported, C2-continuous spline functions whose local segments belong to the four-dimensional exponential space 
+
+E4,α := span {eαt , te αt , e −αt , te −αt }.
+
+Each hyperbolic B-spline is supported on five consecutive knots and exhibits a bell-shaped profile, similarly to classical cubic B-splines. 
+
+Following the P-spline paradigm, hyperbolic B-splines defined on a set of uniformly distributed knots, are combined with a second order penalty term, that relaxes the im-portance of the location of the knots and their number. 
+
+Definition 2 (Hyperbolic-Polynomial Penalized Spline) . Given a set of points {(ti, y i)}di=1 ,a hyperbolic B-spline basis {Bαj }m+1  
+
+> j=0
+
+defined on uniform knots, and a regularization pa-rameter λ > 0, the Hyperbolic-Polynomial Penalized spline (HP-spline) is the function 
+
+sα,λ (t) = 
+
+> m+1
+
+X
+
+> j=0
+
+aj Bαj (t), (1) 
+
+whose coefficients {aj } are computed by solving the penalized least-squares problem 
+
+min 
+
+> a0,...,a m+1
+> d
+
+X
+
+> i=1
+
+yi −
+
+> m+1
+
+X
+
+> j=0
+
+aj Bαj (ti)
+
+!2
+
++ λ2
+
+> m+1
+
+X
+
+> j=2
+
+
+
+(∆ h,α  
+
+> 2
+
+a)j
+
+2
+
+,
+
+3where the α-dependent second-order difference operator is defined as 
+
+(∆ h,α  
+
+> 2
+
+a)j = aj − 2e−αh aj−1 + e−2αh aj−2.
+
+The parameter λ balances data fidelity and smoothness, while the parameter α controls the exponential behavior embedded in the spline basis. 
+
+## 2.2 Approximation properties of ReLU networks 
+
+We briefly recall the main definitions and properties for feedforward neural networks with 
+
+ReLU activation function as formulated in [18] and later in [13]. 
+
+Definition 3. A feedforward neural network with ReLU activation consists of input units, one output unit, and a collection of hidden computational units organized in layers. The inputs of each unit are the outputs of units from previous layers. Each computational unit maps an input vector (xk)Nk=1 to an output of the form 
+
+y = σ
+
+> N
+
+X
+
+> k=1
+
+wkxk + b
+
+!
+
+, σ(x) = max(0 , x ),
+
+where (wk)Nk=1 and b are trainable parameters, and the quantity PNk=1 wkxk + b is an affine combination of the inputs. The output unit is linear, i.e., 
+
+y =
+
+> N
+
+X
+
+> k=1
+
+wkxk + b. 
+
+Definition 4. The complexity of a feedforward neural network is measured by its depth (L), the number of computational units ( U ), and the total number of weights ( W ). The depth is defined as the number of all layers. The total number of weights is given by the sum of all connections and computational units, where connections correspond to the coefficients in the linear combinations and each computational unit contributes one bias parameter. 
+
+We now recall a fundamental approximation result for ReLU networks due to [13]. In that work, functions are considered in the Sobolev space Wk, ∞([0 , 1] d), and the approximation is measured in the infinity norm. 
+
+Theorem 1 (Yarotsky, 2017) . Let d, k ∈ N and ε ∈ (0 , 1) . Consider the unit ball 
+
+Fk,d = f ∈ W k, ∞([0 , 1] d) : ∥f ∥Wk, ∞ ≤ 1 .
+
+Then there exists a ReLU network architecture such that: 
+
+• it can approximate any f ∈ F k,d with error at most ε in the uniform norm; 
+
+• its depth is bounded by c (log(1 /ε ) + 1) ;
+
+4• its size (number of weights and computational units) is bounded by 
+
+c ε −d/k (log(1 /ε ) + 1) ,
+
+for some constant c = c(d, k ).
+
+This result illustrates the efficiency of deep ReLU networks in approximating smooth functions, showing that both depth and size scale in a controlled way with the desired approximation accuracy. 
+
+## 2.3 The proposed model 
+
+Let s(t) be a real-valued function depending on the time variable t. Consider s a discrete sampling of s(t) at some time points t = ( t1, . . . , t d), and α the frequency parameter of the fitting HP-spline (1). α can be computed using the data-driven algorithm in [3] which associates a suitable value of α with the input signal s. This naturally leads to modeling 
+
+α as a multivariate function of the sampled data, i.e., 
+
+α : s ∈ S ⊂ Rd → R. (2) Denoting by s hp (α) := sα,λ the HP-spline fitting the samples s := ( sk)k=1 ,...,d , sk = s(tk), 
+
+k = 1 , . . . , d , we aim to approximate this mapping using an artificial neural network. Specifically, let T = {(si, α i)}i=1 ,...,n be the training set composed of n sampled signals 
+
+si and the corresponding frequency parameters αi, and let 
+
+Fθ : Rd → R, (3) be the ReLU network with trainable parameters vector θ, trained on T based on the empirical training error 
+
+bE(Fθ) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓ Fθ(si), α i),
+
+where the loss function ℓ : R × R → R+ quantifies the difference between the model predictions and the actual target value. Hence, for a given input sequence s, the final goal is to find a suitable ReLU network Fθ that predicts the frequency parameter α defining the HP-spline that best approximates the function s(t) within a predefined tolerance tol ,i.e. 
+
+∥s − shp (Fθ(s)) ∥∞ < tol. 
+
+The computational flow can be synthesized as follows: 
+
+s (1) 
+
+−→ α := Fθ(s) (2) 
+
+−→ shp (α) = s hp (Fθ(s)) .
+
+The overall accuracy is determined by step (1), which is governed by the neural network prediction error for the frequency parameter, and step (2), which evaluates the accuracy of the signal reconstruction using the HP-spline s hp (Fθ(s)), which belongs to the spline space determined by α. Based on this formulation, both accuracy and stability analysis rely on theoretical results on the approximation properties of deep neural network architectures investigated in [13] and related works, aiming to connect approximation in functional spaces with modern data-driven learning approaches. 53 Reconstruction error bound 
+
+This section provides bounds for signal reconstruction error of the model described in Section 2.3. To this aim, α, as defined in (2), is assumed to belong to a suitable Sobolev space Wk, ∞ . The HP-spline is assumed to be defined on the spline space based on E4,α .
+
+Proposition 1. Let s ∈ S ⊂ Rd be a sampled signal and shp (α) denote the HP-spline defined on E4,α and fitting the signal sample s. Let us assume: 1. α(s) ∈ W k, ∞(S \ E) with E ⊂ S a finite set of singular points and ∥α∥Wk, ∞ ≤ 1.2. shp (α) locally Lipschitz in α with constant Lhp ,i in each smooth region Ri, and possibly singular points in Ehp , and Lhp = max iLhp ,i .3. There exist ranges of α such that 
+
+∥shp (α1) − shp (α2)∥L∞ ≤ Lflat |α1 − α2|, Lflat ≪ Lhp .
+
+Let Fθ be a ReLU network that approximates the frequency parameter α. For any ε > 0,there exists a ReLU network Fθ of depth 
+
+L = O(log(1 /ε )) 
+
+and size 
+
+W = O ε−d/k log(1 /ε ) + |E ∪ Ehp |,
+
+such that Fθ predicts α. The reconstruction error on the signal satisfies 
+
+∥s − shp (Fθ(s)) ∥L∞ ≤ ∥s − shp (α(s)) ∥L∞
+
+| {z }
+
+> spline approximation error
+
++ Leff ε
+
+| {z } 
+
+> network error on smooth/flat regions
+
++ C X
+
+> si∈E∪Ehp
+
+|Fθ(si) − α(si)|
+
+| {z }
+
+> contribution from singular points
+
+, (4) 
+
+with Leff and C positive constants. Proof. The proof refers to the different contributions to the signal approximation error separately. 
+
+Approximation of α(s) on smooth regions 
+
+On each smooth region Ri ⊂ S \ E, α(s) ∈ W k, ∞ and ∥α∥Wk, ∞ ≤ 1. By Theorem 1, for any ε > 0 there exists a ReLU network Fθ of depth O(log(1 /ε )) and size 
+
+O(ε−d/k log(1 /ε )) satisfying sup 
+
+> s∈R i
+
+|Fθ(s) − α(s)| ≤ ε. 
+
+6Error propagation in locally Lipschitz and flat regions 
+
+For s ∈ R i, we distinguish two cases: 1. Lipschitz region: 
+
+∥shp (α(s)) − shp (Fθ(s)) ∥L∞ ≤ Lhp ,i |α(s) − Fθ(s)| ≤ Lhp ε. 
+
+2. Flat region: 
+
+∥shp (α(s)) − shp (Fθ(s)) ∥ ≤ Lflat ε ≪ Lhp ε. 
+
+Define Leff = max( Lhp , L flat ) = Lhp as a conservative effective Lipschitz constant. 
+
+Singular points 
+
+∀ si ∈ E ∪ Ehp , define δi = |Fθ(si) − α(si)| and let C > 0 such that 
+
+∥shp (α(si)) − shp (Fθ(si)) ∥ ≤ C δ i.
+
+Using the triangle inequality we can combine all previous errors to bound signal ap-proximation error: 
+
+∥s − shp (Fθ(s)) ∥L∞ ≤ ∥ s − shp (α(s)) ∥L∞ + ∥shp (α(s)) − shp (Fθ(s)) ∥L∞
+
+≤ ∥ s − shp (α(s)) ∥L∞ + Leff ε + C X
+
+> si∈E∪Ehp
+
+δi. (5) Regarding the network size, we have to account for the contributions of smooth regions and singular points. From Theorem 1, smooth regions contribute with O(ε−d/k log(1 /ε )) parameters, while singular points contribute with O(|E ∪ Ehp |) parameters, that are nec-essary for local corrections. Thus, the total network size is 
+
+W = O(ε−d/k log(1 /ε ) + |E ∪ Ehp |),
+
+with depth L = O(log(1 /ε )). 
+
+Remark 1. It is worth observing that the network error on smooth/flat regions is the one provided in [13]. Moreover, even if |Fθ(s) − α(s)| is large, the reconstruction error 
+
+∥s − shp (Fθ(s)) ∥ may remain small in regions where shp (α) is insensitive to α. Hence, the network may estimate α that deviates from nominal values while still producing near-optimal reconstruction. 
+
+In the next section we analyze network generalization, by evaluating how well Fθ(s)predicts α := α(s) on unseen signals. 74 Stability bounds for neural networks outputting model parameters 
+
+In this section, based on uniform stability results, we derive a generalization bound for the neural network by considering the proposed two-stage learning procedure in which a neural network outputs the parameter of a secondary parametric model. Moreover, we introduce a finer wavelet-based generalization bound. The effective Lipschitz constant of the full system is expressed explicitly, and the resulting stability theorems are stated formally. Stability evaluates how sensitive the learned model is to small changes in the training dataset, and uses this to control the gap between training and test performance. To define stability bounds for the learning model (step 1 of the proposed procedure), we recall the formal definition of uniform stability [19]. 
+
+Definition 5 (Uniform Stability) . Let A : T ⊂ Rn×d → Θ be a learning algorithm mapping a dataset T to a model in Θ and ℓ : Θ × Z → R be a function such that ℓ(f, z )
+
+measures the loss of model f on point z ∈ Z ⊂ R. The learning algorithm A is said to be 
+
+β-uniformly stable if for all datasets T = ( s1, . . . , sn), all modified datasets T (i) obtained by replacing si with s′
+
+> i
+
+, and for all points z,
+
+|ℓ(A(T ), z ) − ℓ(A(T (i)), z )| ≤ β. (6) Uniform stability then controls the sensitivity of the learned hypothesis to the re-placement of a single training example. Hence, if β is small, the network Fθ generalizes well. In order to define a stability-based generalization bound for the proposed two-stage learning procedure, we introduce the following definitions [26]. The empirical loss of a learning algorithm A on the dataset T is defined as 
+
+ET [ℓ(A(T ))] = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓ(A(T ), z i); the expected loss relative to the distribution D on Z is 
+
+ED[ℓ(A(T ))] = EZ∼D 
+
+ℓ(A(T ), z ).
+
+Finally, the estimation error (also referred to as the generalization gap ) of A on S relative to D is defined as ∆T (ℓ(A)) = ED[ℓ(A(T )] − E T [ℓ(A(T )] (7) Following the arguments in [26], if the learning algorithm is β−stable, then expected generalization gap can be bounded as follows: 
+
+|E[∆ T (ℓ(A))] | ≤ O 
+
+
+
+β + 1
+
+√n
+
+
+
+8and it is observed to be optimal when β = O(1 /n ). In the next proposition we consider 
+
+β < O(1 /√n) and 
+
+GenGap := |E[∆ T (ℓ(A))] | ≤ O 
+
+ β
+
+√n
+
+
+
+. (8) Given these assumptions, we prove the following propositions about the stability of a learning algorithm for the HP-spline frequency parameter. 
+
+Proposition 2. Let T = {(si, α i)}i=1 ,...,n be a training set, Fθ : S ⊂ Rd → R a neural network such that α := Fθ(s) under the assumptions in Proposition 1, let sα(·, α ) be the composite function acting both on the sampled signal and on the frequency parameter, to estimate the HP-spline coefficients from (s, F θ(s)) , sα : Rd×1 → Rm+2 , and let Fθ(T )
+
+denote the learning model using T . If the neural network Fθ is LF −Lipschitz, i.e. 
+
+∥Fθ(s) − Fθ(s′)∥ ≤ LF ∥s − s′∥, s, s′ ∈ S (9) 
+
+and the composite model satisfies the two Lipschitz- conditions with respect to both its first and second argument, i.e., 
+
+∥sα(s, α ) − sα(s′, α )∥ ≤ Ls∥s − s′∥, s, s′ ∈ S ∥sα(s, α ) − sα′ (s, α ′)∥≤ Lα∥α − α′∥ α, α ′ ∈ R,
+
+then it holds 
+
+∥sα(s, α ) − sα′ (s′, α ′)∥ ≤ (Ls + LαLF )D, (10) 
+
+with Ls, Lα and LF Lipschitz constants and D = sup s,s′∈S ∥s − s′∥ the diameter of the input space S.Proof. Let s, s′ ∈ S ⊂ Rd, α = Fθ(s), α′ = Fθ(s′), then 
+
+∥sα(s, α ) − sα′ (s′, α ′)∥ ≤ ∥ sα(s, α ) − sα(s′, α )) ∥ + ∥sα(s′, α ) − sα′ (s′, α ′)∥≤ Ls∥s − s′∥ + Lα∥Fθ(s) − Fθ(s′)∥.
+
+Since Fθ is LF -Lipschitz we get 
+
+∥sα(s, α ) − sα′ (s′, α ′)∥ ≤ (Ls + LαLF )∥s − s′∥.
+
+from which the assertion (10) follows. Therefore, when a neural network outputs parameters of a secondary model, the ef-fective Lipschitz constant of the overall architecture decomposes into two contributions, under suitable assumptions on the parametric model. This result allows to get a general-ization bound. 9Proposition 3. Under the same assumptions of Proposition 2, if the loss function is 
+
+Lℓ−Lipschitz in its first argument, then the learning algorithm is β-uniformly stable with 
+
+β ≤ LℓLF D, D = sup 
+
+> s,s′∈S
+
+∥s − s′∥ (11) 
+
+and the expected loss relative to a distribution D on R is 
+
+|E[ℓ(Fθ(T ), α )] | ≤ ˆE(Fθ) + O
+
+LℓLF D
+
+√n
+
+
+
+. (12) 
+
+with 
+
+ˆE(Fθ) := 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓ(Fθ(T ), α i). (13) 
+
+Similarly, O
+
+Lℓ(Ls+LαLF D)
+
+> √n
+
+
+
+bounds the expected generalization gap for the composite func-tion sα.Proof. Let s, s′ ∈ S ⊂ Rd, α = Fθ(T ), α′ = Fθ(T ′), with T and T ′ training sets defined according to Definition 5; then it holds 
+
+|ℓ(Fθ(T ), α ) − ℓ(Fθ(T ′), α ′)| ≤ Lℓ∥Fθ(T ) − Fθ(T ′)∥ ≤ ≤ LℓLF ∥T − T ′∥ ≤ LℓLF D, 
+
+with D the diameter of the input space, and the (11) is given. To prove (12), we consider the expected loss for the learning network Fθ(T ) relative to the distribution D:
+
+ED[ℓ(Fθ(T ))] = ET [ℓ(Fθ(T ))] + ∆ T (ℓ(Fθ)) 
+
+|E D[ℓ(Fθ(T ))] | ≤ |E T [ℓ(Fθ(T ))] | + |∆T (Fθ(T )) |
+
+Using (8) we finally have 
+
+|E[ℓ(Fθ(T ), α )] | ≤ ˆE(Fθ) + O
+
+LℓLF D
+
+√n
+
+
+
+with ˆE(Fθ) defined as in (13). Since the learning algorithm is β− stable, using eq. (11) the thesis follows. Using similar arguments and Proposition 2, we get the bound for the expected gener-alization gap for the composite function sα.The generalization bound scales proportionally to the upper bound in (11), revealing how both parameter sensitivity and input sensitivity affect stability and generalization bound. In particular, if L := LℓLF and n are fixed, reducing the diameter of the input space reduces the generalization gap. It is then expected that applying a non expansive transform to the input sequences reduced the diameter and then the expected generaliza-tion gap. Considering its property, a candidate transform is the wavelet transform. 10 Let {ϕJ,k } be the scaling functions of a multiresolution analysis [20] and let 
+
+VJ s := X
+
+> k
+
+⟨s, ϕ J,k ⟩ϕJ,k 
+
+be the approximation operator at scale J. For orthonormal or biorthogonal wavelets, VJ
+
+is non-expansive, that is 
+
+∥VJ s − VJ s′∥ ≤ ∥ s − s′∥.
+
+By observing that the effective diameter of a set on input data after wavelet approximation is 
+
+DJ := sup 
+
+> s,s ′∈S
+
+∥VJ s − VJ s′∥,
+
+it easily follows that projecting into a wavelet approximation space decreases the diameter and the following proposition holds true. 
+
+Proposition 4. Under the same assumption of Proposition 2, assume that the loss func-tion of the learning algorithm is Lℓ−Lipschitz in its first argument, and let VJ be a non-expansive wavelet projection at scale J, then it holds 
+
+E[ℓ(Fθ(VJ T ), α )] ≤ ˆEJ (Fθ) + O
+
+LℓLF DJ
+
+√n
+
+
+
+,
+
+with 
+
+ˆEJ (Fθ) = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ℓ(Fθ(VJ Ti), α i).
+
+In particular, if DJ ≪ D, where D = sup T ,T ′ ∥T − T ′∥, then GenGap (J) ≤ O 
+
+ DJ
+
+√n
+
+
+
+< O
+
+ D
+
+√n
+
+
+
+.
+
+with GenGap (J) defined as in (8). Proof. Using the Lipschitz properties of the loss function difference, under a one-sample replacement in the training set, we get 
+
+|ℓ(Fθ(VJ T ), α ) − ℓ(Fθ(VJ T ′), α ′)| ≤ Lℓ∥Fθ(VJ T ) − Fθ(VJ T ′)∥ ≤ ≤ LℓLF ∥VJ T − VJ T ′∥ ≤ LℓLF DJ .
+
+Thus the learning algorithm is β-stable with β = LℓLF DJ , and the stability generalization bound follows. Using the non-expansion property of the wavelet operator, DJ ≤ D
+
+providing a straightforward bound for the generalization gap. The result in Proposition 4 depends on the resolution of the approximation level J.On the other hand, if s : Rd → R has H¨ older regularity γ > 0 [20, 21], then 
+
+∥s − VJ s∥L2 ≤ C 2−Jγ .
+
+11 This motivates considerations on the choice of the truncation scale J, balancing the approximation error (bias) and the generalization properties associated with the model complexity. In particular, the optimal value of J is expected to trade off approximation accuracy and generalization performance. Coarse scales (small J) reduce the diameter 
+
+Dj , thus improving generalization, but may increase the approximation error. Conversely, finer scales (large J) improve approximation accuracy at the cost of increased model com-plexity and larger Dj . Therefore, while coarse-scale approximations can enhance gener-alization through improved stability, excessively coarse representations may significantly degrade accuracy. This trade-off warrants further investigation. 
+
+# 5 Numerical Results 
+
+This section validates the theoretical findings through numerical simulations. The tests are executed on a personal computer equipped with a 2 .80 GHz Intel Core(TM) i7 −
+
+7700 HQ CPU and 16 .0 GB of RAM, and the algorithms are implemented in Matlab R2025b. Accuracy and stability are evaluated through standard vector-valued metrics: 
+
+• the Mean Squared Error 
+
+M SE (v, ˆv) = 1
+
+d
+
+> d
+
+X
+
+> j=1
+
+ vj − ˆvj
+
+2, v, ˆv ∈ Rd
+
+quantifying the average squared deviation; 
+
+• the Infinity Norm Error 
+
+∥v − ˆv∥∞ = max  
+
+> 1≤j≤d
+
+|vj − ˆvj |, v, ˆv ∈ Rd
+
+capturing the largest pointwise deviation, and 
+
+• the Relative Error 
+
+RE (v, ˆv) = ∥v − ˆv∥2
+
+∥v∥2
+
+, v, ˆv ∈ Rd
+
+quantifying the relative deviation with respect to the magnitude of the reference vector. 
+
+## 5.1 Parameter approximation and error propagation 
+
+The approximation results in [13] and Proposition 1 ensure the existence of neural network architectures with controlled complexity that can achieve arbitrarily small error in ap-proximating α and the corresponding HP-spline reconstruction. However, these results are non-constructive and do not provide explicit design guidelines. Therefore, the theoretical 12 analysis is complemented with an empirical investigation to evaluate the approximation capabilities of ReLU networks. The training and test datasets are constructed from a parameter function α(x) defined on the interval x ∈ [0 , 1], representing the quantity to be predicted by the network. The function is evaluated at discrete points xi, producing the values αi = α(xi). Each αi is then used to generate network input data 
+
+sαi (t) = e−αit,
+
+while αi serves as the corresponding target output. The functions α(x) are selected to satisfy the theoretical assumptions in Proposition 1. Both smooth functions 
+
+α1(x) = 11 + x, α2(x) = 1 + 12 sin(2 πx ),
+
+and functions with locally reduced regularity, such as 
+
+α3(x) = x2 + |x − x0|k−0.5, x0 = 0 .37 , k = 2 as well as the piecewise quadratic function 
+
+α4(x) = 
+
+
+
+x2, x ≤ 13 , 
+
+> 11 3
+
+x − 10 9 , 13 < x ≤ 0.6, 
+
+> 49 45
+
+, 0.6 < x ≤ 0.65 ,
+
+3t2, x > 0.65 are considered to evaluate the network’s performance across different regularity conditions. For each function, fully connected networks with fixed depth L ∈ { 3, 4, 5} are trained, increasing the width W until the approximation condition ∥α(s) − Fθ(s)∥∞ ≤ ε is sat-isfied. Each architecture has uniform width across layers. For each configuration, the corresponding network complexity Ctot is reported, defined as in Section 2.2, depending on ( L, W ) and the input dimension d, which is set to 32 in this study. Table 1 summarizes the results for both smooth functions α1, α 2 and functions with isolated singularities α3, α 5. For each ε and L, the table reports the architecture achiev-ing the target precision, along with the corresponding complexity and error metrics. In particular, the reported metrics refer to parameter approximation errors, HP-spline recon-struction errors computed using both predicted and nominal parameters, and the propa-gation error, which measures the discrepancy between the reconstructed signals obtained with the predicted and nominal parameters, which quantifies the effect of approximation errors in α on the reconstructed HP-spline signals. 13 ϵ Architecture Parameter error HP-spline Reconstruction error Propagation error 
+
+L W Ctot M ax α M SE α M ax pred M SE pred M ax nom M SE nom M SE α1(x)0.10 3 1 35 3.67e-03 1.02e-06 1.84e-09 5.96e-22 1.36e-09 1.53e-22 4.46e-22 0.07 3 2 69 2.35e-02 1.06e-04 1.82e-09 7.29e-22 1.55e-09 2.91e-22 4.46e-22 0.008 3 3 103 6.24e-03 1.79e-06 3.91e-08 1.20e-19 3.91e-08 1.20e-19 4.46e-22 0.10 4 3 115 2.02e-03 2.99e-07 1.73e-08 2.91e-20 1.73e-08 2.87e-20 4.46e-22 0.07 4 3 115 1.75e-02 2.30e-05 4.46e-09 1.34e-21 4.45e-09 8.98e-22 4.46e-22 0.008 4 2 75 2.01e-04 4.49e-09 1.82e-09 4.68e-22 5.91e-10 2.18e-23 4.46e-22 0.10 5 2 81 1.37e-02 1.79e-05 3.41e-09 1.37e-21 3.40e-09 9.22e-22 4.46e-22 0.07 5 1 39 5.28e-02 5.39e-04 1.86e-09 6.95e-22 1.45e-09 2.52e-22 4.46e-22 
+
+α2(x)0.10 3 2 69 9.27e-04 2.89e-07 1.99e-10 6.03e-24 1.95e-09 2.74e-22 2.79e-22 0.07 3 1 35 3.01e-03 2.21e-06 3.82e-10 1.31e-23 1.95e-09 2.74e-22 2.87e-22 0.008 3 1 35 8.91e-04 3.27e-07 9.07e-10 5.57e-23 1.95e-09 2.74e-22 3.28e-22 0.10 4 2 75 1.47e-02 2.07e-05 3.95e-09 7.71e-22 1.95e-09 2.74e-22 1.04e-21 0.07 4 1 37 1.68e-02 1.08e-04 1.92e-08 8.41e-21 1.95e-09 2.74e-22 8.68e-21 0.10 5 3 127 7.32e-02 5.77e-04 3.66e-09 6.98e-22 1.95e-09 2.74e-22 9.73e-22 0.07 5 1 39 1.90e-02 6.56e-05 7.84e-10 4.50e-23 1.95e-09 2.74e-22 3.19e-22 
+
+α3(x)0.10 3 1 35 4.20e-02 1.71e-04 2.43e-08 9.77e-20 3.36e-08 1.19e-19 2.05e-19 0.07 3 2 69 5.82e-02 4.78e-04 1.57e-07 2.13e-18 3.36e-08 1.19e-19 2.25e-18 0.10 4 3 115 6.39e-02 4.47e-04 1.14e-07 1.48e-18 3.36e-08 1.19e-19 1.60e-18 0.07 4 3 115 5.15e-03 2.44e-06 4.86e-08 2.46e-19 3.36e-08 1.19e-19 3.64e-19 0.10 5 5 231 4.55e-02 9.24e-05 4.06e-08 2.62e-19 3.36e-08 1.19e-19 3.80e-19 0.07 5 2 81 4.19e-03 2.22e-06 1.55e-08 3.67e-20 3.36e-08 1.19e-19 1.56e-19 
+
+α4(x)0.10 3 1 35 5.47e-02 2.69e-04 2.46e-08 1.11e-19 2.29e-07 8.53e-18 8.68e-18 0.07 3 1 35 6.60e-03 7.00e-06 1.04e-06 1.41e-17 2.29e-07 8.53e-18 2.26e-17 0.10 4 3 115 3.52e-02 1.29e-04 1.08e-07 1.49e-18 2.29e-07 8.53e-18 1.01e-17 0.07 4 1 37 4.34e-03 2.12e-06 4.48e-07 1.50e-17 2.29e-07 8.53e-18 2.34e-17 0.10 5 4 177 7.05e-02 3.99e-04 7.54e-07 5.61e-17 2.29e-07 8.53e-18 6.35e-17 0.07 5 2 81 5.81e-02 2.22e-04 3.05e-08 8.84e-20 2.29e-07 8.53e-18 8.60e-18 0.008 5 1 39 5.96e-03 3.20e-06 3.78e-06 1.66e-16 2.29e-07 8.53e-18 1.75e-16 
+
+Table 1: Approximation results for the functions α1, . . . , α 4, including both smooth and singular cases. For each ε, the table reports the network architecture ( L, W ), the total complexity Ctot . The approximation errors are given in terms of infinity norm ( M ax α)and mean squared error ( M SE α), HP-spline reconstruction errors are computed using uniformly spaced knots with step size 0 .1, and are reported for both predicted and nominal parameters. The propagation error measures the discrepancy between the corresponding reconstructed signals, quantifying the effect of approximating α.For all α functions, the HP-spline reconstructions using the predicted parameters Fθ(s)closely match those obtained with the nominal parameters α(s). The propagation error remains consistently smaller than the intrinsic spline error, indicating that inaccuracies in the neural approximation have minimal impact on the final reconstruction, even in the presence of few singular points. This demonstrates that moderately-sized ReLU networks can accurately approximate the parameters without compromising HP-spline reconstruc-14 tion quality. It should be noted that the architectures in Table 1 provide only an empirical indica-tion: failure to meet the prescribed tolerance for a given configuration does not preclude the existence of alternative networks of similar complexity that could achieve the same accuracy. 
+
+## 5.2 Empirical evaluation of stability based on general gap bound 
+
+In this section, we adopt an empirical approach to assess stability. We consider a neural network with ReLU activation trained on a dataset T . The test set is constructed as a slight perturbation of T , obtained by adding noise to a limited fraction of the data. After training, we compute the loss on the training set, Loss train , and the loss on the test set, 
+
+Loss test . The generalization gap is then defined empirically as GenGap = Loss train − Loss test .
+
+In this setting, the theoretical results discussed in the Section 4 suggest that the generalization gap should increase with the dataset diameter and decrease as the sample size grows. In particular, the expected behavior is GenGap ≤ O
+
+ D
+
+√n
+
+
+
+, GenGap J ≤ O
+
+ DJ
+
+√n
+
+
+
+,
+
+where n and D are the size and diameter of T , respectively, and DJ the corresponding diameter after wavelet projection at level J.In our experiments, we vary both the sample size and the dataset diameter. We consider synthetic signals of the form 
+
+s(t) = A
+
+> 5
+
+X
+
+> k=1
+
+2−kα cos(2 kπt ), t ∈ [0 , 1] ,
+
+where α is randomly sampled in [0 .5, 5], while the amplitude A ∈ { 0.5, 1, 2, 4.5, 5, 6, 8, 10 .5}
+
+controls the overall scale and hence the diameter. The training dataset consists of n signals, with n ∈ [32 , 64 , 128 , 256 , 512], each sampled on a uniform grid of 256 points in [0 , 1]. The test set is obtained as a perturbed version of the training set by adding independent Gaussian noise ε ∼ N (0 , σ 2) with σ = 10 −2
+
+to a fraction of the training data (30%), while leaving the remaining samples unchanged. This construction is closely related to the uniform stability condition [19]. The same procedure is repeated after projecting both training and test data into wavelet approximation spaces for each level J ∈ { 1, 2, 3, 4}.Figure 1 shows the behavior of the empirical generalization gap ( GenGap ) and the theoretical bound D/ √n as functions of the sample size n, for some values of the parameter 
+
+A. The behavior of the two quantities confirms the theoretical findings. 15 (a) A = 0 .5 (b) A = 1      
+
+> (c) A= 5 .5(d) A= 10 .5
+
+Figure 1: Comparison between the empirical generalization gap ( GenGap ) and the theo-retical bound D/ √n as a function of the sample size n, for different values of the parameter 
+
+A ∈ { 0.5, 1, 5.5, 10 }. Each panel shows how the empirical gap relates to its corresponding bound as n increases. We extend the previous analysis to the case where a non-expansive wavelet projection 
+
+VJ is applied to the input data. Figure 2 illustrates the comparison between empirical and theoretical quantities for each J and A = 1. 16 (a) j = 1 (b) j = 2      
+
+> (c) j= 3 (d) J= 4
+
+Figure 2: Comparison between the empirical generalization gap GenGap J and correspond-ing theoretical bound Dj /√n as functions of the sample size n, for J ∈ { 1, 2, 3, 4} and 
+
+A = 1. The empirical results indicate that the generalization gap behaves as expected, de-creasing with the sample size n and remaining well aligned with the theoretical bounds. The wavelet projections do not compromise stability; in fact, the projected gaps closely follow their respective bounds, which are often smaller than those of the original signals, effectively enhancing stability while preserving the essential statistical structure and fil-tering out noise. For small values of A, where the signal amplitude is low relative to the added noise, the signal-to-noise ratio is reduced, which can slightly affect the alignment with the bound; however, the overall stability and expected behavior remain evident. 
+
+## 5.3 Comparative assessment of the frequency parameter esti-mation 
+
+In this section, we introduce a new set of numerical experiments that aims to assess the effectiveness of the proposed neural network approach to estimate the frequency parameter 17 α. The performance of the network is evaluated compared to the algorithm available in the literature [3], which provides an optimal estimate of α through a dedicated optimization procedure. To thoroughly investigate the generalization capability of the proposed approach, three different scenarios are considered. Each scenario is characterized by a specific choice of training and test datasets, allowing us to progressively increase the level of complexity and mismatch between training and testing conditions. In all scenarios, once the network is trained, the estimation of α is performed on the test data and compared with the corresponding optimal values computed via the reference algorithm. The resulting α
+
+values are then used within the HP spline framework to reconstruct the target functions, enabling a direct comparison in terms of both parameter accuracy and reconstruction performance. In the first scenario, the training data consist of simple exponential functions for which the nominal values of α are known. In (14) we report just an example of simple exponential data: 
+
+s1(t) = Ae αt , s2(t) = Ate −αt . (14) The test data are constructed by perturbing the same functions with additive Gaussian noise ε ∼ N (0 , σ 2) and σ = 10 −2. This setting allows us to evaluate the robustness of the neural network with respect to noise while maintaining consistency between the training and testing distributions. In the second scenario, the training data remains unchanged, still consisting of simple exponential functions with known α. However, test data are generated using more complex multi-exponential functions as defined in (15), introducing a structural mismatch between training and testing data 
+
+s3(t) = t
+
+2e−2α + e− α 
+
+> 2t
+
+. (15) This scenario is designed to assess the extrapolation capability of the network when applied to functions of increased complexity. In the third scenario, the training dataset is enriched by including both simple ex-ponential functions (with known α) and multi-exponential functions. For the latter, the associated values α are not known a priori but are estimated using the reference optimiza-tion algorithm. The test data coincide with the multi-exponential functions considered in the second scenario. This setting allows us to evaluate whether increasing the training set with more representative and heterogeneous data improves the predictive performance of the network. Figure 3 reports the comparison of predicted vs optimal α for some test data in the three scenarios. Performance is measured in terms of MSE and RE for the HP-spline reconstruction. 18 (a) Scenario 1  
+
+> (b) Scenario 2 (c) Scenario 3
+
+Figure 3: Comparison of HP-spline regression performance using predicted and optimal α
+
+across three scenarios. Solid and dashed lines represent the two methods, while horizontal dotted lines indicate their corresponding mean values. Results are reported in terms of 
+
+MSE and RE on a logarithmic scale, computed for each individual test data instance using neural network-based predictions of α. HP-spline reconstruction errors are evaluated on the corresponding test signals using uniformly spaced knots with step size 0 .1. Overall, the neural network provides a reliable and computationally efficient estimate of the HP-spline frequency parameter. The predicted α consistently reproduces the re-gression accuracy of the optimal α, even in scenarios with noise or function extrapolation. This validates the approach as a practical alternative to exhaustive search α, allowing fast and accurate HP-spline reconstruction in various contexts. 19 Conclusions 
+
+In this paper a neural network-based strategy for the estimation of the frequency parame-ter in HP-splines has been developed and analyzed. The parameter selection problem has been reformulated in a functional setting, enabling its approximation through deep archi-tectures with controlled complexity. Under suitable regularity assumptions, bounds for the induced HP-spline approximation error have been established. In addition, the stabil-ity analysis of the whole learning procedure provided further insight into the robustness of the proposed approach, allowing control of the associated generalization gap via uniform stability arguments for the composite model. The numerical results support the theoret-ical analysis, demonstrating that neural networks can reliably estimate the frequency pa-rameter in HP-splines while maintaining high reconstruction accuracy and stability even in scenarios with reduced smoothness. The results also indicate that moderately sized networks are sufficient for practical applications, and network design can remain flexible without compromising accuracy. These findings suggest that learning-based parameter selection constitutes a viable alternative to classical approaches. Further investigation is required in higher-dimensional settings, where tensor-product constructions and direc-tional parameter estimation significantly increase computational complexity. Refinements of approximation error bounds in more complex scenarios also remain an open direction for future research. 
+
+# Acknowledgements 
+
+The authors are members of the INdAM research group GNCS, which has partially sup-ported this work. This research has been accomplished within the UMI-TAA group, of which the authors are members, and UMI AI&ML&MAT group. RC was partially sup-ported by the Italian MUR through the PRIN2022 Project ’Numerical Optimization with Adaptive Accuracy and Applications to Machine Learning’, code: 2022N3ZNAX, and the PRIN2022-PNRR Project ’A multidisciplinary approach to evaluate ecosystems resilience under climate change’, code: P2022WC2ZZ. VB and DV have been partially supported by PNRR-CN1 SPOKE 6 - Multiscale modeling engineering applications B83C22002940006. 
+
+# Declarations 
+
+The MATLAB code used in this study is available from the authors upon request. 
+
+# References 
+
+[1] Campagna, R., Conti, C. (2021) Penalized hyperbolic-polynomial splines, Applied Mathematics Letters , vol. 118. [2] Campagna, R., Conti, C. (2022) Reproduction capabilities of penalized hyperbolic-polynomial splines. Applied Mathematics Letters , 132(2):108133. 20 [3] Campagna, R., Conti, C., Cuomo, S. (2023) A linear algebra approach to HP-splines frequency parameter selection, Applied Mathematics , vol. 458. [4] Campagna, R., Conti, C., Cuomo, S. (2019) Smoothing exponential-polynomial splines for multiexponential decay data, Dolomites Research Notes on Approxima-tion , Volume 12, Issue 1, pp. 86-100. [5] Cotronei, M., R¨ uweler, D., Sauer, T. (2025) Sparse image representation through multiple multiresolution analysis. Applied Mathematics and Computation , Volume 500. [6] Hecht, Tyler, Hampton, Griffin S., Neff, Ryan, Spencer, Richard G., Fok, Pak-Wing, (2025) Parameter Estimation in Two-Dimensional Biexponential Magnetic Resonance Relaxometry: A Case-Study Comparison of Frequentist and Bayesian Approaches, Concepts in Magnetic Resonance Part A , 6678358, 12 pages. [7] Eilers P.H.C., Marx B. D., (1996) Flexible smoothing with B-splines and penalties, 
+
+Statistical Science 11(2), 89-121. [8] Bruni, V., Campagna, R., Vitulano, D. (2025) Multicomponent signals interference detection exploiting HP-Splines frequency parameter, Applied Numerical Mathemat-ics , vol. 209 [9] Bruni, V., Campagna, R., Tartaglione M. and Vitulano D.,(2025) Instantaneous Frequency Estimation via Spectrogram Projection and P-Spline Approximation , IEEE Signal Processing Letters, vol. 32, pp. 3725-3729. [10] Calabrese, P.E., Campagna, R., Conti, C. (2026) An algorithm for locally adaptive bivariate penalized splines . Journal of Computational and Applied Mathematics, , 477. [11] Aggarwal, C. C. (2018) Neural Networks and Deep Learning: A Textbook. Springer International Publishing , Cham. [12] Cybenko, G. (1989) Approximation by superpositions of a sigmoidal function. Math-ematics of control, signals and systems , 2.4: 303-314. [13] Yarotsky, D. (2017) Error bounds for approximations with deep ReLU networks. 
+
+Neural networks , 94: 103-114. [14] Iorio, C., Frasso, G., D’Ambrosio, A., Siciliano, R. (2018) A P-spline based clustering approach for portfolio selection, Expert Systems with Applications , Volume 95, Pages 88-103, ISSN 0957-4174. [15] De Magistris, A., De Simone, V., Romano, E. et al. (2024) Roughness regulariza-tion for functional data analysis with free knots spline estimation, Statistics and Computing , 34, 165. 21 [16] Romano, A., Campagna, R., Masi, P., Toraldo, G. (2020). NMR Data Analysis of Water Mobility in Wheat Flour Dough: A Computational Approach. In: Sergeyev, Y., Kvasov, D. (eds) Numerical Computations: Theory and Algorithms. NUMTA 2019. Lecture Notes in Computer Science (), vol 11973. Springer, Cham. [17] Conti, C., Cotronei, M., Romani, L. (2017) Beyond B-splines: exponential pseudo-splines and subdivision schemes reproducing exponential polynomials, Dolomites Re-search Notes on Approximation , 10 (Special Issue), 31-42. [18] Anthony, M., Bartlett, P. L. (2009). Neural network learning: Theoretical founda-tions. Cambridge university press. [19] Bousquet, O. and Elisseeff, A. (2002) Stability and Generalization, Journal of Ma-chine Learning Research , 2, 499-526. [20] Mallat, S. (1999) A Wavelet Tour of Signal Processing, Academic Press .[21] Daubechies, I. (1992) Ten Lectures on Wavelets, CBMS-NSF Regional Conference Series in Applied Mathematics 61. SIAM (Philadelphia). [22] Mallat, S. and Hwang, W. L. (1992) Singularity Detection and Processing with Wavelets, IEEE Trans. Info. Theory , . [23] Lenzi, A., Bessac, J., Rudi, J., Stein, M. L. (2023) Neural networks for parameter estimation in intractable models, Computational Statistics & Data Analysis , Volume 185, 107762, ISSN 0167-9473. [24] Crisci, S., De Simone, V., Diana, A., Zullo, F. (2025) Neural network for archaeolog-ical glyph detection, Intelligent Systems with Applications , Volume 27, 200562, ISSN 2667-3053. [25] Yang, Z., Zhang, A. and Sudjianto, A. (2021) Enhancing Explainability of Neural Networks Through Architecture Constraints, in IEEE Transactions on Neural Net-works and Learning Systems , vol. 32, no. 6, pp. 2610-2621. [26] Feldman, V., and Vondrak, J. (2018), Generalization bounds for uniformly stable algorithms. In Proceedings of the 32nd International Conference on Neural Informa-tion Processing Systems (NIPS’18). Curran Associates Inc., Red Hook, NY, USA, 9770–9780. 22

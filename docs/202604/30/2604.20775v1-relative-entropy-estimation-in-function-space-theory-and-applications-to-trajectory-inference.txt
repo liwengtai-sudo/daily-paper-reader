@@ -1,0 +1,2205 @@
+Title: Relative Entropy Estimation in Function Space: Theory and Applications to Trajectory Inference
+
+URL Source: https://arxiv.org/pdf/2604.20775v1
+
+Published Time: Thu, 23 Apr 2026 01:19:10 GMT
+
+Number of Pages: 36
+
+Markdown Content:
+# Relative Entropy Estimation in Function Space: Theory and Applications to Trajectory Inference 
+
+Chao Wang ∗
+
+EURECOM 
+
+chao.wang@eurecom.fr 
+
+Luca Nepote ∗
+
+EURECOM 
+
+luca.nepote@eurecom.fr 
+
+Giulio Franzese 
+
+EURECOM 
+
+giulio.franzese@eurecom.fr 
+
+Pietro Michiardi 
+
+EURECOM 
+
+pietro.michiardi@eurecom.fr 
+
+Abstract 
+
+Trajectory Inference (TI) seeks to recover latent dynamical processes from snapshot data, where only independent samples from time-indexed marginals are observed. In applications such as single-cell genomics, destructive measurements make path-space laws non-identifiable from finitely many marginals, leaving held-out marginal prediction as the dominant but limited evaluation protocol. We intro-duce a general framework for estimating the Kullback–Leibler divergence (KL) divergence between probability measures on function space, yielding a tractable, data-driven estimator that is scalable to realistic snapshot datasets. We validate the accuracy of our estimator on a benchmark suite, where the estimated functional KL closely matches the analytic KL. Applying this framework to synthetic and real scRNA-seq datasets, we show that current evaluation metrics often give inconsistent assessments, whereas path-space KL enables a coherent comparison of trajectory inference methods and exposes discrepancies in inferred dynamics, especially in regions with sparse or missing data. These results support functional KL as a principled criterion for evaluating trajectory inference under partial observability. 
+
+1 Introduction 
+
+Trajectory inference (TI) is a rapidly evolving field, especially in single-cell genomics applications that seek to reconstruct latent dynamical processes from observed omics data, typically formalized as probability distributions over trajectories. A major challenge is that omics measurements are destructive, providing only snapshots of cellular states at discrete time points rather than continuous trajectories (Trapnell et al., 2014; Nowakowski et al., 2017; Weinreb et al., 2018; La Manno, 2018; Trevino et al., 2021). This setting has motivated stochastic-process formulations of TI, often borrowing from Optimal Transport (OT) (Peyré & Cuturi, 2020; Villani, 2021) and Schrödinger Bridge (SB) problems (Léonard, 2013; Chen et al., 2021). In this work, we set aside pseudo-time methods (Lange et al., 2022; Haghverdi et al., 2016; Weiler et al., 2024), since pseudo-orderings flatten real temporal structure and can obscure lineage relationships. We focus instead on model families that consider Ordinary Differential Equation (ODE) dynamics Sha et al. (2024) and/or Stochastic Differential Equation (SDE)-based approaches (Tong et al., 2020; Neklyudov et al., 2023; Chizat et al., 2022), including the SB variants (Shi et al., 2023; Shen et al., 2025; Chen et al., 2023; Park & Lee, 2025). ODE-based methods assume noiseless flows and lead to deterministic optimal control, which under marginal 
+
+> ∗Equal contribution. Preprint.
+> arXiv:2604.20775v1 [cs.LG] 22 Apr 2026
+
+constraints yields Monge-Kantorovich-type formulations (Peyré & Cuturi, 2020; Villani, 2021). SDE-based models relax determinism and solve a stochastic control problem that steers a Brownian prior with minimal control effort, typically optimizing only the drift while treating the marginal flow as fixed or estimated from data. SB-based models are less prescriptive: given a reference diffusion (e.g., Brownian or Ornstein-Uhlenbeck), they infer a path measure whose snapshot marginals match the data while remaining close to the reference, equivalently solving a stochastic optimal control problem (Chen et al., 2021). Yet, computational constraints often push SB methods away from native path-space representations, relying on discretization and finite-dimensional parameterizations that only approximately preserve path-space structure. In the literature, most TI methods are evaluated via held-out marginals. Such metrics are intrinsically limited because marginals do not determine how states at different times are coupled. Indeed, while marginal evaluation only compares snapshot distributions in finite-dimensional space, the underlying inference target is a probability measure over full trajectories in function space. Without constraints on temporal correlations, transition structure, or other path-wise properties, distinct trajectory models can attain similar marginal scores while inducing very different distributions over trajectories, differences that remain invisible to marginal-only criteria (see Figure 1). This motivates evaluating the inferred object itself: a probability measure on trajectory space. In this work, we propose a general framework for estimating the KL divergence between probability measures on function space, validate it on special cases where the analytic KL is available, and use it to assess TI methods in both synthetic settings (e.g., physical simulations) and real settings (single-cell omics). 
+
+Figure 1: Petal dataset at τ = 0 .75 :MSBM and TIGON yield marginals close to GT but differ in trajectory dynamics, captured by FKL. This work builds on the growing literature of infinite dimen-sional generative models Kerrigan et al. (2023b); Hagemann et al. (2023); Pidstrigach et al. (2024); Lim et al. (2024); Yang et al. (2024); Baker et al. (2024); Park et al. (2024). In partic-ular, our approach represents trajectory distributions through functional flows using Functional Flow Matching (FFM) (Ker-rigan et al., 2023c). FFM constructs a path of conditional Gaussian measures interpolating between a reference Gaussian law and a data-induced law; marginalizing these conditional laws over the data distribution yields a corresponding path of unconditional measures. Exploiting this structure, we derive a tractable estimator of the KL divergence between trajectory distributions, expressible, up to model- and approximation-dependent terms, in terms of squared discrepancies between the associated (approximate) velocity fields. The resulting estimator is practical and scales to realistic regimes in both snapshot count and trajectory resolution. Our work connects to recent progress on information-measure estimation (Belghazi et al., 2018; Franzese et al., 2023a; Kong et al., 2023; Butakov et al., 2024, 2026; Gowri et al., 2024; Pieper-Sethmacher et al., 2025); to our knowledge, it is among the first practically tractable estimators designed to act directly on distributions over functions. Our contributions are fourfold. First, we give a general construction for estimating the KL divergence between distributions over functions, based on a careful treatment of absolute continuity and trace-class noise covariances, leading to a simple estimator. Second, we validate our functional KL estimator on an extensive set of special cases with known analytic KL divergence, and systematically assess its robustness across multiple estimation factors. Third, we conduct an extensive evaluation of prominent TI methods on a range of synthetic and real datasets, demonstrating that five widely used snapshot-based metrics can yield inconsistent rankings. Fourth, we show that our functional KL estimator provides a coherent comparison that exposes discrepancies in inferred dynamics, particularly under sparse or missing observations, supporting functional relative entropy as a principled criterion for evaluating TI under partial observability. 
+
+2 Preliminaries: Functional Flow Matching 
+
+We now revisit the FFM (Kerrigan et al., 2023c) framework, which is instrumental for the derivation of our method. 2Let H be a real separable Hilbert space, equipped with inner product ⟨· , ·⟩ H (and, consequently, norm ∥ · ∥ H ) and denote its Borel σ-field by B(H). By separability, H has a countable dense subset {dk}k∈N, which allows us to define a countable orthonormal basis (ONB) {ek}k∈N in H.Given {ek}k∈N, the canonical projection map is defined by ∀K ∈ N, π K : H → RK , π K (x) = (⟨x, e 1⟩ , . . . , ⟨x, e K ⟩), and we write Cyl( H × I) for the space of all smooth cylindrical test functions 
+
+φ : H × I → R, φ (x, t ) = ψ  πK (x), t , where K ∈ N, I = (0 , 1) , and ψ ∈ C∞
+
+> c
+
+ RK × I; R is an arbitrary smooth function. Consider a probability space (Ω , F, P ) supporting two independent random variables X0, X 1 :Ω → H, with laws respectively P#X1 = μ1 and P#X0 = μ0. Assume the H−valued random variable X0 to be a Gaussian variable, fully described by its zero mean and its covariance operator 
+
+C. We assume C to be trace-class, self-adjoint, bounded, and strictly positive. We adopt the identification μ0 = N (0 , C ) when useful and use the notation Hμ0 to indicate the Cameron–Martin space associated with such measure. We then define an H-valued random process X = ( Xt)t∈[0 ,1] by the linear interpolation between the two independent random variables X0 and X1:
+
+Xt = (1 − t)X0 + tX 1, t ∈ [0 , 1] (1) Denote the associated curve of finite positive Borel probability measures of X by (μt)t∈[0 ,1] with 
+
+μt = P#Xt . We say that the velocity field v : H × [0 , 1] → H generates the path of measures 
+
+(μt)t∈[0 ,1] if the path μt is the pushforward of μ0 along the flow associated with (vt)t∈[0 ,1] , where flow refers to the mapping ϕ : [0 , 1] × H → H that solves the initial value problem (Kerrigan et al., 2023c): ∂tϕt(x) = vt(ϕt(x)) , ϕ 0(x) = x. A standard way to verify this is to check that the pair 
+
+(μt, v t) satisfies the continuity equation in the sense of distributions (i.e., weakly) (Zhang & Scott, 2025; Kerrigan et al., 2023c): for arbitrary test function φ ∈ Cyl( H × I),
+
+Z
+
+> H
+
+φ(x, 1) dμ 1(x) −
+
+Z
+
+> H
+
+φ(x, 0) dμ 0(x) = 
+
+Z
+
+> I
+
+Z
+
+> H
+
+(∂tφ(x, t ) + ⟨vt(x), ∇xφ(x, t )⟩) dμ t(x)dt 
+
+(2) where ∇xφ(x, t ) is the unique vector g such that the Fréchet derivative Dxφ(·, t ) can be identified with Dxφ(·, t ) = ⟨· , g ⟩ by the Riesz representation theorem. If known, the velocity field could be leveraged for generative modeling purposes (simulating an 
+
+H−valued ODE). Since μ1 and v are unknown in practice, the velocity field is approximated with neural networks optimized using the conditional flow-matching loss (Kerrigan et al., 2023c). 
+
+3 Derivation of Functional KL 
+
+To begin with, we clarify the probabilistic setting and state our objective. 
+
+We extend the previous construction to accommodate two different probability spaces  Ω, F, P A and  Ω, F, P B , both supporting independent random variables X0 and X1, such that X0 has the same Gaussian law in both spaces whereas X1 has laws μA 
+
+> 1
+
+= νA and μB 
+
+> 1
+
+= νB respectively. We then train one FFM model for each endpoint law, obtaining two parametrized pairs  μAt , v At
+
+ and  μBt , v Bt
+
+,each satisfying the weak continuity equation. We overload the notation previously introduced by considering superscripts to indicate whether the measures and fields of interest refer to the first or second probability space. Our objective in this work is to estimate the KL divergence between two probability measures νA
+
+and νB on the Hilbert space H, which is formally defined as 
+
+KL  νA ∥ νB  := 
+
+Z
+
+> H
+
+log 
+
+ dν A
+
+dν B
+
+
+
+dν A, if νA ≪ νB ,
+
++∞, otherwise .
+
+(3) 
+
+Next, we state the assumptions needed to construct our framework. Assumption 3.1 (Existence of Radon–Nikodym derivative) . We assume that νA ≪ νB , so that the Radon–Nikodym derivative dν A 
+
+> dν B
+
+exists. 3Remark. Indeed, as the goal of this work is to obtain KL estimates via a novel estimator, we need to assume that the underlying estimand (the true KL) is well-defined. 
+
+Assumption 3.2 (Cameron–Martin support) . The measures are fully supported on the Cameron– Martin space of the noise ( νA(Hμ0 ) = νB (Hμ0 ) = 1 ). 
+
+Remarks. First, Assumption 3.2 can be relaxed: together with Assumption 3.1, it suffices to require that νB be fully supported on Hμ0 , since νB (Hμ0 ) = 1 paired with Assumption 3.1 implies 
+
+νA(Hμ0 ) = 1 . Indeed, by Assumption 3.1, νA is absolutely continuous with respect to νB on B(H),i.e., νB (Γ) = 0 implies νA(Γ) = 0 for all Γ ∈ B(H). If νB (Hμ0 ) = 1 , then νB (H \ Hμ0 ) = 0 ,and since the Hilbert subspace Hμ0 is Borel, Assumption 3.1 yields νA(H \ Hμ0 ) = 0 , hence 
+
+νA(Hμ0 ) = 1 .Second, Assumption 3.2 can be satisfied by choosing noise that is rougher than the data distribution (so the data are fully supported on Hμ0 ) while still being trace-class (and hence in H). In practice, in 
+
+H := L2(T; Rd) with Fourier orthonormal basis, we first estimate the data’s Fourier spectrum using empirically determined variances for each Fourier coefficient, and then multiply each coefficient by the wavenumber magnitude k = ∥m∥2 to produce noise with a rougher spectrum while still in H as discussed in Chen & Vanden-Eijnden (2025). 
+
+Under these assumptions, we now develop a velocity-only representation of the KL divergence 
+
+KL  νA ∥ νB . The derivation is organized into three lemmas: Lemma 3.3 establishes the absolute continuity needed to ensure the Radon–Nikodym derivatives are well-defined; Lemma 3.4 applies weak continuity equation to express KL divergence with logarithmic Radon–Nikodym derivative and velocities. Lemma 3.5 links the logarithmic gradients to the velocity fields. 
+
+Lemma 3.3. Under the Assumptions 3.1 and 3.2, (a) μA,B t ≪ ρt, where ρt = ((1 − t)Id) # μ0 denotes the push-forward of μ0 by the map 
+
+(1 − t)Id for every t ∈ [0 , 1) .(b) μAt ≪ μBt for every t ∈ [0 , 1] .Proof. The proof follows from a conditional Gaussian representation of μA,B t and the Cameron-Martin theorem. See Appendix A for the full proof. Given the well-definedness of Radon–Nikodym derivatives, next we apply the weak continuity equation using the Radon–Nikodym derivative and its logarithm as test functions to derive an integral representation of the KL divergence. 
+
+Lemma 3.4. Let rt := dμ At
+
+> dμ Bt
+
+, which is a well-defined Radon-Nikodym derivative by Lemma 3.3 (b).Then, under mild regularity conditions, we have that 
+
+KL  νA ∥ νB  =
+
+Z
+
+> I
+
+Z
+
+> H
+
+vAt (x) − vBt (x), ∇x log rt(x) dμAt (x). (4) 
+
+Proof. The proof proceeds in two steps. First, rt and log rt are shown to be admissible test functions, using Doob’s martingale convergence theorem for the projected Radon–Nikodym derivatives and the density of C∞ 
+
+> c
+
+functions in the L1 spaces associated with finite-dimensional projections. Second, the weak continuity equation is tested with log rt for  μAt , v At
+
+ and with rt for  μBt , v Bt
+
+, then combining the resulting identities with μAt = rtμBt gives the desired KL identity. See Appendix A for the full proof. By Lemma 3.3 (a), we can rewrite the term ∇x log rt(x) appearing in Lemma 3.4 as 
+
+∇x log rt(x) = ∇x log dμ At
+
+dρ t
+
+(x) − ∇ x log dμ Bt
+
+dρ t
+
+. (5) The next lemma links this logarithmic gradients mismatch to velocity fields mismatch, which is useful to derive a velocity-only representation of KL  νA ∥ νB .
+
+Lemma 3.5. For the linear interpolation used in FFM Kerrigan et al. (2023c), 
+
+∇x log dμ At
+
+dρ t
+
+(x) − ∇ x log dμ Bt
+
+dρ t
+
+= t
+
+1 − t C−1  vAt (x) − vBt (x) (6) 4Proof. The proof first uses the Gaussian-mixture representation of μA,B t , the Cameron-Martin theo-rem on translated Gaussian measures, and Bayes’ rule to identify 
+
+∇x log dμ A,B t
+
+dρ t
+
+(x) = t
+
+(1 − t)2 C−1EP A,B [X1 | Xt = x]
+
+and then combines this with the velocity formula given by linear interpolation in FFM 
+
+vA,B t (x) = EP A,B [X1 | Xt = x] − x
+
+1 − t
+
+to obtain the desired relation between score mismatch and velocity mismatch. See Appendix A for the full proof. Finally, with ∇x log rt in Lemma 3.4 replaced by velocity fields mismatch in Lemma 3.5, we obtain a velocity-only expression for what we label the Function-space Kullback–Leibler divergence (FKL): 
+
+Theorem 3.6. For the linear interpolation used in FFM Kerrigan et al. (2023c), under Assump-tions 3.1–3.2 and mild regularity conditions, we have 
+
+KL  νA ∥ νB  =
+
+Z 10
+
+Z
+
+> H
+
+t
+
+1 − t vAt (x) − vBt (x) 2
+
+> Hμ0
+
+dμ At (x) dt. (7) In the sequel, we use Equation (7) for FFM-based FKL estimation. To this end, we use a MINO-based conditional neural operator (Shi et al., 2025) to jointly approximate the two velocity fields vA and 
+
+vB , where a binary conditioning variable c specifies which velocity field is being approximated. To cancel the singularity from t 
+
+> 1−t
+
+in Equation (7) and thereby stabilize stable FKL estimation, we enforce the boundary condition vθ (x, 1) = x through a subtraction-based parameterization (Hu et al., 2025), so that the difference between the two learned fields vanishes at t = 1 . The model is trained with the conditional flow-matching objective, and the resulting FKL is estimated by Monte Carlo evaluation of Equation (7) from samples of νA, μ0, and t ∼ U [0 , 1] , without requiring simulating the full generative dynamics via ODE integration. Full implementation details of FKL estimation are provided in Appendix B. 
+
+4 Validation of Function KL Estimation on Special Cases 
+
+To validate our theory and KL estimation pipeline, we conduct an extensive comparison between analytic and estimated KL divergences in two special cases where the analytic KL is available. This enables a direct evaluation of the estimation accuracy. Specifically, we consider (i) Gaussian measures: νA = N s sin(2 πf x ), R, ν B = N (0 , R), where R is a Matérn covariance operator with smoothness parameter α1 = 3 .5, and we vary the codomain dimension D, frequency f , and scale 
+
+s; and (ii) linear SDEs: νA,B : dY t = cA,B Yt dt + g dW t, where we vary the codomain dimension 
+
+D, drift cA,B , and diffusion g. Derivations of the closed-form ground truth KL for both cases are provided in Appendix C; all KL estimates are computed with both the training and estimation resolutions of FFM set to 256 . For the centered noise measure μ0 used in FKL estimation, we choose the covariance operator C as follows: in the (i) Gaussian special case , we use Matérn with smoothness 
+
+α0 = 0 .5; in the (ii) SDE special case and in all experiments in the next section, we estimate the data’s Fourier spectrum using empirically determined variances for each Fourier coefficient, then scale each coefficient by the wavenumber magnitude k = ∥m∥2 to obtain a rougher noise spectrum. As shown in Table 1, across a range of settings, our estimated KL matches the closed-form ground truth very closely. This provides compelling empirical validation that our functional-space KL formulation and its mathematical derivation are correct, and that the proposed estimation procedure is reliable in practice. Appendix D provides a detailed ablation analysis, including sensitivity to the estimation factors and the choice of noise covariance operator C. Overall, the results show that FKL estimation is accurate and numerically stable, supporting our discretization choices and underscoring the importance of choosing a noise covariance that is trace class on H and satisfies the Cameron-Martin support assumption (Assumption 3.2). 5Case D f s KL( νA∥νB ) KL( νB ∥νA)                                                                                                              
+
+> Analytic Estimated Analytic Estimated 1110.5 3.64 3.95 3.64 3.88 2111.5 32.79 32.61 32.79 33.31 3131.5 50.00 49.58 50.00 49.00 4151.5 103.74 104.46 103.74 100.58 5210.5 7.29 6.77 7.29 6.72 6310.5 10.93 10.48 10.93 10.49 7510.5 18.22 22.32 18.22 22.28 810 10.5 36.43 45.12 36.43 45.73
+> Case DcAcBgKL( νA∥νB)KL( νB∥νA)
+> Analytic Estimated Analytic Estimated 110.01 1.50 0.75 8.93 8.87 54.71 53.77 210.10 2.00 0.75 15.89 13.89 186.19 200.64 320.01 1.50 0.75 17.86 18.05 109.43 127.67 430.01 1.50 0.75 26.79 34.58 164.14 145.06 550.01 1.50 1.00 26.34 32.82 158.22 135.28
+
+Table 1: Comparison of analytic and estimated FKL. Top: Gaussian case. Bottom: linear SDE case. Tables (left) report numerical values; plots (right) compare analytic vs estimated values. 
+
+5 Application of Function KL on TI Evaluation 
+
+5.1 TI Benchmark Setup TI methods. We consider several recent SDE-based methods. vanilla IPF-based baseline (vSB) (Chen et al., 2022), Schrödinger Bridge Iterative Reference Refinement (SBIRR) (Shen et al., 2025), and Multi-Marginal Schrödinger Bridge Matching (MSBM) (Park & Lee, 2025) for-mulate TI as a constrained stochastic optimal control problem, which via the Hopf-Cole transform reduces to learning forward and backward diffusion processes. Mean-Field Langevin in path space (MFL) (Chizat et al., 2022) relaxes the multi-marginal fitting constraints and solves the resulting entropy-regularized variational problem using mean-field Langevin dynamics. entropic Action Match-ing (AM) fixes the marginal densities and therefore optimizes only one variable. As an ODE-based baseline, we include Trajectory Inference with Growth via Optimal transport and Neural network (TIGON), which formulates TI as a deterministic optimal control problem governed by the continuity equation with multi-marginal constraints. For each method, we sample trajectories after training. SBIRR and vSB simulate trajectory segments independently between consecutive training snapshots and concatenate them into full trajectories. TIGON, MSBM, and AM sample an initial state at an endpoint and then simulate the trajectory end-to-end. MFL connects optimized snapshots at training time points using conditional reference Brownian bridges. We denote by Validation (VAL) the validation trajectories resampled from the same distribution as the ground-truth trajectories. 
+
+Datasets. We use both synthetic and real single-cell datasets. The synthetic datasets, generated from known SDEs, include (i) Lotka-Volterra , modeling predator–prey dynamics; (ii) Repressilator (Shen et al., 2025), exhibiting cyclic behavior; and (iii) Petal (Neklyudov et al., 2023), capturing bifurcations and merges similar to those in cellular differentiation. For Lotka–Volterra and Repressilator , odd-indexed snapshots are used for training and even-indexed snapshots for validation. In contrast, for 
+
+Petal , all snapshot times are used for both training and validation, but the validation set consists of samples different from those used for training. Real data consists of four scRNA-seq benchmarks, preprocessed following Shen et al. (2025): (i) Embryoid Body (EB) Moon et al. (2019), (ii) Human Embryonic Stem Cell (hESC) Chu et al. (2016), (iii) Mouse Erythroid (ME) Pijuan-Sala et al. (2019), and (iv) Human Fibroblast (HF) Riba et al. (2022). Each dataset is projected to 5 dimensions and split into 3 equally spaced training snapshots and 2 validation snapshots. 6Evaluation metrics. The TI literature typically evaluates performance via marginal reconstruction on held-out validation snapshots, using metrics such as Earth Mover’s Distance (EMD) ( W1), Wasserstein-2 Distance (W2), Sliced Wasserstein Distance (SWD), Max-Sliced Wasserstein Distance (MWD), and RBF-Maximum Mean Discrepancy (MMD) (see Appendix E.1), all of which we report here. To the best of our knowledge, this is the first benchmark using such an extensive set of standard marginal metrics. However, marginal metrics cannot detect discrepancies at the level of full trajectory distributions. We therefore estimate FKL between the ground-truth trajectory distribution and that produced by each method by learning velocity fields from complete trajectories. For synthetic datasets, ground-truth trajectories are simulated from the known SDEs, whereas for real scRNA-seq datasets, where only snapshot samples are observed, we use the trajectory measure inferred by SBIRR (Shen et al., 2025) from all snapshots as a biologically motivated reference. This is consistent with standard assumptions in cellular development modeling, since SBIRR learns stochastic dynamics aligned with Waddington’s landscape view of differentiation; under this proxy, FKL quantifies how closely alternative methods match a biologically interpretable view of developmental dynamics. 
+
+5.2 Results with Marginal-Based Metrics Finding 1: Marginal-based rankings vary substantially with (i) validation time-point, (ii) metric choice, and (iii) metric hyperparameters. Our benchmark highlights that inconsistencies are intrinsic to marginal-based evaluation. (i) The same method can rank best at one validation snapshot and substantially worse at another, even though methods are trained to learn the full underlying dynamics. This pattern is clear on both synthetic and real datasets. On Lotka-Volterra, SBIRR leads at early snapshots but is overtaken by vSB and TIGON at later ones. Repressilator shows even stronger reversals, with SBIRR leading at some snapshots and TIGON at others. Petal is more stable, but still not invariant across τ (Table 2). The same effect appears on real datasets, where the leading method at early snapshot often differs from that at later snapshot (Table 3). (ii) Even at a fixed validation snapshot, different metrics on the same marginal can induce different rankings. For example, at the last validation snapshot of Lotka-Volterra, TIGON ranks best under EMD and MMD, but not under the other metrics (Table 2a). Similar metric-dependent reversals are also observed at early snapshots on Petal, EB, and ME. (iii) Some marginal metrics are themselves sensitive to hyperparameter choices, so rankings can vary even within a fixed metric family. Kernel-based distances illustrate this effect: their usefulness depends on whether the kernel captures a notion of similarity aligned with the data. For MMD with RBF kernel, the statistic is informative only when Euclidean distances in data space are meaningful, and even then it can remain highly sensitive to bandwidth. With a fixed bandwidth, MMD may saturate and become insensitive to growing discrepancies. On Repressilator, this appears for AM: while OT-based metrics such as EMD and W2 increase steadily, reflecting transport over larger spatial scales, MMD remains nearly constant (Table 2b). Taken together, these results suggest that marginal-based rankings are highly sensitive to evaluation choices, making them difficult to interpret robustly. 
+
+Finding 2: Matching marginals does not imply correct dynamics. Marginal evaluation is funda-mentally non-identifiable: many distinct path measures can share the same finite set of time-indexed marginals, so matching these marginals does not determine the underlying dynamics. Therefore, (i) strong marginal agreement can mask incorrect temporal behavior. A model may achieve competitive marginal scores without recovering the true dynamics. On Repressilator, for example, TIGON attains competitive marginal distances despite generating a smooth spiral rather than the characteristic three-gene oscillations (Table 2b). (ii) Marginal comparisons are further affected by method-specific trajectory generation procedures. Choices such as the numerical integration direction can improve agreement at some validation snapshots while degrading it at others. For example, on Lotka-Volterra, TIGON with backward integration performs well at the last validation snapshot (Table 2a). On Repressilator, SBIRR performs well at early snapshots but deteriorates later, whereas vSB scores well at the last snapshot despite missing the correct dynamics (Table 2b). To further assess both the statistical robustness of marginal-metric rankings and their relation to dynamical fidelity, we examine the Critical Difference (CD) plots on the three synthetic datasets (Fig-ure 3). On Lotka-Volterra and Repressilator, the CD plots show that, except for VAL, most differences are not statistically significant, underscoring the statistical weakness of marginal-metric rankings. On Petal, several differences become significant, yet CD ranks SBIRR ahead of VAL, suggesting 7that even statistically significant marginal-based rankings need not align with trajectory-level fidelity. Overall, these results support our observations : marginal-based metrics often yield rankings that are not only statistically indistinguishable but also misaligned with trajectory-level fidelity. As a result, the fact that no method consistently recovers the correct dynamics is largely invisible under marginal evaluation, which can give an incoherent and misleading view of performance. 
+
+5.3 Results with Functional KL 
+
+Next, we analyze the behavior of all methods for all datasets under a new light, by considering the divergence between trajectory distributions, which is unlocked by our estimator. For all the result tables, we report two additional columns: the forward KL  νA ∥ νB , and the reverse KL  νB ∥ νA,where νA stands for the reference, ground-truth path measure, and νB is the path-measure inferred by each TI method. Recall that these are learned through our estimation method, through the lenses of the parametric velocity fields trained on sampled trajectories. 
+
+Figure 2: Trajectories generated by different TI methods across three synthetic datasets, from top to bottom: Lotka–Volterra, Repressilator, and Petal. Colored curves show generated trajectories, while black curves show Ground Truth (GT) trajectories. Colored crosses mark sampled validation snapshots used to compute marginal metrics. 
+
+Method τ = 0 .125 τ = 0 .375 τ = 0 .625 τ = 0 .875 FKL 
+
+EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD KL( νA∥νB ) KL( νB ∥νA)
+
+VAL 0.018 0.024 0.011 0.015 0.007 0.026 0.035 0.015 0.020 0.013 0.036 0.049 0.021 0.027 0.012 0.061 0.082 0.035 0.044 0.017 0.271 0.268 
+
+SBIRR 0.179 0.186 0 .125 0 .178 0 .174 0.090 0.105 0 .064 0 .070 0 .051 0.254 0.281 0 .200 0 .260 0.198 0.368 0.420 0.273 0.375 0.198 43 .352 42 .779 
+
+vSB 1.009 1.022 0.764 1.015 0.874 0.529 0.568 0.381 0.516 0.482 0.306 0.366 0.254 0.311 0.173 0.272 0.323 0 .199 0 .244 0.156 165 .057 126 .886 
+
+MSBM 0.784 0.786 0.595 0.784 0.716 0.321 0.325 0.232 0.323 0.306 0.486 0.503 0.361 0.501 0.426 0.554 0.637 0.452 0.625 0.388 79 .872 46 .023 
+
+MFL 1.004 1.140 0.801 0.905 0.615 0.393 0.639 0.458 0.590 0.247 0.402 0.573 0.396 0.490 0.265 0.659 0.958 0.698 0.875 0.240 43 .929 130 .579 
+
+AM 0.862 0.864 0.655 0.863 0.763 0.342 0.406 0.299 0.381 0.277 0.569 1.079 0.804 1.072 0.239 1.134 1.958 1.449 1.945 0.203 44 .914 55 .488 
+
+TIGON 0.446 0.500 0.340 0.390 0.293 0.323 0.386 0.256 0.361 0.174 0.266 0.381 0.257 0.330 0.131 0.245 0.351 0.241 0.312 0.104 179 .367 65 .442 
+
+(a) Lotka–Volterra dataset. 
+
+Method τ = 0 .1 τ = 0 .3 τ = 0 .5 τ = 0 .7 τ = 0 .9 FKL 
+
+EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD KL( νA∥νB ) KL( νB ∥νA)
+
+VAL 0.036 0.044 0.014 0.019 0.014 0.056 0.070 0.023 0.034 0.011 0.080 0.099 0.033 0.052 0.014 0.094 0.114 0.042 0.060 0.023 0.116 0.147 0.055 0.081 0.030 0.015 0.014 
+
+SBIRR 0.390 0.413 0 .256 0 .401 0 .366 0.865 0.899 0.558 0.868 0.688 0.442 0.475 0 .263 0 .345 0 .291 0.742 0.815 0.477 0.750 0.390 1.832 1.894 1.055 1.852 0.545 23 .519 25 .242 
+
+vSB 1.884 1.889 1.174 1.881 1.270 1.227 1.248 0.724 1.156 0.880 0.983 1.017 0.596 0.972 0.611 1.059 1.122 0.640 0.948 0.605 0.944 1.078 0.576 0.901 0.537 82 .933 79 .014 
+
+MSBM 1.465 1.469 0.790 1.464 1.120 1.324 1.348 0.694 1.306 0.982 1.011 1.106 0.643 1.062 0.713 0.995 1.128 0.571 0.992 0.614 1.225 1.400 0.698 1.288 0.678 90 .011 49 .395 
+
+MFL 1.796 1.914 1.101 1.529 0.931 1.737 1.837 1.083 1.552 0.869 1.500 1.627 0.975 1.391 0.652 1.361 1.510 0.823 1.277 0.523 1.173 1.317 0.718 1.036 0.466 63 .077 84 .621 
+
+AM 1.454 1.456 0.894 1.419 1.111 1.355 1.385 0.840 1.321 0.964 2.208 5.554 3.119 5.278 0.618 7.566 19 .112 11 .037 18 .390 0.551 17 .516 39 .206 22 .624 37 .685 0.352 66 .901 126 .248 
+
+TIGON 1.074 1.135 0.656 0.915 0.687 0.851 0.952 0.501 0 .760 0 .480 0.821 0.884 0.496 0.720 0.441 0.813 0.860 0.444 0.663 0.431 0.842 0.916 0.483 0.677 0.430 54 .515 42 .844 
+
+(b) Repressilator dataset. 
+
+Method τ = 0 τ = 0 .25 τ = 0 .5 τ = 0 .75 τ = 1 FKL 
+
+EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD EM D W 2 SWD MWD MMD KL( νA∥νB ) KL( νB ∥νA)
+
+VAL 0.011 0.015 0.006 0.008 0.006 0.023 0.040 0.019 0.034 0.017 0.038 0.080 0.036 0.063 0.028 0.053 0.143 0.069 0.099 0.036 0.068 0.246 0.113 0.173 0.043 0.079 0.078 
+
+SBIRR 0.017 0.021 0.011 0.014 0.011 0.029 0.046 0 .021 0 .033 0.015 0.037 0.077 0 .030 0 .059 0 .020 0.045 0.105 0 .046 0 .073 0.022 0.045 0.156 0 .071 0 .121 0 .021 15 .991 49 .360 
+
+vSB 0.014 0.019 0.007 0.009 0.004 0.029 0.052 0.023 0.033 0.016 0.046 0.096 0.043 0.062 0.029 0.055 0.131 0.061 0.079 0.034 0.059 0.202 0.098 0.155 0.035 18 .881 53 .435 
+
+MSBM 0.015 0.021 0.007 0.009 0.003 0.043 0.062 0.027 0.050 0.021 0.070 0.111 0.053 0.089 0.043 0.096 0.160 0.084 0.131 0.057 0.119 0.254 0.126 0.226 0.067 9.641 17 .055 
+
+MFL 0.194 0.690 0.482 0.515 0.051 0.287 0.516 0.352 0.385 0.054 0.284 0.445 0.296 0.316 0.106 0.184 0.387 0.251 0.264 0.062 0.105 0.397 0.254 0.285 0.023 42 .660 68 .191 
+
+AM 0.016 0.022 0.008 0.011 0.008 0.102 0.115 0.059 0.081 0.028 0.167 0.194 0.095 0.138 0.067 0.183 0.224 0.114 0.163 0.082 0.166 0.283 0.149 0.205 0.088 12 .328 31 .641 
+
+TIGON 0.094 0.098 0.061 0.071 0.020 0.121 0.126 0.053 0.080 0.011 0.163 0.169 0.091 0.117 0.022 0.128 0.155 0.076 0.100 0.018 0.053 0.169 0.083 0.147 0.028 96 .144 35 .505 
+
+(c) Petal dataset. 
+
+Table 2: Marginal evaluation at each validation time τ and FKL results. 
+
+(d) Lotka-Volterra dataset. (e) Repressilator dataset. (f) Petal dataset. 
+
+Figure 3: Critical difference diagrams of marginal evaluation. 8Figure 4: Trajectories generated by different TI methods across four real-world datasets, from top to bottom: EB, hESC, ME, and HF. Colored curves show generated trajectories, while black curves show reference trajectories inferred by SBIRR.                                                                          
+
+> Method τ= 0 .25 τ= 0 .75 FKL
+> EM D W2SWD MWD MMD EM D W2SWD MWD MMD KL( νA∥νB)KL( νB∥νA)
+> vSB 0.699 0.763 0.215 0.342 0.195 0.856 0.920 0.290 0.502 0.213 23 .778 27 .727
+> MSBM 0.737 0.888 0.268 0.507 0.179 0.736 0.826 0 .212 0 .351 0 .157 29 .452 21 .454
+> MFL 0.699 0.819 0.202 0 .290 0 .171 0.882 0.975 0.322 0.462 0.316 22 .058 73 .201
+> AM 0.781 0.919 0.258 0.416 0.179 1.296 1.389 0.506 0.911 0.371 74 .803 32 .180
+> TIGON 1.151 1.324 0.385 0.758 0.299 0.922 1.033 0.295 0.441 0.170 122 .486 41 .076
+
+(a) EB dataset.                                                                            
+
+> Method τ= 0 .25 τ= 0 .75 FKL
+> EM D W2SWD MWD MMD EM D W2SWD MWD MMD KL( νA∥νB)KL( νB∥νA)
+> vSB 1.008 1.026 0.470 0.871 0.735 1.130 1.168 0 .466 0 .890 0.722 127 .241 124 .057
+> MSBM 1.011 1.036 0.444 0.891 0.703 1.179 1.216 0.508 0.951 0.736 111 .151 81 .697
+> MFL 1.167 1.193 0.508 0.951 0.794 1.183 1.223 0.481 0.956 0.757 97 .134 117 .901
+> AM 2.194 2.243 1.086 2.068 1.023 2.206 2.242 1.025 1.875 1.047 145 .552 283 .293
+> TIGON 0.908 0.990 0 .368 0 .673 0 .565 1.195 1.237 0.497 0.950 0.695 293 .102 161 .731
+
+(b) hESC dataset.                                                                          
+
+> Method τ= 0 .25 τ= 0 .75 FKL
+> EM D W2SWD MWD MMD EM D W2SWD MWD MMD KL( νA∥νB)KL( νB∥νA)
+> vSB 1.041 1.089 0.361 0.592 0.364 1.107 1.248 0 .496 0 .849 0 .416 51 .119 48 .054
+> MSBM 0.943 1.011 0.288 0 .444 0 .290 1.209 1.298 0.501 0.921 0.417 65 .571 37 .563
+> MFL 1.054 1.125 0.385 0.563 0.417 1.398 1.517 0.603 1.014 0.586 42 .268 79 .306
+> AM 0.938 1.003 0.317 0.459 0.316 1.493 1.652 0.600 1.013 0.485 89 .223 81 .838
+> TIGON 1.091 1.189 0.472 0.803 0.425 1.432 1.524 0.656 1.094 0.563 250 .619 82 .386
+
+(c) ME dataset.                                                                          
+
+> Method τ= 0 .25 τ= 0 .75 FKL
+> EM D W2SWD MWD MMD EM D W2SWD MWD MMD KL( νA∥νB)KL( νB∥νA)
+> vSB 1.215 1.343 0.446 0.823 0.268 1.336 1.432 0.510 0.998 0.283 56 .990 41 .638
+> MSBM 0.956 1.063 0.362 0.674 0.216 1.168 1.275 0 .426 0 .765 0.279 58 .914 26 .784
+> MFL 1.151 1.266 0.477 0.827 0.323 1.368 1.476 0.542 0.930 0.379 29 .706 69 .830
+> AM 0.964 1.063 0 .352 0 .631 0 .207 1.701 2.201 0.807 1.475 0.262 73 .227 66 .942
+> TIGON 2.371 2.482 1.097 2.138 0.592 2.031 2.199 0.907 1.688 0.441 197 .769 69 .540
+
+(d) HF dataset. 
+
+Table 3: Marginal evaluation at each validation time τ and FKL results, with SBIRR trajectories used as the reference. 
+
+Finding 3: FKL yields more plausible rankings than marginal metrics. Across datasets, FKL provides a consistent trajectory-level assessment of all methods, with lower values indicating smaller discrepancies between generated and ground-truth trajectory distributions. (i) When marginal-metric-based CD diagrams agree with visual inspection, FKL agrees as well. For example, on 2 of the 3 synthetic datasets (Lotka–Volterra and Repressilator), both marginal-metric-based CD diagrams (Figure 3) and FKL (Table 2) correctly identify VAL as the best-performing method. Likewise, both correctly assign poor performance to AM on Repressilator and to MFL on Lotka–Volterra and Petal. 
+
+(ii) More importantly, FKL remains consistent with visual inspection when marginal metrics become misleading, correcting the inconsistent rankings produced by existing methods. Among all trajectory inference methods, FKL ranks SBIRR as the best method on Lotka–Volterra and Repressilator, and MSBM as the best on Petal. These conclusions match visual inspection but are not fully captured by marginal-metric-based CD plots. For instance, on Repressilator, marginal metrics rank TIGON above SBIRR, whereas FKL places SBIRR higher, in agreement with visual evidence. On Petal, the discrepancy is even more pronounced: although FKL correctly identifies VAL as the best and MSBM as the strongest trajectory inference method, marginal-metric-based CD plots rank VAL only second and place MSBM among the worst methods. On real-world dataset hESC, TIGON is consistently ranked best by all marginal metrics at the first validation timepoint ( τ = 0 .25 ); in contrast, FKL reveals a mismatch in dynamics: TIGON generates smooth trajectories, whereas the reference paths are stochastic. Overall, these results suggest that marginal-based evaluation can be misaligned with trajectory-level quality, whereas our discrepancy measure FKL can recover the similarity in the dynamics between TI methods and produce rankings that are better aligned with visual evidence. 9Finding 4: Mode seeking (reverse KL) vs. mode coverage (forward KL). Recall that νA
+
+denotes the reference, ground-truth path measure and νB the path measure inferred by a TI method. The asymmetry between KL  νA ∥ νB  and KL  νB ∥ νA explains why the two divergences favor different methods empirically. (i) The forward KL, KL  νA ∥ νB , favors mode coverage : it strongly penalizes regions where the reference measure has nonzero mass but the inferred measure assigns little or no mass. Therefore, it favors methods that preserve broad support over the target distribution. This helps explain why forward KL ranks MFL best all real datasets (Table 3), as supported by both the optimization procedure of MFL and the trajectory visualizations. In MFL, a family of point clouds, one for each training snapshot, is initially sampled from a Gaussian distribution and then evolved toward the data by noisy gradient descent. Some particles that start far from the data region fail to move back to the data support, and the Brownian bridges connecting these outliers to correctly optimized particles then produce trajectories that extend well beyond the data support, giving rise to a pronounced radiating pattern in the visualizations. As a result, the inferred trajectories cover not only the data region but also substantial off-support space. (ii) By contrast, the reverse KL, KL  νB ∥ νA, favors mode-seeking : it penalizes probability mass assigned to regions where the reference measure has little or no support, thereby favoring precision over coverage. Consistent with this property, reverse KL ranks MSBM best on all real datasets (Table 3), since its inferred trajectories stay closest to the data distribution, sometimes at the cost of missing lower-density modes. At the other extreme, MFL is among the worst methods on almost all synthetic and real datasets because it assigns substantial mass to regions far from the reference support. Taken together, these results reveal an asymmetry in the preferences of the two divergences that marginal metrics do not capture. Figure 1 highlights the limitations of marginal-only evaluation. On the petal dataset, at validation time point τ = 0 .75 , TIGON performs slightly better than MSBM under snapshot metrics, with W2 = 0 .155 for TIGON versus 0.160 for MSBM, and a clearer advantage in MMD ( 0.018 versus 
+
+0.057 ), reflecting differences in local sample dispersion. Yet these marginal scores do not assess the underlying dynamics. In contrast, our path-level metric FKL, which compares full trajectory distributions rather than isolated time marginals, strongly separates the two methods (reverse FKL =17 .055 for MSBM and 35 .505 for TIGON), revealing the different dynamics despite similar marginal fit. The zoomed inset in Figure 1 provides a visual counterpart to this observation: although snapshot distances at τ = 0 .75 are similar, the generated trajectories exhibit differences in their dynamics. 
+
+6 Conclusion 
+
+We introduced FKL, a general approach for estimating divergences between probability measures over function spaces. Grounded in the theory of infinite-dimensional flows, FKL yields a tractable estimator that can be learned from data and scales to realistic regimes in both the number of snapshots and the dimensionality of observations. We used FKL to re-examine trajectory inference in physics simulations and single-cell genomics. Current state-of-the-art methods are typically evaluated via marginal reconstruction on held-out snapshots, which does not directly assess the implied dynamics. Through an extensive empirical study on both synthetic and real datasets, we showed that these snapshot-based metrics can induce inconsistent method rankings and may even favor models whose assumptions conflict with the dynamics of the process generating the trajectories. By comparing full trajectory distributions to a reference distribution, FKL enables a coherent and principled assessment of TI methods. Across all datasets considered, this evaluation method aligns with qualitative expectations and resolves several counterintuitive outcomes produced by marginal criteria used in the literature. 
+
+References 
+
+Baker, E. L., Yang, G., Severinsen, M. L., Hipsley, C. A., and Sommer, S. Conditioning non-linear and infinite-dimensional diffusion processes. Advances in Neural Information Processing Systems ,37:10801–10826, 2024. Belghazi, M. I., Baratin, A., Rajeshwar, S., Ozair, S., Bengio, Y., Courville, A., and Hjelm, D. Mutual information neural estimation. In International conference on machine learning , pp. 531–540. PMLR, 2018. 10 Butakov, I., Tolmachev, A., Malanchuk, S., Neopryatnaya, A., and Frolov, A. Mutual information estimation via normalizing flows. Advances in Neural Information Processing Systems , 37:3027– 3057, 2024. Butakov, I., Semenenko, A., Kirova, V., Oseledets, I., and Frolov, A. FMMI: Flow matching mutual information estimation. In ICLR 2026 2nd Workshop on Deep Generative Model in Machine Learning: Theory, Principle and Efficacy , 2026. URL https://openreview.net/forum?id= 2zTjX6rvn4 .Chen, T., Liu, G.-H., and Theodorou, E. Likelihood training of schrödinger bridge using forward-backward SDEs theory. In International Conference on Learning Representations , 2022. URL 
+
+https://openreview.net/forum?id=nioAdKCEdXB .Chen, T., Liu, G.-H., Tao, M., and Theodorou, E. Deep momentum multi-marginal schrödinger bridge. In Thirty-seventh Conference on Neural Information Processing Systems , 2023. URL 
+
+https://openreview.net/forum?id=ykvvv0gc4R .Chen, Y. and Vanden-Eijnden, E. Scale-Adaptive Generative Flows for Multiscale Scientific Data, September 2025. Chen, Y., Georgiou, T. T., and Pavon, M. Stochastic control liaisons: Richard Sinkhorn meets Gaspard Monge on a Schrödinger bridge. SIAM Review , 63(2):249–313, 2021. Chizat, L., Zhang, S., Heitz, M., and Schiebinger, G. Trajectory inference via mean-field langevin in path space. Advances in Neural Information Processing Systems , 35:16731–16742, 2022. Chu, L.-F., Leng, N., Zhang, J., Hou, Z., Mamott, D., Vereide, D., Choi, J., Kendziorski, C., Stewart, R., and Thomson, J. Single-cell rna-seq reveals novel regulators of human embryonic stem cell differentiation to definitive endoderm. Genome Biology , 17, 08 2016. doi: 10.1186/ s13059-016-1033-x. Da Prato, G. and Zabczyk, J. Stochastic Equations in Infinite Dimensions . Encyclopedia of Mathe-matics and its Applications. Cambridge University Press, 2 edition, 2014. Franzese, G. Generative diffusion models in infinite dimensions: a survey. Philosophical Transactions A, 383, 06 2025. doi: 10.1098/rsta.2024.0322. Franzese, G., Bounoua, M., and Michiardi, P. Minde: Mutual information neural diffusion estimation. 
+
+arXiv preprint arXiv:2310.09031 , 2023a. Franzese, G., Corallo, G., Rossi, S., Heinonen, M., Filippone, M., and Michiardi, P. Continuous-time functional diffusion processes. In Oh, A., Naumann, T., Globerson, A., Saenko, K., Hardt, M., and Levine, S. (eds.), Advances in Neural Information Processing Systems , volume 36, pp. 37370–37400. Curran Associates, Inc., 2023b. Gowri, G., Lun, X.-K., Klein, A. M., and Yin, P. Approximating mutual information of high-dimensional variables using learned representations. In Globerson, A., Mackey, L., Belgrave, D., Fan, A., Paquet, U., Tomczak, J., and Zhang, C. (eds.), Advances in Neural Information Processing Systems , volume 37, pp. 132843–132875. Curran Associates, Inc., 2024. doi: 10.52202/ 079017-4223. Gretton, A., Borgwardt, K. M., Rasch, M. J., Schölkopf, B., and Smola, A. A kernel two-sample test. Journal of Machine Learning Research , 13(25):723–773, 2012. URL http://jmlr.org/ papers/v13/gretton12a.html .Hagemann, P., Mildenberger, S., Ruthotto, L., Steidl, G., and Yang, N. T. Multilevel diffusion: Infinite dimensional score-based diffusion models for image generation. arXiv preprint arXiv:2303.04772 ,2023. Haghverdi, L., Büttner, M., Wolf, F. A., Buettner, F., and Theis, F. J. Diffusion pseudotime robustly reconstructs lineage branching. Nature Methods , 13(10):845–848, 2016. doi: 10.1038/nmeth.3971. URL https://doi.org/10.1038/nmeth.3971 .11 Hu, X., Liao, R., Xu, K., Liu, B., Li, Y., Ie, E., Fei, H., and Liu, Q. Improving rectified flow with boundary conditions, 2025. URL https://arxiv.org/abs/2506.15864 .Huguet, G., Magruder, D. S., Tong, A., Fasina, O., Kuchroo, M., Wolf, G., and Krishnaswamy, S. Manifold interpolating optimal-transport flows for trajectory inference. Advances in neural information processing systems , 35:29705–29718, 2022. Ismail Fawaz, H., Forestier, G., Weber, J., Idoumghar, L., and Muller, P.-A. Deep learning for time series classification: a review. Data Mining and Knowledge Discovery , 33(4):917–963, 2019. Kerrigan, G., Ley, J., and Smyth, P. Diffusion generative models in infinite dimensions. In Interna-tional Conference on Artificial Intelligence and Statistics , pp. 9538–9563. PMLR, 2023a. Kerrigan, G., Ley, J., and Smyth, P. Diffusion generative models in infinite dimensions. In Interna-tional Conference on Artificial Intelligence and Statistics , pp. 9538–9563. PMLR, 2023b. Kerrigan, G., Migliorini, G., and Smyth, P. Functional Flow Matching, December 2023c. Kong, X., Liu, O., Li, H., Yogatama, D., and Steeg, G. V. Interpretable diffusion via information decomposition. arXiv preprint arXiv:2310.07972 , 2023. La Manno, G. e. a. Rna velocity of single cells. Nature vol. 560,7719: 494-498 , 2018. doi: 10.1038/s41586-018-0414-6. Lange, M., Bergen, V., Klein, M., Setty, M., Reuter, B., Bakhti, M., Lickert, H., Ansari, M., Schniering, J., Schiller, H. B., Pe’er, D., and Theis, F. J. Cellrank for directed single-cell fate mapping. Nature Methods , 19:159–170, 2022. Léonard, C. A survey of the schr \" odinger problem and some of its connections with optimal transport. arXiv preprint arXiv:1308.0215 , 2013. Lim, S., Yoon, E. B., Byun, T., Kang, T., Kim, S., Lee, K., and Choi, S. Score-based generative modeling through stochastic evolution equations in hilbert spaces. Advances in Neural Information Processing Systems , 36, 2024. Mandelbaum, A. Linear estimators and measurable linear transformations on a Hilbert space. 
+
+Zeitschrift für Wahrscheinlichkeitstheorie und Verwandte Gebiete , 65(3):385–397, February 1984. ISSN 1432-2064. doi: 10.1007/BF00533743. Moon, K. R., van Dijk, D., Wang, Z., Gigante, S. A., Burkhardt, D. B., Chen, W. S., Yim, K. M., van den Elzen, A., Hirn, M. J., Coifman, R. R., Ivanova, N. B., Wolf, G., and Krishnaswamy, S. Visualizing structure and transitions in high-dimensional biological data. Nature Biotechnology ,37:1482 – 1492, 2019. URL https://api.semanticscholar.org/CorpusID:208612995 .Nakai, E., Tomita, N., and Yabuta, K. Density of the set of all infinitely differentiable functions with compact support in weighted sobolev spaces. Scientiae Mathematicae Japonicae , 60, 01 2004. Neklyudov, K., Brekelmans, R., Severo, D., and Makhzani, A. Action matching: Learning stochastic dynamics from samples. In International conference on machine learning , pp. 25858–25889. PMLR, 2023. Nowakowski, T. J., Bhaduri, A., Pollen, A. A., Alvarado, B., Mostajo-Radji, M. A., Lullo, E. D., Haeussler, M., Sandoval-Espinosa, C., Liu, S. J., Velmeshev, D., Ounadjela, J. R., Shuga, J., Wang, X., Lim, D. A., West, J. A., Leyrat, A. A., Kent, W. J., and Kriegstein, A. R. Spatiotemporal gene expression trajectories reveal developmental hierarchies of the human cortex. Science , 358(6368): 1318–1323, 2017. doi: 10.1126/science.aap8809. Øksendal, B. Stochastic Differential Equations: An Introduction with Applications . Universitext. Springer Berlin Heidelberg, 2010. ISBN 978-3-642-14394-6. Park, B. and Lee, J. Multi-marginal schrödinger bridge matching, 2025. URL https://arxiv. org/abs/2510.16587 .Park, B., Choi, J., Lim, S., and Lee, J. Stochastic optimal control for diffusion bridges in function spaces. arXiv preprint arXiv:2405.20630 , 2024. 12 Peyré, G. and Cuturi, M. Computational optimal transport, 2020. URL https://arxiv.org/abs/ 1803.00567 .Pidstrigach, J., Marzouk, Y., Reich, S., and Wang, S. Infinite-dimensional diffusion models. Journal of Machine Learning Research , 25(414):1–52, 2024. Pieper-Sethmacher, T., van der Meulen, F., and van der Vaart, A. Simulation of infinite-dimensional diffusion bridges, 2025. URL https://arxiv.org/abs/2503.13177 .Pijuan-Sala, B., Griffiths, J. A., Guibentif, C., and et al. A single-cell molecular map of mouse gas-trulation and early organogenesis. Nature , 566:490–495, 2019. doi: 10.1038/s41586-019-0933-9. Riba, A., Oravecz, A., Durik, M., and et al. Cell cycle gene regulation dynamics revealed by rna veloc-ity and deep-learning. Nature Communications , 13:2865, 2022. doi: 10.1038/s41467-022-30545-8. Sha, Y., Qiu, Y., Zhou, P., and Nie, Q. Reconstructing growth and dynamic trajectories from single-cell transcriptomics data. Nature Machine Intelligence , 6(1):25–39, January 2024. ISSN 2522-5839. doi: 10.1038/s42256-023-00763-w. Shen, Y., Berlinghieri, R., and Broderick, T. Multi-marginal schrödinger bridges with iterative reference refinement. In International Conference on Artificial Intelligence and Statistics , pp. 3817–3825. PMLR, 2025. Shi, Y., Bortoli, V. D., Campbell, A., and Doucet, A. Diffusion schrödinger bridge matching, 2023. URL https://arxiv.org/abs/2303.16852 .Shi, Y., Ross, Z. E., Asimaki, D., and Azizzadenesheli, K. Mesh-informed neural operator : A transformer generative approach, 2025. URL https://arxiv.org/abs/2506.16656 .Tong, A., Huang, J., Wolf, G., Van Dijk, D., and Krishnaswamy, S. Trajectorynet: A dynamic optimal transport network for modeling cellular dynamics. In International conference on machine learning , pp. 9526–9536. PMLR, 2020. Trapnell, C., Cacchiarelli, D., Grimsby, J., Pokharel, P., Li, S., Morse, M., Lennon, N. J., Livak, K. J., Mikkelsen, T. S., and Rinn, J. L. The dynamics and regulators of cell fate decisions are revealed by pseudotemporal ordering of single cells. Nature biotechnology , 32(4):381—386, April 2014. ISSN 1087-0156. doi: 10.1038/nbt.2859. URL https://europepmc.org/articles/PMC4122333 .Trevino, A. E., Müller, F., Andersen, J., Sundaram, L., Kathiria, A., Shcherbina, A., Farh, K., Chang, H. Y., Pa s, ca, A. M., Kundaje, A., Pa s, ca, S. P., and Greenleaf, W. J. Chromatin and gene-regulatory dynamics of the developing human cerebral cortex at single-cell resolution. Cell ,184(19):5053–5069.e23, 2021. ISSN 0092-8674. Villani, C. Topics in optimal transportation , volume 58. American Mathematical Soc., 2021. Weiler, P., Lange, M., Klein, M., Pe’er, D., and Theis, F. J. Cellrank 2: unified fate mapping in multi-view single-cell data. Nature Methods , 21:1053–1062, 2024. doi: 10.1038/s41592-024-02303-9. URL https://doi.org/10.1038/s41592-024-02303-9 .Weinreb, C., Wolock, S., Tusi, B. K., Socolovsky, M., and Klein, A. M. Fundamental limits on dynamic inference from single-cell snapshots. Proceedings of the National Academy of Sciences ,115(10):E2467–E2476, 2018. Yang, G., Baker, E. L., Severinsen, M. L., Hipsley, C. A., and Sommer, S. Simulating infinite-dimensional nonlinear diffusion bridges. arXiv preprint arXiv:2405.18353 , 2024. Zhang, J. and Scott, C. Flow straight and fast in hilbert space: Functional rectified flow, 2025. URL 
+
+https://arxiv.org/abs/2509.10384 .13 Appendices 
+
+Contents 
+
+A Derivation of Functional KL Divergence 14 B Implementation of Functional KL Estimation 19 C Special Cases 20 
+
+C.1 Closed-form Expression . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 C.2 Experimental Details . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21 
+
+D Ablation Studies 21 E Experimental Details for TI Evaluation 24 
+
+E.1 Marginal Metrics . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 E.2 TI Evaluation on Synthetic Datasets . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25 E.3 TI Evaluation on Real-World Datasets . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 30 E.4 Uncertainty Estimation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34 
+
+A Derivation of Functional KL Divergence 
+
+In this section, we present an expanded version of Section 3, with detailed proofs of the three lemmas included. 
+
+To begin with, we clarify the probabilistic setting and state our objective. 
+
+We extend the construction in Section 2 to accommodate two different probability spaces  Ω, F, P A
+
+and  Ω, F, P B , both supporting independent random variables X0 and X1, such that X0 has the same Gaussian law in both spaces whereas X1 has laws μA 
+
+> 1
+
+= νA and μB 
+
+> 1
+
+= νB , respectively. We then train one FFM model for each endpoint law, obtaining two parametrized pairs  μAt , v At
+
+
+
+and  μBt , v Bt
+
+, each satisfying the weak continuity equation. We overload the notation previously introduced by considering superscripts to indicate whether the measures and fields of interest refer to the first or second probability space. Our objective in this work is to estimate the KL divergence between two probability measures νA
+
+and νB on the Hilbert space H, which is formally defined as 
+
+KL  νA ∥ νB  := 
+
+Z
+
+> H
+
+log 
+
+ dν A
+
+dν B
+
+
+
+dν A, if νA ≪ νB ,
+
++∞, otherwise .
+
+(8) 
+
+Next, we state the assumptions needed to construct our framework. Assumption A.1 (Existence of Radon–Nikodym derivative) . We assume that νA ≪ νB , so that the Radon–Nikodym derivative dν A 
+
+> dν B
+
+exists. 
+
+Remark. Indeed, as the goal of this work is to obtain KL estimates via a novel estimator, we need to assume that the underlying estimand (the true KL) is well-defined. 
+
+Assumption A.2 (Cameron–Martin support) . The measures are fully supported on the Cameron– Martin space of the noise ( νA(Hμ0 ) = νB (Hμ0 ) = 1 ). 
+
+Remarks. 
+
+1. Assumption A.2 can be relaxed: together with Assumption A.1, it suffices to require that 
+
+νB be fully supported on Hμ0 , since νB (Hμ0 ) = 1 paired with Assumption A.1 implies 14 νA(Hμ0 ) = 1 . Indeed, by Assumption A.1, νA is absolutely continuous with respect to νB
+
+on B(H), i.e., νB (Γ) = 0 implies νA(Γ) = 0 for all Γ ∈ B(H). If νB (Hμ0 ) = 1 , then 
+
+νB (H \ Hμ0 ) = 0 , and since the Hilbert subspace Hμ0 is Borel, Assumption A.1 yields 
+
+νA(H \ Hμ0 ) = 0 , hence νA(Hμ0 ) = 1 .2. Assumption A.2 can be satisfied by choosing noise that is rougher than the data distribution (so the data are fully supported on Hμ0 ) while still being trace-class (and hence in H). In practice, in H := L2(T; Rd) with Fourier orthonormal basis, we first estimate the data’s Fourier spectrum using empirically determined variances for each Fourier coefficient, and then multiply each coefficient by the wavenumber magnitude k = ∥m∥2 to produce noise with a rougher spectrum while still in H as discussed in Chen & Vanden-Eijnden (2025). 
+
+Under these assumptions, we now develop a velocity-only representation of the KL divergence 
+
+KL  νA ∥ νB . The derivation is organized into three lemmas: Lemma A.3 establishes the absolute continuity needed to ensure the Radon–Nikodym derivatives are well-defined; Lemma A.4 applies weak continuity equation to express KL divergence with logarithmic Radon–Nikodym derivative and velocities. Lemma A.5 links the logarithmic gradients to the velocity fields. 
+
+Lemma A.3. Under the Assumptions A.1 and A.2, (a) μA,B t ≪ ρt, where ρt = ((1 − t)Id) # μ0 denotes the push-forward of μ0 by the map 
+
+(1 − t)Id for every t ∈ [0 , 1) .(b) μAt ≪ μBt for every t ∈ [0 , 1] .Proof. 
+
+(a) By definition, ρt remains a centered Gaussian measure on H with covariance operator 
+
+Ct := (1 − t)2C. Using elementary Hilbert space theory, the Cameron-Martin space associated with μ0 is identical to that associated with ρt, equipped with an inner product scaled by 1(1 −t)2 . Therefore, under Assumption A.2, we also have μA,B  
+
+> 1
+
+(Hρt ) = 1 .For every fixed t, by the construction of linear interpolation (1) , the conditional law of Xt
+
+given X1 = x is the translation of ρt by tx , i.e., L (Xt | X1 = x) = ( τtx )# ρt for μ1-almost any x ∈ H, where τh(·) = · + h. Therefore, this conditional measure is also Gaussian, with mean tx and covariance operator Ct. Since μA,B  
+
+> 1
+
+(Hρt ) = 1 gives that tx ∈ Hρt for 
+
+μA,B  
+
+> 1
+
+-almost any x ∈ H, by the Cameron–Martin theorem (Da Prato & Zabczyk, 2014), we have that (τtx )# ρt ∼ ρt, x μ A,B  
+
+> 1
+
+-a.s. Furthermore, by definition of a conditional measure and Fubini’s Theorem, for every S ∈ B(H), we have 
+
+μA,B t (S) = 
+
+Z
+
+> H
+
+
+
+(τtx )# ρt
+
+
+
+(S)μA,B  
+
+> 1
+
+(dx )=
+
+Z
+
+> H
+
+Z
+
+> S
+
+
+
+(τtx )# ρt
+
+
+
+(dy )μA,B  
+
+> 1
+
+(dx )=
+
+Z
+
+> H
+
+Z
+
+> S
+
+d
+
+
+
+(τtx )# ρt
+
+
+
+d ρ t
+
+(y)ρt(dy )μA,B  
+
+> 1
+
+(dx )=
+
+Z
+
+> S
+
+Z
+
+> H
+
+d
+
+
+
+(τtx )# ρt
+
+
+
+d ρ t
+
+(y)μA,B  
+
+> 1
+
+(dx )
+
+ ρt(dy ).
+
+Hence μA,B t ≪ ρt, and 
+
+dμ A,B t
+
+dρ t
+
+(·) = 
+
+Z
+
+> H
+
+d
+
+
+
+(τtx )# ρt
+
+
+
+d ρ t
+
+(·)μA,B  
+
+> 1
+
+(dx ), ρ t-a.s. (9) 15 (b) Denote dμ A,B t 
+
+> dρ t
+
+by f A,B t , so f A,B t ≥ 0. Let S ∈ B(H) be such that μBt (S) =
+
+R 
+
+> S
+
+f Bt (y)ρt(dy ) = 0 , then ρt
+
+ S ∩ f Bt > 0  = 0 , so 
+
+μAt (S) = 
+
+Z
+
+> S
+
+f At (y)ρt(dy )=
+
+Z 
+
+> S∩{ fB>0}
+
+f At (y)ρt(dy ) + 
+
+Z 
+
+> S∩{ fB=0 }
+
+f At (y)ρt(dy ) = 
+
+Z 
+
+> S∩{ fB=0 }
+
+f At (y)dρ t(dy )
+
+Therefore, to get μAt (S) = 0 (hence μAt ≪ μBt ), it suffices to show that f At = 0 on y ∈ H : f Bt (y) = 0 , ρ t-a.s. To this end, observe that f A,B t admit the representation 
+
+f A,B t (y) = R 
+
+> H
+
+gt(x, y )μA,B  
+
+> 1
+
+(dx ), where gt(x, y ) := d ((τtx )#ρt) 
+
+> d ρ t
+
+(y) ≥ 0. Now fix y ∈ H.If f Bt (y) = 0 , then μB 
+
+> 1
+
+(H ∩ { gt(x, y ) > 0}) = 0 . Under Assumption A.1, we also have 
+
+μA 
+
+> 1
+
+(H ∩ { gt(x, y ) > 0}) = 0 , and therefore f At (y) = R 
+
+> H
+
+gt(x, y )μA 
+
+> 1
+
+(dx ) = 0 .Given the well-definedness of Radon–Nikodym derivatives, next we apply the weak continuity equation using the Radon–Nikodym derivative and its logarithm as test functions to derive an integral representation of the KL divergence. 
+
+Lemma A.4. Let rt := dμ At
+
+> dμ Bt
+
+, which is well-defined by Lemma A.3 (b). Then, under mild regularity conditions, 
+
+KL  νA ∥ νB  =
+
+Z
+
+> I
+
+Z
+
+> H
+
+vAt (x) − vBt (x), ∇x log rt(x) dμAt (x). (10) 
+
+Proof. Step 1: Admissibility of rt and log rt as test functions in weak continuity equation. Given {ek}k∈N, let ˆπK = PKi=1 ei ⊗ ei be the orthogonal projector of H onto the linear span 
+
+HK = lin {e1, . . . , e K }.For all K ∈ N, we first define the projected measures ˆμA,B t,K := (ˆ πK )#μA,B t . Clearly, ˆμA,B t,K =
+
+EP A,B [μA,B t |G K ], where GK := σ(ˆ πK (Xt)) . Note also that {G K }K∈N is a growing filtration with terminal value G∞ = σ(Xt).Next, we define the projected Radon-Nikodym derivative rKt := dˆμAt,K 
+
+> dˆμBt,K
+
+= EP B [rt | G K ], where 
+
+rt := dμ At
+
+> dμ Bt
+
+is well-defined by Lemma A.3 (b). By definition of a Radon-Nikodym derivative, 
+
+rt ∈ L1(H × I, μ Bt ; R), so by Doob’s martingale convergence theorem (Øksendal (2010) Corollary C.9), rKt = E [rt | G K ] K→∞ 
+
+−−−−→ E [rt | G ∞] = rt, μ Bt -a.s. and in L1(μBt ).Now fix K. Since rKt ∈ L1(HK × I, ˆμBt,K ; R), and smooth functions with compact support are dense in L1(HK × I, ˆμBt,K ; R) Nakai et al. (2004), therefore we can extract a sequence (rK,n t )n∈N ⊂
+
+C∞ 
+
+> c
+
+(HK × I, ˆμBt,K ; R) such that rK,n tn→∞ 
+
+−−−−→ rKt in L1(HK × I, ˆμBt,K ; R).Combining the two convergence together and using the reverse triangle inequality and the Cauchy–Schwarz inequality, we then have 
+
+rK,n t L1(ˆ μBt,K )
+
+− ∥ rt∥L1(μBt ) ≤ rK,n t − rt L1(μBt )
+
+≤ rK,n t − rKt L1(ˆ μBt,K )
+
+| {z }
+
+> =: AK,n
+
++ rKt − rt L1(μBt )
+
+| {z }
+
+> =: BK
+
+.
+
+For each K, since AK,n → 0 as n → ∞ , there exists mK ∈ N such that for n ≥ mK , we have 
+
+AK,n < 1 
+
+> K
+
+; therefore, AK,n + BK < 1 
+
+> K
+
++ BK K→∞ 
+
+−−−−→ 0. Consequently, rt can be approximated 16 arbitrarily well by smooth cylindrical test functions 
+
+
+
+rK,n (K)
+
+> t
+
+
+
+, and the interchange of the integral in the definition of the L1-norm and the limit is justified. Analogously, assume that ∂t dμ At
+
+> dμ Bt
+
+∈ L1(μBt ) and ∇x dμ At
+
+> dμ Bt
+
+∈ L1(μBt ), then the L1  μBt
+
+-convergence and the interchange of integral and limit also hold for their corresponding smooth cylindrical approxi-mations. Furthermore, assume that vA,B t ∈ L∞(μA,B t ), by Hölder’s inequality, we get 
+
+D
+
+vA,B t , ∇rK,n (K) 
+
+> t
+
+− ∇ rt
+
+E 
+
+> L1(μBt)
+
+≤ vA,B t L∞(μA,B t )
+
+∇rK,n (K) 
+
+> t
+
+− ∇ rt L1(μBt )
+
+→ 0.
+
+Therefore, letting K → ∞ and n(K) → ∞ in the weak continuity equation ( (2) ) tested against 
+
+rK,n (K) 
+
+> t
+
+yields 
+
+Z
+
+> H
+
+r1(x)dμ A,B  
+
+> 1
+
+(x)−
+
+Z
+
+> H
+
+r0(x)dμ A,B  
+
+> 0
+
+(x) = 
+
+Z
+
+> I
+
+Z
+
+> H
+
+
+
+∂trt(x) + 
+
+D
+
+vA,B t (x), ∇xrt(x)
+
+E 
+
+dμ A,B t (x)dt. 
+
+An analogous equation holds for log rt, under the assumption that log rt ∈ L1(μBt ), ∂t log rt ∈
+
+L1(μBt ), and ∇x log rt ∈ L1(μBt ).Step 2: KL identify from the weak continuity equation. We first consider the weak continuity equation tested with log rt(x) for the pair (vAt , μ At ). Using the boundary identities 
+
+log r1 = log dμ A
+
+> 1
+
+dμ B
+
+> 1
+
+= KL  νA ∥ νB  , log r0 = log dμ A
+
+> 0
+
+dμ B
+
+> 0
+
+= log 1 = 0 , P B -a.s. the L.H.S. of (2) reduces to KL  νA ∥ νB , so 
+
+KL  νA ∥ νB  =
+
+Z
+
+> I
+
+Z
+
+> H
+
+∂t log rt(x)dμ At (x)dt +
+
+Z
+
+> I
+
+Z
+
+> H
+
+vAt (x), ∇x log rt(x) dμ At (x)dt (11) Next, we want to rewrite the time-derivative term on the R.H.S. of Equation (11) in terms of vBt
+
+and ∇x log rt. To this end, we consider the weak continuity equation tested with rt(x) for the pair 
+
+(vBt , μ Bt ). By definition rt := dμ At
+
+> dμ Bt
+
+, we have 
+
+Z
+
+> H
+
+r1 dμ B 
+
+> 1
+
+=
+
+Z
+
+> H
+
+dμ A 
+
+> 1
+
+= 1 ,
+
+Z
+
+> H
+
+r0 dμ B 
+
+> 0
+
+=
+
+Z
+
+> H
+
+dμ A 
+
+> 0
+
+= 1 
+
+the L.H.S. of (2) reduces to 0, so 
+
+Z
+
+> I
+
+Z
+
+> H
+
+∂trt(x) dμ Bt (x) dt = −
+
+Z
+
+> I
+
+Z
+
+> H
+
+⟨vBt (x), ∇xrt(x)⟩ dμ Bt (x) dt. 
+
+Using μBt (dx ) = 1 
+
+> rt
+
+(x)μAt (dx ), we then get 
+
+Z
+
+> I
+
+Z
+
+> H
+
+∂t log rt(x) dμ At (x) dt = −
+
+Z
+
+> I
+
+Z
+
+> H
+
+vBt (x), ∇x log rt(x) dμ At (x) dt (12) Finally, injecting (12) into the R.H.S. of Equation (11) gives the desired result. By Lemma A.3 (a), we can rewrite the term ∇x log rt(x) appearing in Lemma A.4 as 
+
+∇x log rt(x) = ∇x log dμ At
+
+dρ t
+
+(x) − ∇ x log dμ Bt
+
+dρ t
+
+. (13) The next lemma links this logarithmic gradients mismatch to velocity fields mismatch, which is useful to derive a velocity-only representation of KL  νA ∥ νB .17 Lemma A.5. For the linear interpolation used in FFM Kerrigan et al. (2023c), 
+
+∇x log dμ At
+
+dρ t
+
+(x) − ∇ x log dμ Bt
+
+dρ t
+
+= t
+
+1 − t C−1  vAt (x) − vBt (x) (14) 
+
+Proof. Step 1: Expression of logarithmic gradients. By Equation (9), the logarithmic gradients can be written as 
+
+∇x log dμ A,B t
+
+dρ t
+
+(x) = 
+
+R 
+
+> H
+
+∇x d(τth )#ρt 
+
+> dρ t
+
+(x)dμ A,B  
+
+> 1
+
+(h)
+
+R 
+
+> Hd(τth )#ρt
+> dρ t
+
+(x)dμ A,B  
+
+> 1
+
+(h) . (15) Since (τth )# ρt is the translate of ρt = N (0 , (1 − t)2C) by th , the Cameron-Martin theorem yields 
+
+∇x
+
+d
+
+
+
+(τth )# ρt
+
+
+
+dρ t
+
+(x) = 
+
+d
+
+
+
+(τth )# ρt
+
+
+
+dρ t
+
+(x) t
+
+(1 − t)2 C−1h. (16) Substituting (16) into (15) gives 
+
+∇x log dμ A,B t
+
+dρ t
+
+(x) = t
+
+(1 − t)2 C−1
+
+Z
+
+> H
+
+h 
+
+> d(τth )#ρt
+> dρ t
+
+(x)μA,B  
+
+> 1
+
+(dh )
+
+R 
+
+> Hd(τth )#ρt
+> dρ t
+
+(x)μA,B  
+
+> 1
+
+(dh )
+
+| {z }
+
+> =:( I)
+
+. (17) To identify the ratio (I) in (17), note that the conditional law of Xt given X1 = h is: ∀Γ ∈ B(H),
+
+P A,B (Xt ∈ Γ | X1 = h) = ( τth )# ρt(Γ) = 
+
+Z
+
+> Γ
+
+d (τth )# ρt
+
+dρ t
+
+(x)ρt(dx ),
+
+hence the joint law of (Xt, X 1) admits the factorization: ∀Γ, Λ ∈ B(H),
+
+P A,B (Xt ∈ Γ, X 1 ∈ Λ) = 
+
+Z
+
+> Λ
+
+P A,B (Xt ∈ Γ | X1 = h) μA,B  
+
+> 1
+
+(dh ) = 
+
+Z
+
+> Λ
+
+Z
+
+> Γ
+
+d (τth )# ρt
+
+dρ t
+
+(x)ρt(dx )μA,B  
+
+> 1
+
+(dh ),
+
+i.e., 
+
+P A,B (Xt = x, X 1 ∈ dh ) = d (τth )# ρt
+
+dρ t
+
+(x)μA,B  
+
+> 1
+
+(dh ).
+
+Therefore, by Bayes’ rule, (I) in (17) becomes  
+
+> d(τth )#ρt
+> dρ t
+
+(x)μA,B  
+
+> 1
+
+(dh )
+
+R 
+
+> Hd(τth )#ρt
+> dρ t
+
+(x)μA,B  
+
+> 1
+
+(dh ) = P A,B (Xt = x, X 1 ∈ dh )
+
+P A,B (Xt = x) = P A,B (X1 ∈ dh | Xt = x)
+
+Inserting the last display back into (17) gives 
+
+∇x log dμ A,B t
+
+dρ t
+
+(x) = t
+
+(1 − t)2 C−1
+
+Z
+
+> H
+
+hP A,B (X1 ∈ dh | Xt = x)= t
+
+(1 − t)2 C−1EP A,B [X1|Xt = x].
+
+(18) Step 2: Expression of velocity fields. 18 For the linear interpolation used in FFM Kerrigan et al. (2023c), the velocity fields are given by 
+
+vA,B t (x) = EP A,B 
+
+ X1 − x
+
+1 − t | Xt = x
+
+
+
+= 11 − t EP A,B [X1 | Xt = x] − x
+
+1 − t
+
+(19) Step 3: Linking logarithmic gradients and velocities. Combining the two identities (18) and (19) allows us to express logarithmic gradients mismatch with velocity fields mismatch: 
+
+∇x log dμ At
+
+dρ t
+
+(x) − ∇ x log dμ Bt
+
+dρ t
+
+= t
+
+1 − t C−1  vAt (x) − vBt (x)
+
+Finally, with ∇x log rt in Lemma A.4 replaced by velocity fields mismatch in Lemma A.5, we obtain a velocity-only expression for what we label the FKL: 
+
+Theorem A.6. For the linear interpolation used in FFM Kerrigan et al. (2023c), under Assump-tions A.1–A.2 and mild regularity conditions, we have 
+
+KL  νA ∥ νB  =
+
+Z 10
+
+Z
+
+> H
+
+t
+
+1 − t vAt (x) − vBt (x) 2
+
+> Hμ0
+
+dμ At (x) dt. (20) 
+
+B Implementation of Functional KL Estimation 
+
+Given the velocity-field-based expression of the FKL under the FFM framework (Equation 7), we now describe our implementation for estimating KL in function space. 
+
+Parameterization of two velocity fields. Velocity field estimation in FFM is well established Kerrigan et al. (2023c). The key difference between Kerrigan et al. (2023c) and our setting is that, generative modeling typically approximates a single velocity field (e.g., vA by vAθ to generate samples from νA), whereas our KL estimator requires approximating two velocity fields, vA and vB .To reduce parameters and simplify training, we use a single network with a binary conditioning flag 
+
+c ∈ { 0, 1}: vθ (c = 0 , ·) ≈ vA and vθ (c = 1 , ·) ≈ vB . The network is trained on shuffled function samples x1 from νA and νB , each paired with a label c ∈ { 0, 1} indicating the target velocity field. 
+
+Architecture and training. Our network is based on the state-of-the-art functional neural operator Mesh-Informed Neural Operator (MINO) Shi et al. (2025), an encoder–decoder neural operator that uses Graph Neural Operator (GNO)s and Transformers to map between arbitrary irregular discretizations and a latent representation on a fixed regular grid. Compared with Fourier Neural Operator (FNO), which is used in many functional generative models including Kerrigan et al. (2023c), MINO naturally handles irregular grids and, in our preliminary experiments, performs substantially better on functions with non-periodic boundaries. For stable FKL estimation, it is important to enforce v(x, 1) = x. Indeed, under X0 ∼ N (0 , C ) and 
+
+X0 ⊥ X1, the velocity field satisfies v(x, 1) = E[X1 − X0 | X1 = x] = x. Hence, if both vAθ and 
+
+vBθ satisfy this condition, their difference vanishes at t = 1 , thereby canceling the singularity from  
+
+> t
+> 1−t
+
+in Equation (7). To impose this condition, we use the subtraction-based parameterization of Hu et al. (2025): 
+
+vθ (x, t ) = x + mθ (x, t ) − mθ (x, 1) , (21) which guarantees vθ (x, 1) = x.We optimize the neural network with a conditional flow-matching objective Kerrigan et al. (2023a) that linearly combines the squared Hilbert and Cameron-Martin norms of the velocity error, with increasing emphasis on the Cameron-Martin term during training to progressively refine high-frequency modes at later stages. In practice, all fields are represented in a truncated spectral basis, so both norms are well defined. 19 Estimation of FKL. Given the two learned velocity fields, we estimate FKL via Monte Carlo approximation of Equation (7). Specifically, we sample xA 
+
+> 1
+
+∼ νA, t ∼ U [0 , 1] , and x0 ∼ μ0 =
+
+N (0 , C ), and form xAt = tx A 
+
+> 1
+
++ (1 − t)x0, so that xAt ∼ μAt . Evaluating both fields at (xAt , t ) yields 
+
+vAθ (xAt , t ) and vBθ (xAt , t ). We then compute the integrand t 
+
+> 1−t
+
+vAθ (xAt , t ) − vBθ (xAt , t ) 2
+
+> Hμ0
+
+, with the norm computed after projecting the velocity fields onto a suitable orthonormal basis, as in prior function-space literature (Kerrigan et al., 2023c; Franzese et al., 2023b). Averaging over repeated samples yields the FKL estimate. Importantly, this Monte Carlo approximation procedure does not require simulating the full generative dynamics via ODE integration. 
+
+C Special Cases 
+
+In this section, we consider two analytically tractable special cases to validate our functional-space KL formulation. These settings admit closed-form KL values, which serve as ground truth and enable direct verification of both our theoretical derivation and the resulting KL estimation pipeline. Empirically, our estimates closely match the closed-form values, providing strong evidence that the derivation and the resulting estimator are accurate in practice. Section C.1 derives the closed-form KL expressions for the Gaussian-measure and linear-SDE cases, while Section C.2 reports experimental details and results. 
+
+C.1 Closed-form Expression C.1.1 Special Case 1: Gaussian Measures 
+
+We consider the target measures νA,B on some separable Banach space H to be Gaussian measures 
+
+N (mA,B , R). Provided mA − mB ∈ HR, the Cameron Martin space, the KL divergence has known analytical expression 12 || mA − mB || 2 
+
+> HC
+
+. We consider H = L2(T; R) and Matérn covariance 
+
+R = σ2(−∆P +τ 2I)−α, σ, τ, α > 0. For simplicity, we select mA = cos(2 πx ) ∈ HC and mB = 0 .For the analytical computation, we select as ONB {ek(x) = e2πik ·x : k ∈ Z},where Kek = λkek,
+
+λk = σ2(4 π2k2 + τ 2)−α.Furthermore, the velocity field mismatch also admits an analytic expression. Recall that the velocity field is defined as vt(r) = E[ ˙Xt | Xt = r]. Applying the Gaussian conditioning formula in Hilbert space Mandelbaum (1984) to the linear interpolation yields vt(r) = m +  tC − (1 − t)K  (1 −
+
+t)2K + t2C−1(r − tm ). Equivalently, in Fourier coordinates, 
+
+vt,k (rk) = mk + tc k − (1 − t)κk
+
+(1 − t)2κk + t2ck
+
+| {z } 
+
+> =: ak(t)
+
+(rk − tm k). (22) Let vAt and vBt denote the velocity field corresponding to νA = N (m, C ) and νB = N (0 , C )
+
+respectively, then vAt,k (rk) = mk + ak(t)( rk − tm k) and vBt,k (rk) = ak(t)rk, so their difference simplifies to a deterministic (input-independent) quantity: 
+
+vdiff  
+
+> t,k
+
+:= vAt,k − vBt,k = (1 − t)κk
+
+(1 − t)2κk + t2ck
+
+mk. (23) 
+
+C.1.2 Special Case 2: SDEs 
+
+Let (Yt)t∈[0 ,1] be an RD -valued process and consider the two SDEs 
+
+A: dY t = cAYt dt + g dW t,
+
+B: dY t = cB Yt dt + g dW t, Y0 ∼ N (m0, Σ0), (24) where cA, c B ∈ R are scalar drift coefficients and we assume cA̸ = 0 , g > 0 is a constant diffusion, and Wt is a standard D-dimensional Wiener process. Denote the induced path measures on [0 , 1] by 
+
+νA and νB , and define S0 := Tr(Σ 0), M 0 := ∥m0∥2.
+
+Since the two SDEs have the same diffusion and initial law, Girsanov’s theorem gives 
+
+KL( νA∥νB ) = 12
+
+Z 10
+
+EA
+
+"
+
+(cA − cB )Yt
+
+g
+
+> 2
+
+#
+
+dt = (cA − cB )2
+
+2g2
+
+Z 10
+
+EA
+
+∥Yt∥2 dt. (25) 20 Step 1: compute EA[∥Yt∥2]. Under the SDE A, the explicit solution is 
+
+Yt = ecAtY0 + g
+
+Z t
+
+> 0
+
+ecA(t−s) dW s.
+
+Using independence of Y0 and (Ws)s≥0, the cross-term vanishes and Itô isometry yields 
+
+EA[∥Yt∥2] = e2cAt E[∥Y0∥2] + g2 E
+
+" Z t
+
+> 0
+
+ecA(t−s) dW s
+
+> 2
+
+#
+
+= e2cAt(M0 + S0) + g2
+
+Z t
+
+> 0
+
+e2cA(t−s) E[∥dW s∥2]= e2cAt(M0 + S0) + g2D
+
+Z t
+
+> 0
+
+e2cA(t−s) ds. (26) For cA̸ = 0 , Z t
+
+> 0
+
+e2cA(t−s)ds = e2cAt − 12cA
+
+,
+
+hence 
+
+EA[∥Yt∥2] = e2cAt(M0 + S0) + g2D
+
+2cA
+
+ e2cAt − 1. (27) 
+
+Step 2: integrate over t ∈ [0 , 1] . Plugging (27) into (25) gives, for cA̸ = 0 ,
+
+KL( νA∥νB ) = (cA − cB )c2
+
+2g2
+
+Z 10
+
+
+
+e2cAt(M0 + S0) + g2D
+
+2cA
+
+(e2cAt − 1) 
+
+
+
+dt 
+
+= (cA − cB )2
+
+2g2
+
+
+
+(M0 + S0)
+
+Z 10
+
+e2cAtdt + g2D
+
+2cA
+
+Z 10
+
+e2cAtdt − 1
+
+ 
+
+= (cA − cB )2
+
+2g2
+
+
+
+(M0 + S0) e2cA − 12cA
+
++ g2D
+
+2cA
+
+ e2cA − 12cA
+
+− 1
+
+ 
+
+(28) where the last equality follows from the identity R 10 e2cAtdt = e2cA −12cA .
+
+C.2 Experimental Details 
+
+The hyperparameters are reported in Table 4 for the Gaussian case and in Table 5 for the SDE case. 
+
+D Ablation Studies 
+
+We further ablate some important factors, discussed next. 
+
+Sensitivity to estimation factors. To evaluate the robustness of FKL estimation via Equation (7) to four key estimation factors, we conduct a systematic study in a Gaussian special case (Case 3 in Figure 1, top-left), where KL Fwd = KL Rev = 50 .00 , and an analytic expression for the marginal velocity mismatch is also available (see Appendix C). 
+
+(i) Basis truncation. We discretize the Gaussian processes on M = 128 uniformly spaced time points and implement the method using Fourier representations with 8, 16 , 32 , and 64 modes. Figure 5a shows that the estimation error decreases as more modes are retained. (ii) Velocity-field estimation. 
+
+Although the analytic marginal velocity field is unavailable in general, the FFM conditional flow-matching loss provides a surrogate measure of velocity estimation quality and quickly converges to a very small value during training. In the Gaussian special case, with the analytic marginal velocity field being available, Figure 5b shows that the marginal velocity-mismatch error is uniformly small over t ∈ [0 , 1] , decreases as t grows, and vanishes at t = 1 due to the boundary parameterization in Equation (21) . This supports accurate FKL estimation, since Equation (7) emphasizes the regime near 
+
+t = 1 through t 
+
+> 1−t
+
+, where the velocity-estimation error is smallest. (iii) Monte Carlo approximation. 
+
+We vary the number of trajectories in the KL estimator from 10 to 2000. Figure 5c shows that the 21 Name Value 
+
+Training function XA
+
+> 1
+
+
+
+f ∼ N (μ, C )
+
+μ(x) = s sin(2 πf 0x), s ∈ { 0.5, 1.5, 3.0}, f 0 ∈ { 1, 3, 5}
+
+C : Matérn w. νC =3 .5, ℓ C =0 .05 , σ 2 
+
+> C
+
+=0 .15 
+
+Training function XB 
+
+> 1
+
+f ∼ N (0 , C )
+
+Training functions’ input time points M 128 
+
+Training functions’ output dimension D ∈ { 1, 2, 3, 5, 10 }
+
+Noise function X0 f ∼ N (0 , K ), K : Matérn w. νK =0 .5, ℓ K =0 .1, σ 2 
+
+> K
+
+=1 .0
+
+Num. modes N summed at KL estimation 64 
+
+t sampling scheme at training Logit-normal 
+
+t sampling scheme at KL estimation Importance sampling t/ (1 − t)
+
+Num. t sampled at KL estimation 100 
+
+Num. functions at training 50 ,000 
+
+Training batch size 1024 
+
+Training iterations 30 ,000 
+
+Num. functions at KL estimation 500 
+
+Optimizer Adam EMA rate 0.999 
+
+Learning Rate (LR) 1e −3
+
+LR scheduler Cosine annealing FFM training loss LFFM 
+
+Model MINO-T Encoder (dim / depth / heads) 64 / 2 / 4
+
+Decoder (dim / depth / heads) 64 / 2 / 4
+
+Supernode radius 5e −3
+
+GPUs for Training 1 × NVIDIA A100 
+
+Table 4: FKL hyperparameters for Gaussian Measures. 
+
+Name Value 
+
+Training function XA
+
+> 1
+
+dY t = cA Yt dt + g dW t
+
+Y0 ∼ N (m0, Σ0), m 0=2 .0, Σ0=0 .2
+
+Training function XB
+
+> 1
+
+dY t = cB Yt dt + g dW t
+
+Y0 ∼ N (m0, Σ0), m 0=2 .0, Σ0=0 .2
+
+Training functions’ input time points M 128 
+
+Training functions’ output dimension D ∈ { 1, 2, 3, 5}
+
+Noise function X0 Rougher empirical GT Fourier-spectrum Num. modes N summed at KL estimation 64 
+
+t sampling scheme at training Importance sampling t/ (1 − t)
+
+t sampling scheme at KL estimation Importance sampling t/ (1 − t)
+
+Num. t sampled at KL estimation 100 
+
+Num. functions at training 50 ,000 
+
+Training batch size 1024 
+
+Training iterations 30 ,000 
+
+Num. functions at KL estimation 500 
+
+Optimizer Adam EMA rate 0.999 
+
+LR 4.06e −3
+
+LR scheduler Cosine annealing FFM training loss w L FFM + (1 − w) LFKL , w linearly decayed from 1 to 0.2
+
+Model MINO-T Encoder (dim / depth / heads) 32 / 2 / 8
+
+Decoder (dim / depth / heads) 32 / 2 / 8
+
+Supernode radius 5e −4
+
+GPUs for Training 1 × NVIDIA A100 
+
+Table 5: FKL hyperparameters for SDEs. 22 estimates remain highly precise and stable throughout. (iv) Temporal discretization. We vary the number n of sampled time points used to approximate the integral in Equation (7) . Over 5 random seeds, Figure 5d shows that the mean estimate remains close to the ground truth for all n, and the standard deviation decreases substantially with finer discretization and becomes negligible at n = 80 ,confirming the strong stability of our estimator. Together, these results show that FKL estimation is accurate and numerically stable, supporting our discretization choices for FKL estimation.   
+
+> (a) Basis truncation. (b) Velocity-field estimation.
+> (c) Monte Carlo approximation. (d) Temporal discretization.
+
+Figure 5: Sensitivity analysis on a Gaussian special case. 
+
+Choice of noise covariance operator C. In our function-space formulation, the FFM-based FKL estimator is accurate and resolution-invariant only when the noise covariance satisfies two conditions: (i) C is trace-class on the Hilbert space H; and (ii) C satisfies the Cameron-Martin support assumption (Assumption 3.2), i.e., the Gaussian noise N (0 , C ) must be rougher than the data measure. To verify this empirically, we conduct an ablation study on a Gaussian special case (Case 2 in the top-left table of Figure 1). We test three choices of C and evaluate the FKL estimate on trajectories sampled at resolutions M ∈ { 128 , 256 , 512 , 1024 }, while keeping the FFM trained at resolution M = 256 . Results are shown in Figure 6. When C = Id (white noise), condition (i) fails because C is not trace-class; consequently, the estimator is not function-space resolution-invariant, with the estimated FKL diverging as the inference resolution increases. When C is Matérn with smoothness α0 = 6 .0, condition (i) holds, but condition 
+
+(ii) fails because the noise is smoother than the data measure ( α0 > α 1), leading to unstable and divergent FKL estimates across all resolutions. In contrast, Matérn C with α0 = 0 .5 satisfies both conditions, yielding accurate and resolution-invariant forward and reverse FKL estimates, which highlights the importance of choosing a noise covariance that meets both conditions for FKL evaluation. For the empirical comparison between white noise and trace-class Matérn noise with smoothness 
+
+α0 = 0 .5, in addition to demonstrating the improved robustness of KL estimation under super-resolution afforded by trace-class noise (see Figure 6c), we further show that trace-class noise also provides more robust generation quality under super-resolution (see Figure 7). A theoretical discussion of this choice is given in Franzese (2025). 23 (a) White noise. (b) Matérn noise, α0 = 6 .0. (c) Matérn noise, α0 = 0 .5.
+
+Figure 6: Evaluation of resolution invariance with different noise covariances C. All models were trained at resolution M = 256 and evaluated at varying test resolutions. 
+
+Figure 7: Real vs. generated samples across upsample ratios, for the Gaussian measures special case. 
+
+E Experimental Details for TI Evaluation 
+
+E.1 Marginal Metrics 
+
+To quantitatively assess the quality of the generated trajectories and to compare our new evaluation metric, we considered a set of established metrics. These metrics capture the difference in marginal reconstruction on validation data. 
+
+Optimal Transport metrics. We quantify geometric distances between generated and target distributions using Wasserstein distances Peyré & Cuturi (2020). For p ∈ { 1, 2}, the p-Wasserstein distance between probability measures μ and ν is 
+
+Wp(μ, ν ) = 
+
+
+
+inf 
+
+> γ∈Π( μ,ν )
+
+Z
+
+> Rd×Rd
+
+∥x − y∥p dγ(x, y )
+
+1/p 
+
+, (29) where Π( μ, ν ) is the set of couplings with marginals μ and ν. We consider Earth Mover’s Distance (EMD, i.e., W1) and Wasserstein-2 ( W2). To remain comparable to prior work, we also include the Sliced Wasserstein Distance (SWD): 
+
+SW p(μ, ν ) = 
+
+Z 
+
+> Sd−1
+
+W pp (θ#μ, θ #ν) d λ(θ)
+
+1/p 
+
+, (30) which averages 1D Wasserstein distances over random projections over the unit sphere θ ∈ Sd−1.Similarly, we report the Max-Sliced Wasserstein Distance (MWD). 24 (a) Finite-dimensional setting: distributions over states         
+
+> x(t)∈Rdat individual time points.
+> (b) Function-space setting: distributions over trajecto-ries x: [0 ,1] →Rd.
+
+Figure 8: Conceptual comparison between finite-dimensional and function space modeling. 
+
+Kernel-based metrics. In addition to OT metrics, we also report the Maximum Mean Discrepancy (MMD), a kernel based two-sample test Gretton et al. (2012) that detects differences between distributions by comparing their mean embeddings in a Reproducing Kernel Hilbert Space (RKHS). Formally, 
+
+MMD 2(μ, ν ) = Ex,x ′∼μ[k(x, x ′)] − 2Ex∼μ,y ∼ν [k(x, y )] + Ey,y ′∼ν [k(y, y ′)] , (31) where k is a positive definite kernel. For all the experiments, we consider the Radial Basis Function (RBF) kernel with kernel bandwidth σ = 1 .It is important to note that, such marginal metrics are intrinsically limited because marginals do not determine how states at different times are coupled. Figure 8 highlights this distinction: while marginal evaluation only compares snapshot distributions in finite-dimensional space, the underlying inference target is a probability measure over full trajectories in function space. 
+
+E.2 TI Evaluation on Synthetic Datasets E.2.1 Lotka-Volterra Dataset. We evaluate the proposed method on the dynamics of a stochastic Lotka-Volterra predator-prey model Shen et al. (2025). The system describes the evolution of prey ( Xt) and predator ( Yt)populations governed by the following system of stochastic differential equations (SDEs): 
+
+dXt = ( αX t − βX tYt)d t + σdWx,t ,
+
+dYt = ( γX tYt − δY t)d t + σdWy,t , (32) where Wt = [ Wx,t , W y,t ]⊤ denotes a standard 2-dimensional Brownian motion. We define the diffusion coefficient as σ = 0 .1 and fix the model parameters to α = 1 , β = 0 .4, γ = 0 .1, and 
+
+δ = 0 .4.To generate the synthetic dataset, we simulate the system over K = 8 unit time intervals. The initial states are sampled uniformly such that X0 ∼ U (5 , 5.1) and Y0 ∼ U (4 , 4.1) . Numerical integration is performed using the Euler-Maruyama scheme with a discretization step of ∆t = 0 .02 . Generated trajectories are considered as GT. 
+
+TI methods configuration. To train the trajectory inference methods, we considered 9 equally spaced snapshots in the trajectory time [0 , 1] . Odd snapshots are used as training, whereas even snapshots as validation. For each snapshot, we consider 100 points for training TI methods. Specifications of hyperparameters for TI methods: 25 Figure 9: Lotka-Volterra trajectories generated by TI methods. Training and validation samples are denoted by points and crosses respectively. For TI methods, the generated trajectories are plotted in the foreground, training data in the background. • SBIRR-vSB: we run SBIRR and vSB methods using default parameters, but considering the new data. For a fair comparison, the number of iterations for vSB has been set to the same number of SBIRR (i.e. 10). • MSBM: num_stage = 20 ; num_epoch = 1; num_itr = 1000 ; num_ResNet = 1;learning_rate = 1 × 10 −3; var = 0 .1; interval = 101 , BS = 34 , time_scale = 8 • MFL: lambda_reg = 0.0075; initial position of the particles (cx, cy) = (3.0, 2.5); n_sinkhorn = 500; sigma=2.0, sigma_final = 0.8; t_final = 8.0; eta_final =0.1; n_iter = 2500; M (number of particles) = 500; tau_final = 1.0. All the other hyperparameters are set to the default values. Notice that we had to change the initial position of the particles (cx, cy ̸ = 0 , 0) is order to make them closer to the correct positions of the marginals. • AM: T_final = 8.0, BS = 100; SIGMA = 0.1; lr = 5e-5; num_iterations = 2_000. Moreover, due to the non-overlapping of the training snapshots, we needed to use the "interpolation trick" to make the dynamics continuous. • TIGON: learning rate = 5 e − 4; training time points t ∈ [0 , 2, 4, 6, 8] ; initial gaussian kernel bandwidth σnow = 1 ; decay = 0 .9σ; and a regularization parameter λd = 10 4. All the other parameters have been set to the default values. In Figure 9, we show the generated trajectories by TI methods with respect to the training and validation marginals. 
+
+FKL configuration. We report FKL hyperparameters in Table 6.                                                            
+
+> Name Value
+> Training function XA
+> 1GT Training function XB
+> 1TI methods: SBIRR, vSB, MSBM, MFL, AM, TIGON Training functions’ input time points M401
+> Training functions’ output dimension D2
+> Covariance operator of noise function X0Rougher empirical GT Fourier-spectrum Num. modes Nsummed at KL estimation 16
+> tsampling scheme at training Curriculum: logit-normal (mean =0 .8,std =1 ) for first 40% , then uniform
+> tsampling scheme at KL estimation Importance sampling t/ (1 −t)
+> Num. tsampled at KL estimation 100
+> Num. functions at training 500
+> Training batch size 32
+> Training iterations 20 ,000
+> Num. functions at KL estimation 500
+> Optimizer Muon EMA rate 0.999
+> LR 6.21e −4
+> LR scheduler Cosine annealing FFM training loss w L FFM + (1 −w)LFKL ,wlinearly decayed from 1to 0.2
+> Model MINO-T Encoder (dim / depth / heads) 64 /4/4
+> Decoder (dim / depth / heads) 64 /3/4
+> Supernode radius 0.002
+> GPUs for Training 1×NVIDIA A100
+
+Table 6: FKL hyperparameters for Lotka-Volterra. 26 E.2.2 Repressilator Dataset. Repressilator Shen et al. (2025) is a synthetic genetic regulatory network designed to exhibit stable oscillatory behavior. The system consists of three genes connected in a feedback loop, where each gene expresses a protein that represses the next gene in the cycle. The protein concentrations Xt = [ X1,t , X 2,t , X 3,t ]⊤ can be modeled using the following system of SDEs: 
+
+dX1,t =
+
+ β
+
+1 + ( X3,t /k )n − γX 1,t 
+
+
+
+dt + σdW1,t ,
+
+dX2,t =
+
+ β
+
+1 + ( X1,t /k )n − γX 2,t 
+
+
+
+dt + σdW2,t ,
+
+dX3,t =
+
+ β
+
+1 + ( X2,t /k )n − γX 3,t 
+
+
+
+dt + σdW3,t ,
+
+(33) where Wt = [ W1,t , W 2,t , W 3,t ]⊤ denotes a standard 3-dimensional Brownian motion.We set the parameters to β = 10 , n = 3 , k = 1 , and degradation rate γ = 1 . We set the diffusion coefficient 
+
+σ = 0 .1.We simulate trajectories over 7.5 unit time intervals using the Euler-Maruyama scheme with a step size of ∆t = 0 .01 . The system is initialized with X1,0, X 2,0 ∼ U (1 , 1.1) and X3,0 ∼ U (2 , 2.1) .Generated trajectories are considered as GT trajectories. 
+
+TI methods configuration. To train the trajectory inference methods, we considered 11 equally spaced snapshots in the trajectory time [0 , 1] . Odd snapshots are used as training, whereas even snapshots as validation. For each snapshot, we consider 100 points for training. Specifications of hyperparameters for TI methods: • SBIRR-vSB: As in the Lotka Volterra case, we run SBIRR and vSB methods using default parameters, but considering the new data. Again, for a fair comparison, the number of iterations has been set to the same number (i.e. 10). • MSBM hyperparameters: num_stage = 20 ; num_epoch = 5; num_itr = 1000 ;num_ResNet = 3 ; learning_rate = 1 × 10 −3; var = 0 .1; interval = 151 , time_scale = 7.5, BS=32. • MFL: lambda_reg = 0.0075; initial position of the particles (cx, cy, cz) = (2.5, 2.5, 2.5); n_sinkhorn = 500; sigma=1.0, sigma_final = 0.5; t_final = 7.5; eta_final =0.1; n_iter = 2500; M (number of particles) = 500, tau_final = 1.0. All the other hyperparameters are set to the default values. Notice that, also in this case, we had to change the initial position of the particles (cx, cy, cz ̸ = 0 , 0, 0). • AM: T_final = 7.5, BS = 100; SIGMA = 0.1; lr = 5e-6; num_iterations = 10_000. Even in this case we employ the linear interpolation trick, given that training marginals are located far away in space. • TIGON: learning rate = 5 e − 4; training time points t ∈ [0 , 2, 4, 6, 8, 10] ; initial gaussian kernel bandwidth σnow = 1 ; decay = 0 .9σ with a stopping condition of σ > 0.02 ; and a regularization parameter λd = 10 7. We changed the neural network architecture for the drift, considering 8 hidden layers, each with dimension 32. All the other parameters have been set to the default values. In Figure 10, we show the generated trajectories by TI methods with respect to the training and validation marginals. 
+
+FKL configuration. We report FKL hyperparameters in Table 7. 27 Figure 10: Repressilator trajectories generated by TI methods. Training and validation samples are denoted by points and crosses respectively. For TI methods, the generated trajectories are plotted in the foreground, training data in the background.                                                            
+
+> Name Value
+> Training function XA
+> 1GT Training function XB
+> 1TI methods: SBIRR, vSB, MSBM, MFL, AM, TIGON Training functions’ input time points M751
+> Training functions’ output dimension D3
+> Covariance operator of noise function X0Rougher empirical AM Fourier-spectrum Num. modes Nsummed at KL estimation 16
+> tsampling scheme at training Curriculum: logit-normal (mean =0 .5,std =1 ) for first 20% , then uniform
+> tsampling scheme at KL estimation Importance sampling t/ (1 −t)
+> Num. tsampled at KL estimation 100
+> Num. functions at training 500
+> Training batch size 32
+> Training iterations 40 ,000
+> Num. functions at KL estimation 500
+> Optimizer Muon EMA rate 0.999
+> LR 3.57e −3
+> LR scheduler Cosine annealing FFM training loss w L FFM + (1 −w)LFKL ,wlinearly decayed from 0.2to 0.04
+> Model MINO-T Encoder (dim / depth / heads) 32 /2/8
+> Decoder (dim / depth / heads) 32 /2/8
+> Supernode radius 5e −4
+> GPUs for Training 1×NVIDIA A100
+
+Table 7: FKL hyperparameters for Repressilator. 
+
+E.2.3 Petal Dataset. Petal Huguet et al. (2022); Neklyudov et al. (2023) is a 2D dataset designed to evaluate the models ability to handle complex branching dynamics. The data mimics a biological differentiation process where trajectories originate from a single source and evolve into distinct lineages. The geometry consists of 8 sinusoidal branches radiating from a central origin, creating a flower-like structure. The particle dynamics are defined in an intrinsic coordinate system (u, z ) relative to a specific branch 
+
+k ∈ { 1, . . . , 8}. The longitudinal position ut represents the progress along the branch, while the transverse component zt represents the deviation from the branch spine (thickness). The evolution is governed by the following system: 
+
+dut = vdt
+
+dzt = −κz tdt + σz dWt
+
+(34) Here, the longitudinal progress is deterministic with a constant drift velocity v shared by all particles. The transverse dynamics follow an Ornstein-Uhlenbeck process with mean reversion rate κ, confining particles within a "tube" around the branch line driven by diffusion σz . A deterministic mapping function Ψk(ut, z t) then projects these coordinates into the 2D Cartesian space based on the sinusoidal geometry of branch k.We define the branches using a reference length L = 1 .0 and a curvature amplitude α = 0 .25 . The dynamics are configured with a restoring force κ = 0 .5 and transverse diffusion σz = 0 .04 (resulting in a stationary tube width of 0.04 ). The drift velocity is set to v = 0 .2.28 Figure 11: Petal trajectories We simulate GT trajectories over the time interval t ∈ [0 , 4.0] . The simulation uses a time step of 
+
+∆t = 0 .04 (100 steps), from which we extract 5 equidistant snapshots for evaluation. Trajectories are initialized as a Gaussian blob centered at the origin ( σinit = 0 .1). 
+
+TI methods configuration. For trajectory inference methods, we considered the experimental setup of Action Matching Neklyudov et al. (2023) where, instead of considering held-out marginals, we train the system on all 5 snapshots and evaluate the generated trajectories on the validation points. Given the more complex dynamics due to branching, we consider 2000 points for each training snapshot and 2000 for validation. Specifications of hyperparameters for the TI methods: • SBIRR-vSB: for the Petal dataset, we use a custom reference drift PetalReference that softly combines the 8 branches. For a state x, we compute for each branch k a spine point 
+
+ck(x) and a unit tangent tk(x), and assign weights 
+
+wk(x) = exp  −∥ x − ck(x)∥2/τ P8 
+
+> j=1
+
+exp( −∥ x − cj (x)∥2/τ ) , (35) with temperature τ (initialized to 0.01 ). Let ¯c(x) = P 
+
+> k
+
+wk(x) ck(x) and ¯t(x) =
+
+P 
+
+> k
+
+wk(x) tk(x), and define ˜t(x) = ¯ t(x)/(∥¯t(x)∥ + ε). The reference drift is 
+
+fref (x) = s ˜t(x) + λ ¯c(x) − x. (36) The diffusion coefficient is set to match the manifold width σ = 0 .04 , and the solver discretization ∆t = 0 .04 (N = 25 steps per snapshot interval). For SBIRR, we use an informative prior that encodes the geometric structure of the data. We initialize the parameters with a tangential speed s = 0 .2 and a restoring force λ = 0 .5, providing the bridge optimization with a starting process that already respects the flow and the petal structure. For the vSB, we simulate a standard, uninformative Schrödinger Bridge by considering a Brownian motion reference process. • MSBM: default hyperparameters. • MFL: t_final = 4.0, lambda_reg = 0.0075; n_sinkhorn = 250; sigma=1.0, sigma_final = 0.35; eta_final =0.1; n_iter = 2500; M (number of particles) = 2000; tau_final = 1.0. All the other hyperparameters are set to the default values. • AM: T = 4.0, BS = 512; SIGMA = 0.04; lr = 1e-5; num_iterations = 20_000. Given that in this case the training snapshots are overlapping, we followed the same procedure as in the original paper, considering mixture of points to have data which is more dense in time. We do not use any interpolation trick in this case. • TIGON: learning rate = 5 e − 4; training time points t ∈ [0 , 0.25 , 0.5, 0.75 , 1] ; initial gaussian kernel bandwidth σnow = 1 ; decay = 0 .9σ with a stopping condition of σ > 0.02 ;and a regularization parameter λd = 10 7. We changed the neural network architecture for the drift, considering 8 hidden layers, each with dimension 32. All the other parameters have been set to the default values. In Figure 11, we show the generated trajectories by TI methods with respect to the training and validation marginals. 
+
+KL configuration. We report FKL hyperparameters in Table 8. 29 Name Value                                                           
+
+> Training function XA
+> 1GT Training function XB
+> 1TI methods: SBIRR, vSB, MSBM, MFL, AM, TIGON Training functions’ input time points M101
+> Training functions’ output dimension D2
+> Covariance operator of noise function X0Rougher empirical GT Fourier-spectrum Num. modes Nsummed at KL estimation 16
+> tsampling scheme at training Curriculum: logit-normal (mean =0 .5,std =1 .5) for first 60% , then uniform
+> tsampling scheme at KL estimation Importance sampling t/ (1 −t)
+> Num. tsampled at KL estimation 100
+> Num. functions at training 2000
+> Training batch size 64
+> Training iterations 50 ,000
+> Num. functions at KL estimation 500
+> Optimizer Muon EMA rate 0.999
+> LR 1.78e −3
+> LR scheduler Cosine annealing FFM training loss w L FFM + (1 −w)LFKL ,wlinearly decayed from 1to 0.2
+> Model MINO-T Encoder (dim / depth / heads) 32 /2/8
+> Decoder (dim / depth / heads) 32 /2/8
+> Supernode radius 5e −4
+> GPUs for Training 1×NVIDIA A100
+
+Table 8: FKL hyperparameters for Petal. 
+
+E.2.4 Critical differences (CD) diagram. 
+
+We summarize methods performance in terms of marginal metrics using CD Ismail Fawaz et al. (2019) diagrams based on average ranks. For each task, methods are ranked according to the evaluation score (with ties handled by average ranks), and ranks are averaged across tasks. Statistical differences are assessed via a Friedman test followed by a Wilcoxon-Holm post-hoc comparison: two methods are considered significantly different if their average-rank gap exceeds the CD. In the diagram, methods connected by a horizontal bar are not significantly different at the chosen significance level, whereas unconnected groups indicate statistically distinguishable performance. We report the diagrams in Figure 3. 
+
+E.3 TI Evaluation on Real-World Datasets 
+
+As real-world data we consider two different single-cell RNA sequencing (scRNA-seq) datasets that capture cellular differentiation processes over time: the Embryoid Body (EB) dataset and the Human Embryonic Stem Cell (hESC) dataset, both preprocessed as in Shen et al. (2025). Both datasets provide snapshots of gene expression profiles at multiple time points during differentiation, making them suitable for evaluating trajectory inference methods. We consider SBIRR trajectories as reference GT, training the model over all the available snapshots. The other TI methods are trained on odd-index snapshots, and tested on SBIRR validation marginals. 
+
+E.3.1 Embryoid Body TI methods configuration. Specifications of hyperparameters for the TI methods: • SBIRR: default parameters, trained on all snapshots. Time horizon τ ∈ [0 , 1] .• vSB: we run vSB methods with default parameters, but we changed the discretization to 
+
+dt = 0 .01 and dts = [0 , 0.5, 1] in order to be consistent with the other trajectory inference methods. • MSBM: num_stage = 11 ; num_epoch = 10 ; num_itr = 1000 ; num_ResNet = 1 ;learning_rate = 2 × 10 −4; batch_size = 256 ; var = 0 .1; interval = 51 .30 • MFL: lambda_reg = 0.05; n_sinkhorn = 250; sigma=2.0, sigma_final = 1.0; t_final = 1; eta_final =0.1; n_iter = 1500; M (number of particles) = 1000; tau_final = 1.0. All the other hyperparameters are set to the default values. • AM hyperparameters: omega = 0.1; BS = 100; SIGMA = 0.1; lr = 1e-6; num_iterations = 10_000. We followed the same procedure as in the original paper, for which we considered mixture of points to have data which is more dense in time. We do not employ any interpolation trick in this case. • TIGON: training time points t ∈ { 0, 0.5, 1}; initial kernel bandwidth σnow = 1 ; decay 
+
+= 0 .5σ with a stopping condition of σ > 0.02 ; and a regularization parameter λd = 10 7.All the other parameters have been set to the default values. 
+
+KL configuration. We report FKL hyperparameters in Table 9.                                                            
+
+> Name Value
+> Training function XA
+> 1SBIRR Training function XB
+> 1TI methods: vSB, MSBM, MFL, AM, TIGON Training functions’ input time points M101
+> Training functions’ output dimension D5
+> Covariance operator of noise function X0Rougher empirical SBIRR Fourier-spectrum Num. modes Nsummed at KL estimation 16
+> tsampling scheme at training Curriculum: logit-normal (mean =0 .5,std =1 .5) for first 40% , then uniform
+> tsampling scheme at KL estimation Importance sampling t/ (1 −t)
+> Num. tsampled at KL estimation 100
+> Num. functions at training 300
+> Training batch size 32
+> Training iterations 20 ,000
+> Num. functions at KL estimation 500
+> Optimizer Muon EMA rate 0.999
+> LR 1.28e −3
+> LR scheduler Cosine annealing FFM training loss w L FFM + (1 −w)LFKL ,wlinearly decayed from 1to 0.2
+> Model MINO-T Encoder (dim / depth / heads) 32 /2/8
+> Decoder (dim / depth / heads) 32 /2/8
+> Supernode radius 5e −3
+> GPUs for Training 1×NVIDIA A100
+
+Table 9: FKL hyperparameters for Embryoid Body. 
+
+E.3.2 Human Embryonic Stem Cell TI methods configuration. Specifications of hyperparameters for TI methods: • SBIRR: default parameters, trained on all snapshots. Time horizon τ ∈ [0 , 1] .• vSB: we run vSB with default parameters. As for the EB dataset, we changed the time horizon in order to be limited in the interval [0 , 1] , to be consistent with the other methods. • MSBM hyperparameters: num_stage = 100 ; num_epoch = 1; num_itr = 1000 ;num_ResNet = 1 ; learning_rate = 1 × 10 −3; batch_size = 256 ; var = 0 .1; interval = 30 .• MFL: lambda_reg = 0.025; n_sinkhorn = 500; sigma=2.0, sigma_final = 1.0; t_final = 1; eta_final =0.1; n_iter = 2500; M (number of particles) = 500; tau_final = 1.0. All the other hyperparameters are set to the default values. • AM: BS = 50; SIGMA = 0.1; lr = 1e-6; num_iterations = 20_000; MLP with hidden dimension equal to 256. In this case, we used gradient accumulation. We followed the same procedure as in the original paper, for which we considered mixture of points to have data which is more dense in time. We do not employ any interpolation trick in this case, even if the data present jumps in space between marginals. • TIGON: training time points t ∈ { 0, 0.5, 1}; initial kernel bandwidth σnow = 1 ; decay 
+
+= 0 .5σ with a stopping condition of σ > 0.02 ; and a regularization parameter λd = 10 7.31 All the other parameters have been set to the default values. In this case, given the different number of cells for each snapshot, we also included the growth term in the model. 
+
+KL configuration. We report FKL hyperparameters in Table 10.                                                            
+
+> Name Value
+> Training function XA
+> 1SBIRR Training function XB
+> 1TI methods: vSB, MSBM, MFL, AM, TIGON Training functions’ input time points M121
+> Training functions’ output dimension D5
+> Covariance operator of noise function X0Rougher empirical SBIRR Fourier-spectrum Num. modes Nsummed at KL estimation 16
+> tsampling scheme at training Curriculum: logit-normal (mean =0 .5,std =1 .5) for first 40% , then uniform
+> tsampling scheme at KL estimation Importance sampling t/ (1 −t)
+> Num. tsampled at KL estimation 100
+> Num. functions at training 296
+> Training batch size 32
+> Training iterations 20 ,000
+> Num. functions at KL estimation 500
+> Optimizer Muon EMA rate 0.999
+> LR 1.28e −3
+> LR scheduler Cosine annealing FFM training loss w L FFM + (1 −w)LFKL ,wlinearly decayed from 1to 0.2
+> Model MINO-T Encoder (dim / depth / heads) 32 /2/8
+> Decoder (dim / depth / heads) 32 /2/8
+> Supernode radius 5e −3
+> GPUs for Training 1×NVIDIA A100
+
+Table 10: FKL hyperparameters for HESC. 
+
+E.3.3 Mouse Erythroid TI methods configuration. Specifications of hyperparmeters for the TI methods: • SBIRR: 300 training points per snapshot; n_epochs = 40; lr = 2e-2. • vSB: same as SBIRR. • MSBM: num_stage = 20 ; num_epoch = 1; num_itr = 1000 ; num_ResNet = 1;learning_rate = 1 × 10 −3; batch_size = 256 ; var = 0 .1; interval = 512 , time_scale = 1 .0.• MFL: lambda_reg = 0.0075; n_sinkhorn = 250; sigma=2.0, sigma_final = 0.5; t_final = 1.0; eta_final =0.1; n_iter = 10_000; M (number of particles) = 1000; tau_final = 1.0. • AM: omega = 0.1; BS = 100; SIGMA = 0.1; lr = 1e-5; num_iterations = 50_000. • TIGON: same as EB dataset, but we changed the neural network architecture for the drift, considering 8 hidden layers, each with dimension 32. We report the generated trajectories in Figure 4 and the hyperparameters for training FFM in Table 11. 
+
+KL configuration. We report FKL hyperparameters in Table 11. 
+
+E.3.4 Human Fibroblast TI methods configuration. Specifications for the TI methods: • SBIRR: same as Mouse Erythroid. • vSB: same as SBIRR. • MSBM hyperparameters: same as Mouse Erythroid. • MFL hyperparameters: lambda_reg = 0.05; n_sinkhorn = 250; sigma=2.0, sigma_final = 0.5; t_final = 1.0; eta_final =0.1; n_iter = 10_000; M (number of particles) = 1000; tau_final = 1.0. 32 Name Value 
+
+Training function XA 
+
+> 1
+
+SBIRR Training function XB 
+
+> 1
+
+TI methods: vSB, MSBM, MFL, AM, TIGON Training functions’ input time points M 1024 
+
+Training functions’ output dimension D 5
+
+Covariance operator of noise function X0 Rougher empirical SBIRR Fourier-spectrum Num. modes N summed at KL estimation 16 
+
+t sampling scheme at training Curriculum: logit-normal (mean =0 .5, std =1 .5) for first 40% , then uniform 
+
+t sampling scheme at KL estimation Importance sampling t/ (1 − t)
+
+Num. t sampled at KL estimation 100 
+
+Num. functions at training 900 
+
+Training batch size 64 
+
+Training iterations 20 ,000 
+
+Num. functions at KL estimation 500 
+
+Optimizer Muon EMA rate 0.999 
+
+LR 1.28e −3
+
+LR scheduler Cosine annealing FFM training loss w L FFM + (1 − w) LFKL , w linearly decayed from 1 to 0.2
+
+Model MINO-T Encoder (dim / depth / heads) 32 / 2 / 8
+
+Decoder (dim / depth / heads) 32 / 2 / 8
+
+Supernode radius 2e −4
+
+GPUs for Training 1 × NVIDIA A100 
+
+Table 11: FKL hyperparameters for Mouse Erythroid. • AM hyperparameters: omega = 0.1; BS = 100; SIGMA = 0.1; lr = 1e-5; num_iterations = 50_000. • TIGON configuration: same as Mouse Erythroid. We report the generated trajectories in Figure 4 and the hyperparameters for training FFM in Table 12. 
+
+KL configuration. We report FKL hyperparameters in Table 12. 
+
+Name Value 
+
+Training function XA 
+
+> 1
+
+SBIRR Training function XB 
+
+> 1
+
+TI methods: vSB, MSBM, MFL, AM, TIGON Training functions’ input time points M 1024 
+
+Training functions’ output dimension D 5
+
+Covariance operator of noise function X0 Rougher empirical SBIRR Fourier-spectrum Num. modes N summed at KL estimation 16 
+
+t sampling scheme at training Curriculum: logit-normal (mean =0 .5, std =1 .5) for first 40% , then uniform 
+
+t sampling scheme at KL estimation Importance sampling t/ (1 − t)
+
+Num. t sampled at KL estimation 100 
+
+Num. functions at training 1000 
+
+Training batch size 64 
+
+Training iterations 20 ,000 
+
+Num. functions at KL estimation 500 
+
+Optimizer Muon EMA rate 0.999 
+
+LR 1.28e −3
+
+LR scheduler Cosine annealing FFM training loss w L FFM + (1 − w) LFKL , w linearly decayed from 1 to 0.2
+
+Model MINO-T Encoder (dim / depth / heads) 32 / 2 / 8
+
+Decoder (dim / depth / heads) 32 / 2 / 8
+
+Supernode radius 2e −4
+
+GPUs for Training 1 × NVIDIA A100 
+
+Table 12: FKL hyperparameters for Human Fibroblast. 33 E.4 Uncertainty Estimation E.4.1 FKL 
+
+To ensure the reliability of our performance rankings and account for the inherent stochasticity in Monte Carlo sampling and velocity fields training, we evaluate all models across multiple independent runs. By employing 3 different random seeds, we provide quantitative uncertainty estimates for the forward and backward FKL, across the three synthetic datasets (Table 13) and four real-world datasets (Table 14).                                                                                                                                             
+
+> Models LV Repr Petal
+> KL( νA∥νB)KL( νB∥νA)KL( νA∥νB)KL( νB∥νA)KL( νA∥νB)KL( νB∥νA)
+> Val 0.271 ±0.008 0.268 ±0.009 0.015 ±0.001 0.014 ±0.001 0.079 ±0.006 0.078 ±0.005 SBIRR 43 .352 ±1.456 42 .779 ±0.629 23 .519 ±1.087 25 .242 ±0.314 15.991 ±0.892 49.360 ±2.334 vSB 165.057 ±8.938 126.886 ±5.601 82.933 ±2.302 79.014 ±0.874 18.881 ±0.658 53.435 ±4.186 MSBM 79.872 ±2.644 46.023 ±1.504 90.011 ±4.888 49.395 ±1.399 9.641 ±0.307 17 .055 ±1.186
+> MFL 43 .929 ±2.094 130.579 ±13.905 63.077 ±2.686 84.621 ±4.619 42.660 ±0.957 68.191 ±3.010 AM 44.914 ±2.233 55.488 ±3.059 66.901 ±0.437 126.248 ±8.847 12.328 ±0.387 31.641 ±2.890 TIGON 179.367 ±2.205 65.442 ±5.152 54.515 ±3.738 42.844 ±1.857 96.144 ±11.848 35.505 ±3.089
+
+Table 13: Variation in FKL across 3 seeds on synthetic datasets.                                                                                                                                            
+
+> Models EB hESC Mouse Erythroid Fibroblast
+> KL( νA∥νB)KL( νB∥νA)KL( νA∥νB)KL( νB∥νA)KL( νA∥νB)KL( νB∥νA)KL( νA∥νB)KL( νB∥νA)
+> vSB 23.778 ±0.982 27.727 ±0.392 127.241 ±3.511 124.057 ±3.868 51.119 ±1.330 48.054 ±3.561 56.990 ±5.092 41.638 ±0.481 MSBM 29.452 ±0.757 21.454 ±0.878 111.151 ±3.632 81.697 ±1.934 65.571 ±2.524 37.563 ±3.349 58.914 ±2.043 26.784 ±0.437
+> MFL 22.058 ±0.838 73.201 ±2.341 97.134 ±2.747 117.901 ±3.346 42.268 ±2.123 79.306 ±4.288 29.706 ±0.731 69.830 ±7.687 AM 74.803 ±5.319 32.180 ±0.480 145.552 ±18.465 283.293 ±32.506 89.223 ±3.304 81.838 ±5.794 73.227 ±6.770 66.942 ±4.031 TIGON 122.486 ±4.452 41.076 ±1.958 293.102 ±4.104 161.731 ±5.677 250.619 ±29.298 82.386 ±7.848 197.769 ±4.872 69.540 ±5.794
+
+Table 14: Variation in FKL across 3 seeds on real-world datasets. The reported performance metrics exhibit high consistency across multiple independent trials. The variance observed between different random seeds suggests that the model is robust to stochastic initialization and training noise, ensuring the reproducibility of our findings. 
+
+E.4.2 Marginal Metrics. 
+
+In Tables 15 to 17 we estimate the uncertainty of marginal metrics via bootstrapping, on the three synthetic datasets. For Lotka-Volterraand Repressilator we considered 10 runs with a subsample size of 100, whereas for Petal we consider 10 runs and subsample size equal to 500. The low variance present in most of the results show robustness in Monte Carlo sampling of the data. Notably, in the case of AM on the Repressilator dataset (Table 16), we observe that the variance scales positively with τ . This behavior is expected, as larger values of τ correspond to trajectories that propagate further into the state space, naturally leading to a higher dispersion of samples and a subsequent increase in the system’s variance. 34 τ Metric VAL SBIRR vSB MSBM MFL AM TIGON 
+
+0.125 EM D 0.041 ± 0.005 0.182 ± 0.016 1.007 ± 0.018 0.786 ± 0.014 0 .997 ± 0.051 0 .861 ± 0.017 0.434 ± 0.025 
+
+W2 0.054 ± 0.008 0.191 ± 0.015 1.015 ± 0.033 0.788 ± 0.014 1 .131 ± 0.071 0 .864 ± 0.016 0.481 ± 0.024 
+
+SWD 0.029 ± 0.007 0.129 ± 0.012 0.758 ± 0.025 0.596 ± 0.011 0 .794 ± 0.051 0 .654 ± 0.012 0.328 ± 0.016 
+
+MWD 0.038 ± 0.009 0.182 ± 0.016 1.009 ± 0.027 0.786 ± 0.015 0 .897 ± 0.073 0 .862 ± 0.016 0.375 ± 0.030 
+
+MMD 0.019 ± 0.008 0.175 ± 0.016 0.874 ± 0.007 0.717 ± 0.011 0 .617 ± 0.019 0 .762 ± 0.012 0.287 ± 0.021 0.375 EM D 0.058 ± 0.007 0.098 ± 0.006 0.522 ± 0.023 0.322 ± 0.020 0 .411 ± 0.048 0 .329 ± 0.029 0.321 ± 0.032 
+
+W2 0.073 ± 0.006 0.117 ± 0.009 0.545 ± 0.066 0.331 ± 0.019 0 .696 ± 0.105 0 .373 ± 0.057 0.375 ± 0.029 
+
+SWD 0.037 ± 0.005 0.069 ± 0.006 0.363 ± 0.052 0.235 ± 0.015 0 .498 ± 0.080 0 .272 ± 0.044 0.246 ± 0.019 
+
+MWD 0.046 ± 0.006 0.080 ± 0.009 0.515 ± 0.027 0.326 ± 0.019 0 .645 ± 0.093 0 .347 ± 0.058 0.345 ± 0.032 
+
+MMD 0.022 ± 0.012 0.049 ± 0.009 0.478 ± 0.011 0.305 ± 0.018 0 .245 ± 0.019 0 .273 ± 0.023 0.170 ± 0.025 0.625 EM D 0.090 ± 0.009 0.248 ± 0.028 0.311 ± 0.020 0.490 ± 0.051 0 .421 ± 0.061 0 .544 ± 0.074 0.270 ± 0.035 
+
+W2 0.113 ± 0.014 0.276 ± 0.027 0.360 ± 0.056 0.511 ± 0.051 0 .605 ± 0.091 0 .980 ± 0.234 0.361 ± 0.036 
+
+SWD 0.063 ± 0.012 0.194 ± 0.022 0.248 ± 0.042 0.366 ± 0.038 0 .415 ± 0.065 0 .727 ± 0.176 0.238 ± 0.026 
+
+MWD 0.083 ± 0.018 0.250 ± 0.031 0.304 ± 0.063 0.506 ± 0.052 0 .517 ± 0.078 0 .969 ± 0.236 0.311 ± 0.036 
+
+MMD 0.039 ± 0.012 0.189 ± 0.036 0.183 ± 0.016 0.429 ± 0.040 0 .271 ± 0.037 0 .252 ± 0.032 0.136 ± 0.028 
+
+0.875 EM D 0.181 ± 0.025 0.445 ± 0.100 0.293 ± 0.046 0.575 ± 0.077 0 .639 ± 0.080 1 .136 ± 0.146 0.289 ± 0.053 
+
+W2 0.221 ± 0.028 0.514 ± 0.102 0.349 ± 0.052 0.665 ± 0.078 0 .924 ± 0.105 1 .915 ± 0.284 0.380 ± 0.066 
+
+SWD 0.133 ± 0.022 0.345 ± 0.079 0.221 ± 0.040 0.470 ± 0.057 0 .664 ± 0.079 1 .412 ± 0.213 0.254 ± 0.053 
+
+MWD 0.178 ± 0.032 0.472 ± 0.110 0.273 ± 0.065 0.646 ± 0.080 0 .837 ± 0.113 1 .898 ± 0.284 0.331 ± 0.072 
+
+MMD 0.081 ± 0.025 0.234 ± 0.054 0.169 ± 0.030 0.396 ± 0.045 0 .240 ± 0.021 0 .227 ± 0.031 0.127 ± 0.041 
+
+Table 15: Distances from GT Lotka-Volterra trajectories to other methods at each snapshot τ
+
+(mean ±std over resampling runs). 
+
+τ Metric VAL SBIRR vSB MSBM MFL AM TIGON 
+
+0.1 EM D 0.063 ± 0.003 0.392 ± 0.006 1.882 ± 0.006 1 .467 ± 0.014 1 .795 ± 0.098 1.456 ± 0.016 1.084 ± 0.041 
+
+W2 0.073 ± 0.004 0.416 ± 0.007 1.887 ± 0.006 1 .470 ± 0.014 1 .915 ± 0.114 1.459 ± 0.015 1.147 ± 0.043 
+
+SWD 0.026 ± 0.003 0.211 ± 0.004 1.020 ± 0.003 0 .803 ± 0.007 1 .116 ± 0.074 0.799 ± 0.009 0.617 ± 0.025 
+
+MWD 0.040 ± 0.004 0.395 ± 0.005 1.811 ± 0.006 1 .384 ± 0.014 1 .515 ± 0.085 1.375 ± 0.016 0.887 ± 0.031 
+
+MMD 0.024 ± 0.008 0.367 ± 0.005 1.268 ± 0.002 1 .120 ± 0.005 0 .931 ± 0.019 1.111 ± 0.009 0.690 ± 0.016 0.3 EM D 0.118 ± 0.013 0.856 ± 0.037 1.234 ± 0.019 1 .336 ± 0.023 1 .734 ± 0.060 1.364 ± 0.040 0.871 ± 0.060 
+
+W2 0.143 ± 0.020 0.893 ± 0.039 1.258 ± 0.018 1 .366 ± 0.022 1 .845 ± 0.066 1.402 ± 0.045 0.974 ± 0.069 
+
+SWD 0.063 ± 0.015 0.522 ± 0.023 0.747 ± 0.011 0 .790 ± 0.014 1 .031 ± 0.038 0.804 ± 0.029 0.542 ± 0.043 
+
+MWD 0.100 ± 0.026 0.870 ± 0.043 1.135 ± 0.025 1 .315 ± 0.027 1 .519 ± 0.064 1.307 ± 0.049 0.770 ± 0.078 
+
+MMD 0.047 ± 0.024 0.677 ± 0.031 0.880 ± 0.013 0 .982 ± 0.013 0 .866 ± 0.017 0.959 ± 0.023 0.478 ± 0.030 
+
+0.5 EM D 0.174 ± 0.026 0.451 ± 0.044 0.955 ± 0.061 1 .014 ± 0.039 1 .455 ± 0.097 2.253 ± 0.448 0.829 ± 0.070 
+
+W2 0.209 ± 0.029 0.491 ± 0.055 0.996 ± 0.056 1 .114 ± 0.047 1 .593 ± 0.095 5.650 ± 1.121 0.899 ± 0.070 
+
+SWD 0.102 ± 0.023 0.263 ± 0.035 0.578 ± 0.036 0 .658 ± 0.029 0 .892 ± 0.056 3.070 ± 0.646 0.471 ± 0.046 
+
+MWD 0.157 ± 0.039 0.375 ± 0.070 0.935 ± 0.055 1 .050 ± 0.042 1 .316 ± 0.106 5.375 ± 1.033 0.730 ± 0.079 
+
+MMD 0.067 ± 0.025 0.290 ± 0.027 0.596 ± 0.032 0 .707 ± 0.018 0 .642 ± 0.027 0.615 ± 0.036 0.433 ± 0.035 0.7 EM D 0.229 ± 0.026 0.787 ± 0.108 1.090 ± 0.036 1 .019 ± 0.062 1 .380 ± 0.110 7.523 ± 1.679 0.818 ± 0.079 
+
+W2 0.272 ± 0.027 0.854 ± 0.118 1.158 ± 0.035 1 .157 ± 0.073 1 .530 ± 0.105 18 .938 ± 2.964 0.875 ± 0.079 
+
+SWD 0.125 ± 0.020 0.480 ± 0.068 0.622 ± 0.018 0 .642 ± 0.041 0 .861 ± 0.067 10 .616 ± 1.687 0.453 ± 0.051 
+
+MWD 0.205 ± 0.042 0.800 ± 0.125 0.999 ± 0.044 1 .015 ± 0.084 1 .305 ± 0.112 18 .451 ± 2.929 0.684 ± 0.076 
+
+MMD 0.075 ± 0.021 0.402 ± 0.043 0.620 ± 0.013 0 .620 ± 0.028 0 .537 ± 0.021 0.563 ± 0.019 0.425 ± 0.034 0.9 EM D 0.287 ± 0.042 1.872 ± 0.185 0.954 ± 0.073 1 .228 ± 0.077 1 .228 ± 0.104 17 .566 ± 3.948 0.852 ± 0.087 
+
+W2 0.339 ± 0.047 1.943 ± 0.189 1.083 ± 0.070 1 .403 ± 0.089 1 .369 ± 0.103 38 .787 ± 5.272 0.932 ± 0.096 
+
+SWD 0.169 ± 0.032 1.132 ± 0.111 0.625 ± 0.040 0 .781 ± 0.054 0 .715 ± 0.066 22 .178 ± 3.052 0.502 ± 0.062 
+
+MWD 0.264 ± 0.066 1.894 ± 0.189 0.912 ± 0.077 1 .284 ± 0.101 1 .134 ± 0.116 38 .447 ± 5.252 0.712 ± 0.118 
+
+MMD 0.095 ± 0.027 0.563 ± 0.054 0.538 ± 0.033 0 .680 ± 0.025 0 .479 ± 0.026 0.367 ± 0.022 0.428 ± 0.040 
+
+Table 16: Distances from GT Repressilator trajectories to other methods at each snapshot τ (mean ±std over resampling runs) 35 τ Metric VAL SBIRR vSB MSBM MFL AM TIGON 
+
+0 EM D 0.025 ± 0.003 0.027 ± 0.003 0.025 ± 0.002 0.026 ± 0.003 0.203 ± 0.023 0.026 ± 0.002 0.093 ± 0.004 
+
+W2 0.031 ± 0.002 0.034 ± 0.003 0.031 ± 0.002 0.033 ± 0.003 0.694 ± 0.061 0.033 ± 0.002 0.098 ± 0.004 
+
+SWD 0.013 ± 0.003 0.016 ± 0.003 0.013 ± 0.002 0.014 ± 0.002 0.489 ± 0.047 0.013 ± 0.002 0.056 ± 0.003 
+
+MWD 0.017 ± 0.004 0.019 ± 0.004 0.016 ± 0.003 0.018 ± 0.003 0.541 ± 0.060 0.017 ± 0.003 0.068 ± 0.003 
+
+MMD 0.010 ± 0.006 0.013 ± 0.004 0.009 ± 0.004 0.009 ± 0.003 0.054 ± 0.009 0.011 ± 0.004 0.022 ± 0.003 0.25 EM D 0.048 ± 0.011 0.048 ± 0.004 0.048 ± 0.011 0.059 ± 0.005 0.292 ± 0.012 0.111 ± 0.005 0.123 ± 0.004 
+
+W2 0.071 ± 0.019 0.070 ± 0.007 0.071 ± 0.018 0.080 ± 0.008 0.529 ± 0.046 0.126 ± 0.005 0.130 ± 0.005 
+
+SWD 0.034 ± 0.011 0.033 ± 0.004 0.031 ± 0.010 0.041 ± 0.006 0.366 ± 0.034 0.067 ± 0.004 0.060 ± 0.003 
+
+MWD 0.050 ± 0.016 0.050 ± 0.010 0.047 ± 0.018 0.058 ± 0.010 0.407 ± 0.040 0.086 ± 0.005 0.083 ± 0.003 
+
+MMD 0.028 ± 0.013 0.027 ± 0.004 0.021 ± 0.012 0.031 ± 0.009 0.057 ± 0.004 0.037 ± 0.009 0.019 ± 0.012 
+
+0.5 EM D 0.070 ± 0.017 0.066 ± 0.008 0.071 ± 0.017 0.090 ± 0.010 0.291 ± 0.011 0.176 ± 0.009 0.170 ± 0.007 
+
+W2 0.119 ± 0.028 0.114 ± 0.012 0.122 ± 0.026 0.136 ± 0.017 0.460 ± 0.047 0.205 ± 0.010 0.180 ± 0.009 
+
+SWD 0.060 ± 0.015 0.056 ± 0.007 0.056 ± 0.016 0.072 ± 0.012 0.308 ± 0.033 0.106 ± 0.008 0.091 ± 0.005 
+
+MWD 0.086 ± 0.022 0.086 ± 0.012 0.084 ± 0.024 0.101 ± 0.015 0.348 ± 0.045 0.143 ± 0.015 0.121 ± 0.007 
+
+MMD 0.044 ± 0.017 0.038 ± 0.008 0.037 ± 0.018 0.055 ± 0.013 0.109 ± 0.005 0.076 ± 0.015 0.035 ± 0.013 
+
+0.75 EM D 0.089 ± 0.021 0.080 ± 0.009 0.084 ± 0.020 0.118 ± 0.020 0.196 ± 0.012 0.196 ± 0.017 0.147 ± 0.014 
+
+W2 0.176 ± 0.031 0.157 ± 0.017 0.159 ± 0.033 0.189 ± 0.033 0.397 ± 0.049 0.239 ± 0.022 0.192 ± 0.025 
+
+SWD 0.087 ± 0.018 0.076 ± 0.007 0.076 ± 0.019 0.100 ± 0.022 0.255 ± 0.036 0.121 ± 0.015 0.094 ± 0.011 
+
+MWD 0.134 ± 0.036 0.115 ± 0.019 0.117 ± 0.031 0.142 ± 0.034 0.301 ± 0.040 0.170 ± 0.025 0.137 ± 0.026 
+
+MMD 0.055 ± 0.020 0.044 ± 0.009 0.045 ± 0.019 0.070 ± 0.018 0.069 ± 0.007 0.091 ± 0.021 0.039 ± 0.015 
+
+1 EM D 0.103 ± 0.025 0.088 ± 0.013 0.087 ± 0.026 0.143 ± 0.032 0.135 ± 0.022 0.182 ± 0.025 0.090 ± 0.022 
+
+W2 0.272 ± 0.049 0.237 ± 0.034 0.232 ± 0.056 0.289 ± 0.063 0.422 ± 0.049 0.300 ± 0.045 0.241 ± 0.049 
+
+SWD 0.137 ± 0.026 0.117 ± 0.015 0.115 ± 0.028 0.151 ± 0.038 0.261 ± 0.034 0.155 ± 0.024 0.116 ± 0.025 
+
+MWD 0.227 ± 0.058 0.196 ± 0.033 0.193 ± 0.055 0.237 ± 0.062 0.332 ± 0.044 0.225 ± 0.036 0.193 ± 0.046 
+
+MMD 0.062 ± 0.020 0.047 ± 0.011 0.048 ± 0.018 0.080 ± 0.023 0.043 ± 0.016 0.095 ± 0.022 0.047 ± 0.015 
+
+Table 17: Distances from GT Petal trajectories to other methods at each snapshot τ (mean ±std over resampling runs). 36

@@ -1,0 +1,413 @@
+Title: NeuroPlastic: A Plasticity-Modulated Optimizer for Biologically Inspired Learning Dynamics
+
+URL Source: https://arxiv.org/pdf/2604.26297v1
+
+Published Time: Thu, 30 Apr 2026 00:26:22 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# NeuroPlastic: A Plasticity-Modulated Optimizer for Biologically Inspired Learning Dynamics 
+
+Douglas Jiang 1,2,5, Yuechen Wang 1,5, Jiayi Wang 1,3, Jiaying Geng 1,4,Qinglong Wang 1, and Feng Tian 1*
+
+> 1
+
+Department of Neurology, Beth Israel Deaconess Medical Center, Harvard Medical School, Boston, MA 02115, USA 
+
+> 2
+
+Department of Biostatistics, Harvard T.H. Chan School of Public Health, Boston, MA 02115, USA 
+
+> 3
+
+Department of Statistics, John A. Paulson School of Engineering and Applied Sciences, Harvard University, Cambridge, MA 02138, USA 
+
+> 4
+
+Department of Psychology, Columbia University, New York, NY 10027, USA 
+
+> 5
+
+Equal contributions 
+
+> ∗
+
+Correspondence: ftian@bidmc.harvard.edu 
+
+# Abstract 
+
+Optimization algorithms are fundamental to modern deep learning, yet most widely used methods rely on update rules based primarily on local gradient statistics. We introduce NeuroPlastic , a plasticity-modulated optimizer that augments gradient-based updates with an adaptive multi-signal modulation mechanism inspired by multi-factor synaptic plasticity, a concept from neurobiology. NeuroPlastic dynam-ically scales gradient updates using interacting components that capture gradient, activity-like, and memory-like statistics, forming a lightweight modulation layer compatible with standard deep learning training pipelines. Across image classifica-tion benchmarks, NeuroPlastic consistently improves over a controlled gradient-only ablation, with more pronounced gains on the Fashion-MNIST benchmark and in reduced-data regimes. In transfer experiments on CIFAR-10 with ResNet-18, the method remains stable and competitive without retuning. These results suggest that multi-signal plasticity-inspired modulation can provide a useful extension to conventional gradient-driven optimization, particularly when learning signals are limited or noisy, and offer a promising direction for gradient-based methods in deep learning. Code is available at: https://github.com/Sunnylincc/NeuroPlastic-Optimizer. 
+
+# 1 Introduction 
+
+Optimization algorithms are a foundation of modern deep learning. The ability of neural networks to generalize depends not only on model architecture and training data, but critically on how parameters are updated during training [Goodfellow et al., 2016]. Over the past decade, stochastic gradient descent and adaptive methods such as Adam and AdamW have become the dominant tools for this purpose [Robbins and Monro, 1951, Kingma and Ba, 2015, Loshchilov and Hutter, 2019]. They demonstrate strong empirical performance across vision, language, and large-scale foundation model training [He et al., 2016, Brown et al., 2020, Vaswani et al., 2017]. These methods share a common design principle: parameter updates are computed as functions of local gradient statistics, either raw stochastic gradients with momentum, or first- and second-order exponential moving averages [Polyak, 1964, Rumelhart et al., 1986, Kingma and Ba, 2015]. This design is computationally efficient and broadly effective, but it also constrains the learning signal. In all cases, the effective learning signal at 
+
+> Preprint.
+> arXiv:2604.26297v1 [cs.LG] 29 Apr 2026
+
+each step is derived from gradient information as a single source, with history encoded only through moving averages of that same signal. When gradients are informative and plentiful, this is sufficient. When learning signals are weak, sparse, or noisy, single-signal updates may limit the model’s ability to adapt effectively [Frémaux and Gerstner, 2016]. Unlike stochastic gradients, biological neural systems like the human brain organize learning through multiple interacting components. Classical Hebbian learning describes synaptic strengthening as a function of correlated pre- and post-synaptic activity [Hebb, 1949]. Subsequent work in computational neuroscience extended this idea into three-factor or multi-factor plasticity rules, where synaptic updates depend not only on co-activation but also on additional signals [Gerstner, 2011, Lillicrap et al., 2020]. These signals may include neuromodulators, activity traces reflecting the history of a neuron’s firing, and network-level regulatory mechanisms that maintain stability over time [Hebb, 1949, Frémaux and Gerstner, 2016]. Together, these factors allow learning to be modulated by context: what has recently occurred, what the network is currently doing, and signals that reflect the broader relevance of a given update. The key feature of these rules is that the effective learning signal at any synapse emerges from multiple interacting sources rather than a single scalar. This biological architecture suggests a design principle: learning signals constructed from multiple interacting components may be more informative than gradient information alone, particularly in regimes where the primary learning signal is degraded. However, translating these neurobiological principles into scalable deep learning optimizers remains challenging, as neural plasticity mechanisms are not readily compatible with gradient-based training in modern deep learning architectures. Therefore, we ask a focused question: can multi-factor plasticity be implemented in a lightweight optimizer for standard deep learning settings? To investigate this question, we introduce NeuroPlastic . NeuroPlastic augments gradient updates with a plasticity modulation coefficient constructed from three normalized signals: gradient magnitude, an exponential moving average of gradient activity, and an Adam-style memory term, specifically the ratio of first- to second-moment estimates followed by population-level normalization. These three signals jointly determine a modulation factor that scales the effective gradient update. We evaluate the NeuroPlastic optimizer against gradient-only and standard optimizers (SGD, Adam, AdamW) on image classification benchmarks of increasing difficulty. Results show consistent improvements over the gradient-only ablation on MNIST [LeCun et al., 1998], with clearer gains on Fashion-MNIST [Xiao et al., 2017]. On CIFAR-10 with ResNet-18 [Krizhevsky, 2009, He et al., 2016], the method remains stable and competitive without retuning. Our main contributions can be summarized as follows: 1. We introduce NeuroPlastic , a biologically inspired optimizer that modulates gradient up-dates through a plasticity signal combining gradient information with activity- and memory-like components. 2. We design a stabilization mechanism that regulates update magnitudes and maintains stable optimization dynamics across learning rates. 3. We develop a reproducible benchmarking framework and diagnostic tools for analyzing plasticity-modulated optimization behavior during training. 4. We empirically evaluate NeuroPlastic across standard benchmarks and data regimes, demon-strating consistent improvements over gradient-only updates, with the advantage scaling with task difficulty and data scarcity. 
+
+# 2 Related Work 
+
+Despite decades of progress in optimizer design, the question of what constitutes a sufficient learning signal remains largely unexamined. Existing optimizers treat gradient information as the only basis for parameter updates. While richer update rules have been explored through meta-learning, second-order methods, and biologically inspired plasticity, none has produced a practical, drop-in alternative 2competitive with Adam that incorporates multi-signal modulation. We review these three lines of work below, identifying their limitations and how NeuroPlastic extends them to address these gaps. 
+
+2.1 Gradient-Based Optimization in Deep Learning 
+
+Stochastic gradient descent and its momentum-based extensions remain the most widely used op-timization algorithms for neural network training. Adam generalizes this by computing adaptive per-parameter learning rates using exponential moving averages of first and second gradient moments, and AdamW decouples weight decay to improve generalization [Kingma and Ba, 2015, Loshchilov and Hutter, 2019]. Other adaptive methods including AdaGrad, RMSProp, and AdaDelta similarly rely on accumulated gradient statistics to scale updates [Duchi et al., 2011, Zeiler, 2012, Tieleman and Hinton, 2012]. These methods are computationally efficient and have proven to be effective in many large-scale machine learning applications, including computer vision and natural language processing [Kingma and Ba, 2015, Loshchilov and Hutter, 2019, Duchi et al., 2011, Tieleman and Hinton, 2012]. However, they share a structural limitation relevant to our work: the adaptive compo-nent of the update rule is derived entirely from transformations of the gradient signal. History enters only through moving averages of gradient quantities, and the effective learning signal at each step is determined by gradient information alone. NeuroPlastic is designed to explore the possibility of constructing a modulation signal from multiple sources. 
+
+2.2 Alternative and Learned Optimizers 
+
+Beyond classical adaptive gradient methods, a variety of alternative optimization strategies have been proposed to enrich or replace gradient-based update rules. Second-order and preconditioned methods such as K-FAC and Shampoo incorporate curvature information to accelerate convergence, often at the cost of significant computational overhead [Eschenhagen et al., 2023, Martens and Grosse, 2015, Martens, 2010, Gupta et al., 2018]. A separate line of work attempts to learn update rules directly from data: meta-learning approaches train optimizers to generalize across tasks, but typically require expensive meta-training and do not transfer reliably outside the training distribution [Andrychowicz et al., 2016, Chandra et al., 2022]. More recently, symbolic discovery approaches such as Lion have searched mathematical expressions to identify compact and effective update rules, resulting in lightweight alternatives to Adam [Chen et al., 2023, Wang et al., 2022, Berthet et al., 2020, Joseph et al., 2023]. Together, these directions demonstrate that the space of useful optimizer designs extends well beyond first-order gradient descent and that departing from standard update rules in principled ways can yield practical benefits. NeuroPlastic is motivated by the same observation but takes a different path. Rather than learning or searching for an update rule, we derive one from the functional structure of multi-factor biological plasticity. The result is a modulation mechanism that is fixed in structure but adaptive in its per-step behavior. 
+
+2.3 Biologically Inspired Learning Rules 
+
+The computational neuroscience literature has developed a rich family of learning rules motivated by synaptic plasticity mechanisms in biological neural circuits. Hebbian learning, the first formalization, shows that synaptic weights increase in proportion to the correlated activity of pre- and post-synaptic neurons [Hebb, 1949]. Three-factor plasticity rules extend this framework by introducing a third modulatory signal that influences synaptic updates [Gerstner et al., 2018]. These additional signals may include a neuromodulatory input that encodes reward, novelty, or task relevance, determining whether a Hebbian update is applied and at what magnitude [Hebb, 1949, Gerstner, 2011, Frémaux and Gerstner, 2016]. The result is an update rule in which the effective learning signal is a product of three interacting terms: a local activity-dependent term, a synaptic activity trace encoding the history of co-activation, and a global or semi-global modulatory signal. Several lines of work have explored whether biologically motivated plasticity rules can be incorporated into machine learning systems [Lillicrap et al., 2020, Marblestone et al., 2016, Richards and Lillicrap, 2019]. The most prominent efforts focused on making credit assignment more biologically plausible. Feedback alignment and its direct variant replace the standard backward pass of backpropagation with fixed random feedback connections [Lillicrap et al., 2016, Nøkland, 2016]. While this produces a more biologically grounded update rule, performance degrades on tasks beyond simple benchmarks, and the approach has not been shown to scale to modern architectures. Target propagation methods, 3such as difference target propagation [Lee et al., 2015], take a different route by computing layer-wise learning targets rather than gradients, a design with natural connections to local plasticity rules. However, they often suffer from inefficient parameter updates in typical deep networks and similarly fall short of standard backpropagation performance at scale [Meulemans et al., 2020]. A closer parallel to our work is differentiable plasticity: prior work has shown that Hebbian plastic connections, where each synapse carries both a stable weight and an activity-dependent component, can be optimized end-to-end by gradient descent [Miconi et al., 2018]. Subsequent work extended this to neuromodulated plasticity, where a learned modulatory signal gates the Hebbian update moment-to-moment, yielding improvements on meta-learning and reinforcement learning tasks [Miconi et al., 2019]. These approaches share the core intuition motivating NeuroPlastic, but they are primarily evaluated on small recurrent architectures in meta-learning or continual learning settings, and are not designed as drop-in replacements for standard optimizers. No prior work has instantiated multi-signal modulation directly as a parameter update rule and evaluated it against a controlled gradient-only ablation in standard deep learning settings. 
+
+# 3 Methods 
+
+3.1 Overview 
+
+We propose NeuroPlastic , a gradient-based optimizer in which the raw gradient is modulated by a plasticity coefficient constructed from multiple normalized optimization signals and then stabilized before being applied. Let θt denote the model parameters at step t, and let 
+
+gt = ∇θ L(θt) (1) denote the stochastic gradient. The core update takes the form 
+
+θt+1 = θt − ηt eut, (2) where ηt is the effective learning rate and eut is a stabilized, plasticity-modulated update. In the default rule-based configuration, NeuroPlastic first computes a per-parameter modulation factor 
+
+αt, forms the modulated update 
+
+ut = αt ⊙ gt (3) and then applies a stabilization operator 
+
+eut = S(ut). (4) 
+
+3.2 Activity and Memory Signals 
+
+NeuroPlastic maintains three internal statistics derived from the gradient: an activity trace, a first-moment trace, and a second-moment trace. 
+
+Activity trace. The activity trace is an exponential moving average of gradient magnitudes: 
+
+at = βaat−1 + (1 − βa)|gt|. (5) 
+
+Momentum and variance traces. We also maintain Adam-style first- and second-moment statistics: 
+
+mt = β1mt−1 + (1 − β1)gt, (6) 
+
+vt = β2vt−1 + (1 − β2)( gt ⊙ gt). (7) 
+
+3.3 Normalized Plasticity Signals 
+
+The optimizer constructs three normalized signals from the quantities above. 
+
+Gradient signal. 
+
+g(s) 
+
+> t
+
+= |gt|
+
+mean( |gt|) + ϵ . (8) 4Figure 1: Overview of the NeuroPlastic optimizer. Gradient updates are modulated by a plasticity coefficient constructed from normalized gradient, activity-like, and memory-like signals. The result-ing modulated update is ut = αt ⊙ gt, which is then stabilized to produce eut = S(ut) before the parameter update θt+1 = θt − ηt eut. The gradient-only ablation removes the activity and memory contributions while retaining gradient-based modulation, using αgrad  
+
+> t
+
+= clip( g(s) 
+
+> t
+
+, α min , α max ).
+
+Activity signal. 
+
+a(s) 
+
+> t
+
+= at
+
+mean( at) + ϵ . (9) 
+
+Memory signal. The memory signal combines the first- and second-moment traces: 
+
+m(s) 
+
+> t
+
+= |mt|/(√vt + ϵ)mean  |mt|/(√vt + ϵ) + ϵ , (10) where mt and vt are the raw (non-bias-corrected) moment estimates as defined in Equations (6)–(7), and ϵ > 0 is a small constant for numerical stability. 
+
+3.4 Plasticity Coefficient Gradient-only ablation. A key implementation detail is that the gradient-only ablation used in the code does not set αt = 1 . Instead, it removes the activity and memory contributions while retaining gradient-based modulation: 
+
+αgrad  
+
+> t
+
+= clip 
+
+
+
+g(s) 
+
+> t
+
+, α min , α max 
+
+
+
+. (11) 
+
+Full plasticity rule. In the full rule-based configuration, the plasticity coefficient is computed as a weighted combination of the three normalized signals: 
+
+αfull  
+
+> t
+
+= waa(s) 
+
+> t
+
++ wg g(s) 
+
+> t
+
++ wmm(s) 
+
+> t
+
+, (12) followed by clipping: 
+
+αfull  
+
+> t
+
+← clip  αfull  
+
+> t
+
+, α min , α max 
+
+ . (13) 5Warmup interpolation. The final plasticity coefficient interpolates between the gradient-only and full rules: 
+
+αt = αgrad  
+
+> t
+
++ λt
+
+
+
+αfull  
+
+> t
+
+− αgrad 
+
+> t
+
+
+
+, (14) where 
+
+λt = splast · γwarmup  
+
+> t
+
+. (15) Here splast is a plasticity scaling factor and γwarmup  
+
+> t
+
+∈ [0 , 1] is a warmup gate. 
+
+Parameter-wise versus scalar modulation. By default, αt is computed per parameter. If parameter-wise modulation is disabled, the implementation replaces αt by its mean value and broadcasts the resulting scalar across all coordinates of the tensor. 
+
+3.5 Homeostatic Stabilization 
+
+After constructing the plasticity-modulated update 
+
+ut = αt ⊙ gt, (16) NeuroPlastic applies a homeostatic stabilization operator S(·) consisting of two steps. 
+
+Step 1: Norm clipping. Let τ denote the maximum allowed update norm. If ∥ut∥ > τ , the update is rescaled: 
+
+ut ← ut · τ
+
+∥ut∥ + ϵ . (17) 
+
+Step 2: RMS-based gain control. The update is then adjusted using its root-mean-square (RMS) magnitude: 
+
+RMS( ut) = 
+
+q
+
+mean( u2 
+
+> t
+
+) + ϵ. (18) Given a target RMS value rtarget , the stabilizer computes a gain 
+
+γstab  
+
+> t
+
+= 1 + ρ (rtarget − RMS( ut)) , (19) and clips it to a bounded interval: 
+
+γstab  
+
+> t
+
+← clip  γstab  
+
+> t
+
+, γ min , γ max 
+
+ . (20) The stabilized update is therefore 
+
+eut = γstab  
+
+> t
+
+ut. (21) The implementation also supports layer-dependent scaling of the target RMS through a multiplicative factor; when all scaling factors are set identically, the same target RMS is applied across parameter groups. 
+
+3.6 Weight Decay and Effective Learning Rate 
+
+The implementation supports both coupled and decoupled weight decay. In the coupled setting, the decay term is added directly to the update. In the decoupled setting, parameters are separately shrunk before the stabilized update is applied, analogous to AdamW-style regularization. The optimizer also supports an optional learning-rate controller that rescales the base learning rate according to a controller signal derived from the discrepancy between αt and αgrad  
+
+> t
+
+. In the default configuration, this controller is disabled, so the effective learning rate reduces to the base learning rate: 
+
+ηt = η. (22) 
+
+# 4 Experiments 
+
+We evaluate NeuroPlastic through a series of controlled experiments designed not only to assess its empirical performance, but also to understand how plasticity provides useful inductive bias beyond standard gradient-based updates. 6Figure 2: Test accuracy across training epochs on MNIST and Fashion-MNIST. (A) MNIST test accuracy comparing the full NeuroPlastic optimizer with the gradient-only ablation. (B) Fashion-MNIST test accuracy under the same training configuration. Shaded regions denote the standard deviation across independent runs. 
+
+4.1 MNIST and Fashion-MNIST 
+
+We evaluate the optimizer on two standard image-classification benchmarks, using MNIST as a lightweight sanity check and Fashion-MNIST as a more challenging follow-up task. This paired analysis allows us to assess whether the contribution of plasticity-modulated updates changes as task difficulty increases. On MNIST, NeuroPlastic achieves slightly higher final accuracy and lower training loss than the gradient-only ablation across three training seeds. The improvement in final test accuracy is small (approximately +0.001 absolute), but is consistent across all seeds and comparisons. These results indicate that the plasticity-modulated update rule provides a modest but reproducible improvement over a purely gradient-driven update, thus offering a stable baseline for the more challenging eval-uations that follow. Training curves further show stable optimization behavior throughout training (Figure 2A). On Fashion-MNIST, NeuroPlastic demonstrates its advantages by consistently outperforming the gradient-only baseline on multiple metrics. Across three seeds, NeuroPlastic improves mean final test accuracy by approximately +0.006 compared with the gradient-only ablation and consistently achieves lower training loss. It outperforms the gradient-only baseline on all shared seeds for both final accuracy and best observed accuracy during training. These results suggest that the plasticity signal becomes more useful as task difficulty increases, while maintaining stable training dynamics (Figure 2B). To understand why plasticity modulation improves performance on Fashion-MNIST, we examine the internal optimizer dynamics during training. As detailed in Appendix F, the full NeuroPlastic optimizer maintains a consistently higher and more stable plasticity coefficient throughout training, and produces a distinct effective update norm trajectory, with slightly larger early updates and a smoother late-stage decay relative to the gradient-only ablation. Critically, the raw gradient norm remains similar between the two conditions, suggesting that the gains arise from how updates are modulated and stabilized rather than from any change in gradient magnitude. 
+
+4.2 Low-Data Regime Analysis 
+
+To further examine when plasticity modulation is most beneficial, we conduct a controlled low-data study on Fashion-MNIST by training models using only a fraction of the available training data. We evaluate fractions of {0.1, 0.25 , 0.5, 1.0} of the original training set while keeping the test set unchanged. Across all data fractions, NeuroPlastic improves both final accuracy and training loss relative to the gradient-only ablation, with absolute gains in final accuracy ranging from approximately 7Figure 3: Low-data regime analysis on Fashion-MNIST. (A) Final test accuracy under different fractions of the training dataset. Across all data fractions, the full NeuroPlastic optimizer outperforms the gradient-only ablation, with larger gains in the more data-constrained regimes. (B) Final test loss under the same settings. Plasticity-modulated updates consistently achieve lower loss across data fractions. Shaded regions denote the standard deviation across independent runs. +0.004 to +0.006. Interestingly, the advantage of NeuroPlastic tends to slightly increase when less data is available, although the relationship is not strictly monotonic. These findings suggest that plasticity-modulated updates may be particularly beneficial when learning signals are weaker or data is limited (Figure 3). A fuller characterization of how plasticity coefficients evolve across training is provided in Appendix F. 
+
+4.3 Comparison with Standard Optimizer Baselines 
+
+To contextualize NeuroPlastic under standard training settings, we include a comparison on CIFAR-10 [Krizhevsky, 2009] using ResNet-18 and standard optimizer baselines (SGD, Adam, AdamW). Because this experiment intentionally uses the MNIST-tuned configuration without retuning, the re-sults should be interpreted primarily as a transferability test rather than a fully optimized comparison. As shown in Figure 4, NeuroPlastic achieves competitive performance under appropriate learning rate settings, although it does not surpass well-tuned standard optimizers in this regime. The optimizer exhibits stable training dynamics across configurations but shows pronounced sensitivity to learning rate scaling. This behavior is consistent with the broader pattern observed throughout our experiments: the benefit of plasticity modulation depends on how well the optimization setting is matched to the modulation structure. In particular, NeuroPlastic’s gains are tied to regimes where gradient information alone provides a weaker learning signal. At the same time, the fact that performance does not significantly degrade suggests that plasticity-modulated updates remain compatible with the underlying gradient optimization dynamics even outside its original tuning regime. This stability is useful in practice because it indicates that NeuroPlastic can be introduced into a training pipeline without destabilizing training across tasks. An additional transfer validation using the fixed MNIST-tuned configuration is provided in Ap-pendix E, confirming that the performance gap relative to standard optimizers remains small and that training remains stable across configurations. To understand the sensitivity of these results to formulation choices, Appendix G includes a design space exploration evaluating a range of plasticity variants. Results show that performance varies substantially across formulations and that naive vari-ants generally underperform standard optimizers, reinforcing the view that the specific modulation structure of NeuroPlastic matters and that plasticity is not a uniformly beneficial modification to gradient-based updates. 8Figure 4: Validation on CIFAR-10 with ResNet-18 across standard and plasticity-modulated optimizers. (A) Test accuracy over training epochs. (B) Training loss over epochs. (C) Final test accuracy after 50 epochs. (D) Best test accuracy achieved during training. Standard optimizers (SGD, Adam, AdamW) achieve higher final performance under well-tuned learning rates, while NeuroPlastic becomes competitive at larger learning rates ( 5 × 10 −2) but remains sensitive to optimization configuration. Despite this gap, NeuroPlastic exhibits stable convergence behavior across settings, suggesting that plasticity-modulated updates can provide a viable alternative optimization mechanism with further tuning or adaptive scheduling. 
+
+# 5 Conclusions, Limitations, and Future Work 
+
+NeuroPlastic optimizer provides modest but consistent improvements over a gradient-only ablation on lightweight benchmarks, with the clearest gains appearing on Fashion-MNIST and in low-data settings. Mechanistic diagnostics suggest that these improvements arise from modifying the effective update dynamics instead of substantially changing the raw gradient scale. These gains require no additional trainable parameters and no architectural modifications, making the approach a lightweight and compatible extension of standard gradient-based training. Taken together, our results suggest that biologically inspired plasticity signals can be instantiated as a a practical modulation layer on top of gradient updates, and point toward multi-signal modulation as a promising direction for extending gradient-based optimization in settings where learning signals are limited or noisy. Some limitations remain in the current study. First, the experiments focus primarily on lightweight image classification benchmarks, limiting a more comprehensive characterization of NeuroPlastic’s behavior. Second, the current plasticity formulation relies on a fixed modulation structure and manu-ally chosen hyperparameters. Whether learned or adaptive weighting could improve performance, and under what conditions each signal contributes most, remains an open question. Future work could evaluate plasticity-modulated optimization on larger-scale architectures and datasets to fully explore NeuroPlastic’s behavior and scalability. Additionally, future work could explore adaptive plasticity schedules, alternative plasticity signals, or mechanisms that automatically adjust modulation strength during training. Additional diagnostics also suggest that the plasticity 9coefficients can still exhibit boundary saturation in some settings, indicating room for improved constraint handling or adaptive range control. 
+
+# Acknowledgment 
+
+This work was supported by grants from the National Institutes of Health (R00 EY032181). We are grateful for Dr. Mu Qiao, Ms. Qiong Li and Ms. Yun Cao for insightful discussion on this work. 
+
+# Conflict of Interest 
+
+F. T. and D. J. are co-founders of Regenerative AI LLC. F. T. is a consultant of Netvirla Inc. The remaining authors declare no conflict of interest. 
+
+# References 
+
+Marcin Andrychowicz, Misha Denil, Sergio Gomez, Matthew W Hoffman, David Pfau, Tom Schaul, Brendan Shillingford, and Nando de Freitas. Learning to learn by gradient descent by gradient descent. In Advances in Neural Information Processing Systems , volume 29, 2016. Quentin Berthet, Mathieu Blondel, Olivier Teboul, Marco Cuturi, Jean-Philippe Vert, and Francis Bach. Learning with differentiable perturbed optimizers. In Advances in Neural Information Processing Systems , volume 33, 2020. Tom Brown, Benjamin Mann, Nick Ryder, Melanie Subbiah, Jared D. Kaplan, Prafulla Dhariwal, Arvind Neelakantan, Pranav Shyam, Girish Sastry, Amanda Askell, Sandhini Agarwal, Ariel Herbert-Voss, Gretchen Krueger, Tom Henighan, Rewon Child, Aditya Ramesh, Daniel Ziegler, Jeffrey Wu, Clemens Winter, Chris Hesse, Mark Chen, Eric Sigler, Mateusz Litwin, Scott Gray, Benjamin Chess, Jack Clark, Christopher Berner, Sam McCandlish, Alec Radford, Ilya Sutskever, and Dario Amodei. Language models are few-shot learners. In Advances in Neural Information Processing Systems (NeurIPS) , volume 33, 2020. Kartik Chandra, Audrey Xie, Jonathan Ragan-Kelley, and Erik Meijer. Gradient descent: The ultimate optimizer. In Advances in Neural Information Processing Systems , volume 35, 2022. Xiangning Chen, Chen Liang, Da Huang, Esteban Real, Kaiyuan Wang, Hieu Pham, Xuanyi Dong, Thang Luong, Cho-Jui Hsieh, Yifeng Lu, and Quoc V. Le. Symbolic discovery of optimization algorithms. In Advances in Neural Information Processing Systems , 2023. John Duchi, Elad Hazan, and Yoram Singer. Adaptive subgradient methods for online learning and stochastic optimization. In Journal of Machine Learning Research , volume 12, 2011. Runa Eschenhagen, Alexander Immer, Richard E. Turner, Frank Schneider, and Philipp Hennig. Kronecker-factored approximate curvature for modern neural network architectures. In Advances in Neural Information Processing Systems , 2023. Nicolas Frémaux and Wulfram Gerstner. Neuromodulated spike-timing-dependent plasticity and theory of three-factor learning rules. Frontiers in Neural Circuits , 9, 2016. Wulfram Gerstner. Hebbian learning and plasticity. In From Neuron to Cognition via Computational Neuroscience , chapter 9. MIT Press, 2011. Wulfram Gerstner, Marco Lehmann, Vasiliki Liakoni, Dane Corneil, and Johanni Brea. Eligibility traces and plasticity on behavioral time scales: Experimental support of NeoHebbian three-factor learning rules. Frontiers in Neural Circuits , 12, 2018. Ian Goodfellow, Yoshua Bengio, and Aaron Courville. Deep Learning . MIT Press, 2016. Vineet Gupta, Tomer Koren, and Yoram Singer. Shampoo: Preconditioned stochastic tensor optimiza-tion. In International Conference on Machine Learning (ICML) , 2018. 10 Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Deep residual learning for image recognition. In 2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR) ,2016. Donald O. Hebb. The Organization of Behavior: A Neuropsychological Theory . Wiley, 1949. Charles-Étienne Joseph, Benjamin Thérien, Abhinav Moudgil, Boris Knyazev, and Eugene Belilovsky. Learning optimizers for local SGD. In Advances in Neural Information Processing Systems (NeurIPS) , 2023. Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In International Conference on Learning Representations (ICLR) , 2015. Alex Krizhevsky. Learning multiple layers of features from tiny images. Technical report, University of Toronto, 2009. Yann LeCun, Leon Bottou, Yoshua Bengio, and Patrick Haffner. Gradient-based learning applied to document recognition. Proceedings of the IEEE , 86(11), 1998. Dong-Hyun Lee, Saizheng Zhang, Asja Fischer, and Yoshua Bengio. Difference target propagation. In Joint European Conference on Machine Learning and Knowledge Discovery in Databases .Springer, 2015. Timothy P Lillicrap, Daniel Cownden, Douglas B. Tweed, and Colin J. Akerman. Random synaptic feedback weights support error backpropagation for deep learning. Nature Communications , 7, 2016. Timothy P. Lillicrap, Adam Santoro, Luke Marris, Colin J. Akerman, and Geoffrey Hinton. Back-propagation and the brain. Nature Reviews Neuroscience , 21, 2020. Ilya Loshchilov and Frank Hutter. Decoupled weight decay regularization. In International Confer-ence on Learning Representations (ICLR) , 2019. Adam H. Marblestone, Greg Wayne, and Konrad P. Kording. Toward an integration of deep learning and neuroscience. Frontiers in Computational Neuroscience , 10, 2016. James Martens. Deep learning via Hessian-free optimization. In Proceedings of the 27th International Conference on Machine Learning . Omnipress, 2010. James Martens and Roger Grosse. Optimizing neural networks with Kronecker-factored approximate curvature. In Proceedings of the 32nd International Conference on Machine Learning . PMLR, 2015. Alexander Meulemans, Francesco S. Carzaniga, Johan A.K. Suykens, Jo ao Sacramento, and Ben-jamin F. Grewe. A theoretical framework for target propagation. In Advances in Neural Information Processing Systems , 2020. Thomas Miconi, Kenneth O. Stanley, and Jeff Clune. Differentiable plasticity: training plastic neural networks with backpropagation. In Proceedings of the 35th International Conference on Machine Learning . PMLR, 2018. Thomas Miconi, Aditya Rawal, Jeff Clune, and Kenneth O. Stanley. Backpropamine: training self-modifying neural networks with differentiable neuromodulated plasticity. In International Conference on Learning Representations , 2019. Arild Nøkland. Direct feedback alignment provides learning in deep neural networks. In Advances in Neural Information Processing Systems , 2016. Boris T Polyak. Some methods of speeding up the convergence of iteration methods. USSR Computational Mathematics and Mathematical Physics , 4(5), 1964. Blake A. Richards and Timothy P. Lillicrap. Dendritic solutions to the credit assignment problem. 
+
+Current Opinion in Neurobiology , 54, 2019. 11 Herbert Robbins and Sutton Monro. A stochastic approximation method. The Annals of Mathematical Statistics , 22(3), 1951. David E Rumelhart, Geoffrey E Hinton, and Ronald J Williams. Learning representations by back-propagating errors. Nature , 323, 1986. Tijmen Tieleman and Geoffrey Hinton. Lecture 6.5—rmsprop: Divide the gradient by a running average of its recent magnitude. In COURSERA: Neural Networks for Machine Learning , 2012. Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. In Advances in Neural Information Processing Systems , volume 30, 2017. Ruochen Wang, Yuanhao Xiong, Minhao Cheng, and Cho-Jui Hsieh. Efficient non-parametric opti-mizer search for diverse tasks. In Advances in Neural Information Processing Systems (NeurIPS) ,volume 35, 2022. Han Xiao, Kashif Rasul, and Roland Vollgraf. Fashion-mnist: a novel image dataset for benchmarking machine learning algorithms. arXiv preprint arXiv:1708.07747 , 2017. Matthew D Zeiler. Adadelta: An adaptive learning rate method. arXiv preprint arXiv:1212.5701 ,2012. 
+
+# Appendix A Optimizer Hyperparameters 
+
+This appendix summarizes the default optimizer and stabilization hyperparameters used in the implementation of NeuroPlastic. 
+
+A.1 Plasticity Configuration 
+
+The default plasticity configuration is: 
+
+wa = 0 .4, wg = 0 .4, wm = 0 .2, (23) 
+
+splast = 1 .0, αmin = 0 .2, αmax = 2 .0. (24) The numerical stability constant is 
+
+ϵ = 10 −8. (25) By default, the optimizer uses: • rule-based plasticity mode, • parameter-wise modulation, • warmup disabled ( warmup_epochs = 0 ), • no learning-rate controller, • no bounded residual branch, • no orthogonal residual branch, • no hybrid AdamW or SGD-momentum base. 
+
+A.2 Trace and State Statistics 
+
+The default activity-trace decay is 
+
+βa = 0 .95 . (26) The default momentum and variance decay coefficients are 
+
+β1 = 0 .9, β2 = 0 .99 . (27) 12 A.3 Homeostatic Stabilization 
+
+The stabilization hyperparameters are: 
+
+τ = 1 .0, rtarget = 0 .02 , ρ = 0 .01 . (28) The gain is clipped to 
+
+γstab  
+
+> t
+
+∈ [0 .5, 1.5] . (29) The implementation also supports layer-dependent target RMS scaling. The default values for early, middle, and late parameter groups are all set to 
+
+1.0. (30) 
+
+A.4 Weight Decay and Learning Rate Control 
+
+The optimizer supports both coupled and decoupled weight decay. The default value of weight decay is 
+
+0.0. (31) The optional learning-rate controller is disabled by default. When enabled, its default parameters are: 
+
+αctrl = 0 .1, ηctrl min = 0 .8, ηctrl max = 1 .2. (32) 
+
+# B Training Hyperparameters 
+
+All experiments were conducted using identical model architectures and training pipelines for both the full NeuroPlastic optimizer and the gradient-only ablation within each experimental setting. 
+
+Lightweight benchmarks (MNIST, Fashion-MNIST) 
+
+• Optimizer learning rate: η = 10 −3
+
+• Batch size: 128 • Training epochs: 10 • Number of random seeds: 3 • Plasticity coefficient bounds: αmin = 0 .9, αmax = 1 .1
+
+CIFAR-10 (ResNet-18, GPU validation) 
+
+• Learning rates: {10 −3, 10 −2, 5 × 10 −2}
+
+• Training epochs: 50 • Batch size: 128 • Optimizers compared: SGD, Adam, AdamW, NeuroPlastic • Number of random seeds: 3 
+
+Datasets 
+
+• MNIST • Fashion-MNIST • CIFAR-10 
+
+# C Reproducibility 
+
+To facilitate reproducibility, we provide the following experimental protocol details: • All models were trained using identical architectures and training pipelines across optimizers within each experimental setting. 13 Figure 5: Transfer validation on CIFAR-10. (A) Test accuracy across training epochs when applying the optimizer configuration tuned on MNIST. The gradient-only baseline achieves slightly higher final accuracy. (B) Test loss across epochs. Both optimizers exhibit stable convergence behavior, indicating that the NeuroPlastic mechanism does not destabilize training when transferred across datasets. Shaded regions denote the standard deviation across independent runs. • Random seeds were fixed for dataset splitting, weight initialization, and training order. • Each experiment was repeated across three independent seeds and results are reported as mean performance with standard deviation. • The gradient-only ablation is implemented by removing the activity and memory contribu-tions while retaining gradient-based modulation: 
+
+αgrad  
+
+> t
+
+= clip 
+
+
+
+g(s) 
+
+> t
+
+, α min , α max 
+
+
+
+.
+
+• NeuroPlastic is implemented in PyTorch as a drop-in optimizer without modifying model architectures or introducing additional trainable parameters. • The plasticity coefficient αt is computed per-parameter and normalized as defined in the main formulation. • Stabilization is applied to all updates to prevent instability, particularly at larger learning rates. • Learning rate sensitivity is explicitly evaluated, and multiple learning rates are reported to reflect different optimization regimes. 
+
+# D Compute Resources 
+
+All experiments were conducted using CPU or NVIDIA GPU in a standard workstation environment using PyTorch. Depending on the dataset and model configuration, runtime ranges from 1 to 24 hours. The overall compute used during development is comparable in scale to the experiments reported. 
+
+# E Additional Transfer Validation on CIFAR-10 
+
+We further evaluate the transfer behavior of the optimizer on CIFAR-10 using the fixed hyperparameter configuration obtained from MNIST tuning. This experiment serves as a supplementary validation to assess whether the plasticity-modulated optimizer generalizes to a more complex dataset without additional retuning. Under this setting, the gradient-only ablation achieves slightly higher final accuracy than the full NeuroPlastic optimizer, with an average difference of approximately 0.001 (Appendix Figure 5). While the full optimizer occasionally attains comparable or slightly higher intermediate accuracy during training, this advantage is not consistently maintained at convergence. 14 Figure 6: Mechanistic optimizer diagnostics on Fashion-MNIST. (A) Mean plasticity coefficient dynamics. Full NeuroPlastic maintains a higher and more stable effective plasticity level than the gradient-only condition. (B) Effective update norm dynamics. Full NeuroPlastic exhibits a distinct update trajectory, with slightly larger early effective updates and a smoother decay over training. (C) Raw gradient norm dynamics. The raw gradient scale remains similar between the two conditions, indicating that the difference in optimization behavior is not primarily driven by larger gradients, but by how updates are transformed and applied. Solid blue lines denote Full NeuroPlastic; dashed gray lines denote gradient-only. Shaded bands indicate ±1 standard deviation over three random seeds. Overall, these results indicate that the MNIST-derived configuration does not directly translate into improved performance on CIFAR-10. Nevertheless, the performance gap remains small, suggesting that the plasticity-modulated update does not introduce instability when applied outside its original tuning regime. Additional transfer results are shown in Appendix Figure 5. 
+
+# F Analysis of Plasticity-Modulated Optimization Behavior 
+
+To characterize the effect of plasticity modulation, we analyze optimizer state dynamics during training on Fashion-MNIST (Appendix Figure 6). NeuroPlastic maintains a higher and more stable plasticity coefficient than the gradient-only ablation, indicating sustained modulation throughout train-ing. The effective update norm follows a distinct trajectory under NeuroPlastic, with slightly larger updates during early training and a smoother decay in later stages. This suggests that improvements arise from modifying update dynamics rather than gradient scale. We further observe that removing normalization or stabilization can lead to unstable training dynamics, particularly at larger learning rates, where the plasticity coefficient may grow excessively and produce exploding updates. These observations highlight the importance of bounded modulation and normalization for maintaining stable optimization behavior. Taken together, these results support the view that NeuroPlastic functions as a secondary modulation layer on top of gradient-based optimization, altering effective update dynamics without substantially changing the underlying gradient scale. 
+
+# G Design Space Exploration of Plasticity-Modulated Optimization 
+
+To further understand how different formulations of plasticity-modulated updates affect optimization behavior, we evaluate a range of variants derived from the proposed framework. These include residual-style updates, hybrid modulation schemes, and an interpretation of plasticity as a learning-rate controller. As shown in Appendix Fig. 7, performance varies substantially across formulations. Naive variants such as residual or hybrid modulation generally underperform standard optimizers, indicating that directly injecting plasticity signals into the update may not consistently improve optimization. In contrast, a controller-style interpretation, in which plasticity modulates the effective learning rate rather than acting as an additive update component, achieves performance close to well-tuned SGD. This suggests that the effectiveness of plasticity-modulated updates depends critically on how the modulation signal is integrated into the optimization process. 15 Figure 7: Design space exploration of plasticity-modulated optimization variants on CIFAR-10 (ResNet-18). Each bar shows the best test accuracy achieved by a given optimizer or formulation. Differences relative to the SGD baseline are annotated above the bars. While several naive variants underperform, a controller-style formulation of plasticity achieves performance close to SGD, sug-gesting that the effectiveness of plasticity modulation depends strongly on how it is incorporated into the update rule. These observations highlight that plasticity is better understood as a modulation mechanism whose impact is highly formulation-dependent, rather than as a standalone improvement over existing optimizers. Identifying formulations that align with stable and effective optimization dynamics remains an important direction for future work. 16
