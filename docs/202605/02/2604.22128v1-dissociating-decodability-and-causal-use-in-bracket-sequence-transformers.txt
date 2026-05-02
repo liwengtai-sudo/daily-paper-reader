@@ -1,0 +1,507 @@
+Title: Dissociating Decodability and Causal Use in Bracket-Sequence Transformers
+
+URL Source: https://arxiv.org/pdf/2604.22128v1
+
+Published Time: Mon, 27 Apr 2026 00:13:36 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Dissociating Decodability and Causal Use in Bracket-Sequence Transformers 
+
+Aryan Sharma 1 Cutter Dawes 2 Shivam Raval 3
+
+## Abstract 
+
+When trained on tasks requiring an understanding of hierarchical structure, transformers have been found to represent this hierarchy in distinct ways: in the geometry of the residual stream, and in stack-like attention patterns maintaining a last-in, first-out ordering. However, it remains unclear whether these representations are causally used or merely decodable. We examine this gap in trans-formers trained on the Dyck language (a formal language of balanced bracket sequences), where the hierarchical ground truth is explicit. By prob-ing and intervening on the residual stream and attention patterns, we find that depth, distance, and top-of-stack signals are all decodable, yet their causal roles diverge. Specifically, mask-ing attention to the true top-of-stack position causes a sharp drop in long-distance accuracy, while ablating low-dimensional residual stream subspaces has comparatively little effect. These results, which extend to a templated natural lan-guage setting, suggest that even in a controlled set-ting where the relevant hierarchical variables are known, decodability alone does not imply causal use. 
+
+## 1. Introduction 
+
+Linear probes are widely used to test whether model states encode algorithmic and linguistic variables (Hewitt & Man-ning, 2019; Hewitt & Liang, 2019; Elazar et al., 2021). However, encoding does not directly imply use, and decod-able variables have previously been seen to be behaviorally irrelevant (Hewitt & Liang, 2019; Elazar et al., 2021). This gap has become increasingly important as many empirical claims in interpretability methodology rely on decodability alone. More broadly, false positives from multiple test-ing and underconstrained analysis pipelines are a familiar methodological risk, meaning this concern is not unique to    
+
+> 1Yale University 2Independent 3Harvard University. Correspon-dence to: Aryan Sharma <aryan.sharma@yale.edu >.
+> Preprint.
+
+interpretability (M´ eloux et al., 2025). We study this gap in the Dyck language setting—the formal language of balanced bracket sequences—where the rele-vant hierarchical variables are explicitly computable. This provides us with a controlled setting in which representa-tional and causal claims can be separated cleanly, since the relevant variables can be probed directly and interventions can be evaluated against ground-truth structure. Specifically, we ask: when hierarchical variables are decodable within Dyck transformers, which are actually relevant to model computation? Our main claim is that the behavior of these Dyck transform-ers depends more strongly on sparse top-of-stack attention routing (i.e., each closing bracket attending almost entirely to the current stack top) than on decoded residual-stream di-rections. We support this claim with five findings: (i) hierar-chical signals (depth, distance, and top-of-stack identity) are strongly decodable early in training; (ii) depth and distance remain decodable OOD, yet ablating their probe-aligned subspaces has near-zero behavioral effect; (iii) masking the true top-of-stack attention edge is catastrophic; (iv) activa-tion patching localizes the critical retrieval step to a single computational block; and (v) a templated natural-language pilot replicates the same dissociation outside of the Dyck setting. 
+
+## 2. Related Work 
+
+Prior work has shown that syntactic and hierarchical struc-ture is linearly decodable from language model representa-tions. In particular, Hewitt & Manning (2019) demonstrated that parse-tree distance and depth are linearly decodable from transformer hidden states, and we test whether they are causally used. Subspace-removal methods extend probing by ablating decoded directions to test causal use (Ravfogel et al., 2020; 2022), and have found that certain decoded features can be removed without affecting downstream be-havior, which motivates our decodability-versus-causality framing in a controlled setting. Related work in causal abstraction (Geiger et al., 2021) and mechanistic interpretability (Elhage et al., 2021; Conmy et al., 2023; Wang et al., 2023) emphasizes specific attention pathways rather than globally decodable geometry. Notably, 1        
+
+> arXiv:2604.22128v1 [cs.CL] 24 Apr 2026 Dissociating Decodability and Causal Use in Bracket-Sequence Transformers
+> Figure 1. Decodability ̸=causal use. (A) At a closing bracket in a trained Dyck transformer, layer-1 attention routes sharply to the matching opener, while three latent variables (depth, distance, and top-of-stack) are well-defined at this position. (B) All three variables are decodable from the model. (C) Only top-of-stack is causally used: ablating the probe-aligned residual-stream subspaces for depth and distance has near-zero effect on task performance, while masking the top-of-stack attention edge collapses it.
+
+Wang et al. (2023) identified a small circuit of attention edges carrying the indirect-object-identification task in GPT-2. Our attention-knockout finding is a formal-language instance of this pattern, with the advantage that the ground-truth mechanism is explicitly computable. The Dyck language is a standard testbed for hierarchical structure in transformers (Yao et al., 2021; Murty et al., 2023; Tiwari et al., 2025; Hayakawa & Sato, 2025; Wen et al., 2023). We add a causal, per-model analysis differ-entiating linearly decodable features from those used at inference time. 
+
+## 3. Setup 
+
+Task and models. The Dyck-(k, m ) language consists of balanced strings with k bracket types and maximum depth 
+
+m, where depth counts the number of open brackets. For example, in ([]) , the depth after each token is (1 , 2, 1, 0) ,and the matched pairs [] and () are at distances 1 and 3.At each position, we refer to the stack top as the most re-cently opened unclosed bracket. We use the Dyck language because it exposes explicit latent hierarchical variables— including stack top, depth, and parsed distance—in a set-ting where both probing and intervention can be evaluated against the ground truth. As a baseline setting, we train on Dyck-(20 , 10) with 2-layer, 1-head transformers, embedding dimension d ∈{16 , 32 , 64 }, 5×10 5 optimization steps, a training set of 10 4
+
+sequences, and a held-out test set of 10 3 sequences with no overlap. Data generation details are in Appendix A.2. On held-out IID evaluation data, these base models achieve 98.2%–100% long-distance accuracy (i.e., accuracy on matched bracket pairs whose closing position is at least 10 positions from the corresponding opening position) across the three widths. Architecture and training details are in Appendix A.1. We additionally scale task difficulty by varying (k, m ) ∈{(20 , 18) , (30 , 14) , (40 , 10) , (40 , 18) } at d = 64 . Training details and full results are in Appendix A.10. 1
+
+Residual-stream and attention probes. We probe depth and distance from the layer-2 residual stream and report the Pearson correlation between predicted and true values as our primary metric. Probe architectures, training details, and R 2/MSE numbers are in Appendices A.3 and A.6. We additionally sweep over probe capacity to show that reg-ularization does not change the qualitative OOD pattern (Appendix A.7). When probing top-of-stack position, we read it directly from the attention pattern, since the model’s prediction at a clos-ing bracket depends on routing attention to a single source token. Specifically, at a closing-bracket query q with ground- 
+
+> 1All code is available at https://anonymous.4open. science/r/bracket-transformers-F44D/ .
+
+2Dissociating Decodability and Causal Use in Bracket-Sequence Transformers 
+
+truth stack-top source position s(q), we report the attention miss as 1 − a(1) 
+
+> q, s (q)
+
+, where a(1)  
+
+> q, ·
+
+is the layer-1 attention row at q. This has no fitted probe parameters, so overfitting is not a concern. A logistic-regression probe on the residual stream is reported in Appendix A.8. We note that the top-of-stack identity and distance are re-lated but not redundant, since top-of-stack fixes which bracket type is the next closer (categorical), while dis-tance measures how far back the corresponding opener sits (scalar). Knowing distance at a closing bracket determines identity via the sequence, but the converse does not hold. Meanwhile, depth is orthogonal to both. 
+
+Causal interventions. For depth and distance, we ablate probe-identified subspaces in the residual stream at ranks 
+
+r ∈ { 2, 4, 8, 16 , 32 , 64 }, comparing against random rank-matched baselines (further details in Appendix A.4, and intervention strength sensitivity analysis in Appendix A.14). For top-of-stack, we perform attention knockout by zero-ing the attention score to the true source position before softmax (Wang et al., 2023), against random control edges. Query/key-space interventions are in Appendix A.15. 
+
+Activation patching. To localize where in computation the stack-top signal becomes sufficient, we use activation patching (Meng et al., 2022): we substitute clean activations at each sublayer checkpoint of a corrupted run and measure recovery. Setup details, including corruption strategy, cache points, and offset sweep, are in Appendix A.5. 
+
+## 4. Results 
+
+4.1. Decodability Hierarchical signals emerge early. Figure 2 shows all three signals over training. By step 5k, top-of-stack attention mass and depth probe Pearson correlation are already strong, and task accuracy is near ceiling. This indicates that depth, distance, and top-of-stack identity are recoverable before complete task convergence. Probe accuracy as a function of sequence position is in Appendix A.16. Figure 3 shows the corresponding picture through attention. Each row of the heatmap is an attention distribution for a sin-gle query position, and the orange triangles mark the rows corresponding to closing brackets, i.e., the positions whose next-token prediction depends on retrieving the matching opener. In layer 0, these marked rows are diffuse, mean-ing attention is spread broadly across source positions. In layer 1, each marked row collapses onto a single bright cell, which is consistently the column of the matching opening bracket. We show this mechanism is causally necessary in Section 4.2. 0 10k 25k 50k 
+
+Step   
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Score
+> Task accuracy
+> Depth probe Pearson r(IID)
+> Stack-top attention mass (L1)
+
+Figure 2. Training dynamics for the d = 64 base model on the first 50k steps. Task accuracy (red), depth probe Pearson IID (dark purple), and layer-1 stack-top attention mass (blue) all stabilize by step 5k. The full 500k-step trajectory is in Figure 7. [5 
+
+> ]19
+> [20
+> [16
+> ]11
+> ]7
+> ]6
+> ]14
+> ]12
+> Source position
+> [5
+> ]19
+> [20
+> [16
+> ]11
+> ]7
+> ]6
+> ]14
+> ]12
+> Query position
+> Layer 0: diffuse
+> [5
+> ]19
+> [20
+> [16
+> ]11
+> ]7
+> ]6
+> ]14
+> ]12
+> Source position
+> Layer 1: stack-top routing
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Attention weight
+
+Figure 3. Attention weights for a representative length-24 sequence. Orange triangles mark closing-bracket query rows. Layer 0 (left) attention is diffuse; Layer 1 (right) collapses each marked row onto the matching opener’s column. 
+
+Out-of-distribution decodability. Figure 4 reports decod-ability across IID, OOD-length, and OOD-depth splits (de-fined in Appendix A.2). The top-of-stack attention is near-perfect on all three splits, while the depth and distance probe Pearson correlations degrade but stay positive. We sweep probe capacity to reproduce the same qualitative pattern, verifying that OOD degradation is not a probe-overfitting artifact (Appendix A.7). 
+
+4.2. Causality Depth and distance are not causally necessary. Ablating the decoded depth and distance directions from the residual stream has little effect. Depth ablation produces zero drop on the harder variants despite a final probe Pearson r of 
+
++0 .67 on IID, indicating the model encodes depth but does not use it for prediction. Similarly, ablating probe-aligned distance subspaces at low ranks has a near-zero effect, while removing a random subspace of the same rank causes sub-stantial drops (Appendix A.13). 3Dissociating Decodability and Causal Use in Bracket-Sequence Transformers Depth Distance Top-of-stack     
+
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Pearson  r / attention mass
+> 0.67
+> 0.18
+> 0.38 0.35
+> 0.18 0.19
+> 1.00 0.99 1.00
+> residual
+> probe
+> residual
+> probe
+> attention
+> probe
+> IID
+> OOD-length
+> OOD-depth
+
+Figure 4. Decodability across splits. Depth and distance (pur-ple) report residual-probe Pearson r; top-of-stack (blue) reports layer-1 attention mass. Top-of-stack stays near-perfect across IID, OOD-length, and OOD-depth; depth and distance degrade but stay positive. Long-distance task accuracy is ≥ 0.994 across all splits. Depth Distance Top-of-stack  
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> |Δ| LD accuracy drop
+> 0.000 0.000
+> 0.967
+> 0.000
+> 0.197
+> 0.014
+> residual
+> ablation
+> residual
+> ablation
+> attention
+> knockout
+> Target-aligned
+> Random baseline
+
+Figure 5. Causal intervention |∆| long-distance accuracy: resid-ual ablation of depth (left), residual ablation of rank-2 distance subspace (middle), and layer-1 attention-edge knockout of top-of-stack (right). 
+
+Top-of-stack routing is causally necessary. In our base 
+
+d = 64 models, layer 1 attention to the true stack-top po-sition is ≈ 0.98 –0.997 , compared to a uniform baseline of ≈ 0.013 (Appendix A.10). This routing mechanism is stable across seeds (Appendix A.18). To test causal necessity, we perform attention knockout. We find that masking the true stack-top edge drops long-distance accuracy by −0.967 ± 0.009 on the harder-variant test sets, while masking a randomly chosen edge only drops it by −0.014 ± 0.002 . Figure 5 shows all three interventions on a common axis: residual-stream depth ablation, residual-stream distance ablation (at low rank), and attention-edge knockout of top-of-stack. Only the attention-edge knockout collapses accuracy. post-    
+
+> embedding
+> post-
+> L0-attn
+> post-
+> L0-MLP
+> post-
+> L1-attn
+> post-
+> L1-MLP
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Recovery rate
+> 0.00 0.00 0.00
+> 1.00 1.00
+> pre-routing post-routing
+
+Figure 6. Activation patching recovery rate at the closing-bracket query position. Recovery jumps from 0 to 1 between post-L0-MLP and post-L1-attention. Full offset heatmap in Appendix A.12. 
+
+Activation patching localizes the mechanism to layer 1 attention. Our attention masking result shows the stack-top edge is necessary, but does not answer at what stage that signal becomes sufficient. To bridge this gap, we turn to activation patching. Figure 6 shows that patching be-fore layer 1 attention yields essentially no recovery, while patching at or after layer 1 attention at the closing bracket position produces 100% recovery. This indicates that the critical retrieval step is complete at layer-1 attention, and once that operation is correct, the residual state is sufficient for task success. 
+
+## 5. Discussion 
+
+We study the relationship between decodability and causal importance in transformer representations, within a con-trolled setting containing explicit hierarchy. We find depth and distance to be decodable early and positively correlated OOD, yet ablating their probe-aligned subspaces has near-zero effect. Top-of-stack identity behaves differently: its attention probe is lossless under distribution shift, and mask-ing the single attention edge collapses task performance. Activation patching further establishes that the top-of-stack attention mechanism is not only causally necessary, but its recovery is sufficient for task success. These results make clear the importance of dissociating between decodability and causality in transformers and other neural networks. Significantly, our conclusions are limited by the model scale studied here and the Dyck language domain. A templated natural language pilot (Appendix A.19) replicates all three findings in a controlled English setting, which suggests the dissociation is not an artifact of synthetic grammars. Whether similar dissociations appear in larger models or richer natural language settings is left to future work. 4Dissociating Decodability and Causal Use in Bracket-Sequence Transformers 
+
+## Acknowledgments 
+
+We thank the Supervised Program for Alignment Research (SPAR) for providing compute and resources to carry out this work. 
+
+## References 
+
+Conmy, A., Mavor-Parker, A., Lynch, A., Heimersheim, S., and Garriga-Alonso, A. Towards automated circuit discovery for mechanistic interpretability. In Advances in Neural Information Processing Systems , 2023. doi: 10.48550/arXiv.2304.14997. URL https://arxiv. org/abs/2304.14997 . NeurIPS 2023 Spotlight. Elazar, Y., Ravfogel, S., Jacovi, A., and Goldberg, Y. Am-nesic probing: Behavioral explanation with amnesic coun-terfactuals. Transactions of the Association for Computa-tional Linguistics , 9:160–175, 2021. doi: 10.1162/tacl a 00359. URL https://arxiv.org/abs/2006.0 0995 .Elhage, N., Nanda, N., Olsson, C., Henighan, T., Joseph, N., Mann, B., Askell, A., Bai, Y., Dhariwal, P., Ganguli, D., et al. A mathematical framework for transformer circuits. 
+
+Transformer Circuits Thread , 2021. URL https://tr ansformer-circuits.pub/2021/framework /index.html .Geiger, A., Potts, C., and Icard, T. Causal abstractions of neural networks. In Advances in Neural Information Processing Systems , volume 34, pp. 9574–9586, 2021. URL https://papers.neurips.cc/paper_ files/paper/2021/file/4f5c422f4d49a5 a807eda27434231040-Paper.pdf .Hayakawa, D. and Sato, I. Theoretical analysis of hierarchi-cal language recognition and generation by transformers without positional encoding. In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pp. 30777–30834, 2025. doi: 10.18653/v1/2025.acl-long.1488. URL 
+
+https://aclanthology.org/2025.acl-lon g.1488/ .Hewitt, J. and Liang, P. Designing and interpreting probes with control tasks. In Proceedings of EMNLP-IJCNLP ,pp. 2733–2743, 2019. doi: 10.18653/v1/D19-1275. URL 
+
+https://aclanthology.org/D19-1275/ .Hewitt, J. and Manning, C. D. A structural probe for finding syntax in word representations. In Proceedings of NAACL-HLT , pp. 4129–4138, 2019. doi: 10.18653/v1/N19-1419. URL https://aclanthology.org/N19-141 9/ .Meng, K., Bau, D., Andonian, A., and Belinkov, Y. Locating and editing factual associations in GPT. In Advances in Neural Information Processing Systems , volume 35, pp. 17359–17372, 2022. URL https://arxiv.org/ab s/2202.05262 .Murty, S., Sharma, P., Andreas, J., and Manning, C. D. Grokking of hierarchical structure in vanilla transformers. In Proceedings of the 61st Annual Meeting of the Asso-ciation for Computational Linguistics (Volume 2: Short Papers) , pp. 439–448, 2023. doi: 10.18653/v1/2023.acl -short.38. URL https://aclanthology.org/2 023.acl-short.38/ .M ´eloux, M., Dirupo, G., Portet, F., and Peyrard, M. The dead salmons of ai interpretability. arXiv preprint arXiv:2512.18792 , 2025. URL https://arxiv.or g/abs/2512.18792 .Ravfogel, S., Elazar, Y., Gonen, H., Twiton, M., and Gold-berg, Y. Null it out: Guarding protected attributes by iterative nullspace projection. In Proceedings of ACL , pp. 7237–7256, 2020. doi: 10.18653/v1/2020.acl-main.647. URL https://aclanthology.org/2020.ac l-main.647/ .Ravfogel, S., Twiton, M., Goldberg, Y., and Bachrach, Y. Linear adversarial concept erasure. In Proceedings of the 39th International Conference on Machine Learning , pp. 18400–18421, 2022. URL https://proceedings. mlr.press/v162/ravfogel22a.html .Tiwari, U., Gupta, A., and Hahn, M. Emergent stack representations in modeling counter languages using transformers. arXiv preprint arXiv:2502.01432 , 2025. doi: 10.48550/arXiv.2502.01432. URL https: //arxiv.org/abs/2502.01432 .Wang, K. R., Variengien, A., Conmy, A., Shlegeris, B., and Steinhardt, J. Interpretability in the wild: a circuit for indirect object identification in GPT-2 small. In Inter-national Conference on Learning Representations , 2023. URL https://openreview.net/forum?id= NpsVSN6o4ul .Wen, K., Li, Y., Liu, B., and Risteski, A. Transformers are uninterpretable with myopic methods: a case study with bounded Dyck grammars. In Advances in Neural Information Processing Systems , 2023. Yao, S., Peng, B., Papadimitriou, C., and Narasimhan, K. Self-attention networks can process bounded hierarchical languages. In Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (ACL-IJCNLP) , pp. 3770–3785, 2021. doi: 10.18653/v1/2021.acl-long.292. URL https://acla nthology.org/2021.acl-long.292/ .5Dissociating Decodability and Causal Use in Bracket-Sequence Transformers 
+
+Table 1. Training hyperparameters (all models). Parameter Value Optimizer AdamW Learning rate 3 × 10 −4 (constant) Adam β1, β 2 (0 .9, 0.999) 
+
+Weight decay 0.0
+
+Batch size 128 sequences Gradient clipping 1.0 (max norm) Base model steps 500k Harder variant steps 300k 
+
+Table 2. Model architecture (all variants). Property Value Layers 2Heads 1MLP hidden dim 4d (ReLU) Positional encoding Learned Layer norm Post-LN Attention mask Causal 
+
+## A. Appendix 
+
+A.1. Training and architecture details Full training-dynamics trajectory. Figure 7 extends the main-text Figure 2 to the full 500k-step trajectory on a log x-axis. All three signals stabilize well before the end of training. The dashed vertical line marks step 50k. 
+
+A.2. Data generation and evaluation splits 
+
+We sample Dyck strings with a stack-based probabilistic procedure. At each step, if the stack is empty, the model samples uniformly from k opening brackets or END ; if at maximum depth, it returns the closing bracket no matter what; and otherwise, it samples uniformly from k opening brackets or the one correct closing bracket. Our base model is trained on Dyck-(20 , 10) with 10,000 training sequences (with length range of 22–512 and mean of 146.5) and 1,000 test sequences (with length range of 4–488 and mean of 51.9). The harder variants use 200,000 training and 20,000 test sequences each. Out-of-distribution splits are constructed from our base set as follows. OOD-length : we train on sequences with length 
+
+≤ 64 (759 sequences) and evaluate on sequences with length 
+
+≥ 128 (124 sequences). OOD-depth : we train on sequences with max depth ≤ 4 (567 sequences) and evaluate on se-quences with max depth ≥ 8 (288 sequences). 
+
+A.3. Probe training details 
+
+All our probes are trained on an 80/20 split across a base 1,000-sequence set, with up to 128 tokens subsampled per sequence, and hidden states extracted from the final trans-
+
+Table 3. Parameter counts and vocabulary sizes (vocab size =2k + 2 ). Base models use d ∈ { 16 , 32 , 64 } with k = 20 ; harder variants fix d = 64 and vary k.
+
+d k Parameters Vocab size 16 20 15,424 42 32 20 43,136 42 64 20 135,424 42 64 30 136,704 62 64 40 137,984 82 1k 10k 100k 500k   
+
+> Step (log)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Score
+> Task accuracy
+> Depth probe Pearson r(IID)
+> Stack-top attention mass (L1)
+
+Figure 7. Full 500k-step training dynamics on a log x-axis. Task accuracy (red), depth probe Pearson IID (dark purple), and layer-1 stack-top attention mass (blue) all stabilize well before the end of training. Dashed vertical line marks step 50k. 
+
+former block without standardization. For activation patch-ing experiments, we train probes on clean sequences only and apply them to corrupted forward passes. Our depth probe is a ridge regressor with α = 1 .0, our top-of-stack probe is a multinomial logistic regression ( lbfgs ,
+
+C = 1 .0), and our distance probe is a linear projection 
+
+B ∈ Rd×32 trained with AdamW (learning rate 3 × 10 −3,weight decay 10 −4, cosine schedule) for 1500 steps, fit-ting ∥Bh i − Bh j ∥2 to the true pairwise Dyck tree distance. We additionally ablate probe-aligned distance subspaces at ranks r ∈ { 2, 4, 8, 16 , 32 , 64 } for the causal-intervention experiments (Appendix A.13). 
+
+A.4. Causal intervention details Residual-stream ablation (depth). We remove probe-identified directions from the residual stream: if Ur ∈ Rd×r
+
+is an orthonormal basis for a probe-aligned rank-r subspace with projector Pr = Ur U ⊤ 
+
+> r
+
+, we intervene on a hidden state 
+
+h via h′ = h − αP r h, with α = 1 in the main text (other strengths in Appendix A.14). As a baseline, we apply the same procedure to random rank-matched orthonormal sub-spaces in the same layer. For completeness, we apply the same residual-stream ablation procedure to the top-of-stack direction; results are in Appendix A.9 and are consistent with our attention knockout findings. 6Dissociating Decodability and Causal Use in Bracket-Sequence Transformers                                 
+
+> Table 4. Depth and distance probe metrics across splits ( d= 64
+> base model). Pearson is the main-text metric; R 2and MSE are reported here for completeness. Probe Split Pearson rR2MSE Depth IID +0 .67 +0 .44 0.60
+> Depth OOD-length +0 .18 −2.20 22 .78
+> Depth OOD-depth +0 .38 −1.00 16 .14
+> Distance IID +0 .35 −0.17 1.53
+> Distance OOD-length +0 .18 −1.98 41 .47
+> Distance OOD-depth +0 .19 −1.18 18 .76
+
+A.5. Activation patching setup 
+
+We construct (clean, corrupted) sequence pairs by replacing a matched opening bracket with a wrong bracket type and only keeping pairs where the corrupted model incorrectly predicts the closing position. For each pair, we cache the residual stream at five sublayer boundaries in the clean run (post-embedding, post-attention, and post-MLP at each layer) and substitute the clean cache into the corrupted run one position and one cache point at a time, sweeping a 
+
+±3 token window around the closing bracket to account for variation in the opening bracket’s location. Corruption strategy and probe tracking details are in Appendices A.11 and A.17. 
+
+Distance subspace ablation. For distance, we ablate the probe-aligned subspace at ranks r ∈ { 2, 4, 8, 16 , 32 , 64 }
+
+and compare the behavioral effect against ablating a random rank-matched subspace. This tests whether the distance geometry encoded in the residual stream is causally used. 
+
+Attention knockout. For each query token t, we identify the source position corresponding to the true top-of-stack token and set the corresponding boolean attention-mask entry to True (Wang et al., 2023). This sends the relevant logit to −∞ before softmax, thereby removing that edge from the attention graph. We compare masking the true top-of-stack edge against masking random control edges. 
+
+A.6. Probe metrics: Pearson vs. R 2
+
+The main text reports Pearson correlation between predicted and true depth/distance as the probe quality metric. For completeness, we also report R 2 and MSE in Table 4. We report Pearson because of scaling differences between IID and OOD splits; specifically, the mean depth shifts from 
+
+≈ 1 IID to ≈ 5 OOD-depth. These differences inflate MSE and R 2, making them inaccurate reflections of whether the probe recovers the underlying variable, while Pearson is scale-invariant.                                   
+
+> Table 5. Harder variant results on IID test sets. LD = long-distance accuracy, ToS = top-of-stack probe accuracy, Attn = mean layer 1 stack-top attention mass, Unif = uniform attention baseline, Edge
+> ∆= change in LD acc. when stack-top attention edge is masked. Variant LD acc. Depth R2ToS acc. Attn Unif Edge ∆
+> k20 m18 0.9999 0.887 0.9999 0.986 0.013 −0.954
+> k30 m14 0.9981 0.846 0.9999 0.983 0.014 −0.965
+> k40 m10 0.9993 0.711 0.9999 0.990 0.017 −0.977
+> k40 m18 0.9986 0.716 0.9999 0.983 0.013 −0.972
+
+A.7. Probe capacity sweep 
+
+As a sensitivity check on probe capacity, we sweep the top-k PC-regularized variants ( k ∈ { 8, 16 , 32 }) and full-rank Ridge α ∈ { 1, 10 , 100 , 1000 } for depth. We find that no configuration recovers positive R 2 on either OOD split, and the top-10 PC h-probe gives IID R 2 = 0 .08 , OOD-length −3.25 , OOD-depth −1.88 — worse than the full-rank α = 1 probe on IID and OOD alike, indicating the first 10 PCs of the layer-2 residual stream do not cleanly carry the depth signal. This qualitative collapse is robust across the sweep. The Pearson r sweep shows the same qualitative pattern, as every probe-capacity configuration produces an OOD Pearson r below IID, confirming that the main-text degradation is not an artifact of probe capacity. 
+
+A.8. Residual stream top-of-stack probe 
+
+As a completeness check, we fit a multinomial logistic-regression probe for top-of-stack identity directly on the residual stream. This probe achieves 1.000 accuracy across IID, OOD-length, and OOD-depth splits, consistent with the attention-based readout. The main text uses the attention pattern as the canonical stack-top readout because it has no fitted parameters and is therefore resistant to overfitting. 
+
+A.9. Residual stream top-of-stack ablation 
+
+As a completeness check, we ablate the residual-stream stack-top direction identified by the logistic-regression probe above. The ablation has a much smaller effect than the attention-edge knockout ( |∆| LD ≪ 0.967 ), consistent with the finding that stack-top is causally used in the attention pattern rather than the residual stream. 
+
+A.10. Harder variant results 
+
+We report R2 rather than Pearson r in Table 5 because the harder variants are only evaluated IID, where the scale concerns motivating Pearson in the main text do not apply. All four harder variants achieve a long-distance accuracy above 99.8% and top-of-stack probe accuracy above 99.99%. The depth R2 decreases with k, indicating that depth be-comes harder to linearly extract as bracket type complexity 7Dissociating Decodability and Causal Use in Bracket-Sequence Transformers 
+
+Table 6. Harder variant training summary. All runs use d = 64 ,seed 42, AdamW lr= 3 × 10 −4. Steps to 99% denotes the first checkpoint at which long-distance accuracy exceeds 0.99. Variant Final loss Steps to 99% Wall-clock (h) k20 m18 2.145 50k 5.9 k30 m14 2.331 50k 6.3 k40 m10 2.463 50k 7.1 k40 m18 2.482 150k 7.8 -4 -3 -2 -1 0 1 2                              
+
+> Offset from query position
+> post-embedding
+> post-L0-attn
+> post-L0-MLP
+> post-L1-attn
+> post-L1-MLP
+> 0.32 0.00 0.00 0.00 0.00 0.00 0.00
+> 0.32 0.00 0.00 0.00 0.00 0.00 0.00
+> 0.32 0.00 0.00 0.00 0.00 0.00 0.00
+> 0.00 0.00 0.00 0.00 1.00 0.00 0.00
+> 0.00 0.00 0.00 0.00 1.00 0.00 0.00
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Recovery rate
+
+Figure 8. Full activation patching recovery heatmap across cache points (rows) and offsets from the closing bracket (columns). 
+
+increases, yet the task performance still remains near ceiling, further emphasizing decodability without causality. Further-more, the layer 1 attention directs over 98% of its weight to the true stack-top position in all variants, compared to a uniform baseline of 1.3%–1.7% (i.e., what equal attention across all positions would give). Finally, causal ablations of the probe-aligned distance subspace yield ∆ = 0 .000 for all 
+
+α across all variants, consistent with our base model results. 
+
+A.11. Corruption strategy for activation patching 
+
+We construct activation patching pairs by replacing a matched opening bracket with a different bracket type and evaluating at the corresponding closing bracket prediction position, only keeping pairs where the corrupted model pre-dicts incorrectly. This strategy directly targets the bracket-type retrieval mechanism that layer 1 attention implements. 
+
+A.12. Activation patching: full offset heatmap 
+
+The main-text patching figure reports recovery rate only at the closing-bracket query position. Figure 8 shows a larger offset sweep, illustrating that recovery is concentrated at offset 0 for post-layer-1 cache points, with negligible recovery elsewhere. This confirms that the critical retrieval step is localized to a single sublayer and position. 
+
+A.13. Distance-sweep numeric summary 
+
+At low ranks ( r ∈ { 2, 4, 8}) the probe-aligned subspace is behaviorally inert while random rank-matched ablation 
+
+Table 7. Distance-subspace ablations across ranks ( d = 64 , IID). Probe ∆ = accuracy change when removing the probe-aligned subspace; Rand ∆ = same for a random rank-matched subspace; Gap = probe minus random. Rank 64 is aggregated across five model configurations ( d = 64 base + four harder variants) with 
+
+α = 1 .0 and five random subspace seeds per model; ranks 2–32 are from the original rank-sweep on the base model. Rank Probe ∆ Rand ∆ Gap 2 −0.000 ± 0.000 −0.197 ± 0.169 +0 .197 
+
+4 −0.006 ± 0.017 −0.301 ± 0.185 +0 .295 
+
+8 −0.015 ± 0.028 −0.485 ± 0.258 +0 .470 
+
+16 −0.316 ± 0.447 −0.625 ± 0.262 +0 .309 
+
+32 −0.458 ± 0.458 −0.751 ± 0.220 +0 .293 
+
+64 −0.931 ± 0.024 −0.959 ± 0.018 +0 .028 2 4 8 16 32 64 
+
+Ablation rank r
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> |Δ| LD accuracy drop  Distance (probe-aligned)
+> Distance (random rank-matched)
+
+Figure 9. Accuracy drop from ablating the probe-aligned distance subspace (solid) vs. a random subspace of equal rank (dashed), across ranks r ∈ { 2, 4, 8, 16 , 32 , 64 }.
+
+causes substantial drops, showing the decoded subspace is not causally privileged. As rank grows, both ablations converge to near-total accuracy loss, but the probe-aligned subspace remains marginally less damaging than random even at full rank — inconsistent with distance being causally used in a higher-dimensional linearly-decodable subspace. 
+
+A.14. α-sweep (intervention strength) 
+
+All our residual-stream ablation results in the main text use 
+
+α = 1 . For completeness, we also present results of ablating with α ∈ { 0.5, 1.5} to check robustness to intervention strength. This sweep further verifies our claim that depth and distance ablation have negligible behavioral effect, and random rank-matched ablation has a much larger effect at low ranks. Figure 10 shows the full α-sweep. 
+
+A.15. Query/key-space interventions 
+
+We additionally test whether probe-aligned directions are causally involved in the computation of attention scores. Let 8Dissociating Decodability and Causal Use in Bracket-Sequence Transformers 0.5 1.0 1.5 
+
+Intervention strength α
+
+−0.01 
+
+0.00 
+
+0.01 
+
+0.02 
+
+0.03 
+
+0.04 
+
+0.05 
+
+> LD accuracy drop  Top-of-stack
+> Depth
+> Random
+
+Figure 10. Residual-stream ablation at three intervention strengths. 
+
+q = WQh and k = WK h be the query and key vectors, and let Ur be the probe-aligned residual basis. We project this 
+
+Ur into the query/key space via BQ = orth( WQUr ) and 
+
+BK = orth( WK Ur ), then remove these components from 
+
+q and k before recomputing the attention weights. When doing this, we find that removing the probe-aligned components from query/key space causes large drops in stack-top attention at subspace dimensions 8, 16, and 32 (with mean changes of −0.778 ± 0.082 , −0.816 ± 0.041 ,and −0.890 ± 0.059 ), which are much larger than the weak effects seen under residual-stream ablation. Query-only and key-only removals are also both strongly negative, meaning both sides of the attention score contribute. Furthermore, retaining only the probe-aligned component is also harmful, indicating these directions are necessary but not sufficient for the routing computation. This is consistent with our activation patching result: probe-aligned directions participate in layer 1 attention routing, but the full mechanism requires additional structure that the low-rank probes do not capture. 
+
+A.16. Probe accuracy vs. sequence position 
+
+Figure 11 shows our probe and task accuracy as a function of relative sequence position. The top-of-stack probe is near-perfect ( ≈ 100% ) throughout, dropping only to 97.1% at sequence end. The depth probe Pearson r hovers around 0.40–0.45 with no positional trend, consistent with weak linear decodability. Next-token accuracy rises from 25% to 77% near sequence end, reflecting increasing predictability as sequences approach termination. 
+
+A.17. Probe corruption tracking 
+
+Figure 12 shows probe accuracy on corrupted inputs by offset from the corruption point. The top-of-stack probe 0 5 10 15 
+
+Relative sequence position (bin) 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Accuracy
+> Top-of-stack probe
+> Depth probe
+> Task accuracy
+
+Figure 11. Probe and task accuracy vs. relative sequence position. −4 −2 0 2 4    
+
+> Offset from corruption
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Top-of-stack probe acc.
+> vs. clean stack
+> vs. corrupt stack
+> −4 −2 024
+> Offset from corruption
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Depth probe acc.
+> vs. clean stack
+> vs. corrupt stack
+
+Figure 12. Probe tracking on corrupted inputs. Top: top-of-stack probe accuracy versus clean and corrupt ground truth, measured by offset from the corruption point. Bottom: depth probe accuracy is unchanged by the corruption, confirming that bracket-type cor-ruption does not affect depth. 
+
+tracks the corrupted input faithfully (100% vs. corrupt stack, 0% vs. clean stack at offset 0), while the depth probe is flat and identical for both comparisons across all offsets, confirming that our corruption procedure correctly isolates the type-tracking mechanism. 
+
+A.18. Multi-seed replication 
+
+We train three additional seeds (7, 11, 22) on the base Dyck-
+
+(20 , 10) , d = 64 model using 150k steps, and two additional seeds (11, 22) on the Dyck-(40 , 18) harder variant. We find that seeds 7, 11, 22, and 42 consistently learn the same mechanism, with mean layer 1 stack-top attention mass 
+
+≈ 0.97 , edge-masking yielding ∆ ≈ − 0.938 ± 0.003 , and activation patching recovery jumping from 0 to 1 at post-layer-1-attention (logit-diff recovery 1.000 ± 0.000 ). We note that the 1.000 values are an architectural identity, since once our clean post-layer-1 attention state is restored at the 9Dissociating Decodability and Causal Use in Bracket-Sequence Transformers 
+
+query position, all remaining computation deterministically reproduces the clean output. We also train four harder model variants with differ-ent language complexities — specifically with (k, m ) ∈{(20 , 18) , (30 , 14) , (40 , 10) , (40 , 18) } — all using indepen-dent random initializations. The consistency across these variants (Table 5) provides evidence that our findings are not specific to a single random seed. We note that one additional seed converged to a qualitatively different circuit — reaching comparable long-distance ac-curacy with layer 0 attention specialized rather than layer 1 — which we leave as an open question about the unique-ness of the solution rather than a failure of our discovered mechanism. 
+
+A.19. Natural language pilot: subject-verb agreement 
+
+To test if our dissociation extends beyond formal languages, we train a 2-layer, 1-head transformer with the same archi-tecture ( d = 64 ) on a templated subject-verb agreement task. We evaluate the three main properties identified in the Dyck setting: decodability without causality (Q1), causal necessity for a single edge (Q2), and sublayer localization (Q3). In our setup, each sentence follows a controlled template with a single unambiguous subject, zero or more prepo-sitional phrase attractors with independently randomized numbers, and a dedicated <verb> query token at the end. This design eliminates the redundant syntactic cues present in unconstrained English, forcing our model to retrieve the subject number via attention rather than local token identity. Across four seeds (42, 7, 11, 22), our model achieves 99.2– 99.4% accuracy uniformly across attractor counts (0–3), confirming no shortcut exploitation. Furthermore, Q1, Q2, and Q3 all hold: the subject number probe accuracy remains 
+
+≥ 0.99 IID and OOD, while the attractor count probe R2
+
+collapses from positive IID to −12 .3 OOD, and activation patching localizes the computation to layer 1 attention (logit-diff recovery 1.000 at post-layer-1 attention, 0.000 at post-embedding), replicating our Dyck localization result exactly. For Q2, seeds 42, 7, and 11 show a catastrophic accuracy drop ( ≈ 0.50 ) when the single subject-to-verb attention edge at layer 1 is masked. Interestingly, however, seed 22 only routes subject information partially through layer 0 atten-tion, so simply masking layer 1 is insufficient. Nevertheless, jointly masking layer 0 and layer 1 is catastrophic, confirm-ing that our mechanism concentrates in a single attention layer. This behavior mirrors our outlier seed discussed in Appendix A.18, suggesting that solution multiplicity across layers is a general phenomenon rather than a Dyck-specific artifact. In summary, all three findings replicate in natural language: hierarchical variables are decodable but not causally neces-sary (Q1), a single attention edge is causally necessary for task performance (Q2), and critical computation localizes to a single sublayer (Q3). 10

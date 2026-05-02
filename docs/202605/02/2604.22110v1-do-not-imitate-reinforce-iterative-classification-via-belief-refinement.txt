@@ -1,0 +1,964 @@
+Title: Do Not Imitate, Reinforce: Iterative Classification via Belief Refinement
+
+URL Source: https://arxiv.org/pdf/2604.22110v1
+
+Published Time: Mon, 27 Apr 2026 00:11:46 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+Cover Page 
+
+# Do Not Imitate, Reinforce: Iterative Classification via Belief Refinement 
+
+Mahdi Kallel, Johannes Tölle, Ahmed Hendawy, Carlo D’Eramo 
+
+Keywords: Reinforcement Learning, Adaptive Computation, Classification 
+
+# Summary 
+
+Standard supervised classification trains models to strictly mimic the exact labels of a per-fect oracle. Since this typically happens in a single forward pass, models are locked into a fixed compute budget whether an input is simple or highly complex. Moreover, this rigid train-ing objective forces the model to express absolute certainty on its training data, which often carries over into evaluation, leading to overconfident predictions. To address these limitations, we propose Reinforced Iterative Classification (RIC), which replaces the imitative objective with Reinforcement Learning (RL). RIC deploys a recurrent agent that iteratively refines a predictive distribution over classes, receiving reward for stepwise improvements in prediction quality. Using image classification as a testbed, we show that RIC maintains the accuracy of supervised baselines while achieving better calibration. The learned policy naturally manages its own computation by allocating more effort on resolvable inputs while halting when further improvement appears unlikely. 
+
+# Contribution(s) 
+
+1. Viewing supervised classification as single-step behavior cloning, we propose Reinforced Iterative Classification (RIC), recasting it as iterative belief refinement via a thought MDP formulation. A recurrent agent refines a continuous predictive distribution over classes, re-ceiving reward for stepwise improvement in log-score. 
+
+Context: Adaptive computation methods such as ACT (Graves, 2016) and PonderNet (Banino et al., 2021) learn when to halt under supervised objectives. Recurrent visual at-tention (Mnih et al., 2014) uses RL to select where to look but trains the classifier with cross-entropy. Neither approach iteratively refines a belief over classes via RL. 2. We analyze RIC’s optimization dynamics. The discounted objective is equivalent to a geo-metrically weighted mixture of per-step log-scores, yielding an anytime classifier. Despite the sequential formulation, the optimal policy still recovers the true class probabilities under realizability (Proposition 1). The geometric mixture admits a finite logit-scale maximizer that standard cross-entropy lacks (Proposition 2), predicting improved calibration. 
+
+Context: Prior analyses show standard cross-entropy pushes logit norms to infinity on separable data, leading to overconfidence (Soudry et al., 2018). Our analysis shows that RIC’s geometric mixture objective counteracts this pathology by anchoring the logit scale at a finite value. 3. RIC achieves competitive accuracy compared to standard supervised approaches and super-vised adaptive computation models, while improving calibration on CIFAR-10, SVHN, and ImageWoof. The learned value function provides a halting signal that concentrates compu-tation on resolvable inputs and terminates early on intractable ones, without explicit design. 
+
+Context: ACT (Graves, 2016) and PonderNet (Banino et al., 2021) are the primary adap-tive computation baselines for classification. Both use supervised objectives with explicit halting mechanisms, with evaluation centered on computational efficiency. 
+
+> arXiv:2604.22110v1 [cs.LG] 23 Apr 2026
+
+# Do Not Imitate, Reinforce: Iterative Classification via Belief Refinement 
+
+Mahdi Kallel 1, Johannes Tölle 1, Ahmed Hendawy 2, Carlo D’Eramo 1
+
+> 1
+
+Center for Artificial Intelligence and Data Science, University of Würzburg 
+
+> 2
+
+Department of Computer Science, Technical University of Darmstadt 
+
+Abstract 
+
+Standard supervised classification trains models to strictly mimic the exact labels of a perfect oracle. Since this typically happens in a single forward pass, models are locked into a fixed compute budget whether an input is simple or highly complex. Moreover, this rigid training objective forces the model to express absolute certainty on its training data, which often carries over into evaluation, leading to overconfident predictions. To address these limitations, we propose Reinforced Iterative Classification (RIC), which replaces the imitative objective with Reinforcement Learning (RL). RIC deploys a re-current agent that iteratively refines a predictive distribution over classes, receiving re-ward for stepwise improvements in prediction quality. Using image classification as a testbed, we show that RIC maintains the accuracy of supervised baselines while achiev-ing better calibration. The learned policy naturally manages its own computation by allocating more effort on resolvable inputs while halting when further improvement appears unlikely. 
+
+1 Introduction 
+
+Standard supervised classification models are structurally restricted to a single forward pass, apply-ing a fixed compute budget to every input regardless of its complexity. From a sequential decision-making perspective, this can be viewed as a rigid form of imitation learning. Under this paradigm, the model is trained to replicate an oracle label in one step, with no mechanism to reflect on am-biguous features. This imitation bottleneck creates two major limitations. First, it pushes models toward pathological overconfidence on the training data, which later leaks into evaluation, resulting in poorly calibrated predictions (Guo et al., 2017). Second, this single-step inference prevents the dynamic allocation of additional compute for ambiguous examples. To overcome these limitations, we propose Reinforced Iterative Classification (RIC), a framework that replaces the standard imitation objective with a Reinforcement Learning (RL) based sequential formulation. Instead of relying on a single-step predictor, RIC deploys a recurrent agent that main-tains and iteratively refines a continuous predictive distribution over classes. By receiving rewards for incremental improvements in prediction quality, the agent learns to update its internal state over multiple steps until converging to a stable belief. Unlike the standard supervised paradigm, which optimizes cross-entropy in a single step, our RL formulation reshapes the optimization landscape while targeting the same true class probabilities. The discounted objective evaluates a shared classifier at early refinement steps where features are not yet separable, anchoring logit confidence at a finite scale. This prevents the unbounded logit growth that standard cross-entropy exhibits on separable data (Soudry et al., 2018), leading to more calibrated predictions. Unlike post-hoc calibration methods such as temperature scaling (Guo et al., 2017), which correct overconfidence after training, RIC’s calibration arises structurally from the optimization objective. These approaches are orthogonal and can be combined. 1Moreover, our RL formulation naturally yields a principled mechanism for adaptive computation. Given that the value function explicitly estimates the potential for future refinement, a near-zero value indicates that further computation is unlikely to improve the prediction. This naturally pro-vides a transparent halting signal without requiring any additional parameters. Such a criterion sharply contrasts with supervised alternatives for adaptive computation, which typically rely on carefully-tuned ponder penalties or auxiliary halting networks (Graves, 2016; Banino et al., 2021). In summary, our work formalizes these conceptual advantages into three concrete contributions :
+
+(i.) We establish the RIC framework, recasting classification from a rigid imitation task into a sequential decision-making process. (ii.) We analyze RIC’s optimization dynamics. The discounted objective decomposes into a geometrically weighted mixture of per-step log-scores, yielding an anytime classifier. Despite the sequential formulation, the optimal policy still recovers the true class probabilities under realizability (Proposition 1). The geometric mixture admits a finite logit-scale maximizer that standard cross-entropy lacks (Proposition 2), predicting improved calibration over single-step training (Soudry et al., 2018). Finally, (iii.) we show empirically that RIC matches the accuracy of supervised baselines on CIFAR-10, SVHN, and ImageWoof while reducing calibration error (Guo et al., 2017). The learned value function provides a halting signal that concentrates computation on resolvable inputs and terminates early on intractable ones, without explicit design. 
+
+2 Preliminaries 
+
+Supervised Classification. We consider a K-class classification problem with input space X ,label space Y = {1, . . . , K }, and an unknown data distribution D over X × Y . We write 
+
+∆K−1 = {p ∈ RK 
+
+> ≥0
+
+: PKj=1 pj = 1 } for the probability simplex and q(·| x) ∈ ∆K−1 for the true conditional distribution over labels given input x. Cross-entropy is the negative log-score, 
+
+CE( p, y ) = − log py , where py is the probability that p assigns to class y. We measure calibration with expected calibration error (ECE) (Guo et al., 2017). Predictions are grouped into M equal-width confidence bins B1, . . . , B M , and ECE = PMm=1  
+
+> |Bm|
+> n
+
+|acc( Bm) − conf( Bm)|, the weighted average gap between per-bin accuracy and mean confidence. 
+
+Markov Decision Processes. A standard Markov Decision Process (MDP) is a tuple M =
+
+⟨S , A, P, R, γ ⟩ with state space S, action space A, transition kernel P , reward function R, and discount factor γ ∈ (0 , 1) . An agent’s behavior is governed by a policy π that maps states to distributions over actions. For a fixed labeled example (x, y ), the per-example objective is 
+
+Jx,y (θ) := Eπθ
+
+P ∞ 
+
+> t=1
+
+γt−1rt | x, y . The overall dataset objective is J(θ) := E(x,y )∼D [Jx,y (θ)] .The value function V π (s) = Eπ [P∞ 
+
+> u=t
+
+γu−tru | st = s] represents the expected cumulative dis-counted reward from state s onward. 
+
+3 Reinforced Iterative Classification 
+
+3.1 MDP Formulation 
+
+The proposed classification agent refines an internal belief over labels rather than interacting with an external environment. This internal focus is close in spirit to recent work on Thought MDPs (Hanna & Corrado, 2025), but our formulation is developed independently and tailored to supervised clas-sification. Each training episode corresponds to a single labeled example (x, y ) ∼ D .
+
+Action and State. Each episode begins from s1 = ( x, a 0, τ 0), where a0 = [1 /K, . . . , 1/K ] is the uniform prior over classes and τ0 = 0 is the initial latent thought state. For each refinement step t ≥ 1, the state is st = ( x, a t−1, τ t−1), containing the input, the previous prediction, and the previous latent state. The agent then produces an updated prediction at ∈ ∆K−1 according to 
+
+at ∼ πθ (· | st). The label y is used only to compute rewards, so the policy conditions solely on st.2τ0
+
+## a0
+
+## x
+
+## RNN RNN RNN 
+
+## + + +
+
+## V π V π V ππ π
+
+## τ1 τ2 · · · τT
+
+## a1 · · · aT
+
+> · · ·
+
+Figure 1: Actor-critic architecture for RIC. A recurrent module maintains the thought state τt.The policy head outputs a continuous distribution over class probabilities. The value head predicts expected future improvement. At each step, the recurrent module reads the input and previous action to produce the next thought state, and the two heads produce the next action and value estimate. During inference, refinement stops once the predicted value becomes negative and the current action is returned as the final output. 
+
+Transition. The environment dynamics are deterministic. After the agent produces at, the latent thought state is updated by the recurrent computation τt = fθ (x, τ t−1, a t−1), yielding the next state 
+
+st+1 = ( x, a t, τ t).
+
+Reward. Standard classification training minimizes cross-entropy, but providing this loss only at the end of an episode yields a sparse learning signal and makes credit assignment across refinement steps more difficult. We therefore assign an incremental reward that measures how much each step improves the log- score of the correct class. Let at,y denote the probability that prediction at assigns to the true class y. For t ≥ 1, we define 
+
+rt = log at,y − log at−1,y . (1) 
+
+3.2 Architecture and Algorithms 
+
+We instantiate this MDP with an actor-critic architecture (Figure 1). A recurrent module receives the input x and the previous action at at every step and produces thought state τt+1 . The policy 
+
+πθ (· | st) is implemented by a policy head that outputs a Dirichlet distribution over ∆K−1. The value function Vϕ(st) ∈ R is implemented by a separate value head. Both heads are reused at every refinement steps and share the same recurrent backbone. Because rewards measure one-step change in log-score, the value function estimates the expected cumulative improvement still available from a given state. During inference, the agent checks Vϕ(st)
+
+before taking another refinement step. If Vϕ(st) < 0, it stops and returns the current prediction. Oth-erwise, it computes the next action update. This gives an adaptive stopping rule without any auxiliary halting mechanism. The agent also acts deterministically at inference, outputting the Dirichlet mean 
+
+μt = Eπ [at | st] as its class-probability prediction rather than sampling from the policy. During training, each episode is unrolled for a fixed horizon of T steps. Value-based stopping is used only at inference. Training proceeds in rounds. At the start of each round, we freeze the current parameters as a snapshot (θold , ϕ old ). Over P passes through the dataset, rollouts are collected using 3Algorithm 1: RIC Training 
+
+Input: dataset D, horizon T , passes per snapshot P , discount γ, value coefficient cv 
+
+> 1
+
+Initialize parameters θ, ϕ ; 
+
+> 2
+
+for n ← 1, 2, . . . do  
+
+> 3
+
+θold ← θ, ϕold ← ϕ ; // snapshot  
+
+> 4
+
+for p ← 1 to P do  
+
+> 5
+
+foreach minibatch B ⊂ D do  
+
+> 6
+
+Roll out πθold for T steps on each x ∈ B ; 
+
+> 7
+
+ˆA, ˆR ← GAE( B, V ϕold , γ ); 
+
+> 8
+
+Update θ, ϕ via ∇ˆEB
+
+LSPO (θ, θ old , ˆA) − cv ∥Vϕ − ˆR∥2;the snapshot policy πθold , and the current parameters (θ, ϕ ) are updated via SPO (Xie et al., 2025) with generalized advantage estimation (Algorithm 1). The sequential formulation is only interesting if it changes optimization in a principled way. We therefore show next that discounting yields an anytime log-score objective, preserves the Bayes target under realizability, and reshapes logit-scale incentives relative to standard cross-entropy. 
+
+4 Theoretical Analysis 
+
+4.1 Anytime Prediction via Geometric Stopping 
+
+An iterative classifier is only useful if its intermediate predictions are already meaningful, not just its final one. This is the setting of an anytime classifier, which should make accurate predictions no matter when computation stops. In the following, we show that the discounted RIC objective enables this behavior. A standard identity from MDPs shows that the discounted return is mathematically equivalent to the undiscounted return under a random stopping time with a geometric distribution. 
+
+Lemma 1 (Geometric horizon (Puterman, 1994)) . For any integrable reward sequence {rt} and discount γ ∈ (0 , 1) ,
+
+E
+
+" ∞X
+
+> t=1
+
+γt−1rt
+
+#
+
+= EN ∼Geom(1 −γ)
+
+" NX
+
+> t=1
+
+rt
+
+#
+
+,
+
+where the random horizon N is independent of the rewards. 
+
+Since our per-step reward is the change in log-score (Eq. 1), the cumulative reward up to step N
+
+telescopes to PNt=1 rt = log aN,y − log a0,y . By applying Lemma 1, the expected return for a single example reduces to the expectation at a geometrically drawn terminal step. 
+
+Jx,y (θ) = EN ∼Geom(1 −γ), a 1: N ∼πθ [log aN,y ] − log a0,y . (2) The initial prediction a0 is fixed, so − log a0,y is a constant offset that does not affect the optimizer. Under the uniform prior a0 = [1 /K, . . . , 1/K ], this offset is log K. Thus, maximizing the sequential return reduces to maximizing the expected log-score at a random terminal step. Because the geomet-ric horizon can stop at any step, the model is rewarded for making accurate predictions throughout refinement rather than only at the end. In this sense, RIC is an anytime classifier. This resembles deep supervision (Lee et al., 2015), but here it arises directly from the discounted objective. 44.2 The Structure of the Optimal Policy 
+
+Under the RIC formulation, the policy is trained under an RL objective with stochastic actions, so the next question is what this objective is actually pushing the policy toward. We show that, at optimum, it has the same solution as standard cross-entropy training. During training, the policy explores by sampling stochastic actions on the simplex. After Eq. 2, the objective reduces to expected log-score at a randomly selected refinement step. Since log ay is concave in the action, stochastic spread around the mean prediction incurs a quantifiable penalty. 
+
+Lemma 2 (Variance penalty of stochastic actions) . For any continuous policy on the simplex with per-state mean μy = Eπ [ay | s], the expected reward is strictly bounded by the reward of the mean 
+
+Eπ [log ay | s] = log μy − Eπ
+
+DF (ay ∥μy ) | s, (3) 
+
+where DF (x∥y) = x/y − log( x/y ) − 1 is the Bregman divergence of F (x) = − log x. The penalty 
+
+Eπ [DF ] ≥ 0 vanishes if and only if ay = μy almost surely. Proof. Appendix A.2.1. Lemma 2 reveals a strict optimization pressure toward determinism. The agent pays a quantifiable penalty for acting stochastically, which drives the policy to collapse around its mean prediction μt.We can formalize this dynamic by applying the standard log-score identity ( Ey∼q [log μy ] =
+
+−H(q) − KL( q∥μ)) to the variance penalty. This decomposes the expected per-step return into an optimal ceiling and two distinct penalties. 
+
+Ey∼q, a t∼π [log at,y ] = −H(q)
+
+| {z } 
+
+> reward ceiling
+
+− KL( q∥μt)
+
+| {z }
+
+> bias penalty
+
+− Ey∼q Eπ [DF (at,y ∥μt,y )] 
+
+| {z }
+
+> variance penalty
+
+(4) The maximum achievable return at any step is −H(q), the negative entropy of the true label distri-bution. However, the agent falls short of this optimal ceiling due to two forces. First, the variance penalty Eπ [DF ] from Lemma 2 measures the stochastic spread around the mean. Second, the bias penalty KL( q∥μt) measures the standard cross-entropy misalignment between the policy mean and the true class probabilities. Maximizing this return requires driving both the variance and the bias to zero. Because the geometric horizon places strictly positive weight on every step, the agent cannot defer its accuracy to the end of the sequence and must optimize this per-step return everywhere. 
+
+Proposition 1 (Optimal policy target) . If the true conditional distribution q(·| x) is realizable, the optimal policy π∗ is deterministic and outputs a∗ 
+
+> t
+
+= q(·| x) at every step . At this optimum, the expected return is −H(q(·| x)) − log a0,y , which reduces to −H(q(·| x)) + log K under the uniform prior. Proof sketch. Equation 4 establishes that the per-step return is maximized only when both the bias and variance penalties are zero. This condition requires the policy to be deterministic and exactly match the true distribution q(·| x). Since the geometric horizon weights every step positively, the optimal policy must attain this perfectly accurate prediction at all times. Full proof in Appendix A.2. The optimal policy therefore recovers the same solution as standard cross-entropy, while the RL formulation changes how that solution is approached. 
+
+4.3 Bounded Confidence under Shared Refinement 
+
+On separable data, standard cross-entropy admits no finite minimizer because gradient descent drives logit norms to infinity and causes severe overconfidence (Soudry et al., 2018). Since RIC shares the 50 200 400 600 800 1000                  
+
+> Epoch
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Normalized Return
+> (a)
+> 025 50 75 100
+> 0.0
+> 0.5
+> 0200 400 600 800 1000
+> Epoch
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> Accuracy
+> (b)
+> 0.95 0.96 0.97 0.98 0.99 1.00
+> Train Accuracy
+> 0.88
+> 0.89
+> 0.90
+> 0.91
+> 0.92
+> 0.93
+> 0.94
+> Eval Accuracy
+> (c)
+> Train RIC Val RIC Train SL Val SL
+
+Figure 2: CIFAR-10 training dynamics of RIC and SL. Trained for 1000 epochs with 5 random seeds. (a) Normalized return over training. RIC improves more slowly due to policy-gradient op-timization, but ultimately attains higher validation return. (b) Classification accuracy on train and validation sets. Both objectives optimize predictive performance, and RIC matches SL in accuracy. (c) Evaluation accuracy as a function of training accuracy across epochs. For comparable training accuracy, RIC achieves slightly higher evaluation accuracy, indicating improved generalization. same optimum, the question is whether it also inherits the same pathology. Here, we show that the shared refinement structure changes this behavior. Our shared-classifier architecture inherently prevents this when optimizing over fixed features. In our setting, the policy mean is parameterized by a shared linear classifier μt = softmax( W τ t(x)) .The same weights W are applied at every refinement step, so they must classify early thought states 
+
+τt(x) that are not yet linearly separable. The geometric horizon places strictly positive probability on these early steps. If the logit norm ∥W ∥ → ∞ , overconfident misclassifications on these early ambiguous states drive the expected log-score to −∞ , which bounds the optimal logit scale. 
+
+Proposition 2 (Finite logit scale under shared weights) . Let the policy mean be μt =softmax( W τ t(x)) with a shared classifier W evaluated over fixed, bounded thought states (∥τt(x)∥ ≤ B). Assume there is an early step t0 where the labeled states (τt0 (x), y ) are non-separable in a strong sense (see Appendix for the formal condition). Then, the expected return diverges to −∞ as ∥W ∥ → ∞ . Consequently, the objective admits a finite logit-scale maximizer. Proof sketch. Standard classifiers drive weight norms to infinity because increasing confidence on correct, separable predictions continuously lowers the cross-entropy loss. In our setting, the shared classifier W must also evaluate early unrefined states. If the logit norm grows too large, the penalty for confidently misclassifying these early ambiguous states dominates the expected return. This inherent tension bounds the optimal logit scale. Full proof in Appendix A.2. These properties emerge naturally from our sequential formulation, in contrast to standard super-vised classification, which lacks anytime predictions and produces unbounded logits on separable data. The next section tests these structural differences empirically for vision tasks. 
+
+5 Results 
+
+The preceding sections motivate RIC as an RL alternative to single-pass imitation in Supervised Learning (SL), and yield concrete predictions about optimization behavior. We now evaluate these claims empirically and assess RIC as a practical image classifier. Our results are organized to: 
+
+(i) compare training dynamics against SL, (ii) characterize emergent behaviors such as calibration, value-based halting, and (iii) benchmark accuracy and calibration across multiple datasets. We compare RIC against standard SL and two supervised adaptive-computation baselines, ACT (Graves, 2016) and PonderNet (Banino et al., 2021). All methods use the same ResNet-34 backbone to encode an image x into an embedding e and are trained end-to-end. SL predicts from this em-bedding in a single forward pass without recurrence. ACT and PonderNet use the same GRU-based 60 200 400 600 800 1000              
+
+> Epoch
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> ECE
+> (a)
+> 0200 400 600 800 1000
+> Epoch
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> ECE
+> (b)
+> 0200 400 600 800 1000
+> Epoch
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> ECE
+> (c)
+> 0.5
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+> Confidence Mean
+> 0.5
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+> Confidence Mean
+> 0.5
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+> Confidence Mean
+> RIC SL RIC Confidence SL Confidence
+
+Figure 3: Calibration dynamics under varying label noise. ECE and Confidence over training on CIFAR-10 (a), CIFAR-10N with aggregated human labels (9.03% noise) (b), and CIFAR-10N with worst-case labels (40.21% noise) (c). RIC consistently achieves lower ECE than SL throughout training with calibration remaining stable as label noise increases. recurrent refinement module as RIC, differing only in the training objective and halting mechanism. Full hyperparameter settings, including hyperparameter sweeps, are reported in the supplementary material. RIC uses a Dirichlet policy over the simplex with discount γ=0 .8 and truncated rollouts of T =20 refinement steps with value bootstrapping. At γ=0 .8 the residual weight γ20 ≈ 0.01 , so truncation negligibly affects the infinite-horizon objective. We evaluate on CIFAR-10 (Krizhevsky et al., 2009), CIFAR-10N (Wei et al., 2021), SVHN (Netzer et al., 2011), and ImageWoof (Howard & Gugger, 2020), a fine-grained subset of ImageNet (Deng et al., 2009). In all plots, shaded bands show 95% confidence intervals across random seeds. 
+
+5.1 Optimization Dynamics 
+
+Figure 2 compares the training dynamics on CIFAR-10. RIC improves more slowly in the early phase due to policy-gradient variance but both methods converge to comparable accuracy (Fig-ure 2(b)), consistent with the shared log-score objective. Despite slower early learning, RIC achieves higher validation return at convergence and maintains it through the end of training, whereas SL models overfit in terms of return (Figure 2(a)). Although SL slightly outperforms RIC in accuracy (Figure 2(b)), Figure 2 (c) reveals a systematic generalization advantage. For a fixed level of training accuracy, RIC attains higher evaluation accuracy, suggesting that the accuracy gap reflects training speed rather than asymptotic performance. Overall, while RIC requires longer training due to the intrinsic inefficiency of policy-gradient opti-mization, its objective induces more stable confidence dynamics. At equal training accuracy, RIC achieves higher validation accuracy (Figure 2(c)). These dynamics manifest in several observable behaviors related to model calibration. Figure 3 examines ECE over training under increasing levels of human label noise. RIC exhibits an initial phase of systematic underconfidence, in which predictive accuracy improves faster than model confidence. Consequently, ECE temporarily peaks at values above 0.6 early in training. Over time, however, the agent gradually increases its confidence while maintaining accuracy, yielding a self-calibrating effect as training progresses. In contrast, SL models maintain low ECE only during a limited early phase of training before calibra-tion deteriorates as confidence continues to increase. On standard CIFAR-10, RIC achieves a slightly lower minimum ECE than SL. Importantly, this minimum occurs at a later training stage when validation accuracy is already high (Figure 2(b)), indicating that calibration improves alongside predictive performance rather than degrading as training continues. This calibration gap becomes more pronounced as label noise increases. Under aggregated human annotations (9.03% noise) and worst-case labels (40.21% noise), SL exhibits substantial calibration degradation, whereas RIC re-mains comparatively stable. This robustness follows from the more gradual evolution of predictive confidence under the reinforced objective. 70.5 0.6 0.7 0.8 0.9 1.0           
+
+> Confidence
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> % of Samples
+> (a)
+> Confidence Distribution
+> SL
+> RL
+> Accuracy
+> Avg. Confidence
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Confidence
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Accuracy
+> Error=5.6
+> (b)
+> ECE (SL)
+> Outputs
+> Gap
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Confidence
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Accuracy
+> Error=3.5
+> (c)
+> ECE (RIC)
+> Outputs
+> Gap
+
+Figure 4: Confidence distributions and reliability diagrams on CIFAR-10 (test). (a) Confidence histogram averaged across models trained with five random seeds. (b) Reliability diagram for SL. (c) Reliability diagram for RIC. SL produces a sharply peaked confidence distribution and exhibits systematic overconfidence, whereas RIC predictions are more dispersed and tend to be slightly un-derconfident across most bins, resulting in improved calibration. 
+
+5.2 Evaluation 
+
+Figure 4 illustrates the resulting differences in the final predictive distributions on the test set. SL models produce a sharply peaked confidence distribution, concentrating predictions near extreme confidence values. Moreover, the accuracy of the SL model is substantially lower than its mean confidence. The corresponding reliability diagram reveals systematic overconfidence across all bins. In contrast, RIC produces a broader confidence distribution and tends to be mildly underconfident throughout the diagram, resulting in a closer alignment between accuracy and confidence. These observations reflect a fundamental difference in optimization dynamics. Cross-entropy train-ing drives predicted probabilities toward extremes, even when labels are noisy, amplifying overcon-fidence on mislabeled examples. In contrast, RIC avoids aggressively sharpening predictions on ambiguous or corrupted examples, leading to stable confidence dynamics and improved calibration. Table 1 summarizes accuracy and calibration across all datasets. RIC achieves test accuracies com-parable to SL and consistently reduces ECE, despite slightly lower training accuracy in some cases. Additionally, adaptive computation baselines such as ACT and PonderNet behave similarly to SL in terms of ECE, suggesting that adaptive inference alone does not improve calibration. Rather, the cal-ibration effect arises from the RL objective used by RIC. The calibration advantage is small on easy datasets such as SVHN, where accuracy is already high, but becomes more pronounced on harder tasks. In particular, ImageWoof, which is characterized by fine-grained classes and fewer training examples, shows the largest calibration improvement, highlighting the benefit of RIC’s confidence dynamics in harder recognition settings with limited data. The calibration also evolves during iterative refinement. Figure 5(b) shows that confidence increases across refinement steps while ECE decreases on the ImageWoof test set. At early steps the agent                                                     
+
+> CIFAR-10 SVHN ImageWoof
+> Acc train [%] Acc test [%] ECE test Acc train [%] Acc test [%] ECE test Acc train [%] Acc test [%] ECE test
+> SL 99 .83 92 .57 0.059 99 .88 95 .80 0.033 90 .91 82 .61 0.102
+> ACT 99 .78 92 .51 0.059 99 .80 95 .68 0.033 91 .90 83 .62 0.097
+> PonderNet 99 .78 92 .43 0.059 99 .83 95 .79 0.033 91 .52 83 .68 0.097
+> RIC (ours) 99 .33 93 .05 0.035 99 .40 95 .86 0.018 86 .37 85 .39 0.049
+
+Table 1: Test accuracy and ECE across CIFAR-10, SVHN, and ImageWoof. Results are aver-aged over five seeds. Models are selected by best validation accuracy. RIC achieves competitive test accuracy across datasets while consistently reducing calibration error compared to supervised baselines. Confidence intervals are omitted, but can be found in the Supplementary Materials. 85 10 15 20             
+
+> Inference Steps
+> 0.25
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Normalized Return
+> (a)
+> Easy
+> Intermediate
+> Hard
+> 510 15 20
+> Inference Steps
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+> Confidence
+> (b)
+> Confidence
+> ECE
+> Value halt
+> 12345678910
+> Inference Steps
+> 0
+> 10
+> 20
+> 30
+> % of Samples
+> (c)
+> Correct
+> Incorrect
+> 0.000
+> 0.025
+> 0.050
+> 0.075
+> 0.100
+> 0.125
+> 0.150
+> ECE
+
+Figure 5: Adaptive computation analysis on ImageWoof (test). (a) Normalized return by input difficulty (easy, intermediate, hard). (b) Average confidence and ECE as a function of inference steps. The vertical line marks the mean value-based halting step. (c) Distribution of halting steps for correctly and incorrectly classified inputs. maintains low confidence and gradually sharpens its beliefs as additional computation is used. As confidence stabilizes, the predicted future return approaches zero, providing a natural stopping cri-terion that terminates inference when further refinement yields marginal gains. Figure 5(a) shows this behavior on different examples. Easy inputs saturate quickly, while intermediate inputs benefit from additional refinement steps. On hard images, the policy stops before additional negative reward accrues. In addition, Figure 5(c) confirms that the value-based halting rule allocates more steps to inputs that are ultimately classified correctly. This is consistent with prior observations that, on hard images where the policy tends to be incorrect, early stopping is induced by the value function. 
+
+6 Related Work 
+
+Earlier adaptive computation methods learn halting behavior under supervised training signals. Graves (2016) introduce Adaptive Computation Time, a differentiable halting mechanism for re-current models that trades task loss against an explicit ponder cost. Banino et al. (2021) build on this idea with PonderNet, which learns an explicit distribution over stopping times and regularizes it toward a geometric prior via a KL term, making the compute accuracy trade-off more stable and yielding a usable halting rule at deployment. Dehghani et al. (2018) show that the Universal Trans-former can perform recurrent refinement with shared weights and can apply ACT-style per-token halting so each position is updated a variable number of times. Figurnov et al. (2017) extend ACT to convolutional residual networks by allowing different spatial locations to halt at different depths. Several earlier lines of work use RL for classification, but they do not use a single agent to iteratively refine a continuous belief distribution at scale. Mnih et al. (2014) learn a sequential policy for Recurrent Attention Models, while the final class prediction is still trained with a standard supervised objective. SkipNet and BlockDrop learn policies that decide which layers or residual blocks to execute for each input, with rewards that reflect both accuracy and computation, while the predicted label is still produced by one supervised forward pass through the chosen path (Wang et al., 2018; Wu et al., 2018). Wiering et al. (2011) also frame classification as a MDP and evaluate RL algorithms in small-scale settings, including actor critic variants designed for this formulation. Mousavi et al. (2019) study iterative belief updates for image classification using multi-agent RL with multiple cooperating agents that share information and update beliefs through consensus. More recent work treats deliberation and computation control as part of the action space. Hanna & Corrado (2025) formalize deliberation as mental actions in a thought MDP and analyze when model-free RL will select such actions under return maximization. Orenstein et al. (2025) similarly give agents explicit compute-related actions and feedback about compute cost, then train policies that trade off performance against computation. These formulations parallel chain-of-thought prompt-ing, which elicits intermediate reasoning by generating additional tokens rather than updating a latent belief representation (Wei et al., 2022b). In latent reasoning for language models, Hao et al. (2025) train models to reason entirely in a continuous latent space without decoding to tokens at intermediate steps, and Ning et al. (2025) use RL to learn when to stop such latent computation. 9Both support the broader premise that the depth and medium of computation can be optimized by reward rather than fixed by architecture. Our use of recurrent architectures is also consistent with related findings in RL and decision-making. Wispinski et al. (2026) show that deep recurrent agents trained with RL on noisy perceptual dis-crimination tasks can develop primate-like decision behaviors such as speed accuracy trade-offs and changes of mind. Lambrechts et al. (2022) show that recurrent networks trained to approximate value functions in partially observable environments develop hidden states that become increasingly correlated with Bayesian belief states over task-relevant variables. Calibration provides another reason to pursue iterative belief refinement. Cross-entropy training in-duces overconfidence (Guo et al., 2017), which Wei et al. (2022a) trace to unbounded logit-norm growth during training and mitigate via logit normalization. In language models, Leng et al. (2025) show that generic RLHF further amplifies overconfidence. Chen et al. (2025) show that this over-confidence can be misaligned with repeated test-time sampling and propose a modified objective that limits confidence under that evaluation setting. Much of the calibration literature relies on post-hoc adjustments such as temperature scaling (Guo et al., 2017). An alternative is to address calibration at training time through reward design: Damani et al. (2025) and Bani-Harouni et al. (2026) use proper scoring rules as rewards to train language models to express calibrated uncertainty, though both frame the problem as single-step confidence estimation rather than iterative belief refinement. When we instantiate a continuous policy with a Dirichlet distribution, RIC is superficially related to evidential deep learning, which predicts Dirichlet parameters in a single supervised forward pass to represent uncertainty (Sensoy et al., 2018). Juergens et al. (2024) report that epistemic uncertainty from evidential methods is not faithfully represented in general, highlighting limitations of this approach under distribution shift and related settings. 
+
+7 Conclusion 
+
+We presented Reinforced Iterative Classification (RIC), an RL formulation of classification in which a recurrent agent refines a predictive distribution over classes rather than producing a prediction in a single pass. Theoretically, the discounted objective yields an anytime predictor and, under the conditions of Proposition 2, favors a finite logit scale under shared refinement. Empirically, across CIFAR-10, SVHN, and ImageWoof, RIC achieves accuracy comparable to supervised baselines while improving calibration, with the clearest gains on the more challenging settings. In addition, these improved calibration findings seem robust to human label noise, which further strengthens the observation that RIC induces more stable confidence dynamics. The learned value function also provides a practical stopping rule, allowing the model to spend more refinement steps on examples that benefit from additional computation and halt when further updates are unlikely to improve the prediction. More broadly, these results suggest that classification can be treated as sequential belief refinement rather than only as single-step label imitation. 
+
+Limitations. In our setup, the supervised baselines are trained for 300 epochs, whereas RIC is trained for 2000 , reflecting a higher optimization cost due to the variance and inefficiency of policy-gradient updates. A second limitation is the current policy parameterization. Because the Dirichlet policy becomes numerically delicate near the boundary of the simplex, stability becomes hardest to maintain precisely when the model is concentrating mass on a single class. This is especially problematic for classification tasks, because typically the provided label lays on the simplex border. The supplementary ablations also show that the choice of policy distribution affects both stability and learning speed. Finally, the present experiments are limited to moderate-scale image classification benchmarks. Extending RIC to larger label spaces and more complex domains will likely require better policy parameterizations and more scalable optimization, since exploration on the simplex and log-score-based updates become more difficult as the number of classes grows. 10 References 
+
+David Bani-Harouni, Chantal Pellegrini, Paul Stangel, Ege Özsoy, Kamilia Zaripova, Nassir Navab, and Matthias Keicher. Rewarding doubt: A reinforcement learning approach to calibrated confi-dence expression of large language models, 2026. URL https://arxiv.org/abs/2503. 02623 .Andrea Banino, Jan Balaguer, and Charles Blundell. Pondernet: Learning to ponder. arXiv preprint arXiv:2107.05407 , 2021. Feng Chen, Allan Raventos, Nan Cheng, Surya Ganguli, and Shaul Druckmann. Rethinking fine-tuning when scaling test-time compute: Limiting confidence improves mathematical reasoning. 
+
+arXiv preprint arXiv:2502.07154 , 2025. Mehul Damani, Isha Puri, Stewart Slocum, Idan Shenfeld, Leshem Choshen, Yoon Kim, and Jacob Andreas. Beyond binary rewards: Training lms to reason about their uncertainty. arXiv preprint arXiv:2507.16806 , 2025. Mostafa Dehghani, Stephan Gouws, Oriol Vinyals, Jakob Uszkoreit, and Łukasz Kaiser. Universal transformers. arXiv preprint arXiv:1807.03819 , 2018. Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li Fei-Fei. Imagenet: A large-scale hierarchical image database. In CVPR , 2009. Michael Figurnov, Maxwell D Collins, Yukun Zhu, Li Zhang, Jonathan Huang, Dmitry Vetrov, and Ruslan Salakhutdinov. Spatially adaptive computation time for residual networks. In Proceedings of the IEEE conference on computer vision and pattern recognition , pp. 1039–1048, 2017. Alex Graves. Adaptive computation time for recurrent neural networks. arXiv preprint arXiv:1603.08983 , 2016. Chuan Guo, Geoff Pleiss, Yu Sun, and Kilian Q Weinberger. On calibration of modern neural networks. In International conference on machine learning , pp. 1321–1330. PMLR, 2017. Josiah P. Hanna and Nicholas E. Corrado. When can model-free reinforcement learning be enough for thinking? In Advances in Neural Information Processing Systems (NeurIPS) , 2025. URL 
+
+https://arxiv.org/abs/2506.17124 .Shibo Hao, Sainbayar Sukhbaatar, DiJia Su, Xian Li, Zhiting Hu, Jason Weston, and Yuandong Tian. Training large language models to reason in a continuous latent space. In International Conference on Learning Representations (ICLR) , 2025. Jeremy Howard and Sylvain Gugger. Fastai imagenette and imagewoof datasets. https: //github.com/fastai/imagenette , 2020. Accessed: 2026-03-03. Mira Juergens, Nis Meinert, Viktor Bengs, Eyke Hüllermeier, and Willem Waegeman. Is epis-temic uncertainty faithfully represented by evidential deep learning methods? arXiv preprint arXiv:2402.09056 , 2024. Alex Krizhevsky, Geoffrey Hinton, et al. Learning multiple layers of features from tiny images. 2009. Gaspard Lambrechts, Adrien Bolland, and Damien Ernst. Recurrent networks, hidden states and beliefs in partially observable environments. arXiv preprint arXiv:2208.03520 , 2022. Chen-Yu Lee, Saining Xie, Patrick Gallagher, Zhengyou Zhang, and Zhuowen Tu. Deeply-supervised nets. In Artificial intelligence and statistics , pp. 562–570. Pmlr, 2015. Jixuan Leng, Chenguang Dong, Yihong Zhou, Yiyang Jiang, Qiang Wang, and Bing Qin. Taming overconfidence in LLMs: Reward calibration in RLHF. In International Conference on Learning Representations (ICLR) , 2025. 11 Volodymyr Mnih, Nicolas Heess, Alex Graves, and Koray Kavukcuoglu. Recurrent models of visual attention. Advances in neural information processing systems , 27, 2014. Hossein K Mousavi, Mohammadreza Nazari, Martin Takáˇ c, and Nader Motee. Multi-agent image classification via reinforcement learning. In 2019 IEEE/RSJ International Conference on Intelli-gent Robots and Systems (IROS) , pp. 5020–5027. IEEE, 2019. Yuval Netzer, Tao Wang, Adam Coates, Alessandro Bissacco, Baolin Wu, Andrew Y Ng, et al. Reading digits in natural images with unsupervised feature learning. In NIPS workshop on deep learning and unsupervised feature learning , volume 2011, pp. 4. Granada, 2011. Alex Ning, Yen-Ling Kuo, and Gabe Gomes. Learning when to stop: Adaptive latent reasoning via reinforcement learning. arXiv preprint arXiv:2511.21581 , 2025. Adrian Orenstein, Jessica Chen, Gwyneth Anne Delos Santos, Bayley Sapara, and Michael Bowling. Toward agents that reason about their computation. arXiv preprint arXiv:2510.22833 , 2025. Martin L. Puterman. Markov Decision Processes: Discrete Stochastic Dynamic Programming . John Wiley & Sons, Inc., USA, 1st edition, 1994. ISBN 0471619779. Murat Sensoy, Lance Kaplan, and Melih Kandemir. Evidential deep learning to quantify classifica-tion uncertainty. Advances in neural information processing systems , 31, 2018. Daniel Soudry, Elad Hoffer, Mor Shpigel Nacson, Suriya Gunasekar, and Nathan Srebro. The im-plicit bias of gradient descent on separable data. Journal of Machine Learning Research , 19(70): 1–57, 2018. Xin Wang, Fisher Yu, Zi-Yi Dou, Trevor Darrell, and Joseph E Gonzalez. Skipnet: Learning dy-namic routing in convolutional networks. In Proceedings of the European conference on computer vision (ECCV) , pp. 409–424, 2018. Hongxin Wei, Renchunzi Xie, Hao Cheng, Lei Feng, Bo An, and Yixuan Li. Mitigating neural net-work overconfidence with logit normalization. In International Conference on Machine Learning (ICML) , 2022a. Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Fei Xia, Ed Chi, Quoc V Le, Denny Zhou, et al. Chain-of-thought prompting elicits reasoning in large language models. Advances in neural information processing systems , 35:24824–24837, 2022b. Jiaheng Wei, Zhaowei Zhu, Hao Cheng, Tongliang Liu, Gang Niu, and Yang Liu. Learning with noisy labels revisited: A study using real-world human annotations. ArXiv , abs/2110.12088, 2021. URL https://api.semanticscholar.org/CorpusID:239768373 .Marco A Wiering, Hado Van Hasselt, Auke-Dirk Pietersma, and Lambert Schomaker. Reinforce-ment learning algorithms for solving classification problems. In 2011 IEEE Symposium on Adap-tive Dynamic Programming and Reinforcement Learning (ADPRL) , pp. 91–96. IEEE, 2011. Nathan J Wispinski, Scott A Stone, Anthony Singhal, Patrick M Pilarski, and Craig S Chapman. Primate-like perceptual decision making emerges through deep recurrent reinforcement learning. 
+
+arXiv preprint arXiv:2601.12577 , 2026. Zuxuan Wu, Tushar Nagarajan, Abhishek Kumar, Steven Rennie, Larry S Davis, Kristen Grauman, and Rogerio Feris. Blockdrop: Dynamic inference paths in residual networks. In Proceedings of the IEEE conference on computer vision and pattern recognition , pp. 8817–8826, 2018. Zhengpeng Xie, Qiang Zhang, Fan Yang, Marco Hutter, and Renjing Xu. Simple policy optimiza-tion. In Aarti Singh, Maryam Fazel, Daniel Hsu, Simon Lacoste-Julien, Felix Berkenkamp, Tegan Maharaj, Kiri Wagstaff, and Jerry Zhu (eds.), Proceedings of the 42nd International Conference on Machine Learning , volume 267 of Proceedings of Machine Learning Research ,pp. 68813–68824. PMLR, 13–19 Jul 2025. URL https://proceedings.mlr.press/ v267/xie25m.html .12 Supplementary Materials 
+
+The following content was not necessarily subject to peer review. 
+
+A Theoretical Supplement 
+
+A.1 Regularity Conditions 
+
+The results in this paper hold for any continuous simplex-valued policy satisfying the conditions below. The Dirichlet policy of Section 3.2 is one such instantiation. 1. Interior support. The policy is supported on the interior of the simplex ( ak > 0 almost surely), so the log-score log ay is finite with probability one. 2. Integrability. Eπ [P∞ 
+
+> t=1
+
+γt−1| log at,y |] < ∞, ensuring that the geometric mixture objective and all interchange-of-summation steps are valid. 
+
+Verification for the Dirichlet policy. For a Dir( cμ ) policy with c clipped to [cmin , c max ] and softmax outputs ensuring μk bounded away from zero, Eπ [| log ay |2] is finite at each step (via digamma/trigamma bounds on the Dirichlet log-moments). Since N ∼ Geom(1 − γ) has finite mo-ments, the integrability condition follows. Other continuous simplex-valued families (e.g., logistic-normal) satisfy the same conditions under analogous parameter constraints. 
+
+Boundary behavior. When q(·| x) assigns zero probability to some classes, the optimal action lies on the simplex boundary. The Dirichlet policy, which has interior support, approaches such boundary points as c → ∞ . Formal “maximizer” statements in the main text refer to the supremum of the expected objective. 
+
+A.2 Proofs A.2.1 Jensen Gap for Stochastic Simplex Actions 
+
+We rewrite the expected log-score as a mean term minus a nonnegative penalty. We use the Bregman divergence associated with F (x) = − log x, which is strictly convex on (0 , ∞). The Bregman divergence is 
+
+DF (x∥y) = F (x) − F (y) − F ′(y)( x − y).
+
+Setting x = ay and y = μy , with F ′(y) = −1/y :
+
+DF (ay ∥μy ) = − log ay − (− log μy ) −
+
+
+
+− 1
+
+μy
+
+
+
+(ay − μy )= − log ay + log μy + ay − μy
+
+μy
+
+. (5) Rearranging for log ay :
+
+log ay = log μy + ay − μy
+
+μy
+
+− DF (ay ∥μy ).
+
+This identity already shows the structure we need. We now take expectation under a ∼ πθ with 
+
+Eπ [ay ] = μy
+
+Eπ [log ay ] = log μy + Eπ [ay ] − μy
+
+μy
+
+− Eπ [DF (ay ∥μy )] = log μy − Eπ [DF (ay ∥μy )] , (6) where the linear correction vanishes because Eπ [ay ] = μy .13 Since DF (x∥y) = x/y − log( x/y ) − 1 ≥ 0 with equality only when x = y, the expected log-score is maximized when there is no stochastic spread around the mean. This is exactly the lemma statement. 
+
+Optional local approximation for intuition. This short derivation gives intuition and is not needed for any formal claim. Start from F (ay ) = − log ay and expand around ay = μy .
+
+− log ay = − log μy + 1
+
+μy
+
+(μy − ay ) + 12μ2
+
+> y
+
+(ay − μy )2 + O
+
+ (ay − μy )3
+
+μ3
+
+> y
+
+
+
+.
+
+Substitute into the Bregman definition and cancel linear terms. 
+
+DF (ay ∥μy ) = (ay − μy )2
+
+2μ2
+
+> y
+
++ O
+
+ (ay − μy )3
+
+μ3
+
+> y
+
+
+
+.
+
+Take expectation. 
+
+Eπ [DF (ay ∥μy )] ≈ Var π (ay )2μ2
+
+> y
+
+. (7) Combining with the identity above gives 
+
+Eπ [log ay ] ≈ log μy − Var π (ay )2μ2
+
+> y
+
+.
+
+The penalty is proportional to the squared coefficient of variation of the action. For a Dir( cμ ) policy, 
+
+Var π (ay ) = μy (1 − μy )/(c + 1) , so the penalty scales as O(1 /c ).
+
+A.2.2 Proof of Proposition 1 (Optimal Policy Target) 
+
+We give a self-contained proof that avoids any independence assumption between refinement steps. The argument has four parts. 
+
+Step 1. Geometric stopping reduces the objective to terminal log-score. By Lemma 1 and telescoping of the shaped reward (Eq. 2), the per-example objective equals J(π) =
+
+EN ∼Geom(1 −γ), a 1: N ∼π [log aN,y ] − log a0,y , with N independent of the trajectory. Since a0 is con-stant, maximizing J is equivalent to maximizing EN,π [log aN,y ].
+
+Step 2. Expand by terminal time. Since P(N = t) = (1 − γ)γt−1 > 0 for all t ≥ 1, the law of total expectation gives 
+
+J(π) = 
+
+> ∞
+
+X
+
+> t=1
+
+(1 − γ)γt−1 E(x,y )∼D Eπ [log at,y ].
+
+This decomposition uses only the law of total expectation over N and requires no independence between steps. 
+
+Step 3. KL identity bounds each per-step term. Fix any step t and condition on x. For any action 
+
+at in the simplex interior (guaranteed by the interior-support condition), the KL identity gives 
+
+Ey∼q(·| x)[log at,y ] = −H(q(·| x)) − KL( q(·| x)∥at).
+
+Taking the policy expectation over at,
+
+Eπ
+
+Ey∼q(·| x)[log at,y ] | x = −H(q(·| x)) − Eπ [KL( q(·| x)∥at) | x] ≤ − H(q(·| x)) ,
+
+with equality if and only if KL( q(·| x)∥at) = 0 π-almost surely, i.e., at = q(·| x) a.s. This single condition simultaneously pins the correct target and forces deterministic actions. 
+
+Step 4. Positive weights force optimality at every step. The full objective is upper bounded by replacing each per-step term with its maximum −H(q(·| x)) . Under realizability, a policy that 14 outputs q(·| x) deterministically at every step achieves this upper bound. Since every weight (1 −
+
+γ)γt−1 is strictly positive, any optimal policy π∗ must attain the per-step maximum at every t, which requires a∗ 
+
+> t
+
+= q(·| x) a.s. The optimal value conditioned on input x is 
+
+Ey∼q(·| x)[Jx,y (π∗)] = −H q(·| x) − log a0,y .
+
+Since a0 is uniform, this becomes −H q(·| x) + log K.
+
+A.2.3 Proof of Proposition 2 
+
+Let Lt(W ) = E(x,y )∼D [− log softmax( W τ t(x)) y ] be the per step expected loss and L(W ) = P∞
+
+> t=1
+
+(1 − γ)γt−1Lt(W ) the geometric mixture. Equivalently, L(W ) = EN ∼Geom(1 −γ)[LN (W )] .We proceed in three steps. First we remove softmax shift ambiguity. Next we show that large scaling is penalized at an early step where features are strongly non-separable. Finally we combine continuity and coercivity to prove existence of a finite minimizer. 
+
+Step 1. Fixing the shift ambiguity. Since softmax( z) is invariant under z 7 → z + c1, adding the same row vector to all rows of W leaves every loss value unchanged. We fix this by setting the last row of W to zero. All norms below are Frobenius norms on this reduced (K−1) × d space. 
+
+Step 2. Coercivity from early features that are strongly non-separable. Fix any nonzero direc-tion U in the reduced space and scale it as αU with α > 1. At the early step t0, define 
+
+mU (x, y ) = max   
+
+> k̸=y
+
+[U τ t0 (x)] k − [U τ t0 (x)] y .
+
+The strong non-separability condition states that for every nonzero U in the reduced space, we have 
+
+cU := E(x,y )∼D [max(0 , m U (x, y ))] > 0. Since ∥τt0 (x)∥ ≤ B, this expected value is finite. For every (x, y ),
+
+softmax( αU τ t0 (x)) y ≤ eα[U τ t0 (x)] y
+
+eα max k [U τ t0 (x)] k
+
+= e−α m U (x,y ),
+
+hence − log softmax( αU τ t0 (x)) y ≥ max(0 , αm U (x, y )) = α max(0 , m U (x, y )) and 
+
+Lt0 (αU ) ≥ α c U −−−−→ 
+
+> α→∞
+
+∞.
+
+Because (1 − γ)γt0−1 > 0,
+
+L(αU ) ≥ (1 − γ)γt0−1 Lt0 (αU ) −−−−→ 
+
+> α→∞
+
+∞.
+
+Since this holds for every nonzero direction U , L is coercive on the reduced space. 
+
+Step 3. Continuity and existence of a finite minimizer. Each Lt is continuous (smooth softmax composed with the map τt). On any ball ∥W ∥F ≤ R,
+
+Lt(W ) ≤ log K + 2 ∥W ∥F B ≤ log K + 2 RB. 
+
+Therefore 
+
+sup   
+
+> ∥W∥F≤R
+
+X
+
+> t>n
+
+(1 − γ)γt−1Lt(W ) ≤ (log K + 2 RB )γn → 0,
+
+so the geometric series is uniformly convergent on bounded sets and L is continuous. Now let 
+
+S = {W | L (W ) ≤ L (0) }. Coercivity makes S bounded, and continuity makes S closed, so S
+
+is compact in finite dimension. By the extreme value theorem, L attains its minimum at some W ∗
+
+with ∥W ∗∥F < ∞.
+
+Comparison. Single-step cross-entropy LT (W ) on separable data decreases monotonically to-ward 0 as ∥W ∥ → ∞ but never attains its infimum at any finite W .15 B Additional Experimental Results 
+
+B.1 Hyperparameters 
+
+A short overview of the hyperparameter sweep during training is shown in Table 2. We tuned optimizer choice, activation function, and batch size over the options listed there: optimizer 
+
+∈ { SGD , Adam }, activation ∈ { ReLU , SiLU }, and batch size ∈ { 128 , 256 }. For Adam, we used a learning rate of 3 × 10 −4, weight decay of 0.001 , and gradient clipping of 0.5, while for SGD we used standard settings including momentum 0.9. No learning rate scheduler was used for any training paradigm. For the table, Supervised training paradigms were trained for 300 epochs, RIC for 2000 epochs, independent of the dataset. The number of passes per snapshot was fixed to 5. To make compute budgets comparable to our RIC baseline with discount γ = 0 .8, we matched both adaptive methods to the same geometric horizon: we set PonderNet’s geometric prior to λp = 1 −γ = 0 .2 (implying E[N ] = 1 /λ p = 5 ) and used the standard KL weight β = 0 .01 , while keeping max_steps = 20 . For ACT, we fixed the numerical/stability constants to paper defaults (ϵ = 0 .01 , positive halting-bias initialization) and set the ponder penalty to τ = − ln( γ) = 0 .223 ,which corresponds to a geometric continuation probability γ under a linear compute cost. These set-tings provide a principled, analytically grounded starting point for apples-to-apples compute com-parisons, with any residual deviations in realized step counts arising from each method’s learned halting dynamics. The parameters of the Dirichlet policy are given by α = μ · c + ϵ, the concentration scale is clipped to c ∈ [1 , 10] with ϵ = 0 .01 added for numerical stability. For low-resolution datasets such as CIFAR-10, we modify the encoder stem to better preserve spatial information, employing a 3 × 3 stride-1 convolution and removing the initial max-pooling layer to avoid early spatial downsampling. The original ResNet architecture is otherwise preserved, with the activation function selected from the sweep in Table 2. Encoding and thought space dimensions are set equal. All experiments were conducted on NVIDIA L40 GPUs. 
+
+B.2 Results 
+
+This section holds supplementary evaluation material. Figure 6 shows validation accuracy as a func-tion of training accuracy for CIFAR-10 (a), SVHN (b), and ImageWoof (c). RIC generally exhibits better generalization, with the gap increasing on harder datasets. Figure 7 and Figure 8 show confidence distributions and reliability diagrams on SVHN (test). Both models produce sharply peaked confidence distributions due to the high accuracy on SVHN. At high accuracies, the calibration advantage is reduced. However, on ImageWoof, SL exhibits systematic overconfidence, whereas RIC predictions are more dispersed and are underconfident on all bins, re-sulting in improved calibration. Table 3 shows this trend on all evaluated datasets. It reports test accuracy, train accuracy, and ECE with confidence intervals across CIFAR-10, SVHN, and ImageWoof. RIC achieves competitive vali-dation accuracy across datasets while consistently reducing calibration error compared to supervised baselines. Figure 9 shows a small ablation study. The Dirichlet head improves stability and training speed. In Table 2: Hyperparameter sweep considered in our experiments. Group Hyperparameter Value / Options Optimizer Choice {SGD, Adam} Optimizer Adam learning rate 3 × 10 −4
+
+Optimizer SGD settings standard (e.g., momentum 0.9)Training Batch size {128, 256} Model Activation {ReLU, SiLU} 16 0.95 0.96 0.97 0.98 0.99 1.00           
+
+> Train Accuracy
+> 0.88
+> 0.89
+> 0.90
+> 0.91
+> 0.92
+> 0.93
+> 0.94
+> Eval Accuracy
+> (a)
+> 0.92 0.94 0.96 0.98 1.00
+> Train Accuracy
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> Eval Accuracy
+> (b)
+> 0.800 0.825 0.850 0.875 0.900 0.925
+> Train Accuracy
+> 0.76
+> 0.78
+> 0.80
+> 0.82
+> 0.84
+> 0.86
+> 0.88
+> Eval Accuracy
+> (c)
+> RIC SL
+
+Figure 6: Validation accuracy as a function of training accuracy. (a) On CIFAR-10, (b) on SVHN, (c) on ImageWoof. RIC achieves slightly better generalization. 0.5 0.6 0.7 0.8 0.9 1.0 
+
+Confidence 
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> % of Samples
+
+(a) 
+
+Confidence Distribution 
+
+SL 
+
+RL 
+
+Accuracy 
+
+Avg. Confidence 
+
+0.0 0.2 0.4 0.6 0.8 1.0 
+
+Confidence 
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> Accuracy
+
+Error=3.3 
+
+(b) 
+
+ECE (SL) 
+
+Outputs 
+
+Gap 
+
+0.0 0.2 0.4 0.6 0.8 1.0 
+
+Confidence 
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> Accuracy
+
+Error=1.3 
+
+(c) 
+
+ECE (RIC) 
+
+Outputs 
+
+Gap 
+
+Figure 7: Confidence distributions and reliability diagrams on SVHN (test). (a) Confidence histogram averaged across models trained with five random seeds. (b) Reliability diagram for SL and RIC (c) addition, the SPO objective improves calibration slightly at the cost of training speed compared to PPO. 17 0.5 0.6 0.7 0.8 0.9 1.0 
+
+Confidence 
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> % of Samples
+
+(a) 
+
+Confidence Distribution 
+
+SL 
+
+RL 
+
+Accuracy 
+
+Avg. Confidence 
+
+0.0 0.2 0.4 0.6 0.8 1.0 
+
+Confidence 
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> Accuracy
+
+Error=10.1 
+
+(b) 
+
+ECE (SL) 
+
+Outputs 
+
+Gap 
+
+0.0 0.2 0.4 0.6 0.8 1.0 
+
+Confidence 
+
+0.0 
+
+0.2 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> Accuracy
+
+Error=4.6 
+
+(c) 
+
+ECE (RIC) 
+
+Outputs 
+
+Gap Figure 8: Confidence distributions and reliability diagrams on ImageWoof (test). (a) Confidence histogram averaged across models trained with five random seeds. (b) Reliability diagram for SL and RIC (c) 0 200 400 600 800 1000             
+
+> Step
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> Normalized Return
+> (a)
+> 0200 400 600 800 1000
+> Step
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Accuracy
+> (b)
+> 0200 400 600 800 1000
+> Step
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> ECE
+> (c)
+> RIC RIC (PPO) RIC (Logistic Gaussian)
+
+Figure 9: Ablation study. (a) normalized return, (b) validation accuracy and ECE (c) over training time for ablations. Standard RIC (blue) with Dirichlet head outperforms Logistic Gaussian head in terms of stability and training speed. SPO achieves better calibration compared to PPO. 
+
+CIFAR-10 SVHN ImageWoof 
+
+acc train [%] acc test [%] ece test acc train [%] acc test [%] ece test acc train [%] acc test [%] ece test 
+
+SL 99 .83 ± 0.02 92 .57 ± 0.17 0.059 ± 0.002 99 .88 ± 0.03 95 .80 ± 0.04 0.033 ± 0.0001 90 .91 ± 0.81 82 .61 ± 0.50 0.102 ± 0.005 
+
+ACT 99 .78 ± 0.10 92 .51 ± 0.14 0.059 ± 0.002 99 .80 ± 0.02 95 .68 ± 0.09 0.033 ± 0.0009 91 .90 ± 0.57 83 .62 ± 0.29 0.097 ± 0.003 
+
+PonderNet 99 .78 ± 0.04 92 .43 ± 0.23 0.059 ± 0.002 99 .83 ± 0.07 95 .79 ± 0.15 0.033 ± 0.0005 91 .52 ± 0.48 83 .68 ± 0.22 0.097 ± 0.004 
+
+RIC (ours) 99 .33 ± 0.33 93 .05 ± 0.07 0.035 ± 0.004 99 .40 ± 0.20 95 .86 ± 0.20 0.018 ± 0.006 86 .37 ± 0.55 85 .39 ± 0.28 0.049 ± 0.010 
+
+Table 3: Test accuracy, train accuracy, and ECE with confidence intervals across CIFAR-10, SVHN, and ImageWoof. RIC achieves competitive validation accuracy across datasets while consistently improving calibration. 18

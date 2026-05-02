@@ -1,0 +1,1778 @@
+Title: Progressive Approximation in Deep Residual Networks: Theory and Validation
+
+URL Source: https://arxiv.org/pdf/2604.24154v1
+
+Published Time: Tue, 28 Apr 2026 01:53:18 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Wei Wang 1 Xiao-Yong Wei 1 Qing Li 1
+
+Abstract 
+
+The Universal Approximation Theorem (UAT) guarantees universal function approximation but does not explain how residual models distribute approximation across layers. We reframe residual networks as a layer-wise approximation process that builds an approximation trajectory from in-put to target, and prove the existence of progres-sive trajectories where error decreases monotoni-cally with depth. It reveals that residual networks can implement structured, step-by-step refinement rather than end-to-end (E2E) black-box mapping. Building on this, we propose Layer-wise Pro-gressive Approximation (LPA), a theoretically grounded training principle that explicitly aligns each layer with its residual target to realize such trajectories. LPA is architecture-agnostic: we observe progressive behavior in residual FNNs, ResNets, and Transformers across tasks including complex surface fitting, image classification, and NLP with LLMs for generation and classification. Crucially, this enables “train once, use N models”: a single network yields useful predictions at every depth, supporting efficient shallow inference with-out retraining. Our work unifies approximation theory with practical deep learning, providing a new lens on representation learning and a flexi-ble framework for multi-depth deployment. The source code will be released unpon acceptance at 
+
+https://(open_upon_acceptance) .
+
+1. Introduction 
+
+The UAT (Cybenko, 1989; Hornik et al., 1989; Hornik, 1991) guarantees that sufficiently large neural networks can approximate any continuous function. However, UAT is nei-ther directly applicable to residual networks nor informative about how approximation develops during learning, espe-cially in modern deep architectures where the input–output 
+
+> 1
+
+Department of Computing, the Hong Kong Poly-technic University. Correspondence to: Xiao-Yong Wei 
+
+<cs007.wei@polyu.edu.hk >.
+
+Preprint. April 28, 2026. 𝑥 0        
+
+> 𝑓 (𝑥 0)
+> 𝑥 1
+> 𝑥 2
+> …
+> 𝑥 N−2
+> 𝑥 𝑁 −1
+> 𝐺 2(𝑥 1)
+> 𝐺 1(𝑥 0)
+> 𝐺 𝑁 −1(𝑥 𝑁 −2)
+> 𝐺 𝑁 (𝑥 𝑁 −1)
+> (a) Residual
+> Networks
+> 𝑥 0
+> 𝑓 (𝑥 0)
+> 𝑥 1
+> 𝑥 1
+> 𝑥 2
+> 𝑥 𝑁 −1
+> 𝑥 𝑁
+> 𝑥 1
+> 𝑥 2
+> 𝑥 3
+> 𝑥 𝑁 −1
+> 𝑥 𝑁
+> 𝑥 2
+> 𝑥 𝑁 −2
+> 𝑥 𝑁 −1
+> (b) Progressive
+> Approximation
+> (c) Embedding
+> Space
+> (d) End -to -End
+> Approximation
+> 𝑥 0𝑥 0
+> 𝑥 1
+> 𝑥 2
+> 𝑥 𝑁 −2
+> 𝑥 𝑁 −1
+> 𝑓 (𝑥 0)𝑓 (𝑥 0)
+> …
+> …
+> 𝑥 𝑁 𝑥 𝑁 𝑥 𝑁
+
+Figure 1. Progressive vs. E2E Approximation Trajectories: pro-gressive approximation moves toward the target more effectively and yields useful intermediate layers, whereas intermediates in E2E training are less aligned with the target. 
+
+mapping is realized through many intermediate transforma-tions. In this work, we address a fundamental question left open by classical approximation theory: can the global ap-proximation in deep residual networks be decomposed into a sequence of well-defined layer-wise approximation steps? 
+
+We answer affirmatively. We show that training a deep network is equivalent to constructing an approximation tra-jectory {x0, x1, . . . , xN } (see Figure 1) that progressively moves from the input x0 toward the target f (x0).We prove that there exists a class of progressive trajectories along which the approximation error ∥f (x0)−xi∥ decreases monotonically with depth i. This reveals that deep residual networks do not merely act as black-box universal approxi-mators; rather, they implement a structured, layer-by-layer refinement process grounded in approximation theory. Building on this insight, we derive a principled training paradigm: Layer-wise Progressive Approximation (LPA), which explicitly encourages alignment with such trajectories. Unlike heuristic deep supervision, LPA is not an regularizer but a direct consequence of our theoretical characterization: each layer is guided to approximate the residual between the current state and the final target. Our framework is architecture-agnostic. We validate progressive trajectories across full connected neural net-works (FNNs), ResNets (He et al., 2015), and Transform-1
+
+> arXiv:2604.24154v1 [cs.LG] 27 Apr 2026 Progressive Approximation in Deep Residual Networks: Theory and Validation
+
+ers (Vaswani et al., 2017) on tasks spanning Simulation (function regression), Computer Vision (image classifica-tion), and NLP (language generation and classification with LLMs), indicating that this phenomenon is intrinsic to resid-ual learning rather than specific to any single model or task. In summary, our contributions are: 1. A layer-wise decomposition of the global objective in residual networks, establishing a formal link between UAT and intermediate representations; 2. A proof of the existence of monotonic progressive tra-jectories, providing theoretical grounding for interme-diate supervision; 3. A theoretical treatment of the LPA training principle with validation across architectures and tasks; 4. A reframing from E2E training to progressive approxi-mation, offering theoretical clarity and practical flexi-bility (e.g., “train once, use N models,” demonstrated experimentally). 
+
+2. Related Work 
+
+Theoretical Analysis of Neural Approximation. The the-oretical foundation of neural networks largely rests on the UAT (Cybenko, 1989), which establishes that sufficiently wide single-hidden-layer fully connected networks can ap-proximate any continuous function on compact domains. Subsequent work extended UAT to multilayer architec-tures (Hornik et al., 1989; Hornik, 1991). With the rise of deep learning, a series of increasingly complex architectures have been developed including FNNs (Rumelhart et al., 1986), plain convolutional neu-ral networks (CNNs) (LeCun et al., 1998; Krizhevsky et al., 2012), ResNet (He et al., 2015), Transformers (Vaswani et al., 2017), BERT (Devlin et al., 2019), and Vision Trans-formers (ViTs) (Dosovitskiy et al., 2020). While these models achieve remarkable performance, their growing ar-chitectural complexity has made rigorous analysis of their approximation behavior increasingly challenging. Significant efforts have been devoted to establishing univer-sal approximation guarantees for such modern architectures. For instance, Hardt & Ma (2016); Lin & Jegelka (2018) showed that FNNs retain universal approximation capability when equipped with residual connections; similarly, Oono & Suzuki (2019); He et al. (2021) proved analogous results for residual CNNs. Transformers are also shown to be universal approximators (Yun et al., 2019; Kratsios et al., 2021). Fundamentally, prior work views the network as a mono-lithic universal approximator, concerned only with match-ing the final output to the target, and offers little insight into the layer-by-layer evolution of approximation. To our knowledge, this is the first study to leverage UAT to analyze approximation progressively at each layer. By decomposing the global objective into layer-wise targets, we expose the internal dynamics of approximation in residual networks. 
+
+Algorithmic Approaches with Intermediate Supervision. 
+
+Algorithmically, prior work on supervising intermediate layers falls into two broad categories. The first adds aux-iliary losses, often unsupervised or self-supervised pretext objectives, to improve intermediate representations (Vincent et al., 2008; van den Oord et al., 2018; Pathak et al., 2016; Hjelm et al., 2018). These objectives promote robust, dis-criminative features for downstream tasks but do not require intermediate layers to produce valid predictions. The second category introduces additional modules (e.g., early-exit heads or auxiliary classifiers) to enable interme-diate layers to output task-specific results (Bengio et al., 2006; Szegedy et al., 2015; Bakhtiarnia et al., 2021; Xu et al., 2023). While effective for efficiency or adaptive in-ference, these approaches are largely heuristic: they lack a principled characterization of what each intermediate layer should learn, and offer no guarantee that the sequence of approximations improves monotonically toward the target. We bridge this gap with the first formal theory of progressive approximation. Under a unified residual formulation, we show that the global objective decomposes into layerwise approximation problems and that a coherent trajectory with monotonically decreasing errors exists. 
+
+3. Layer-Wise Progressive Approximation Trajectories in Residudal Networks 
+
+In this section, we give a justification for the existence of layer-wise progressive approximation trajectories. 
+
+3.1. Residual Networks Unfolding and Error Trajectory 
+
+Let {Ki}Ni=1 ⊆ Rd be compact subsets representing the input and intermediate representation spaces, and let f :
+
+K0 → KN be a continuous target function to be approxi-mated. For an input x0 ∈ K0, we denote by xi ∈ Ki the output of the i-th layer of a deep residual network. The network follows the forward recurrence 1:
+
+xi = xi−1 + W′
+
+> i
+
+σ Wixi−1 + bi
+
+ + b′
+
+> i
+
+, (1) where σ denotes a pointwise nonlinearity (e.g., ReLU). Defining the residual mapping Gi : Ki−1 → Rd is a learn-
+
+> 1For clarity of exposition, we present the analysis using FNNs. However, the framework is general and directly applies to ResNet and Transformer architectures, as both can be expressed within the similar residual formulation (see Appendix E for details).
+
+2Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+able residual block: 
+
+Gi(xi−1) := W′
+
+> i
+
+σ Wixi−1 + bi
+
+ + b′
+
+> i
+
+, (2) which constitutes a FNN and shares the same mathematical form with UAT (Cybenko, 1989), the block simplifies to 
+
+xi = xi−1 + Gi(xi−1). (3) Unfolding the recurrence over N layers yields the cumula-tive representation (see Sections A in the Appendix) 
+
+g(x0) = xN = x0 +
+
+> N
+
+X
+
+> i=1
+
+Gi(xi−1). (4) For an E2E trained network, we denote the learned map-pings by G∗ 
+
+> i
+
+. The behavior of intermediate representations can be analyzed via the following formal notion: 
+
+Definition 3.1 (Error Trajectory) . Consider an N -layer residual network with forward pass xi = xi−1 + G∗ 
+
+> i
+
+(xi−1)
+
+for i = 1 , . . . , N . The approximation error at layer i is defined as 
+
+εi := f (x0) − xi , i = 0 , 1, . . . , N, (5) and the sequence T = ( ε0, ε 1, . . . , ε N ) is called the error trajectory of the trained network on input x0.The objective of a residual N -layer network is to learn 
+
+{G∗ 
+
+> i
+
+}N 
+
+> 1
+
+approximates f :
+
+{G∗ 
+
+> i
+
+}N 
+
+> 1
+
+= arg min 
+
+> g
+
+∥g(x0) − f (x0)∥. (6) In the E2E paradigm, this global objective is applied only at the final layer, with earlier layers updated via the chain rule. Since standard training minimizes only the final loss εN ,the intermediate errors εi (i < N ) are not directly super-vised. Consequently, the error trajectory T is generally non-monotonic and emerges as a byproduct of global opti-mization. For a more detailed derivation and discussion, see Sections B in the Appendix. 
+
+3.2. Layer-Wise Approximation Perspective 
+
+Although residual networks are trained end-to-end (E2E) to minimize only the global error ∥f (x0) − xN ∥, their addi-tive structure admits a natural layer-wise decomposition of the target function. This decomposition provides a useful analytical lens—even though E2E training does not enforce it explicitly. 
+
+Proposition 3.2 (Implicit Layer-Wise Residual Targets) .
+
+Let {G∗ 
+
+> i
+
+}Ni=1 denote the residual mappings of an N -layer network after E2E training. Define the layer-i residual target as 
+
+fi(x0) := f (x0) − x0 −
+
+> i−1
+
+X
+
+> j=1
+
+G∗ 
+
+> j
+
+(xj−1), (7) 
+
+where xj = xj−1 + G∗ 
+
+> j
+
+(xj−1) for j < i . Then, by construc-tion, the ideal update at layer i would be Gideal  
+
+> i
+
+(xi−1) = 
+
+fi(x0).
+
+Proposition 3.2 does not claim that E2E training actively steers G∗ 
+
+> i
+
+toward fi(x0). Rather, it highlights that, given any fixed set of preceding layers, we could define the residual target fi, and the role of Gi can be interpreted as approxi-mating this target. To assess whether such an approximation is theoretically feasible, consider the effective input domain to layer i:
+
+Ki−1 := xi−1(x0) | x0 ∈ K0 .
+
+Assume K0 ⊂ Rd is compact and all G∗ 
+
+> j
+
+are continuous; then Ki−1 is also compact. Since fi(x0) is a continuous function of x0, and xi−1 is a continuous function of x0, the mapping from xi−1 to fi(x0) is continuous on Ki−1. By the UAT (Cybenko, 1989), for any εi > 0, there exists a FNN Gi satisfying 
+
+sup 
+
+> xi−1∈Ki−1
+
+Gi(xi−1) − fi(x0) < ε i. (8) Thus, from an approximation-theoretic standpoint, each residual block is capable of realizing its implicit target, pro-vided sufficient capacity. However, because standard E2E training optimizes only the final output, intermediate layers receive no explicit signal to match fi. Consequently, the actual error trajectory {εi}Ni=1 
+
+(defined in Section 3.1) may be non-monotonic in practice. 
+
+3.3. Progressive Approximation Trajectories 
+
+Proposition 3.2 shows that, in a globally optimal residual network, each layer i implicitly targets the residual function 
+
+fi(x0) = f (x0) − xi−1,
+
+which represents the part of the target not yet captured by the first i − 1 layers. This raises a natural question: does there exist a choice of residual mappings {Gi}Ni=1 such that the approximation error never increases with depth? We now show that such a trajectory indeed exists. 
+
+Theorem 3.3 (Existence of Progressive Trajectory) . There exists a sequence of residual mappings {Gi}Ni=1 such that the corresponding uniform errors 
+
+εi := sup 
+
+> x0∈K0
+
+f (x0) − xi
+
+satisfy 
+
+ε1 ≥ ε2 ≥ · · · ≥ εN ≥ 0. (9) 3Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Proof. At layer 1, the residual to approximate is f1(x0) = 
+
+f (x0) − x0. By the UAT, there exists a FFN G∗ 
+
+> 1
+
+such that the output x1 = x0 + G∗
+
+> 1
+
+(x0) satisfies 
+
+ε1 = sup 
+
+> x0∈K0
+
+∥f (x0) − x1∥ < ∞.
+
+Assume that after i − 1 layers, we have obtained xi−1 with error εi−1. The remaining residual is fi(x0) = f (x0) −
+
+xi−1. Since fi is a continuous function of x0, and the input to layer i is xi−1 (which is determined by x0), the universal approximation capability implies that there exists a network 
+
+Gi capable of approximating this residual from xi−1. In particular, we can choose G∗ 
+
+> i
+
+such that the new error satisfies 
+
+εi = sup 
+
+> x0∈K0
+
+∥fi(x0) − G∗ 
+
+> i
+
+(xi−1)∥ ≤ εi−1.
+
+This is always possible because the best achievable error at layer i cannot exceed the current residual magnitude εi−1;otherwise, one could simply set Gi ≡ 0 and retain error 
+
+εi−1. Hence, by selecting Gi appropriately (e.g., better than zero), we ensure εi ≤ εi−1. By induction, there exists a se-quence {Gi}Ni=1 yielding a non-increasing error trajectory: 
+
+ε1 ≥ ε2 ≥ · · · ≥ εN ≥ 0.
+
+This completes the proof. Thus, progressive approximation trajectories are theoret-ically realizable: the compositional structure of residual networks, combined with the universal approximation prop-erty, guarantees the existence of a depth-wise refinement path along which the worst-case error does not increase. 
+
+4. Learning for Progressive Approximation 
+
+To realize the progressive approximation trajectory estab-lished in theory, we design a practical training paradigm that aligns intermediate layers with the global objective while respecting architectural constraints. The key challenge is that intermediate representations xi typically live in a hid-den space of dimension d, which may differ from the output dimension dy of the target function f : Rd → Rdy . This dimensional mismatch prevents direct application of the loss 
+
+L(xi, f (x0)) at intermediate layers. Our solution is to introduce a shared, learnable linear read-out that projects all layer outputs into the target space. This leads to the following design principles: • Global supervision at all depths: Every layer receives a learning signal derived from the global target f (x0),enabling error feedback at all depths. • Consistent output-space alignment: All layers use the same readout mapping for predictions, ensuring their objectives are defined in a common space and remain coupled through the shared parameters. We now describe how these principles are instantiated in the LPA framework. 
+
+Algorithm 1 LPA Training  
+
+> 1:
+
+Preprocessing layer: G0() ; Residual network of N lay-ers {Gi() }N 
+
+> 1
+
+and weights {θi}N 
+
+> 1
+
+; Linear transformation for prediction: WN +1 ; Training data: {(x, y)}; Loss function: ℓ. 
+
+> 2:
+
+for epoch = 1 to Nepochs do  
+
+> 3:
+
+for each batch (xb, yb) do  
+
+> 4:
+
+x0 ← G0(xb) 
+
+> 5:
+
+for i = 1 to L do  
+
+> 6:
+
+xi ← xi−1 + Gi(xi−1) 
+
+> 7:
+
+ˆyi ← WN +1 xi 
+
+> 8:
+
+Li ← ℓ(ˆ yi, yb) 
+
+> 9:
+
+end for  
+
+> 10:
+
+Backpropagate L = ΣNi=1 λiLi and update 
+
+{θ1, ..., θ N , WN +1 .} 
+
+> 11:
+
+end for  
+
+> 12:
+
+end for 4.1. Synchronized Layer Objectives via Shared Readout 
+
+Let xi ∈ Rd denote the output of layer i, and let f (x0) ∈
+
+Rdy be the target. Since d̸ = dy in general, we introduce a learnable linear readout matrix WN +1 ∈ Rdy ×d and share it across all layers. The prediction at depth i is then: 
+
+ˆfi(x0) = WN +1 xi.
+
+Note that WN +1 is jointly optimized with the residual blocks {Gi}Ni=1 during training. According to Eq.4, the output-space of a residual network prediction becomes a cumulative sum: 
+
+ˆfi(x0) = WN +1 
+
+ x0 +
+
+> i
+
+X
+
+> j=1
+
+Gj (xj−1)
+
+= WN +1 x0 +
+
+> i
+
+X
+
+> j=1
+
+WN +1 Gj (xj−1)
+
+| {z }
+
+> =: Hi(xj−1)
+
+.
+
+(10) Each term Hj : Rd → Rdy can be viewed as an output-space correction contributed by block j.The LPA loss aggregates supervision signals from all layers: 
+
+LLPA =
+
+> N
+
+X
+
+> i=1
+
+λi ℓ  ˆfi(x0), f (x0), (11) where λi ≥ 0 are weighting coefficients. Because all ˆfi
+
+are computed using the same WN +1 , the layer-wise losses 4Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Table 1. Performance comparison of the proposed LPA and E2E optimization on complex surface fitting tasks. The best results are in bold.                                                                               
+
+> Datasets Anisotropic Radial Oscillations Damped Concentric Ripples Exponential Saddle Quadratically Warped Oscillations Standing Wave Grid Asymmetric Power-Modulated Wave Localized High-Frequency Stripes Logarithmic Central Well Methods MSE ↓MAE ↓MSE ↓MAE ↓MSE ↓MAE ↓MSE ↓MAE ↓MSE ↓MAE ↓MSE ↓MAE ↓MSE ↓MAE ↓MSE ↓MAE ↓
+> E2E 0.0081 0.0458 0.1431 0.2535 0.0048 0.0428 0.0159 0.0679 0.0062 0.0441 0.0071 0.0474 0.0010 0.0238 0.0109 0.0654
+> LPA 0.0016 0.0292 0.0109 0.0752 0.0005 0.0173 0.0077 0.0599 0.0011 0.0239 0.0019 0.0322 0.0009 0.0207 0.0087 0.0649 E2ELPA
+> Layer: 1Layer: 3Layer: 6Target Function
+> Layer -wise MSE
+> E2E
+> LPA
+> Layer: 2Layer: 4Layer: 5
+
+Figure 2. Layer-wise approximation results of LPA and E2E optimizations. The target function is f (x, y ) = e−5( x2+y2) sin(10 x) with Localized high-frequency stripe. LPA exhibits clear progression, reaching near-perfect approximation by layer 3. 
+
+are inherently coupled, so the updating of WN +1 affects all terms simultaneously, enforcing consistent output-space alignment. The implementation as shown in Algorithm 1. By supervising earlier layers, we constrain the residual passed to deeper blocks, facilitating the non-increasing error behavior suggested by Theorem 3.3. 
+
+4.2. Progression Preservation with Shared Readout 
+
+A natural question arises: does using a shared final linear layer WN +1 , applied to all intermediate representations, preserve the layer-wise approximation and progressive re-finement properties? This design is not a trick but aligns with the intrinsic structure of residual networks. Recall that the network output 
+
+ˆfN +1 (x0) = WN +1 xN , (12) and by unrolling the residual recurrence xi = xi−1 +
+
+Gi(xi−1), we obtain (as in Eq. 4) 
+
+ˆfN +1 (x0) = WN +1 x0 +
+
+> N
+
+X
+
+> j=1
+
+WN +1 Gj (xj−1)
+
+| {z } 
+
+> =: Hj(xj−1)
+
+. (13) This decomposition reveals that the contribution of each residual block Gj to the final prediction is necessarily me-diated through the same linear map WN +1 . Therefore, evaluating intermediate layers via the shared readout 
+
+ˆfi(x0) := WN +1 xi = WN +1 x0 +
+
+> i
+
+X
+
+> j=1
+
+Hj (xj−1) (14) is not only practical but also theoretically faithful to the network’s native computation. Under this formulation, each 
+
+ˆfi remains a continuous function on the compact input do-main K0, and thus satisfies the conditions of the UAT. A layer-wise UAT argument, analogous to Proposition 3.2, guarantees that for any target decomposition {fi}Ni=1 , there exist residual blocks {G∗ 
+
+> j
+
+} such that the induced functions 
+
+{ ˆfi} approximate the desired trajectory. Moreover, the approximation error at layer i can be bounded as 
+
+sup 
+
+> x0∈K0
+
+f (x0) − ˆfi(x0) < ε i, (15) with ε1 ≥ ε2 ≥ · · · ≥ εN , establishing a monotonic pro-gressive trajectory as in Theorem 3.3. Hence, the shared readout preserves both the expressivity and the progressive refinement property. A full constructive proof with explicit error propagation bounds is provided in Appendix C.1. Besides, the layer-wise representation under intermediate dimension changes is discussed in Ap-pendix C.2. 
+
+5. Experiments 
+
+To assess progressive approximation, we test three settings: • Complex surface fitting: residual FNNs regressing a diverse set of 8 scientific functions to examine the performance and progressive behavior of intermediate layers. • Image classification: ViTs and ResNets on 4 stan-dard datasets to assess architectural compatibility, with large-scale ImageNet to test scalability. • Large language models: QWen on text classification 5Progressive Approximation in Deep Residual Networks: Theory and Validation LPA   
+
+> Exponential
+> saddle
+> Asymmetric power -
+> modulated waves
+> Logarithmic
+> central well
+> Quadratically
+> warped oscillations
+> Target
+> Standing
+> wave grid
+> Anisotropic radial
+> oscillations
+> Damped
+> concentric ripples
+> LPA MSE E2E MSE
+> Layer -wise
+> MSE
+
+Figure 3. Additional complex surface fitting results with LPA, and a layerwise performance comparison between LPA and E2E. 
+
+and generation benchmarks to evaluate scalability and task compatibility. Across simulations and real-world vision and language tasks, we observe consistent progressive approximation across architectures and tasks. Full implementation details are provided in Appendix I. 
+
+5.1. Experiments for Complex Surface Fitting 
+
+We generate 8 simulation datasets using functions as fol-lows: Asymmetric power-modulated waves f (x, y ) = |x|0.7 + |y|1.3 sin(4 x), Localized high-frequency stripes 
+
+f (x, y ) = e−5( x2+y2) sin(10 x), Exponential saddle 
+
+f (x, y ) = ex2−y2
+
+, Logarithmic central well f (x, y ) = log( x2 +y2 +10 −5) cos(5 x), Standing wave grid f (x, y ) = sin(3 x) cos(3 y), Anisotropic radial oscillations f (x, y ) = sin(4 x2 + y2)
+
+px2 + y2 + 0 .001 , Quadratically warped oscillations: 
+
+f (x, y ) = sin(5 x2) + cos(3 y2), and Damped concentric ripples: f (x, y ) = sin  10( x2 + y2)
+
+x2 + y2 + 0 .1 . Full descriptions are provided in Appendix D. There are 20,000 input-output pairs for each target function (10,000 pairs for training and 10,000 pairs for testing). The target functions are complex, non-linear surfaces de-fined over R2. All experiments employ a standardized 6-layer residual FNNs, where each layer consists of a 30-width MLP with ReLU activation and residual connections. We compare two training paradigms: E2E optimization and our proposed LPA. As shown in Table 1, LPA achieves lower final MSE and MAE across all benchmarks compared to E2E, with im-provements ranging from 1.1× to 13 .1× in MSE. More importantly, the aim here is not merely superior final accu-racy but to confirm that the network follows the progressive approximation trajectory predicted by theory. Figure 2 shows a layerwise comparison for f (x, y ) =
+
+e−5( x2+y2) sin(10 x). With E2E training, mid-layer flex-ibility lacks early guidance and often fails to refine the approximation. In contrast, LPA allows early layers to cap-ture coarse structure and later layers to progressively refine it, yielding near perfect alignment at the final layer. This matches the progressive trajectory in Theorem 3.3. Figure 3 further illustrates the final approximated surfaces under LPA paradigms. LPA consistently produces smoother, faithful reconstructions of the target functions. Moreover, the evolution of layer-wise MSE reveals that LPA maintains a monotonically decreasing trend, whereas E2E exhibits fluctuating errors, sometimes increasing mid-training, indi-cating unstable learning dynamics. These results confirm that LPA not only improves final performance in this controlled setting but also enforces a theoretically sound approximation process: each layer con-tributes and cumulatively toward the global objective. 
+
+Table 2. Performance comparison of LPA and E2E with ViT on three benchmarks of CIFAR-10 (C10), CIFAR-100 (C100), and Fashion-MNIST (FM). Best scores are in bold.                                       
+
+> Models ViT (Transformers) Training Paradigms #Layers = 12 #Layers = 24 C10 C100 FM C10 C100 FM E2E Acc. ↑84.85 60.83 92.90 86.59 60.65 93.40 Loss ↓0.47 1.53 0.19 0.46 1.72 0.19
+> LPA Acc. ↑85.16 60.0 93.00 86.95 60.69 93.39
+> Loss ↓0.47 1.62 0.19 0.47 1.79 0.20
+
+5.2. Experiments for Image classification 
+
+We evaluate LPA on CIFAR-10, CIFAR-100, and Fashion-MNIST using both ResNet-18 and ResNet-34 (approxi-mately 11.2M and 21.3M parameters) and Vision Trans-6Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Table 3. Performance comparison of LPA and E2E with ResNet on three benchmarks of CIFAR-10 (C10), CIFAR-100 (C100), and Fashion-MNIST (FM). Best scores are in bold. 
+
+Models ResNet (Residual CNN) Training Paradigms #Layers = 18 #Layers = 34 C10 C100 FM C10 C100 FM E2E Acc. ↑ 85.70 61.83 91.54 87.57 64.34 92.52 Loss ↓ 0.42 1.35 0.23 0.47 1.27 0.20 
+
+LPA Acc. ↑ 85.44 62.34 92.54 87.81 63.95 92.03 
+
+Loss ↓ 0.30 1.22 0.20 0.24 1.08 0.17 Depth Depth  Depth                              
+
+> LPA Acc Simultaneous Acc Sequential Acc
+> LPA Loss Simultaneous Loss Sequential Loss
+> CIFAR -10 (ViT -12) CIFAR -10 0 (ViT -12) Fashion -MNIST (ViT -12)
+> Performance Performance
+> CIFAR -10 (ViT -24) CIFAR -10 0 (ViT -24) Fashion -MNIST (ViT -24)
+> LPA finetune Acc
+> LPA finetune Loss
+> CoLA MNLI
+> QNLI QQP
+> LPA Acc E2E Acc
+> Accuracy ( %)Accuracy ( %)
+> LPA Acc E2E Acc
+> Accuracy ( %)Accuracy ( %)
+> CIFAR -10 (ResNet -18) CIFAR -10 0 (ResNet -18) Fashion -MNI
+> CIFAR -10 (ResNet -34) CIFAR -10 0 (ResNet -34) Fashion -MNI
+> Accuracy ( %)Accuracy ( %)
+> LPA Acc E2E Acc
+
+Figure 4. Layer-wise performance comparison with ViT. Conver-gence at early layers appears across all three datasets, with strong approximation by layer 5 of 24 on Fashion-MNIST. 
+
+formers with 12 and 24 layers. Each ViT layer uses 3 at-tention heads of size 192 and an MLP hidden size of 768, yielding models of about 5.5M and 10.9M parameters. ViTs are trained for 300 epochs and ResNets for 50 epochs. In Tables 2 and 3, LPA matches E2E in final accuracy across all settings, indicating that progressive supervision does not degrade performance. More importantly, our goal is to verify that LPA induces a progressive approximation trajectory in real datasets, as predicted by theory. We evaluate layer-wise accuracy at inference by feeding intermediate features through the shared readout. As shown in Figures 4 and 5, the accuracy generally increases with depth for both methods, but LPA consistently delivers much higher performance in the early layers. (We use ResNet-18 and ResNet-34, which contain 18 and 34 computational layers, respectively. However, they consist of only 8 and 16 residual blocks. Throughout this work, “layer-wise” refers to these residual blocks. Thus, the curves in Figure 5 corre-spond to 8 and 16 layers, respectively.). In the 24-layer ViT, LPA attains near-optimal accuracy at intermediate depths, around layer 15 on CIFAR-10/100 and layer 10 on Fashion-MNIST, and then refines smoothly. In contrast, E2E leaves early layers under-optimized, with peak accuracy only at the final output. This property has practical implications: users can de-ploy shallower subnetworks of an LPA-trained model to meet computational or latency constraints, without requir-ing distillation or retraining. The model is inherently depth-Depth  Depth                        
+
+> LPA Acc Sequential Acc
+> LPA Loss Sequential Loss
+> CIFAR -10 0 (ViT -12) Fashion -MNIST (ViT -12)
+> CIFAR -10 0 (ViT -24) Fashion -MNIST (ViT -24)
+> LPA finetune Acc
+> LPA finetune Loss
+> LPA Acc E2E Acc
+> LPA Acc E2E Acc
+> CIFAR -10 (ResNet -18) CIFAR -10 0 (ResNet -18) Fashion -MNIST (ResNet -18)
+> CIFAR -10 (ResNet -34) CIFAR -10 0 (ResNet -34) Fashion -MNIST (ResNet -34)
+> Accuracy ( %)Accuracy ( %)
+> LPA Acc E2E Acc
+
+Figure 5. Layer-wise performance comparison with ResNet. Note: ResNet-18 and ResNet-34 contain 8 and 16 residual blocks, re-spectively; “layer” here refers to residual blocks. 
+
+adaptive and has implemented “train once, use N models”. 
+
+Scalability test. We train ViT-12 and ViT-24 from scratch on ImageNet-1k (Deng et al., 2009) with both LPA and E2E. As shown in Table 4, LPA matches final accuracy while preserving progressive behavior. For example, ViT-24 with LPA surpasses 80% top-1 accuracy by layer 14, indicating that strong representations emerge well before full depth. Finally, we examine whether LPA can fine-tune pre-trained models. In Table 5, we fine-tune pre-trained ViT-Small and ViT-Base for 30 epochs on Imagenet using LPA. Again, LPA yields significantly better intermediate-layer performance: strong accuracy is achieved early in the network, whereas E2E remains heavily reliant on the final layer. This confirms that the progressive approximation property is not limited to training from scratch but is also capable of finetuning. CIFAR -10 0 Fashion -MNIST                            
+
+> Performance
+> Performance
+> Depth Depth
+> LPA Acc uential Acc
+> LPA Loss uential Loss
+> CIFAR -10 0 (ViT -12) Fashion -MNIST (ViT -12)
+> CIFAR -10 0 (ViT -24) Fashion -MNIST (ViT -24)
+> LPA finetune Acc
+> LPA finetune Loss
+> CoLA MNLI MRPC
+> QNLI QQP SST -2
+> LPA Acc E2E Acc
+> LPA Acc Acc
+> Accuracy ( %)Accuracy ( %)
+> Perplexity
+> CIFAR -10 (ResNet -18) CIFAR -10 0 (ResNet -18) Fashion -MNIST (ResNet -18)
+> CIFAR -10 (ResNet -34) CIFAR -10 0 (ResNet -34) Fashion -MNIST (ResNet -34)
+> Accuracy ( %)Accuracy ( %)
+> LPA Acc E2E Acc
+> Perplexity
+
+Figure 6. Layer-wise performance comparison with Qwen. Con-vergence at early layers appears across all the LLM tasks. 
+
+5.3. Experiments for LLM tasks 
+
+To evaluate the generality of progressive approximation, we test Qwen2-0.5B on both discriminative and generative tasks, examining whether layerwise refinement holds in modern transformer LLMs. Note that our experiments are proof of concept rather than SOTA. In particular, LLM train-ing is resource-intensive and beyond the scope of most labs, so we focus on feasibility rather than peak performance. 7Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Table 4. Layer-wise accuracy and loss of ViTs under E2E and LPA full training. For each layer, the higher accuracy is bolded .                                                                                                                             
+
+> Model / Method Metric Layers L2 L4 L6 L8 L10 L12 L14 L16 L18 L20 L22 L24 ViT-12 E2E Acc ↑0.12 0.24 0.35 5.18 33.54 78.42 ––––––
+> Loss ↓6.87 6.83 6.70 6.27 5.78 1.06 ––––––
+> LPA Acc ↑15.95 51.34 66.79 73.32 77.44 78.29 ––––––
+> Loss ↓4.67 2.34 1.53 1.24 1.05 1.14 ––––––
+> ViT-24 E2E Acc ↑0.10 0.11 0.14 0.13 0.15 0.12 0.11 0.19 2.43 12.29 49.38 76.70
+> Loss ↓7.01 6.918 6.89 6.87 6.875 6.876 6.874 6.84 6.57 6.30 5.11 1.30
+> LPA Acc ↑42.42 60.37 70.52 74.79 76.42 79.08 80.18 80.51 80.67 80.60 79.90 79.76 Loss ↓2.88 1.89 1.37 1.17 1.11 1.01 1.02 1.060 1.07 1.06 1.16 1.21 LPA PPL
+> Wikitext Alpaca
+> Dolly -15k Gsm8k
+> E2E PPL
+> Perplexity
+> 8)
+> 4)
+> Perplexity
+
+Figure 7. Layer-wise perplexity comparison with Qwen. Conver-gence at early layers appears across all the LLM tasks. 
+
+Table 5. Layer-wise accuracy and loss of ViT-Base and ViT-Small under E2E and LPA fine-tuning. For each layer, the higher accuracy between E2E and LPA is bolded .                                                                   
+
+> Model / Method Metric Layers L2 L4 L6 L8 L10 L12 ViT-Base E2E Acc. ↑0.15 0.10 0.20 2.546 50.15 81.58 Loss ↓7.42 7.60 7.53 6.55 2.50 1.72
+> LPA Acc. ↑5.69 12.012 23.87 47.13 69.95 81.56
+> Loss ↓5.81 5.11 4.13 2.698 1.462 0.859
+> ViT-Small E2e Acc. ↑0.10 0.10 0.10 0.63 25.69 77.08
+> Loss ↓7.84 7.69 7.57 6.97 4.90 1.15
+> LPA Acc. ↑2.36 9.73 29.95 55.42 74.86 79.46 Loss ↓6.35 5.37 3.93 2.32 1.20 0.91
+
+Classification tasks. We fine-tune Qwen2-0.5B on six GLUE datasets of CoLA, MNLI, MRPC, QNLI, QQP, and SST-2 (Wang et al., 2018) with 3 epochs under both train-ing paradigms. As shown in Figure 6, LPA yields a clear monotonic rise in layerwise accuracy, consistent with the theoretical progressive trajectory. In contrast, E2E shows fluctuations across layers, suggesting non-cumulative fea-ture development. 
+
+Generative and instruction-following tasks. Given the higher complexity of generative tasks, we adopt a practical setting where only the final few transformer blocks are su-pervised in LPA. We evaluate on four diverse datasets: Wiki-text (language modeling), Alpaca, Dolly-15k, and GSM8K (instruction-following and reasoning). All models are fine-tuned for 1 epoch. Figure 7 reports the layer-wise perplexity (PPL) during in-ference using the shared readout head. Remarkably, LPA achieves substantially lower PPL even at shallow depths, and PPL continues to decrease smoothly as depth increases, demonstrating stable progressive refinement. By contrast, E2E exhibits significantly higher PPL in early and inter-mediate layers, with improvements concentrated only the output. This suggests that E2E fails to propagate meaningful supervision signals for generation to shallower components of the LLM. Together, these results confirm that the progressive approxi-mation principle can also be generalized to large-scale lan-guage architectures. 
+
+6. Conclusion 
+
+In this work, we bridge approximation theory and modern deep learning by reinterpreting deep residual networks as a progressive approximation process. We prove that there exist layer-wise trajectories along which the approximation the target progressively with depth. It reveals that deep mod-els can implement structured, step-by-step refinement rather than acting as opaque E2E mappers. Building on this insight, we propose LPA, a training paradigm that explicitly enforces alignment between each layer and its residual target. Across a diverse range of architectures, including fully connected networks, ResNets, ViTs, and large language models, and tasks spanning scientific function approximation, image classification, and language understanding/generation, we consistently observe that LPA induces stable, cumulative refinement. Critically, this property enables a powerful deployment paradigm: “train once, use N models”. A single LPA-trained network provides meaningful predictions at every in-termediate depth, allowing users to adapt model complexity to computational budgets without distillation, pruning, or re-training. Our results suggest that progressive approximation is not merely a theoretical curiosity but a practical principle that unifies representation learning across modalities and scales. This offers both a new lens for understanding how deep networks compute and a versatile framework for effi-cient, depth-adaptive inference in real-world applications. 8Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+7. Impact Statements 
+
+This paper presents work whose goal is to advance the field of machine learning. There are many potential societal consequences of our work, none of which we feel must be specifically highlighted here. 
+
+References 
+
+Bakhtiarnia, A., Zhang, Q., and Iosifidis, A. Multi-exit vision transformer for dynamic inference. 
+
+ArXiv , abs/2106.15183, 2021. URL https: //api.semanticscholar.org/CorpusID: 235670159 .Bengio, Y., Lamblin, P., Popovici, D., and Larochelle, H. Greedy layer-wise training of deep net-works. In Neural Information Processing Systems ,2006. URL https://api.semanticscholar. org/CorpusID:14201947 .Cybenko, G. V. Approximation by superpositions of a sigmoidal function. Mathematics of Control, Signals and Systems , 2:303–314, 1989. URL https://api. semanticscholar.org/CorpusID:3958369 .Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., and Fei-Fei, L. Imagenet: A large-scale hierarchical image database. 
+
+2009 IEEE Conference on Computer Vision and Pattern Recognition , pp. 248–255, 2009. URL https://api. semanticscholar.org/CorpusID:57246310 .Devlin, J., Chang, M.-W., Lee, K., and Toutanova, K. Bert: Pre-training of deep bidirectional transformers for lan-guage understanding. In Proceedings of the 2019 confer-ence of the North American chapter of the association for computational linguistics: human language technologies, volume 1 (long and short papers) , pp. 4171–4186, 2019. Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., et al. An image is worth 16x16 words: Transformers for image recognition at scale. arXiv preprint arXiv:2010.11929 , 2020. Hardt, M. and Ma, T. Identity matters in deep learning. 
+
+ArXiv , abs/1611.04231, 2016. URL https://api. semanticscholar.org/CorpusID:17786716 .He, J., Li, L., and Xu, J. Approximation properties of deep relu cnns. Research in the Mathematical Sciences ,9, 2021. URL https://api.semanticscholar. org/CorpusID:237373552 .He, K., Zhang, X., Ren, S., and Sun, J. Deep resid-ual learning for image recognition. 2016 IEEE Conference on Computer Vision and Pattern Recog-nition (CVPR) , pp. 770–778, 2015. URL https: //api.semanticscholar.org/CorpusID: 206594692 .Hjelm, R. D., Fedorov, A., Lavoie-Marchildon, S., Gre-wal, K., Trischler, A., and Bengio, Y. Learn-ing deep representations by mutual information esti-mation and maximization. ArXiv , abs/1808.06670, 2018. URL https://api.semanticscholar. org/CorpusID:52055130 .Hornik, K. Approximation capabilities of multilayer feedforward networks. Neural Networks , 4:251–257, 1991. URL https://api.semanticscholar. org/CorpusID:7343126 .Hornik, K., Stinchcombe, M. B., and White, H. L. Multilayer feedforward networks are universal ap-proximators. Neural Networks , 2:359–366, 1989. URL https://api.semanticscholar.org/ CorpusID:2757547 .Kratsios, A., Zamanlooy, B., Liu, T., and Dokmani’c, I. Universal approximation under constraints is possible with transformers. ArXiv , abs/2110.03303, 2021. URL https://api.semanticscholar. org/CorpusID:238419267 .Krizhevsky, A., Sutskever, I., and Hinton, G. E. Ima-genet classification with deep convolutional neural net-works. Communications of the ACM , 60:84 – 90, 2012. URL https://api.semanticscholar. org/CorpusID:195908774 .LeCun, Y., Bottou, L., Bengio, Y., and Haffner, P. Gradient-based learning applied to document recognition. Proc. IEEE , 86:2278–2324, 1998. URL https://api. semanticscholar.org/CorpusID:14542261 .Lin, H. and Jegelka, S. Resnet with one-neuron hidden layers is a universal approximator. In Neural Informa-tion Processing Systems , 2018. URL https://api. semanticscholar.org/CorpusID:49527065 .Oono, K. and Suzuki, T. Approximation and non-parametric estimation of ResNet-type convolutional neural networks. In Chaudhuri, K. and Salakhutdinov, R. (eds.), Proceed-ings of the 36th International Conference on Machine Learning , volume 97 of Proceedings of Machine Learn-ing Research , pp. 4922–4931. PMLR, 09–15 Jun 2019. Pathak, D., Kr ¨ahenb ¨uhl, P., Donahue, J., Darrell, T., and Efros, A. A. Context encoders: Feature learning by inpainting. 2016 IEEE Conference on Computer Vi-sion and Pattern Recognition (CVPR) , pp. 2536–2544, 2016. URL https://api.semanticscholar. org/CorpusID:2202933 .9Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Rumelhart, D. E., Hinton, G. E., and Williams, R. J. Learning representations by back-propagating er-rors. Nature , 323:533–536, 1986. URL https: //api.semanticscholar.org/CorpusID: 205001834 .Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J., and Wo-jna, Z. Rethinking the inception architecture for com-puter vision. 2016 IEEE Conference on Computer Vi-sion and Pattern Recognition (CVPR) , pp. 2818–2826, 2015. URL https://api.semanticscholar. org/CorpusID:206593880 .van den Oord, A., Li, Y., and Vinyals, O. Repre-sentation learning with contrastive predictive coding. 
+
+ArXiv , abs/1807.03748, 2018. URL https://api. semanticscholar.org/CorpusID:49670925 .Vaswani, A., Shazeer, N. M., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., and Polosukhin, I. Attention is all you need. In Neural Informa-tion Processing Systems , 2017. URL https://api. semanticscholar.org/CorpusID:13756489 .Vincent, P., Larochelle, H., Bengio, Y., and Manzagol, P.-A. Extracting and composing robust features with denoising autoencoders. In International Confer-ence on Machine Learning , 2008. URL https: //api.semanticscholar.org/CorpusID: 207168299 .Wang, A., Singh, A., Michael, J., Hill, F., Levy, O., and Bowman, S. R. Glue: A multi-task benchmark and anal-ysis platform for natural language understanding. In 
+
+BlackboxNLP@EMNLP , 2018. URL https://api. semanticscholar.org/CorpusID:5034059 .Xu, G., Hao, J., Shen, L., Hu, H., Luo, Y., Lin, H., and Shen, J. Lgvit: Dynamic early exiting for ac-celerating vision transformer. Proceedings of the 31st ACM International Conference on Multimedia ,2023. URL https://api.semanticscholar. org/CorpusID:260350893 .Yun, C., Bhojanapalli, S., Rawat, A. S., Reddi, S. J., and Kumar, S. Are transformers universal approximators of sequence-to-sequence functions? ArXiv , abs/1912.10077, 2019. URL https://api.semanticscholar. org/CorpusID:209444410 .Zhou, D.-X. Universality of deep convolutional neural net-works. Applied and computational harmonic analysis , 48 (2):787–794, 2020. 10 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+A. Unfold the RN 
+
+To analyze the representational structure of residual networks, we unfold the recursive definition into an explicit summation form. A layer i of a RN can be expressed as: 
+
+xi = xi−1 + W′
+
+> i
+
+σ(Wixi−1 + bi) + b′
+
+> i
+
+, (16) where xi−1 and xi denote the input and output of the i-th residual block, respectively. Defining the residual mapping as 
+
+Gi(xi−1) = W′
+
+> i
+
+σ(Wixi−1 + bi) + b′
+
+> i
+
+, (17) which is a two-layer FNN, we rewrite Eq. (16) as 
+
+xi = xi−1 + Gi(xi−1). (18) Unfolding this recurrence yields: 
+
+x1 = x0 + G1(x0),
+
+x2 = x1 + G2(x1) = x0 + G1(x0) + G2(x1),
+
+...
+
+xN = x0 +
+
+> N
+
+X
+
+> i=1
+
+Gi(xi−1).
+
+B. Approximation Trajectories 
+
+To prepare for the formal analysis of progressive approximation, we first define the error trajectory induced by a trained residual network. 
+
+Definition B.1 (Error Trajectory) . Let f : K0 → KN denote the target function to be approximated, and let x0 ∈ K0 be an input. Consider an N -layer residual network that has been trained E2E, with forward recurrence 
+
+xi = xi−1 + G∗ 
+
+> i
+
+(xi−1), i = 1 , . . . , N, 
+
+where each G∗ 
+
+> i
+
+denotes the residual mapping after training. The approximation error after layer i is defined as 
+
+εi := f (x0) − xi , i = 0 , 1, . . . , N. (19) The sequence T = {εi}Ni=0 is called the error trajectory of the trained network on input x0.Note that the superscript ∗ here signifies the mappings obtained from E2E optimization, not an ideal or optimal decomposition, but the actual functions realized by the trained model. Under the hypothesis of layer-wise progressive approximation, this trajectory would satisfy 
+
+ε0 ≥ ε1 ≥ · · · ≥ εN , (20) meaning that each residual block brings the representation strictly closer to the target. However, standard end-to-end training imposes no such monotonicity constraint. Instead, all residual mappings {G∗ 
+
+> i
+
+}Ni=1 
+
+are jointly optimized solely to minimize the final loss εN = ∥f (x0) − xN ∥. Consequently, intermediate errors εi for i < N 
+
+are not directly supervised, and the resulting error trajectory T may exhibit non-monotonic behavior. To illustrate, consider: • Single-layer RN : x1 = x0 + G∗
+
+> 1
+
+(x0), so ε1 = ∥f (x0) − x0 − G∗
+
+> 1
+
+(x0)∥. Although G∗ 
+
+> 1
+
+contributes to reducing εN , it may inadvertently increase ε1 if doing so facilitates later corrections. • Two-layer RN : x2 = x0 + G∗
+
+> 1
+
+(x0) + G∗
+
+> 2
+
+(x1), and 
+
+ε2 = f (x0) − x0 − G∗
+
+> 1
+
+(x0) − G∗
+
+> 2
+
+(x1) .
+
+It is entirely possible that ε2 < ε 1 but ε1 > ε 0, or even that ε2 > ε 1, depending on how G∗ 
+
+> 1
+
+and G∗ 
+
+> 2
+
+co-adapt during training. 11 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+In general, for i layers, 
+
+εi = f (x0) − x0 −
+
+> i
+
+X
+
+> j=1
+
+G∗ 
+
+> j
+
+(xj−1) ,
+
+and the lack of local supervision allows the trajectory {εi} to: • temporarily increase due to over-correction or representation reconfiguration; • stagnate when updates become redundant; • decrease only after sufficient representational groundwork has been laid. Thus, standard training does not constrain the approximation trajectory. The actual error trajectory is an emergent property of global optimization. 
+
+C. Residual Networks with Dimension Changes 
+
+C.1. Residual Networks with Shared Linear Readout 
+
+In practical residual networks, the hidden dimension d often differs from the target output dimension dy . To handle this mismatch, a linear readout layer WN +1 ∈ Rdy ×d is applied to the final hidden state: 
+
+ˆfN +1 (x0) = WN +1 xN . (21) Due to the additive structure of residual connections, 
+
+xN = x0 + G1(x0) + G2(x1) + · · · + GN (xN −1),
+
+the network output can be equivalently expressed as 
+
+ˆfN +1 (x0) = WN +1 x0 +
+
+> N
+
+X
+
+> i=1
+
+WN +1 Gi(xi−1)
+
+| {z }
+
+> =: Hi(xi−1)
+
+. (22) Thus, each residual block contributes to the final prediction through the same linear map WN +1 . This allows us to analyze the approximation process directly in the output space Rdy . Note that each Gi : Rd → Rd is a FNN, and therefore the composition 
+
+Hi(x) := WN +1 Gi(x)
+
+is also a FNN mapping Rd → Rdy . By the UAT, such networks can approximate any continuous function on a compact set arbitrarily well, provided sufficient width. Hence, the layer-wise approximation analysis from Section 3.3 extends naturally to this setting. We now extend the existence result of Theorem 3.3 to the setting where predictions are formed via a shared linear readout 
+
+WN +1 ∈ Rdy ×d, i.e., ˆfi(x0) = WN +1 xi, even when d̸ = dy . We show that a non-increasing error trajectory in output space still exists. Let f : K0 → Rdy be continuous on a compact set K0 ⊂ Rd, and define the layer-wise prediction as 
+
+ˆfi(x0) := WN +1 xi, where xi = xi−1 + Gi(xi−1), x0 ∈ K0.
+
+The approximation error at depth i is 
+
+εi := sup 
+
+> x0∈K0
+
+f (x0) − ˆfi(x0) .
+
+We construct {Gi}Ni=1 inductively such that ε1 ≥ ε2 ≥ · · · ≥ εN ≥ 0.
+
+Base case ( i = 1 ). Define the initial prediction ˆf0(x0) = WN +1 x0 and the first residual target 
+
+f1(x0) := f (x0) − ˆf0(x0).
+
+12 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Since f1 is continuous on the compact set K0, the UAT guarantees the existence of a FNN G∗ 
+
+> 1
+
+: Rd → Rd such that the induced correction 
+
+H∗ 
+
+> 1
+
+(x0) := WN +1 G∗
+
+> 1
+
+(x0)
+
+satisfies 
+
+sup 
+
+> x0∈K0
+
+f1(x0) − H∗ 
+
+> 1
+
+(x0) < ε 1,
+
+for some ε1 ≥ 0. Setting x1 = x0 + G∗
+
+> 1
+
+(x0), we obtain 
+
+ˆf1(x0) = WN +1 x1 = ˆf0(x0) + H∗ 
+
+> 1
+
+(x0),
+
+and thus ε1 = sup x0 ∥f (x0) − ˆf1(x0)∥ is well-defined. 
+
+Inductive step. Assume that after i − 1 layers, we have constructed {G∗ 
+
+> j
+
+}i−1 
+
+> j=1
+
+such that 
+
+ˆfi−1(x0) = WN +1 xi−1 = WN +1 x0 +
+
+> i−1
+
+X
+
+> j=1
+
+H∗ 
+
+> j
+
+(xj−1),
+
+with error εi−1 = sup x0 ∥f (x0) − ˆfi−1(x0)∥. Define the remaining residual 
+
+fi(x0) := f (x0) − ˆfi−1(x0).
+
+Note that fi is a continuous function of x0, and since xi−1 is a continuous function of x0 (as a composition of continuous maps), we may view fi as a continuous function of xi−1 over the compact image set Ki−1 := {xi−1(x0) : x0 ∈ K0} ⊂ Rd.By the UAT, there exists a network G∗ 
+
+> i
+
+: Rd → Rd such that the correction 
+
+H∗ 
+
+> i
+
+(xi−1) := WN +1 G∗ 
+
+> i
+
+(xi−1)
+
+approximates fi arbitrarily well: 
+
+sup 
+
+> x0∈K0
+
+fi(x0) − H∗ 
+
+> i
+
+(xi−1) < ε i,
+
+for some εi ≥ 0. Crucially, we can always choose G∗ 
+
+> i
+
+such that εi ≤ εi−1—for instance, by selecting G∗ 
+
+> i
+
+≡ 0 yields 
+
+εi = εi−1, while any better approximator gives εi < ε i−1.Setting xi = xi−1 + G∗ 
+
+> i
+
+(xi−1), the new prediction becomes 
+
+ˆfi(x0) = ˆfi−1(x0) + H∗ 
+
+> i
+
+(xi−1),
+
+and the error satisfies εi ≤ εi−1.By induction, there exists a sequence {G∗ 
+
+> i
+
+}Ni=1 such that 
+
+ε1 ≥ ε2 ≥ · · · ≥ εN ≥ 0.
+
+This establishes that progressive approximation holds in the output space even under a shared linear readout. The key requirement is that each residual fi remains continuous in the current representation xi−1, which is guaranteed by the continuity of the network up to layer i − 1 and the compactness of K0. The shared matrix WN +1 merely defines a fixed linear projection into Rdy and does not impede the layer-wise refinement enabled by the residual structure and UAT. 
+
+C.2. Layer-wise Representation under Intermediate Dimension Changes 
+
+Consider a residual network with possible dimension changes across layers. Let the forward recurrence be 
+
+xi = Wproj  
+
+> i−1
+
+xi−1 + Gi(xi−1), i = 1 , . . . , N, 
+
+where xi ∈ Rdi , Wproj  
+
+> i−1
+
+∈ Rdi×di−1 is a linear projection (identity if di = di−1), and Gi : Rdi−1 → Rdi is the residual function. 13 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Let the target be f (x0) ∈ Rdy . To define layer-wise predictions in a common output space despite heterogeneous intermediate dimensions, we use the full linear path from layer i to the output. Specifically, define the post-i linear operator 
+
+fWi := WN +1 Wproj  
+
+> N−1
+
+Wproj   
+
+> N−2
+
+· · · Wproj  
+
+> i
+
+∈ Rdy ×di ,
+
+where WN +1 ∈ Rdy ×dN is a learnable readout matrix at the last layer. The prediction at depth i is then defined as 
+
+ˆfi(x0) := fWixi.
+
+Note that WN +1 and all {Wproj  
+
+> j
+
+} are jointly optimized during training. Unrolling the recurrence up to layer i, we obtain 
+
+xi = Wproj  
+
+> i−1
+
+· · · Wproj 0 x0 +
+
+> i
+
+X
+
+> j=1
+
+
+
+Wproj  
+
+> i−1
+
+· · · Wproj 
+
+> j
+
+
+
+Gj (xj−1),
+
+with the convention that an empty product equals the identity. Applying fWi yields 
+
+ˆfi(x0) = fWixi
+
+= WN +1 Wproj   
+
+> N−1
+
+· · · Wproj 0
+
+| {z }
+
+> =: fW0
+
+x0 +
+
+> i
+
+X
+
+> j=1
+
+WN +1 Wproj   
+
+> N−1
+
+· · · Wproj  
+
+> j
+
+Gj
+
+| {z }
+
+> =: Hj
+
+(xj−1)= fW0x0 +
+
+> i
+
+X
+
+> j=1
+
+Hj (xj−1),
+
+(23) where each Hj (·) := WN +1 Wproj   
+
+> N−1
+
+· · · Wproj  
+
+> j
+
+Gj : Rdj−1 → Rdy represents the contribution of block j in the target output space. Since all Wj are linear maps , the entire expression is a well-defined sum in Rdy . Moreover, because matrix multiplication is associative, each fWi can be fused into a single matrix during inference. This ensures that the sequence { ˆfi(x0)}Ni=0 lies in a common space Rdy , enabling a consistent error trajectory εi = ∥f (x0) − ˆfi(x0)∥ even when intermediate dimensions vary. 
+
+D. Data for Complex Surface Fitting 
+
+We generate 6 synthetic datasets using functions as follows. There are 20,000 input-output pairs for each target function (10,000 pairs for training and 10,000 pairs for testing). • f (x, y ) =  |x|0.7 + |y|1.3 sin(4 x) (Asymmetric power-modulated waves): A distorted oscillatory surface with non-integer, directionally unbalanced amplitude envelopes; tests the model’s ability to fit asymmetric scaling combined with linear-frequency sine modulation. • f (x, y ) = e−5( x2+y2) sin(10 x) (Localized high-frequency stripes): A sharply localized Gaussian window containing multiple rapid oscillations along the x-axis; evaluates joint modeling of spatial confinement and fine-scale directional features within a bounded domain. • f (x, y ) = ex2−y2
+
+(Exponential saddle): A gently varying saddle-shaped surface with exponential contrast between orthogonal axes; assesses capture of hyperbolic structure under mild. • f (x, y ) = log( x2 + y2 + 10 −5) cos(5 x) (Logarithmic central well): An oscillating surface featuring a deep, narrow depression at the origin due to a regularized logarithmic singularity; probes robustness to near-singular radial potentials coupled with transverse cosine waves. • f (x, y ) = sin(3 x) cos(3 y) (Standing wave grid): A regular checkerboard-like interference pattern with uniform spatial frequency; serves as a baseline for testing periodicity, orthogonality, and separable oscillation representation. 14 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+• f (x, y ) = sin(4 x2 + y2)
+
+px2 + y2 + 0 .001 (Anisotropic radial oscillations): A directionally asymmetric ripple pattern whose frequency increases quadratically away from the origin, modulated by a near-singular radial amplitude; challenges modeling of anisotropic behavior with weak singularity regularization. • f (x, y ) = sin(5 x2) + cos(3 y2) (Quadratically warped oscillations): Non-uniform spatial frequencies that increase with distance from the origin in each axis; tests the ability to learn separable, nonlinearly warped oscillatory structures. • f (x, y ) = sin  10( x2 + y2)
+
+x2 + y2 + 0 .1 (Damped concentric ripples): A smooth, circularly symmetric oscillatory surface with amplitude decaying radially; evaluates handling of rotational symmetry and damped high-frequency content in a compact domain. 
+
+E. Unifing the Representation of Resiudal CNN and Transformer 
+
+As we establish early in the main text, if a residual network layer can be written as Eq. (16) 
+
+xi = xi−1 + W′
+
+> i
+
+σ(Wixi−1 + bi) + b′
+
+> i
+
+, (24) then the layer-wise UAT holds, and LPA is applicable. In this section, we detail how CNNs and Transformers can be expressed in this form. 
+
+E.1. Matrix and Vecotr Representations 
+
+Before diving into the details, we emphasize that in the equation, W′ 
+
+> i
+
+and Wi are weight matricies, while the xi, xi−1, bi
+
+and b′ 
+
+> i
+
+are vectors. In the derivations below, all products strictly follow the standard definitions of linear algebra and matrix analysis, from a mathematical standpoint, rather than the simplified conventions often used in machine learning to describe inputs, outputs, and weights. 
+
+E.2. Conversion for CNNs 
+
+It is evident that convolution operations can be equivalently expressed in matrix-vector form. This transformation allows us to interpret the convolution process as applying a structured, sparse matrix (derived from the convolutional kernel) to the input vector. In this formulation, each row of the matrix corresponds to a local receptive field, and the sparsity pattern encodes the weight sharing and local connectivity inherent in convolutional layers. This perspective not only unifies convolution with linear transformations but also highlights its role in hierarchically extracting spatial features from the input data. For a detailed theoretical treatment of this equivalence and its implications for representational capacity refer to (Zhou, 2020). Based on the matrix-vector form of convolution, it is easy to know that each layer of a multi-layer residual based CNN can be expressed as Eq. (16). 
+
+E.3. Conversion for Transformers 
+
+Representing Transformer operations in matrix–vector form is more involved, since they are typically expressed in matrix form (e.g., Y = WX ). Let us define a basic conversion x = vec (X) and y = vec (Y), where vec (·) denotes vectorization. 
+
+X =
+
+x11 x12 · · · x1n
+
+x21 x22 · · · x2n
+
+... ... ... ...
+
+xm1 xm2 · · · xmn m×n
+
+⇒ x =  x11 x21 · · · xm1 x12 x22 · · · xm2 · · · x1n x2n · · · xmn 
+
+⊤ 
+
+> 1×mn
+
+.
+
+(25) However, as we will soon see, this alone does not suffice to translate products like Y = WX , Y = XW , or Y = WXW 
+
+into equivalent matrix–vector expressions. We first need additional, more fundamental conversion tools. 15 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+E.3.1. F UNDEMENTAL CONVERSION TOOLS 
+
+Theorem E.1 (Right Multiplication Conversion to Matrix-Vector Form ). With X ∈ Rm×n, Y ∈ Rm×p, W ∈ Rn×p,the right matrix multiplicaion Y = XW can be converted into the form of y = W′x where W′ = W⊤ ⊗ Im with 
+
+Im ∈ Rm×m representing a unit matrix. Proof. Starting with 
+
+Ym×p = Xm×nWn×p, (26) we can write 
+
+vec (Ym×p) = vec (Xm×nWn×p)= vec (Im×mXm×nWn×p)= ( W⊤ ⊗ Im)vec (X) (27) 
+
+= ( W⊤ ⊗ Im)x
+
+= W′x (28) where ⊗ is Kronecker product, and W′ = W⊤ ⊗ Im. In Eq. (27), Vectorization Property, which states vec (ABC ) = (C⊤ ⊗ A)vec (B) is used. In a more general case, we often have a bias term as Y = XW + B1×m. It is easy to see that its vertor form is: 
+
+y = W′x + b,
+
+where b = B ⊗ 1p and 1m ∈ Rm×1 is a column vector of all ones. 
+
+Theorem E.2 (Left Multiplication Conversion to Matrix-Vector Form ). With X ∈ Rm×n, Y ∈ Rp×n, W ∈ Rp×m, the left matrix multiplicaion Y = WX can be converted into the form of y = W′x where W′ = In ⊗ W with In ∈ Rn×n
+
+representing a unit matrix. Proof. Starting with 
+
+Yp×n = Wp×mXm×n, (29) we can write 
+
+vec (Yp×n) = vec (Wp×mXm×n)= vec (Wp×mXm×nIn)= ( In ⊗ Wp×m)vec (X) (30) 
+
+= ( In ⊗ Wp×m)x
+
+= W′x (31) where W′ = In ⊗ W. In Eq. (30), Vectorization Property is used. 
+
+Theorem E.3 (Bi-Directional Multiplication Conversion to Matrix-Vector Form ). With X ∈ Rn×p, Y ∈ Rm×q , WL ∈
+
+Rm×n, WL ∈ Rp×q , the matrix multiplicaion Y = WLXW R can be converted into the form of y = W′x where 
+
+W′ = W⊤ 
+
+> R
+
+⊗ WL.Proof. Starting with 
+
+Y = WLXW R, (32) where WL ∈ Rm×n, X ∈ Rn×p, WR ∈ Rp×q , and Y ∈ Rm×q . We proceed in two steps: • Let Z = WLX, then vec (Z) = z = ( Ip ⊗ WL)x.• Then, Y = ZW R, so vec (Y) = y = ( W⊤ 
+
+> R
+
+⊗ Im)z.16 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Substituting the expression for z, we get: 
+
+y = ( WTR ⊗ Im)( Ip ⊗ WL)x.
+
+Using the mixed-product property of the Kronecker product: 
+
+(A ⊗ B)( C ⊗ D) = ( AC ) ⊗ (BD ),
+
+we simplify: 
+
+(W⊤ 
+
+> R
+
+⊗ Im)( Ip ⊗ WL) = W⊤ 
+
+> R
+
+⊗ WL.
+
+Thus, the final expression becomes: 
+
+y = ( W⊤ 
+
+> R
+
+⊗ WL)x.
+
+E.3.2. F ORMULATION FOR TRANSFORMERS 𝑋 i−1 from 𝐺 i−1(𝑋 i−2; 𝑊 i−1)     
+
+> Feed -Forward (FNN) 𝐺 𝑖
+> 𝑁 (𝑋 1;𝑊 𝑖 𝐹 )
+> Multi -Head Attention 𝐺 𝑖 𝑆 𝑋 𝑖 −1;𝑊 𝑖 𝑆
+
+𝑋 i to 𝐺 i+1(𝑋 i; 𝑊 i+1)
+
+𝑋 𝑖 𝑆                
+
+> 𝐺 i(𝑋 i−1;𝑊 i)
+> 𝑊 𝑖 ∗=𝐚𝐫𝐠𝐦𝐢𝐧
+> 𝑊 i
+> 𝐺 i𝑋 i−1;𝑊 i−𝑓 (𝑋 0)
+> 𝑊 i=𝑊 𝑖 𝑆 ,𝑊 𝑖 𝐹 ,𝑊 𝑖 𝐹 ={𝑊 𝑖 𝐹 1,𝑊 𝑖 𝐹 2}
+
+Figure 8. The ith layer of a Transformer illustrated using the notations defined in this paper. 
+
+Figure 8 depicts the ith Transformer layer, consisting of a Multi-Head Attention (MHA) block followed by a Feed-Forward (FFN) block. We now cast this process into matrix–vector form. 
+
+Multi-Head Attention Formulation The input Xi−1 is a matrix with each column representing an input token embedding, which will be transformed in to query, key, value matrices, respectively as at the jth self-attention head as 
+
+Qi,j = WQi,j Xi−1,
+
+Ki,j = WKi,j Xi−1,
+
+Vi,j = WVi,j Xi−1,
+
+where Xi−1 ∈ Rd×I , WQi,j , WKi,j , WVi,j ∈ Rdh ×d, and h is the total number of heads. It is then processed as 
+
+GSi,j (Xi−1) = Vi,j sof tmax QTi,j Ki,j 
+
+√d
+
+!
+
+(33) Letting Hi,j = sof tmax 
+
+ QTi,j Ki,j 
+
+> √d
+
+
+
+, we have 
+
+GSi,j (Xi−1) = WVi,j XiHi,j . (34) Using Theorem E.3 , We can the j-th self-attention in i-th layer can be written as: 
+
+vec (GSi,j (Xi−1)) = gSi,j (xi−1) =  H⊤ 
+
+> i,j
+
+⊗ WVi,j 
+
+ xi−1 (35) 17 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+The whole MHA computation with all h heads merged is then written 
+
+GSi (Xi−1) = WOi Concat [GSi, 1(Xi−1)⊤, · · · GSi,h (Xi−1)⊤]⊤
+
++ Xi−1. (36) where WOi ∈ Rd×d is the weight matrix for head merger. This a right matrix multiplication, by applying Theorem E.1 , it can be exprssed in vectorized form as 
+
+gSi (xi−1) = ( II ⊗ Wi,O )
+
+ H⊤ 
+
+> i, 1
+
+⊗ WVi, 1
+
+ xi−1 H⊤ 
+
+> i, 2
+
+⊗ WVi, 2
+
+ xi−1
+
+...
+
+H⊤ 
+
+> i,h
+
+⊗ WVi,h 
+
+
+
+xi−1
+
+ + xi−1. (37) Note that we have replaced GS () with gS () after vectorization, as this adheres more strictly to the mathematical convention. Specifically, GS () operates on the matrix-form input Xi−1, while gS () operates on the vector-form input xi−1.Eq. (37) can be simplified as: 
+
+vec (GSi (Xi−1)) = gSi (xi−1) = (II ⊗ Wi,O )
+
+ H⊤ 
+
+> i, 1
+
+⊗ WVi, 1
+
+ H⊤ 
+
+> i, 2
+
+⊗ WVi, 2
+
+
+
+...
+
+H⊤ 
+
+> i,h
+
+⊗ WVi,h 
+
+ xi−1 + xi−1. (38) Let 
+
+WSi = ( II ⊗ Wi,O )
+
+ H⊤ 
+
+> i, 1
+
+⊗ WVi, 1
+
+ H⊤ 
+
+> i, 2
+
+⊗ WVi, 2
+
+
+
+...
+
+H⊤ 
+
+> i,h
+
+⊗ WVi,h 
+
+ ,
+
+the whole process of MHA in the i-th layer can be written into vector form as 
+
+gSi (xi−1) = WSi xi−1 + xi−1. (39) 
+
+Feed-Forward Formulation The FNN component is essentially a FCN which takes input XSi = GS (Xi−1) (or in vector form xSi = gS (xi−1)) from the MHA component, it can be written as 
+
+Xi = GFi (XSi ; WFi ) = WF 2 
+
+> i
+
+σ(WF 1 
+
+> i
+
+XSi + bF 1 
+
+> i
+
+) + bF 2 
+
+> i
+
++ XSi , (40) where WFi = {WF 2 
+
+> i
+
+, WF 1 
+
+> i
+
+} is the paramter implementation, and bF 1 
+
+> i
+
+and bF 2 
+
+> i
+
+is the bais for the FNN block. With Theorem E.1 , we can transform each part as 
+
+vec (WF 1 
+
+> i
+
+XSi ) = ( II ⊗ WF 1 
+
+> i
+
+)xSi = WF 1′ 
+
+> i
+
+xSi ,
+
+bF 1′ 
+
+> i
+
+= bF 1 
+
+> i
+
+⊗ 1I ,
+
+bF 2′ 
+
+> i
+
+= bF 2 
+
+> i
+
+⊗ 1I ,vec (WF 2 
+
+> i
+
+σ(·)) = ( II ⊗ WF 2 
+
+> i
+
+)vec (σ(·)) = WF 2′ 
+
+> i
+
+vec (σ(·)) .
+
+Eq. (40) is then converted into its vector form as 
+
+xi = vec (GFi (XSi ; WFi )) = gFi (xSi ; WFi )= WF 2′ 
+
+> i
+
+σ(WF 1′ 
+
+> i
+
+xSi + bF 1′ 
+
+> i
+
+) + bF 2′ 
+
+> i
+
++ xSi . (41) 18 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Now we see that the entire procedure matches the form of Eq. (16), with the only difference that xSi serves as the input in place of xi−1. In fact, xSi can be viewed as a transformed version of xi−1. This is justified because, although the MHA block is central to a Transformer layer’s performance, computationally it acts as a transformation of the original input xi−1
+
+via the weight matrix WSi . Put differently, Transformers form a special class of residual networks: each layer consumes a transformed version of the previous layer’s output, rather than the raw output itself as in standard residual networks. Consequently, the layer-wise UAT and LPA continue to apply to Transformers. To ensure greater rigor, we have also conducted a thorough proof of how this difference affects the UAT property in Section F. 
+
+F. A detailed Examination of the Universal Approximation Property in Transformers 
+
+In this section, we analyze the universal approximation property of Transformers from a mathematical standpoint. Based on the layer-wise UAT framework in Section E.3, it suffices to show that a single-layer Transformer has universal approximation capability; the result then extends to deeper models. More specifically, UAT requires three conditions: • Compact Input : the input domain is compact; • FFN-centered Network : the model has the form of UAT with an FFN as its core; • Target Validity : the target function is well-defined on a compact set. We begin by examining the structure of a single Transformer layer and, accordingly, delineating the proof objective. 
+
+F.1. Transformer Sturcture and Proof Objective 
+
+A single-layer Transformer consists primarily of two components: MHA and a FFN, with the overall operation expressed as 
+
+(gFi ◦ gSi )( xi−1), where: gSi : RdI → RdI denotes the feature transformation applied by the MHA module; gFi : RdI → RdI 
+
+represents the non-linear mapping of the FFN; xi−1 ∈ KIi−1 ⊂ RdI is the input at layer i, with KIi−1 = ( Ki−1)I being the product space of I tokens, each belonging to a compact set Ki−1 ⊂ Rd. Since finite products of compact sets are compact, 
+
+KIi−1 is compact in RdI .Notably, the mathematical form of the FFN component, gFi (see Eq. (41)), aligns with the framework of the UAT (see Eq. (16)), fulfilling the FFN-centrered Network condition. Let the target function fi : KIi−1 → RdI be continuous. The key difficulty in establishing its validity is that, before the FFN 
+
+gFi receives its input xSi the MHA block gSi applies an additional transformation, and thus the FFN does not act directly on 
+
+xi−1.Hence, fi is valid if there exists a continuous function f Fi defined on a compact domain such that 
+
+fi(xi−1) = ( f Fi ◦ gSi )( xi−1),
+
+and f Fi can be approximated by gFi . Equivalently, f Fi serves as the transformed target function for the FFN module. We can now state our proof goals: 1. Compact Input : KSi := gSi (KIi−1) is a compact subset of RdI ;2. Target Validty : There exists a continuous function f Fi : KSi → RdI such that fi = f Fi ◦ gSi .
+
+F.2. KSi is Compact 
+
+Proof. Since KIi−1 is a finite product of compact sets, it is compact in RdI . The transformation gSi is composed of matrix multiplication, Kronecker product, Softmax, and vector addition. The Softmax function is continuous on RI×I , and all linear operations are continuous; compositions and combinations of continuous functions remain continuous. Hence, gSi is a continuous function of the input xi−1. As the continuous image of a compact set is compact, the set 
+
+KSi := gSi (KIi−1) = gSi (xi−1) | xi−1 ∈ KIi−1
+
+is compact in RdI .19 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+F.3. f Fi is Valid 
+
+F.3.1. fi IS DECOMPOSABLE 
+
+The first requirement for f Fi to be well-defined is that fi be decomposable. By the Factorization Continuity Theorem (Theorem H.1), this holds provided the following condition is satisfied: 
+
+gSi (x(1)  
+
+> i
+
+) = gSi (x(2)  
+
+> i
+
+) = ⇒ fi(x(1)  
+
+> i
+
+) = fi(x(2)  
+
+> i
+
+), ∀x(1)  
+
+> i
+
+, x(2)  
+
+> i
+
+∈ KIi−1. (42) We regard this condition as satisfied because it is a learnable property reinforced by optimization. The rationale is as follows. If gSi maps two inputs x(1)  
+
+> i
+
+, x(2)  
+
+> i
+
+with fi(x(1)  
+
+> i
+
+)̸ = fi(x(2)  
+
+> i
+
+) to the same representation gSi (x(1)  
+
+> i
+
+) = gSi (x(2)  
+
+> i
+
+), then the FFN (being a deterministic function) cannot simultaneously output both fi(x(1)  
+
+> i
+
+) and fi(x(2)  
+
+> i
+
+), resulting in irreducible approximation error and high loss. Consequently, gradient descent penalizes such “representation collapse”, encouraging gSi
+
+to preserve distinctions between inputs with different target values. In other words, the attention mechanism, combined with training, promotes the emergence of consistency representations for fi, ensuring that inputs differing under gSi are not collapsed into the same latent point. F.3.2. E XISTENCE , CONTINUITY , AND APPROXIMABILITY OF f Fi
+
+Proof. Under condition in Eq. (42), we define f Fi : KSi → RdI by 
+
+f Fi (z) := fi(x), for any x ∈ KIi−1 such that gSi (x) = z.
+
+Condition in Eq. (42) ensures that f Fi is well-defined. By the Factorization Continuity Theorem H.1, f Fi is continuous on the compact set KSi .Then, by the UAT, there exists a FFN gFi that uniformly approximates f Fi to arbitrary precision. In summary, the MHA module gSi continuously maps the input space KIi−1 to a latent representation space KSi , while the training dynamics encourage gSi to maintain consistency representation, ensuring that fi can be factored as f Fi ◦ gSi .The FFN gFi then approximates f Fi , completing the approximation. Therefore, a single-layer Transformer is a universal approximator. 
+
+G. Representation Consistency and Optimization Dynamics in Deep Residual Networks 
+
+A multi-layer RN can be viewed as an approximation to a target function f : Rn → Rm with a series of single-layer RNs 
+
+ˆfN , ˆfN −1, · · · , ˆf1: ˆf = ˆfN ◦ ˆfN −1 ◦ · · · ◦ ˆf1,
+
+During the forward pass, an intermediate module ˆfi computes a representation of the input and hands it off to subsequent layers ˆfi+1 , ..., ˆfN for further processing. These intermediate representations are crucial for accurately approximating the target function f . A key requirement is that ˆfi produce sufficiently distinguishable representations. 
+
+G.1. Distinguishability Preservation in Intermediate Representations 
+
+In RNs, the effectiveness of intermediate representations depends not only on hierarchical abstraction, but more critically on their ability to provide embeddings consitent to the outputs of the target function f . Consider an arbitrary intermediate layer 
+
+i (1 ≤ i ≤ N ), and define the encoding path up to layer i − 1 as: 
+
+ϕi = ˆfi−1 ◦ · · · ◦ ˆf1,
+
+which maps the input x ∈ Rn to its representation at the output of the i − 1-th layer. The decoding path from layer i to the output is defined as: 
+
+gi = ˆfN ◦ · · · ◦ ˆfi.
+
+Thus, the network computes ˆf = gi ◦ ϕi, where ˆf is an approximation to the target function f .20 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Assume there are inputs x(1) 0 , x(2) 0 with f (x(1) 0 )̸ = f (x(2) 0 ), yet ϕi(x(1) 0 ) = ϕi(x(2) 0 ). Then, due to the deterministic nature of 
+
+gi, the network will produce identical final estimates, ˆf (x(1) 0 ) = ˆf (x(2) 0 ), contradicting the ground truth f (x(1) 0 )̸ = f (x(2) 0 ).This is an indication that the optimization of the network has not converged to its optimal. Therefore, by Factorization Continuity Theorem H.1, upon convergence (idealy ˆf = f ), ϕi must satisfy: 
+
+ϕi(x(1) 0 ) = ϕi(x(2) 0 ) = ⇒ f (x(1) 0 ) = f (x(2) 0 ), ∀ x(1) 0 , x(2) 0 ∈ Rn. (43) This condition is a necessary condition for f can be represented by ˆf : if violated, f lies outside the expressive capacity of the f .In practice, while ˆf is typically only required to approximate f rather than match it exactly, significant issues still arise when ϕi(x(1) 0 ) ≈ ϕi(x(2) 0 ) but f (x(1) 0 ) and f (x(2) 0 ) differ substantially. In such cases, the decoder gi must generate vastly different outputs from nearly identical inputs, demanding extreme sensitivity to small input perturbations. This not only increases the difficulty of approximation but also risks training instability. Hence, even in approximate learning, intermediate representations should avoid mapping inputs with significantly different targets into overly similar regions of the representation space. Equivalently, this principle can be expressed more directly by taking the conv erse-negative proposition of Eq. (43) as: 
+
+f (x(1) 0 )̸ = f (x(2) 0 ) = ⇒ ϕi(x(1) 0 )̸ = ϕi(x(2) 0 ), ∀ x(1) 0 , x(2) 0 ∈ Rn.
+
+We refer to this necessary condition as ˆf -distinguishability, it means that the intermediate representation ϕi must preserve the distinguishability of inputs with distinct true target values under f . Notably, the condition is asymmetric: when 
+
+f (x(1) 0 ) = f (x(2) 0 ), multiple inputs may share similar or even identical representations. Such over-separation is harmless and often beneficial, as it allows the network to encode auxiliary information that may aid generalization. In summary, maintaining distinguishability between intermediate representations with distinct target is a key design principle for efficient approximation. The most critical failure mode is false merging, in which inputs with different targets are irreversibly collapsed into the same or highly similar representations. Once such structural loss occurs, no subsequent layer can recover the necessary distinctions, rendering the error uncorrectable. 
+
+G.2. Unified Interpretation via Optimization Dynamics: Emergence of f -Distinguishability 
+
+Under both E2E and LPA optimization, representation collapse induces irreducible error. Since gradient descent inherently minimizes the loss, it implicitly penalizes parameter configurations that lead to information loss. This mechanism drives the network to gradually establish f -consistency in intermediate representation during training—inputs with different f -values become increasingly separated in the intermediate representation space. Notably, the residual connection plays a crucial role: by preserving the identity path, it maintains access to the original input information, reducing the risk of information loss and providing structural support for the emergence of f -consistency. 
+
+G.3. Generality: Optimization-Induced Separation 
+
+This mechanism is not limited to residual networks or specific optimization strategies. In any deep model where subsequent modules depend deterministically on earlier representations (i.e., xj = Tj (xj−1)), representational collapse leads to unrecoverable errors. Thus, both end-to-end joint training and layer-wise optimization use loss feedback to drive the network away from information merging. We term this universal phenomenon optimization-induced consistency: the training process itself acts as an implicit regularizer, encouraging the network to preserve task-relevant information structures during representation learning. This provides a unified perspective for understanding generalization, representation evolution, and universal approximation in deep networks. 
+
+H. Factorization Continuity Theorem 
+
+Theorem H.1 (Factorization and Continuity ). Let In ⊂ Rn be compact, f : In → Rm continuous, and T : In → Z
+
+continuous with Z ⊂ Rd compact. Then: 
+
+21 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+• (Existence of g) There exists a function g : T (In) → Rm such that f = g ◦ T if and only if 
+
+T (x(1) ) = T (x(2) ) = ⇒ f (x(1) ) = f (x(2) ), ∀x(1) , x(2) ∈ In.
+
+• (Continuity of g) If such a g exists, then g is continuous on the compact set T (In).
+
+If the above assumption holds, then since g is continuous on the compact set T (In) ⊆ Z, it follows that g can be approximated by a neural network. We now provide the proof. 
+
+Proof. Let In ⊆ Rn be a nonempty compact set, f : In → Rm a continuous function, and T : In → Rd a continuous mapping. Define the image set: 
+
+Z := T (In) = {T (x) | x ∈ In} ⊆ Rd.
+
+Since In is compact and T is continuous, Z is also compact (the continuous image of a compact set is compact). Our purpose is to prove that there exists a function g : Z → Rm such that: 
+
+f (x) = g(T (x)) = ( g ◦ T )( x), ∀x ∈ In,
+
+i.e., f = g ◦ T .
+
+Lemma H.2 (Existence ). Let T : In → Rd be an arbitrary mapping and f : In → Rm. If 
+
+∀x(1) , x(2) ∈ In, T (x(1) ) = T (x(2) ) = ⇒ f (x(1) ) = f (x(2) ),
+
+then there exists a function g : T (In) → Rm such that f = g ◦ T .Proof. For each z ∈ Z, define g(z) := f (x) for any x ∈ In with T (x) = z. Such an x exists because Z = T (In). This definition is well-defined: if T (x(1) ) = T (x(2) ) = z, then by assumption f (x(1) ) = f (x(2) ). So g(z) is independent of the choice of preimage. By construction, g(T (x)) = f (x) for all x ∈ In, so there exists a function g fulfilling f = g ◦ T .
+
+Necessity: Suppose f = g ◦ T , i.e., f (x) = g(T (x)) . If T (x(1) ) = T (x(2) ), then: 
+
+f (x(1) ) = g(T (x(1) )) = g(T (x(2) )) = f (x(2) ).
+
+This proves the necessity. 
+
+Sufficiency: Suppose that 
+
+T (x(1) ) = T (x(2) ) = ⇒ f (x(1) ) = f (x(2) ), ∀x(1) , x(2) ∈ In.
+
+We aim to construct a function g : Z := T (In) → Rm such that f = g ◦ T . Define g as follows: for each z ∈ Z, choose any x ∈ In such that T (x) = z (such x exists by definition of Z), and set 
+
+g(z) := f (x).
+
+We now show that g is well-defined, i.e., the value g(z) does not depend on the choice of preimage x. Let x(1) , x(2) ∈ In
+
+be such that T (x(1) ) = T (x(2) ) = z. Then by assumption, f (x(1) ) = f (x(2) ). Hence, regardless of which preimage we choose, g(z) = f (x) is the same. Therefore, g is well-defined. Finally, by construction, for every x ∈ In, we have 
+
+g(T (x)) = f (x),
+
+since g(T (x)) was defined precisely as f (x) when x was chosen as the preimage of T (x). Thus, f = g ◦ T .
+
+Lemma H.3 (Uniqueness ). If g1, g 2 : Z := T (In) → Rm both satisfy f = g1 ◦ T = g2 ◦ T , then g1 = g2 on Z.
+
+22 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Proof. Assume g1 and g2 satisfy: 
+
+f (x) = g1(T (x)) , f (x) = g2(T (x)) , ∀x ∈ In.
+
+We aim to show g1(z) = g2(z) for all z ∈ Z. Let z ∈ Z be arbitrary. Since Z = T (In), there exists x ∈ In such that 
+
+T (x) = z. Then: 
+
+g1(z) = g1(T (x)) = f (x), g 2(z) = g2(T (x)) = f (x).
+
+Hence g1(z) = f (x) = g2(z). Since z was arbitrary, g1 = g2 on Z. Therefore, the function g : Z → Rm satisfying 
+
+f = g ◦ T is unique. 
+
+Lemma H.4 (Continuity ). Let In ⊆ Rn be a nonempty compact set, f : In → Rm continuous, T : In → Rd continuous, and suppose: 
+
+∀x(1) , x(2) ∈ In, T (x(1) ) = T (x(2) ) = ⇒ f (x(1) ) = f (x(2) ).
+
+Let Z := T (In) ⊆ Rd. Then there exists a unique function g : Z → Rm such that f = g ◦ T . We claim that g is continuous on Z.Proof. Suppose, for contradiction, that g is discontinuous at some point z0 ∈ Z. Then there exists ε0 > 0 and a sequence 
+
+{zk} ⊂ Z such that zk → z0, but 
+
+∥g(zk) − g(z0)∥ ≥ ε0, ∀k ∈ N.
+
+Since zk ∈ Z = T (In), for each k, there exists xk ∈ In such that T (xk) = zk. As In is compact, the sequence {xk} has a convergent subsequence {xkj } such that 
+
+xkj → x∗ ∈ In, as j → ∞ .
+
+By continuity of T , we have 
+
+T (xkj ) → T (x∗).
+
+But T (xkj ) = zkj , and since zk → z0, the subsequence zkj → z0. By uniqueness of limits, 
+
+T (x∗) = z0.
+
+By continuity of f ,
+
+f (xkj ) → f (x∗).
+
+Note that f (xkj ) = g(T (xkj )) = g(zkj ), and f (x∗) = g(T (x∗)) = g(z0). Therefore, 
+
+g(zkj ) → g(z0), as j → ∞ .
+
+Thus, there exists J ∈ N such that for all j ≥ J, ∥g(zkj ) − g(z0)∥ < ε 0. However, this contradicts the earlier assumption that 
+
+∥g(zk) − g(z0)∥ ≥ ε0, ∀k, 
+
+which in particular implies ∥g(zkj ) − g(z0)∥ ≥ ε0 for all j. Hence, the assumption of discontinuity is false. Therefore, g is continuous at z0. Since z0 ∈ Z was arbitrary, g is continuous on Z.
+
+I. Experimental Details 
+
+To ensure reproducibility and address potential concerns regarding experimental completeness, we provide full implementa-tion details below. 
+
+Synthetic Simulation. We generate 10,000 random input–output pairs as the training set and an additional 10,000 uniformly sampled pairs as the test set. The model is a 6-layer residual MLP with hidden dimension 30. We train for 300 epochs using standard optimization settings. 23 Progressive Approximation in Deep Residual Networks: Theory and Validation 
+
+Image Classification. We evaluate on CIFAR-10, CIFAR-100, and Fashion-MNIST using both ViT and ResNet architec-tures. • For ViT, we use 12- and 24-layer variants with attention heads = 3, embedding dimension = 192, and MLP hidden size = 768, resulting in approximately 5.5M and 10.9M parameters, respectively. • For ResNet, we adopt standard ResNet-18 and ResNet-34. Following the analysis in Appendix C.2, our LPA framework naturally incorporates dimension-matching projections via the shared readout head, eliminating the need for additional ad-hoc projection modules. All image classification models are trained for 300 epochs. We use a learning rate of 6 × 10 −4 for ResNet and 1 × 10 −4 for ViT. 
+
+Train ImageNet From-scratch: To validate our method under large-scale training, we train ViT models from scratch on ImageNet-1k for 300 epochs with an initial learning rate of 5 × 10 −4. The input image size is 224 × 224 with patch size 16. Specifically: • ViT-12 : 12 layers, embedding dimension 768, 12 attention heads, FFN hidden dimension 3072. • ViT-24 : 24 layers, embedding dimension 1024, 16 attention heads, FFN hidden dimension 4096. 
+
+Finetuning from pretrained checkpoints. We finetune from publicly available DeiT pretrained weights on ImageNet-1k: • ViT-Base 2: 12 layers, embedding dimension 768, 12 attention heads, FFN hidden dimension 3072. • ViT-Small 3: 24 layers, embedding dimension 1024, 16 attention heads, FFN hidden dimension 4096. We finetune for 30 epochs with a learning rate of 1 × 10 −5 (same as used in the main ViT experiments above). 
+
+Large Language Model Tasks. Due to computational constraints, we do not train LLMs from scratch. Instead, we initialize from the pretrained Qwen2-0.5B model (24 layers). • For classification benchmarks (CoLA, MNLI, MRPC, QNLI, QQP, SST-2), which impose relatively modest demands on model capacity compared to generation tasks, we apply LPA supervision to all layers .• For generation tasks (Wikitext, Alpaca, Dolly-15k, GSM8K), which are more complex, we apply LPA supervision only to layers 20–24 (i.e., the top 5 layers). In all LPA training setups, we assign a weight of 0.1 to losses from earlier layers and a weight of 1.0 to the final layer. This weighting scheme is motivated by the structural property of deep residual networks: as shown in Eq. (10) and its generalization in Eq. (23) , the final prediction is a cumulative sum of layer-wise contributions, with the last layer directly shaping the output. Emphasizing the final layer ensures that the primary learning objective remains aligned with the E2E task performance, while auxiliary supervision on earlier layers provides regularization without compromising convergence. We also note that LPA incurs negligible computational overhead compared to standard E2E training. Since LPA only reuses the final linear readout head at intermediate layers, adding a lightweight linear projection per layer, the additional cost is minimal relative to the full network computation. For example, on CIFAR-10 with a ViT-12 model trained on an NVIDIA A6000 GPU, both LPA and E2E take approximately 28 seconds per epoch. 
+
+> 2https://dl.fbaipublicfiles.com/deit/deit_base_patch16_224-b5f2ef4d.pth
+> 3https://dl.fbaipublicfiles.com/deit/deit_small_patch16_224-cd65a155.pth
+
+24
