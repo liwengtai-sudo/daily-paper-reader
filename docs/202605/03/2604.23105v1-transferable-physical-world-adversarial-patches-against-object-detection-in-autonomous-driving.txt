@@ -1,0 +1,239 @@
+Title: Transferable Physical-World Adversarial Patches Against Object Detection in Autonomous Driving
+
+URL Source: https://arxiv.org/pdf/2604.23105v1
+
+Published Time: Tue, 28 Apr 2026 00:29:00 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+# Transferable Physical-World Adversarial Patches Against Object Detection in Autonomous Driving 
+
+Zihui Zhu 
+
+zhuzihui@hust.edu.cn Huazhong University of Science and Technology China 
+
+Ziqi Zhou 
+
+zhouziqi@hust.edu.cn Huazhong University of Science and Technology China 
+
+Yichen Wang 
+
+wangyichen@hust.edu.cn Huazhong University of Science and Technology China 
+
+Lulu Xue 
+
+lluxue@hust.edu.cn Huazhong University of Science and Technology China 
+
+Minghui Li 
+
+minghuili@hust.edu.cn Huazhong University of Science and Technology China 
+
+Shengshan Hu 
+
+hushengshan@hust.edu.cn Huazhong University of Science and Technology China 
+
+Abstract —Deep learning drives major advances in autonomous driving (AD), where object detectors are central to perception. However, adversarial attacks pose significant threats to the reliability and safety of these systems, with physical adversar-ial patches representing a particularly potent form of attack. Physical adversarial patch attacks pose severe risks but are usually crafted for a single model, yielding poor transferability to unseen detectors. We propose AdvAD, a transfer-based physical attack against object detection in autonomous driving. Instead of targeting a specific detector, AdvAD optimizes adversarial patches over multiple detection models in a unified framework, encouraging the learned perturbations to capture shared vulner-abilities across architectures. The optimization process adaptively balances model contributions and enforces robustness to physical variations. It further employs data augmentation and geometric transformations to maintain patch effectiveness under diverse physical conditions. Experiments in both digital and real-world settings show that AdvAD consistently outperforms state-of-the-art (SOTA) attacks in performance and transferability. 
+
+Index Terms —Object Detection, Adversarial Patch, Physical-World Attack 
+
+I. I NTRODUCTION 
+
+With the rapid development of deep learning [1]–[3], object detection models have been widely deployed in critical real-world applications [4], [5]. Recent studies show that these detectors are exposed to numerous security threats [6]–[15], particularly exhibiting high vulnerability to adversarial attacks [16]–[20], where carefully designed perturbations mislead predictions. Among various approaches, as illustrated in Fig. 1, patch-based adversarial attacks [21], [22] have attracted par-ticular attention due to their practicality. Despite their effectiveness, existing patch-based attacks face two major challenges: 1) Poor transferability. Their trans-ferability to black-box detectors with different architectures remains limited. Existing ensemble-based methods [23], [24] attempt to mitigate this by aggregating gradients from multiple models, but uniform weighting often leads to overfitting. DOEPatch [25] improves transferability through dynamically Benign Image      
+
+> Adversarialexamples
+> Adversarialpatch
+> Benignresult
+> Adversarialresult
+> Perturbations
+> ObjectDetector
+> BackboneFPN/NMS/..
+
+Fig. 1. An illustration of attacking object detection models in autonomous driving systems using adversarial patches. The adversarial patch is strategi-cally placed in the environment, leading the detector to miss safety-critical objects and potentially compromising perception reliability. 
+
+adjusted weights in a min–max framework, yet its optimiza-tion is primarily energy-driven rather than detection-aware. Although the perturbations achieve broad spectrum coverage, they may fail to sufficiently exploit the intrinsic vulnerabili-ties of detection pipelines, limiting their effectiveness against real detectors. 2) Environmental sensitivity. Physical-world evaluation has been restricted to limited scenarios, leaving robustness under diverse conditions largely unexplored [26]. Adversarial perturbations deployed in real-world scenarios are easily affected by environmental factors such as viewing angles, lighting variations, and weather conditions, which can significantly reduce their effectiveness [27]. This sensi-tivity arises because most perturbations are optimized under idealized digital conditions with fixed viewpoints and clean inputs. When deployed physically, the perturbation undergoes various transformations, which distort its adversarial features and weaken its ability to mislead detectors. In this paper, we propose AdvAD, a novel adaptive physical-world adversarial attack designed for autonomous driving systems. Unlike prior energy-based ensemble methods, Ad-vAD integrates both feature-level and output-level gradients from multiple surrogate detectors and introduces a detection-aware adaptive weighting strategy that adaptively balances  
+
+> arXiv:2604.23105v1 [cs.CV] 25 Apr 2026 Fig. 2. Overall framework of the proposed AdvAD method. Given an input image, tailored data augmentation is first applied to simulate diverse real-world physical conditions. Two pre-trained white-box object detectors are then employed to localize target objects in the augmented images, and the adversarial patch is placed at the center of each detected object with a fixed relative scale to the object size. This framework enables the generation of physical adversarial patches that remain effective under diverse real-world conditions.
+
+contributions across models to mitigate overfitting. Moreover, we design a realistic deployment augmentation suite that incorporates random cropping, geometric transformations, illu-mination changes, and total variation regularization to simulate real-world distortions to sustain high attack success rates under diverse deployment conditions. Our main contributions are summarized as follows: 1) We propose AdvAD, an adversarial patch framework that simulta-neously achieves high transferability and physical robustness for object detection tasks. 2) We introduce a detection-aware dynamic weighting strategy, which adaptively balances model contributions and mitigates overfitting in ensemble training. 3) We conduct extensive experiments on multiple benchmarks and detectors. Results demonstrate that AdvAD consistently outperforms existing SOTA methods in terms of attack effectiveness and transferability. II. R ELATED WORK 
+
+A. Object Detection 
+
+Early object detection methods [28]–[30] relied on hand-crafted features, which lack generalization and robustness in complex real-world environments, making them inadequate for modern detection tasks. Recently, deep learning-based object detection algorithms have advanced rapidly, with two-stage (e.g., SPP-Net [31], Faster R-CNN [32], Cascade R-CNN [33]). In contrast, single-stage detectors, including the YOLO [34]series, SSD [35], RetinaNet [36], and DETR [37], eliminate the region proposal stage to improve detection efficiency, performing category classification and bounding box regression directly on the input image. Among these, the YOLO series has seen continuous improvements in both detection accuracy and inference speed. 
+
+B. Adversarial Attacks on Object Detection 
+
+Adversarial attacks mislead detectors by injecting carefully designed perturbations. Existing approaches can be broadly categorized into perturbation-based [38]–[45] and patch-based [46]–[49] methods. While effective in digital settings, their success degrades in the physical world due to viewpoint shifts, lighting variations, and printing artifacts. To bridge this gap, recent work explores robust physical attacks using printed stickers [50], adversarial paint [51], or optical projec-tion [23],or 3D-based adversarial attacks [52]. Recent work [53] has also investigated translucent adversarial patches to improve the stealth of physical attacks on object detectors, demonstrating their effectiveness in both digital and physical settings. Despite these advances, such methods remain sensi-tive to environmental conditions and exhibit poor cross-model transferability, limiting their practicality. III. M ETHODOLOGY 
+
+A. Problem Formulation 
+
+We formalize the task of generating physical adversarial patches for object detection. Let X be the space of raw images and Y the space of detection outputs. Object detector can be written as f : X → Y , f = h ◦ g ◦ S, where S is the preprocessing stage (resize, normalize, pad), g is the feature extractor, and h is the detection head producing a set of predictions y = {(bi, c i, s i)}Ni=1 , with bi is bounding box, ci
+
+is class label, and si the confidence score. 
+
+Threat model. The attacker aims to produce a physical patch 
+
+p that, when physically realized and placed in the scene, causes the target detector f to make specified errors. Physical adversarial patch p ∈ Rwp×hp×3, when place in the scene and observed by a camera, generates an adversarial input via the operator xadv = A(x, p, τ ), where τ ∈ T encodes physical transformations such as scale, rotation, viewpoint, and illumination. The detector output on this adversarial image is 
+
+yadv = f (xadv ) = h g(S(A(x, p, τ ))) . (1) 
+
+B. Overall Framework 
+
+Our proposed method, the AdvAD pipeline, as illustrated in Fig.2, aims to generate an adversarial patch that can maintain Gray Ra ndom Raw Ours White NPAP T-SEA NAPGaurd Fig. 3. Visualization results in the digital world. The adversarial patch is aligned with the target object region during attack generation. Compared with baseline methods, AdvAD results in more missed detections and reduced detection confidence. These visual results demonstrate the effectiveness of AdvAD in degrading object detector performance in the digital domain. 
+
+its attack effectiveness against the object detector in real-world autonomous driving scenarios. Given an input image x, we first apply tailored data augmentation to mimic dynamic real-world conditions. Two pre-trained white-box detectors are then used to localize objects in the augmented images, and the adversarial patch is placed at the center of each detected object. Each detector contributes an individual loss, and adaptive optimization is performed by dynamically weighting these losses. The patch is optimized by minimizing the following total loss: 
+
+Ltotal = Lobj · L cls + λtv · L tv (2) where Lobj = 1
+
+> N
+
+PNi=1 Ci is the average object confidence and Lcls = − PCc=1 yc log 
+
+ 
+
+> efc
+> PCj=1 efj
+
+
+
+is the cross-entropy loss over C classes, with yc the target label and fc the predicted detector score, The total variation loss, Ltv =P 
+
+> i,j
+
+(|Pi,j +1 − Pi,j | + |Pi+1 ,j − Pi,j |), with a lower bound 
+
+τ = 0 .1 to avoid vanishing. λtv controls its weight. Finally, we apply patch cutout during training to mitigate overfitting to specific image regions. 
+
+C. Ensemble-based Adversarial Attack 
+
+Multi-model Integration Attack. Adversarial examples gen-erated from a single model usually exhibit poor transferability across black-box detectors. We therefore optimize a single patch across an ensemble of M white-box agent models 
+
+G = {g1, . . . , g M }:
+
+ˆp = arg min 
+
+> p∼P
+> M
+
+X
+
+> m=1
+
+αm, Lm(˜ xi, p ), (3) where αm is the weight of model gm and ˜xi is the augmented input image, and Lm(˜ xi, p ) is the attack loss computed on model gm for patch p Training aggregates losses from the ensemble to produce a patch with improved generalization. 
+
+Dynamic Loss-weighting Strategy. We adaptively tune αm
+
+during training to avoid overly focus models with large losses. During patch optimization, the ensemble weights αm are adaptively adjusted to balance the influence of each surrogate model, while keeping the model parameters fixed. Weights are initialized uniformly: α(m)0 = 1 
+
+> M
+
+, ∀i ∈ { 1, 2, . . . , M } and at each iteration, the weight αm is adjusted according to the gradient of the total loss with respect to αm:
+
+α(t+1)  
+
+> m
+
+= α(t) 
+
+> m
+
+− η ∂Ltotal 
+
+∂α (t)
+
+> m
+
+, (4) where η is a small step size. After each update, the weights are normalized to ensure stability. 
+
+D. Patch Cropping 
+
+We apply random patch cropping during training to improve patch generalization and reduce reliance on specific regions. Instead of always using the full patch, we randomly crop a small rectangular region within the patch before applying it to the image. Given a normalized image x and patch P , cropping is applied with probability pcrop . A square region of side length 
+
+s in P is replaced with a constant value v (e.g., 0 or the patch mean) before applying the patch to x. This approach encourages the patch to distribute its adversarial effect across a wider area, rather than relying heavily on specific pixels. IV. E XPERIMENTS 
+
+A. Experimental Setup 
+
+Datasets and models. We train adversarial patches on the INRIA dataset [28]. Evaluation is conducted on MS-COCO 2017 [57] and PASCAL VOC [58], using both single- and two-stage detectors (YOLOv5, SSD, Faster R-CNN). 
+
+Parameter setting. For each image during training patches, we resize them to 416 × 416, and adversarial patches are set to 300 × 300. Data augmentation includes horizontal flipping, small-angle rotation, slight color perturbation, and random scale cropping. We set λtv = 2 .5, train for 1000 epochs with batch size 16 , and clip pixel values to 255 [45]. Optimization uses Adam with learning rate 0.03 ; ALRS is applied for dynamic step-size adjustment. 
+
+Evaluation metrics. We report mean average precision (mAP), computed over all classes at an IoU threshold of 0.45 [23]. Attack strength is quantified by the mAP drop between clean and adversarial images. 
+
+B. Digital Domain Evaluation 
+
+We evaluate AdvAD against three SOTA baselines on two datasets in Table I. Adversarial patches are applied to clean images, and performance is measured by detection mAP. AdvPatch and T-SEA are trained on YOLOv5s, while NPAP is trained on YOLOv4s. Results show that AdvAD achieves the largest mAP reduction, outperforming all baselines. As controls, gray, random noise, and white patches are also tested. Qualitative results on MS-COCO in Fig. 3 further confirm the effectiveness of AdvAD. We also evaluate transferability across datasets and detectors. AdvAD consistently attains low mAP across datasets and detectors, demonstrating strong transferability. The quantitative and qualitative results show that our method achieves better attack performance. 
+
+C. CARLA-Based Simulation Evaluation 
+
+We evaluate AdvAD in autonomous-driving scenarios using the CARLA simulator [59] to emulate road elements and sensor settings. CARLA is an open-source simulator designed for the development, training, and validation of autonomous driving systems. It provides high-fidelity urban environments and supports diverse sensor simulations, making it widely used in research areas such as perception, planning, control, and adversarial robustness. Scenes include stop signs, trees, pedestrians and vehicles; patches (rectangular and planar) are rendered onto the rear or side panels of trucks via planar projection. After deployment, we sample images from multiple viewpoints and feed them to the detector for evaluation. Qualitative examples appear in Fig. 4, where AdvAD achieves stronger attacks: it not only mislocalizes bounding boxes but also induces false positives, leading to larger mAP degradation. T-sea  
+
+> Car
+> 0.96
+> Car
+> 0.85
+> Advpatch
+> Car
+> 0.25
+> car
+> 0.11
+> person
+> 0.95
+> car
+> 0.99
+> car
+> 0.75
+> car
+> 0.94
+> person
+> 0.55
+> car
+> 0.93
+> clean
+> White
+> Noise
+> Fig. 4. Visualization results in simulated environments. Notably, since the generated adversarial patches are regular in shape and suitable for planar placement, we select trucks as the target vehicles in our simulations.
+
+D. Physical-World Evaluation 
+
+We conduct two experiments to validate the effectiveness of AdvAD in the physical world. In Fig. 5(a), the experiment evaluates the physical realizability of adversarial patches by printing adversarial examples with patches and capturing them using a camera. This setting aims to verify whether the adversarial effect can be preserved after common physical transformations introduced by the printing and imaging pro-cess. In Fig. 5(b), the experiment evaluates the robustness of AdvAD in realistic deployment scenarios by deploying printed patches in real scenes and recording the results. Overall, the physical-world evaluations demonstrate that AdvAD exhibits strong robustness and transferability when moving from digital simulations to real-world environments. Despite the presence of complex environmental variations, AdvAD consistently achieves high attack success rates, confirming its effectiveness in practical physical-world deployments. 
+
+E. Transferability Discussion 
+
+Transferability is a central objective of AdvAD. In the digital domain (Sec. IV-B), adversarial patches jointly opti-mized on two source detectors achieve substantial performance degradation on unseen detectors and datasets, indicating effec-tive cross-model and cross-dataset transferability. Furthermore, the physical-world experiments (Sec. IV-D) show that the adversarial effectiveness of AdvAD is preserved after printing, imaging, and real-scene deployment. These results indicate that AdvAD learns robust adversarial patterns that successfully transfer from digital simulations to physical-world scenarios, highlighting its strong digital-to-physical transferability. This digital-to-physical transferability is particularly important for practical adversarial deployments. 
+
+F. Comparison Study 
+
+We compare attack performance across ensemble configu-rations. Table II evaluates ensembles of three detectors: V5 (YOLOv5), SSD, and FR (Faster R-CNN). Ensembles tested include V5+SSD, V5+FR, SSD+FR, and V5+SSD+FR; all TABLE I COMPARISON OF M AP (%) FOR DIFFERENT ATTACK METHODS ON MS-COCO AND PASCAL VOC. Methods MS-COCO PASCAL VOC YOLOv5 SSD Faster R-CNN Avg. YOLOv5 SSD Faster R-CNN Avg. Gray 58.89 56.89 46.95 54.24 48.03 49.30 35.85 44.39 Random Noise 60.10 56.19 52.53 56.27 47.39 47.16 41.21 45.25 White 53.75 52.07 45.61 50.48 40.46 43.84 32.61 38.97 AdvPatch [54] 25.24 37.47 33.57 32.09 18.55 28.84 26.07 24.49 NPAP [55] 42.65 45.71 39.82 42.73 28.71 33.29 29.13 30.38 T-SEA [23] 28.22 40.06 34.41 34.23 21.93 32.78 26.92 27.21 NAPGuard [56] 44.91 48.08 39.91 44.30 32.70 34.64 31.16 32.83 AdvAD (Ours) 23.61 32.08 29.27 28.32 19.15 26.31 22.69 22.72 （b1 ） （b2 ） （b3 ）
+
+> （b）
+> （a）
+
+Fig. 5. Visualization results in the physical world. (a) Physical-world validation under controlled conditions, where adversarial patches are printed and captured by a camera to evaluate attack effectiveness after physical rendering. (b) Real-scene deployment of printed adversarial patches under diverse environments. (b1) shows detection comparisons of vehicles before and after applying adversarial patches under outdoor scenes with various viewpoints; (b2) presents detection results in mixed human–vehicle scenes, comparing vehicles with and without adversarial patches in the same environment; (b3) illustrates indoor scenarios containing humans and other objects, where detection results of humans before and after applying adversarial patches are compared. These results demonstrate that AdvAD maintains robust attack performance under real-world variations in viewpoint, illumination, background, and scene composition. 
+
+other settings are held constant for fair comparison. In these experiments, we keep all other settings consistent to ensure a fair comparison. The experimental results indicate that among the two-model ensemble approaches, V5+FR achieves the lower mAP value, suggesting a stronger attack effective-ness and transferability. Although the three-model ensemble achieves lower mAP, it incurs much higher optimization cost. Balancing effectiveness and efficiency, AdvAD adopts the V5+FR ensemble. 
+
+G. Ablation Study 
+
+To investigate the contribution of each component in our proposed approach, we conduct an ablation study by selec-tively removing specific modules, as reported in Table III. Removing the dynamic weighting strategy results in consistent 
+
+TABLE II ATTACK RESULTS ON ATTACK PERFORMANCE ACROSS ENSEMBLE CONFIGURATIONS .Methods YOLOv5 Faster R-CNN SSD Avg. V5 + SSD 33.09 33.87 21.00 29.32 FR + SSD 28.15 28.30 29.03 28.49 V5 + FR + SSD 22.91 29.40 30.65 27.65 V5 + FR (Ours) 23.61 29.27 32.08 28.32 
+
+performance degradation across all evaluated detectors, indi-cating that adaptive weighting is important for balancing multi-ple optimization objectives and stabilizing the training process across heterogeneous models. When the patch cutout module TABLE III ABLATION STUDY ABOUT MODULES OF ADV AD. Methods YOLOv5 Faster R-CNN SSD - Dynamic weight 23.90 29.66 32.18 - Patch cutout 23.84 29.90 33.10 - Classification loss 23.32 34.23 30.29 - Total variation loss 25.04 37.81 31.87 
+
+is omitted, the average attack performance decreases, indicat-ing that patch cutout improves transferability by enhancing robustness to spatial variations. Furthermore, removing the classification loss weakens semantic alignment with the target class and degrades attack effectiveness. Finally, omitting the TV loss produces noisy, less natural patches that hurt physical-world robustness. Overall, the ablation results demonstrate that each component of AdvAD plays a complementary role in improving attack effectiveness, transferability, and physical-world robustness. V. C ONCLUSIONS 
+
+In this paper, We present AdvAD, a transferable physical-world adversarial patch attack against object detectors in autonomous driving. AdvAD enhances cross-model transfer-ability through a multi-detector ensemble with dynamic loss weighting, and improves robustness via realistic deployment augmentation suite simulating real-world conditions. Exper-iments in digital and physical settings show that AdvAD consistently outperforms existing methods in attack success and transferability. Our method provides a practical and effec-tive framework for evaluating the vulnerability of perception modules in safety-critical scenarios. REFERENCES [1] L. Xue, S. Hu, W. Lu, Y. Shen, D. Li, P. Guo, Z. Zhou, M. Li, Y. Zhang, and L. Y. Zhang, “Towards reliable forgetting: A survey on machine unlearning verification,” arXiv preprint arXiv:2506.15115 , 2025. [2] H. Pan, C. Wei, D. Liang, Z. Huang, P. Gao, Z. Zhou, L. Xue, P. Yan, X. Wei, M. Li et al. , “Ufvideo: Towards unified fine-grained video cooperative understanding with large language models,” in Proceedings of the Computer Vision and Pattern Recognition Conference (CVPR’26) ,2026. [3] Y. Wu, X. Hu, Z. Zhou, and H. Lu, “Tattoo: Training-free aesthetic-aware outfit recommendation,” arXiv preprint arXiv:2509.23242 , 2025. [4] A. E. Sallab, M. Abdou, E. Perot, and S. K. Yogamani, “Deep reinforcement learning framework for autonomous driving,” in 
+
+Autonomous Vehicles and Machines , 2017. [Online]. Available: https://api.semanticscholar.org/CorpusID:12064877 [5] E. Martinez-Martin and A. P. Del Pobil, “Object detection and recog-nition for assistive robots: Experimentation and implementation,” IEEE Robotics & Automation Magazine , vol. 24, no. 3, pp. 123–138, 2017. [6] Z. Zhou, M. Deng, Y. Song, H. Zhang, W. Wan, S. Hu, M. Li, L. Y. Zhang, and D. Yao, “Darkhash: A data-free backdoor attack against deep hashing,” IEEE Transactions on Information Forensics and Security ,2025. [7] S. Hu, Z. Zhou, Y. Zhang, L. Y. Zhang, Y. Zheng, Y. He, and H. Jin, “Badhash: Invisible backdoor attacks against deep hashing with clean label,” in Proceedings of the 30th ACM International Conference on Multimedia (ACM MM’22) , 2022, pp. 678–686. [8] W. Wan, Y. Ning, Z. Huang, C. Hong, S. Hu, Z. Zhou, Y. Zhang, T. Zhu, W. Zhou, and L. Y. Zhang, “Mars: A malignity-aware backdoor defense in federated learning,” in Proceedings of the 39th Annual Conference on Neural Information Processing Systems (NeurIPS’25) , 2025. [9] H. Zhang, S. Hu, Y. Wang, L. Y. Zhang, Z. Zhou, X. Wang, Y. Zhang, and C. Chen, “Detector collapse: Backdooring object detection to catastrophic overload or blindness,” in Proceedings of the Thirty-Third International Joint Conference on Artificial Intelligence (IJCAI’24) ,2024. [10] H. Zhang, Y. Wang, S. Yan, C. Zhu, Z. Zhou, L. Hou, S. Hu, M. Li, Y. Zhang, and L. Y. Zhang, “Test-time backdoor detection for object detection models,” in Proceedings of the Computer Vision and Pattern Recognition Conference (CVPR’25) , 2025, pp. 24 377–24 386. [11] X. Wang, H. Pan, H. Zhang, M. Li, S. Hu, Z. Zhou, L. Xue, P. Guo, Y. Wang, W. Wan et al. , “Trojanrobot: Backdoor attacks against robotic manipulation in the physical world,” arXiv e-prints , pp. arXiv–2411, 2024. [12] M. Li, X. Wang, Z. Yu, S. Hu, Z. Zhou, L. Zhang, and L. Y. Zhang, “Detecting and corrupting convolution-based unlearnable exam-ples,” in Proceedings of the AAAI Conference on Artificial Intelligence (AAAI’25) , vol. 39, no. 17, 2025, pp. 18 403–18 411. [13] X. Wang, S. Hu, Y. Zhang, Z. Zhou, L. Y. Zhang, P. Xu, W. Wan, and H. Jin, “Eclipse: Expunging clean-label indiscriminate poisons via sparse diffusion purification,” in European Symposium on Research in Computer Security . Springer, 2024, pp. 146–166. [14] L. Yu, Y. Zhang, Z. Zhou, Y. Wu, W. Wan, M. Li, S. Hu, P. Xiaobing, and J. Wang, “Spa-vlm: Stealthy poisoning attacks on rag-based vlm,” 
+
+arXiv preprint arXiv:2505.23828 , 2025. [15] X. Wang, M. Li, W. Liu, H. Zhang, S. Hu, Y. Zhang, Z. Zhou, and H. Jin, “Unlearnable 3d point clouds: Class-wise transformation is all you need,” in Proceedings of the 38th Annual Conference on Neural Information Processing Systems (NeurIPS’24) , vol. 37, 2024, pp. 99 404–99 432. [16] Z. Zhou, M. Li, W. Liu, S. Hu, Y. Zhang, W. Wan, L. Xue, L. Y. Zhang, D. Yao, and H. Jin, “Securely fine-tuning pre-trained encoders against adversarial examples,” in Proceedings of the 2024 IEEE Symposium on Security and Privacy (SP’24) , 2024. [17] Z. Zhou, S. Hu, M. Li, H. Zhang, Y. Zhang, and H. Jin, “Advclip: Downstream-agnostic adversarial examples in multimodal contrastive learning,” in Proceedings of the 32nd ACM International Conference on Multimedia (MM’23) , 2023, pp. 6311–6320. [18] Z. Zhou, S. Hu, R. Zhao, Q. Wang, L. Y. Zhang, J. Hou, and H. Jin, “Downstream-agnostic adversarial examples,” in Proceedings of the 2023 IEEE/CVF International Conference on Computer Vision (ICCV’23) , 2023, pp. 4345–4355. [19] Z. Zhou, B. Li, Y. Song, S. Hu, W. Wan, L. Y. Zhang, D. Yao, and H. Jin, “Numbod: A spatial-frequency fusion attack against object detectors,” in Proceedings of the 39th Annual AAAI Conference on Artificial Intelligence (AAAI’25) , 2025. [20] Z. Zhou, Y. Song, M. Li, S. Hu, X. Wang, L. Y. Zhang, D. Yao, and H. Jin, “Darksam: Fooling segment anything model to segment nothing,” in Proceedings of the 38th Annual Conference on Neural Information Processing Systems (NeurIPS’24) , 2024. [21] Z. Wang, S. Zheng, M. Song, Q. Wang, A. Rahimpour, and H. Qi, “advpattern: Physical-world attacks on deep person re-identification via adversarially transformable patterns,” 
+
+in IEEE/CVF ICCV 2019 , pp. 8340–8349, 2019. [Online]. Available: https://api.semanticscholar.org/CorpusID:201650275 [22] T. Lin, L. Yu, G. Jin, R. Li, P. Wu, and L. Zhang, “Out-of-bounding-box triggers: A stealthy approach to cheat object detectors,” ArXiv , vol. abs/2410.10091, 2024. [Online]. Available: https://api.semanticscholar.org/CorpusID:273345346 [23] H. Huang, Z. Chen, H. Chen, Y. Wang, and K. A. Zhang, “T-sea: Transfer-based self-ensemble attack on object detection,” in IEEE/CVF CVPR 2023 , pp. 20 514–20 523, 2022. [24] Z. Cai, Y. Tan, and M. S. Asif, “Ensemble-based blackbox attacks on dense prediction,” in IEEE/CVF CVPR 2023 , pp. 4045–4055, 2023. [On-line]. Available: https://api.semanticscholar.org/CorpusID:257766952 [25] W. Tan, Y. Li, C. Zhao, Z. Liu, and Q. Pan, “Doepatch: Dynamically optimized ensemble model for adversarial patches generation,” IEEE Transactions on Information Forensics and Security , 2024. [26] T. Liu, Y. Liu, Z. Ma, T. Yang, X. Liu, T. Li, and J. Ma, “L-hawk: A controllable physical adversarial patch against a long-distance target.” in NDSS , 2025. [27] M. Zheng, X. Yan, Z. Zhu, H. Chen, and B. Wu, “Blackboxbench: A comprehensive benchmark of black-box adversarial attacks,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2025. [28] N. Dalal and B. Triggs, “Histograms of oriented gradients for human detection,” in in IEEE CVPR 2005 , vol. 1. Ieee, 2005, pp. 886–893. [29] D. G. Lowe, “Object recognition from local scale-invariant features,” in 
+
+Proceedings of the seventh IEEE international conference on computer vision , vol. 2. Ieee, 1999, pp. 1150–1157. [30] Y. Freund and R. E. Schapire, “A decision-theoretic generalization of on-line learning and an application to boosting,” Journal of computer and system sciences , vol. 55, no. 1, pp. 119–139, 1997. [31] K. He, X. Zhang, S. Ren, and J. Sun, “Spatial pyramid pooling in deep convolutional networks for visual recognition,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 37, no. 9, pp. 1904– 1916, 2015. [32] S. Ren, K. He, R. Girshick, and J. Sun, “Faster r-cnn: Towards real-time object detection with region proposal networks,” in Advances in Neural Information Processing Systems , vol. 28, 2015. [33] Z. Cai and N. Vasconcelos, “Cascade r-cnn: Delving into high quality object detection,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2018, pp. 6154–6162. [34] R. Khanam and M. Hussain, “Yolov11: An overview of the key architectural enhancements,” 2024, arXiv preprint arXiv:2410.17725. [35] W. Liu, D. Anguelov, and D. Erhan, “Ssd: Single shot multibox detector,” in European Conference on Computer Vision . Springer, 2016, pp. 21–37. [36] T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Doll´ ar, “Focal loss for dense object detection,” in Proceedings of the IEEE International Conference on Computer Vision , 2017, pp. 2980–2988. [37] N. Carion, F. Massa, G. Synnaeve, N. Usunier, A. Kirillov, and S. Zagoruyko, “End-to-end object detection with transformers,” in 
+
+European Conference on Computer Vision . Springer, 2020, pp. 213– 229. [38] Z. Zhou, Y. Hu, Y. Song, Z. Li, S. Hu, L. Y. Zhang, D. Yao, L. Zheng, and H. Jin, “Vanish into thin air: Cross-prompt universal adversarial attacks for sam2,” in Proceedings of the 39th Annual Conference on Neural Information Processing Systems (NeurIPS’25) , 2025. [39] Y. Wang, h. Zhang, P. Hewen, Z. Zhou, X. Wang, P. Guo, l. Xue, S. Hu, M. Li, L. Y. Zhang, and Yao, “Advedm: Fine-grained adversarial attack against vlm-based embodied agents,” in Proceedings of the 39th Annual Conference on Neural Information Processing Systems (NeurIPS’25) ,2025. [40] Y. Wang, Y. Chou, Z. Zhou, H. Zhang, W. Wan, S. Hu, and M. Li, “Breaking barriers in physical-world adversarial examples: Improving robustness and transferability via robust feature,” in Proceedings of the 39th Annual AAAI Conference on Artificial Intelligence (AAAI’25) , 2025. [41] Y. Song, Z. Zhou, M. Li, X. Wang, M. Deng, W. Wan, S. Hu, and L. Y. Zhang, “Pb-uap: Hybrid universal adversarial attack for image segmentation.” in Proceedings of the IEEE International Conference on Acoustics, Speech, and Signal Processing (ICASSP’25) , 2025. [42] M. Li, J. Wang, H. Zhang, Z. Zhou, S. Hu, and X. Pei, “Transferable adversarial facial images for privacy protection,” in Proceedings of the 32nd ACM International Conference on Multimedia (ACM MM’24) ,2024, pp. 10 649–10 658. [43] Y. Song, Z. Zhou, Q. Lu, H. Zhang, Y. Hu, L. Xue, S. Hu, M. Li, and L. Y. Zhang, “Segtrans: Transferable adversarial examples for segmentation models,” IEEE Transactions on Multimedia , 2025. [44] Y. Song, Z. Zhou, M. Deng, Y. Hu, S. Hu, M. Li, and L. Y. Zhang, “Erosion attack for adversarial training to enhance semantic segmenta-tion robustness,” in Proceedings of the IEEE International Conference on Acoustics, Speech, and Signal Processing (ICASSP’26) , 2026. [45] N. Carlini and D. A. Wagner, “Towards evaluating the robustness of neural networks,” 2017 IEEE Symposium on Security and Privacy (SP) , 2016. [Online]. Available: https://api.semanticscholar.org/CorpusID:2893830 [46] T. B. Brown, D. Man´ e, A. Roy, M. Abadi, and J. Gilmer, “Adversarial patch,” ArXiv , vol. abs/1712.09665, 2017. [Online]. Available: https://api.semanticscholar.org/CorpusID:13198654 [47] J. Lee, E. Kim, and S. Yoon, “Anti-adversarially manipulated attributions for weakly and semi-supervised semantic segmentation,” 
+
+2021 IEEE/CVF CVPR , pp. 4070–4078, 2021. [Online]. Available: https://api.semanticscholar.org/CorpusID:232240142 [48] Z. Shen, Q. Li, X. Zhang, Y. Cai, X. Chen, P. An, H. Weng, and Y. Liu, “Patchsegdet: Attack-agnostic detection of physical adversarial patches in face recognition systems,” in 2025 IEEE International Conference on Multimedia and Expo (ICME) , 2025, pp. 1–6. [49] C. Hu, W. Shi, W. Yao, T. Jiang, L. Tian, and W. Li, “Two-stage optimized unified adversarial patch for attacking visible-infrared cross-modal detectors in the physical world,” Applied Soft Computing , vol. 171, p. 112818, 2025. [50] A. Etim and J. Szefer, “Adversarial universal stickers: Universal perturbation attacks on traffic sign using stickers,” arXiv preprint arXiv:2502.18724 , 2025. [51] N. Suryanto, Y. Kim, and H. T. Larasati, “Active: Towards highly transferable 3d physical camouflage for universal and robust vehicle evasion,” 2023 IEEE/CVF ICCV , pp. 4282–4291, 2023. [Online]. Available: https://api.semanticscholar.org/CorpusID:260887446 [52] J. Wang, F. Li, and L. He, “A unified framework for adversarial patch attacks against visual 3d object detection in autonomous driving,” IEEE Transactions on Circuits and Systems for Video Technology , 2025. [53] K. Tiliwalidi, C. Hu, W. Shi, G. Lu, and H. Wu, “Adversarial translucent patch: a robust physical attack technique against object detectors,” 
+
+Pattern Analysis and Applications , vol. 28, no. 4, p. 157, 2025. [54] S. Thys, W. Van Ranst, and T. Goedem´ e, “Fooling automated surveil-lance cameras: adversarial patches to attack person detection,” in Pro-ceedings of the IEEE/CVF conference on computer vision and pattern recognition workshops , 2019, pp. 0–0. [55] Y.-C.-T. Hu, B.-H. Kung, D. S. Tan, J.-C. Chen, K.-L. Hua, and W.-H. Cheng, “Naturalistic physical adversarial patch for object detectors,” in Proceedings of the IEEE/CVF international conference on computer vision , 2021, pp. 7848–7857. [56] S. Wu, J. Wang, J. Zhao, Y. Wang, and X. Liu, “Napguard: Towards de-tecting naturalistic adversarial patches,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 24 367–24 376. [57] T.-Y. Lin, M. Maire, and S. J. Belongie, “Microsoft coco: Common objects in context,” in European Conference on Computer Vision , 2014. [Online]. Available: https://api.semanticscholar.org/CorpusID:14113767 [58] M. Everingham and L. V. Gool, “The pascal visual object classes (voc) challenge,” International Journal of Computer Vision , vol. 88, pp. 303–338, 2010. [Online]. Available: https://api.semanticscholar.org/CorpusID:4246903 [59] A. Dosovitskiy, G. Ros, F. Codevilla, A. Lopez, and V. Koltun, “Carla: An open urban driving simulator,” in Conference on robot learning .PMLR, 2017, pp. 1–16.
