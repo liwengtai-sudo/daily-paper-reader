@@ -1,0 +1,1525 @@
+Title: Partition-of-Unity Gaussian Kolmogorov-Arnold Networks
+
+URL Source: https://arxiv.org/pdf/2604.23599v1
+
+Published Time: Tue, 28 Apr 2026 00:56:39 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# Partition-of-Unity Gaussian Kolmogorov–Arnold Networks 
+
+## Amir Noorizadegan 
+
+Department of Mathematics, Hong Kong Baptist University, Hong Kong SAR, China 
+
+amir noori@hkbu.edu.hk 
+
+## April 28, 2026 
+
+Abstract 
+
+Gaussian basis functions provide an efficient and flexible alternative to spline activations in KANs. In this work, we introduce the partition-of-unity Gaussian KAN (PU-GKAN), a Shepard-type normalized Gaussian KAN in which the Gaussian basis values on each edge are divided by their local sum over fixed centers. This produces a partition-of-unity feature map with trainable coefficients, while preserving the standard edge-based KAN structure. The normalized con-struction gives exact constant reproduction at the edge level and admits an explicit finite-feature kernel interpretation. We formulate both the standard Gaussian KAN (GKAN) and PU-GKAN from a finite-feature and additive-kernel viewpoint, making the induced layer kernels and empirical feature matrices explicit. Using the first-layer feature matrix as the reference object, we adopt a practical scale-selection interval for ǫ, with the lower endpoint determined by adjacent-center overlap and the upper endpoint determined by a conservative conditioning threshold. Numerical experiments show that PU-GKAN reduces sensitivity to ǫ, improves validation accuracy for most smooth and moderately non-smooth targets, and gives more stable training behavior. The benefit persists across sample-size and center-number sweeps, higher-dimensional architectures, Mat´ ern RBF bases, and physics-informed examples involving Helmholtz and wave equations. These results indicate that Shepard-type partition-of-unity normalization is a simple and effective stabiliza-tion mechanism for RBF-based KANs. The implementation is available at https://github.com/AmirNoori68/PU-GKAN .
+
+Keywords: Kolmogorov–Arnold networks; Gaussian basis functions; partition of unity; radial basis functions; shape parameter selection; physics-informed learning. 
+
+# 1 Introduction 
+
+Kolmogorov–Arnold Networks (KANs) have recently emerged as a structured alternative to classical multilayer perceptrons (MLPs), replacing fixed node activations by learnable univariate functions placed on edges [ 1, 2]. Although MLPs have shown strong potential in scientific computing and AI tasks [ 3–6], they also face challenges related to training, accuracy, stability, and generalization in complex problems [ 7–9]. KANs have therefore attracted attention as a complementary architecture with a different inductive bias for multivariate approximation, especially in regression, scientific machine learning, and physics-informed modeling. The original KAN architecture was built on B-spline bases [ 1], but a rapidly growing literature has since explored many other basis families in order to improve approximation quality, computational efficiency, smoothness, and training behavior [ 10 ]. Recent KAN variants include Chebyshev-based constructions [ 11 –13 ], Jacobi and rational Jacobi bases [ 14 ,15 ], Fourier-based activations [ 16 , 17 ], ReLU-based and adaptive piecewise bases [ 18 –20 ], as well as wavelet, finite-basis, and polyno-mial formulations [ 21 –23 ]. At the same time, substantial effort has been devoted to improving adaptability and efficiency through geometric or grid-refinement strategies [ 24 ], grid-adaptive physics-informed KANs [ 20 ], sparse-identification frame-works [ 25 ], JAX/GPU implementations [ 12 , 20 ], and improved initialization methods [ 26 ]. This broad development makes clear that the choice of basis is one of the central design decisions in KANs. Within this landscape, Gaussian radial basis functions (RBFs) are especially appealing because of their smoothness, locality, and simple analytical form. More generally, Gaussian KANs should be viewed within the wider history of RBF approximation. Beginning with Hardy’s multiquadric interpolation [ 27 ] and Kansa’s extension of RBF methods to partial differential equations [ 28 ], the RBF literature has developed into a large and mature body of work on interpolation, approximation, and scientific computing. This perspective places Gaussian KANs not only within the classical theory of kernel and meshfree approximation [ 41 –43 ], but also within modern neural architectures. In the KAN setting, Gaussian bases were first introduced in FastKAN [ 29 ] as computationally efficient surrogates for spline activations. There, the Gaussian scale was fixed, mainly to demonstrate that Gaussian features can mimic 1
+
+> arXiv:2604.23599v1 [cs.CE] 26 Apr 2026
+
+spline-based constructions while reducing implementation complexity and computational cost. Subsequent studies ex-tended Gaussian-based KANs in several directions, including residual architectures [ 30 ], operator-learning formulations with learnable Gaussian bases [ 31 ], improved accuracy and training efficiency [ 32 , 33 ], and complex-valued Gaussian KANs [ 34 , 35 ]. Beyond regression and PDE-related applications, Gaussian-based KANs have also shown promising re-sults in classification, often with reduced parameter counts, faster training, and improved stability in high-dimensional or large-scale settings [ 36 ]. Taken together, these works show that Gaussian bases are not merely convenient replacements for splines, but a flexible and expressive basis family in their own right. Despite these advantages, Gaussian KANs retain the classical RBF sensitivity to the scale parameter: small scales give overly localized bases, while large scales lead to nearly flat, ill-conditioned features [ 44 ]. Hence, their performance depends strongly on proper normalization and scale selection. Conditioning provides a useful tool for assessing accuracy and stability simultaneously, as shown in classical RBF methods [ 37 –40 ]. In the context of Gaussian KANs, this conditioning-based scale analysis leads to the simple reference scale ǫ = 2 /(G − 1), where G is the number of Gaussian centers, as a practical upper choice [ 44 ]. As also shown in this work, this upper-bound scale performs very well in practice and often gives accuracy close to the optimal value obtained from full ǫ-sweeps in both function-approximation and differential-equation solving tasks. A classical way to improve stability and accuracy in RBF approximation is Shepard-type normalization [ 45 ]. Shepard’s method, introduced in [ 46 ], can be interpreted as the zero-degree case of moving least squares and is also closely related to classical kernel regression methods studied in statistics [ 47 –50 ]. In its basic form, the approximation is obtained by normalizing local weights by their sum, thereby producing a partition of unity. This viewpoint is also closely connected to partition-of-unity methods, where normalized weights are used to blend local approximations; in this sense, partition-of-unity constructions may be regarded as Shepard-type methods with higher-order local data [ 51 ]. These ideas are attractive for Gaussian KANs because they suggest a simple normalization that preserves locality while avoiding the direct use of unnormalized Gaussian responses. Although many successful KAN variants are motivated mainly by empirical performance, the present normalization follows from established ideas in Shepard approximation, partition-of-unity methods, finite-feature kernels, and condition-ing analysis. Therefore, PU-GKAN is not only a practical modification, but also a mathematically grounded construction with a clear numerical interpretation. It is useful to distinguish the present construction from domain-decomposition partition-of-unity methods. Finite-Basis KANs (FBKANs) with B-spline bases [ 22 ] use overlapping subdomains and smooth window functions, following finite-basis PINNs [ 52 –55 ] and classical meshfree RBF PoU methods [ 56 –58 ]. In those approaches, the partition of unity combines several local models. In contrast, here the normalization is applied directly to the Gaussian basis functions inside each KAN edge, without subdomains or local subnetworks. Thus, the architecture remains unchanged, and the method is closer to Shepard-type normalization while keeping essentially the same trainable coefficients as the standard Gaussian KAN. Motivated by this connection, we introduce the partition-of-unity Gaussian KAN (PU-GKAN), a Shepard-type nor-malized Gaussian KAN in which the Gaussian basis values are divided by their local sum over fixed centers before the learned linear combination is applied. This produces a partition-of-unity feature map and leads to a normalized Gaus-sian representation that can be used in the same edge-based KAN framework as the standard Gaussian KAN (GKAN). The goal of this work is to understand whether this Shepard-type normalization improves robustness, conditioning, and practical accuracy, and to relate this behavior to the classical numerical issues associated with Gaussian basis expansions. The main contributions of this work are summarized as follows. 
+
+• We introduce PU-GKAN, a Shepard-type partition-of-unity normalization for Gaussian KAN edge bases. The method is defined over fixed centers with trainable coefficients, preserves the original edge-based KAN architecture, and gives exact constant reproduction at the edge level. 
+
+• We derive the normalized Gaussian feature map and formulate both GKAN and PU-GKAN from a finite-feature and additive-kernel viewpoint. This makes the induced kernels, empirical feature matrices, rank behavior, and conditioning properties explicit. 
+
+• We adopt a practical conditioning-based scale-selection rule using the first-layer feature matrix. The resulting reference interval has a lower endpoint determined by adjacent-center overlap and an upper endpoint ǫ = 2 /(G − 1). We show that this upper-bound choice performs very well and often gives accuracy close to the best value obtained by full ǫ-sweeps in both function-approximation and differential-equation solving tasks. 
+
+• We provide numerical evidence across different sample sizes, numbers of centers, and higher-dimensional architec-tures, showing that PU-GKAN regularizes the internal coordinate distribution, reduces extreme excursions, improves basis usage, and enhances accuracy and stability for most tested regression, elliptic PDE, and wave-equation exam-ples. 2• We further demonstrate that the same partition-of-unity normalization can be applied to non-Gaussian RBF bases such as Mat´ ern functions, indicating that the idea is not limited to Gaussian bases alone. The remainder of the paper is organized as follows. Section 2 presents the finite-feature and additive-kernel formulation of Gaussian KANs and introduces the Shepard-type PU-GKAN normalization. Section 3 recalls the conditioning-based ref-erence scale range used for selecting the Gaussian scale parameter. Section 4 reports the numerical experiments, including function-approximation tests, sample-size and center-number studies, Mat´ ern bases, higher-dimensional architectures, and physics-informed Helmholtz and wave-equation examples. Finally, Section 5 summarizes the main findings and outlines possible extensions. 
+
+# 2 Gaussian KAN from a Finite-Feature and Kernel Viewpoint 
+
+Consider a KAN layer mapping x(ℓ) ∈ Rnℓ to x(ℓ+1) ∈ Rnℓ+1 through 
+
+x(ℓ+1)  
+
+> j
+
+=
+
+> nℓ
+
+∑
+
+> i=1
+
+ψ(ℓ)
+
+> j,i
+
+(
+
+x(ℓ)
+
+> i
+
+)
+
+, j = 1 , . . . , n ℓ+1 . (1) Thus, each output component is obtained by summing univariate edge functions evaluated on the input coordinates. In the basis-expanded KAN considered here, each edge function is represented in a shared finite dictionary 
+
+b(ℓ) : R → RG, b(ℓ)(t) = 
+
+
+
+b(ℓ)1 (t)...
+
+b(ℓ) 
+
+> G
+
+(t)
+
+ , (2) so that 
+
+ψ(ℓ) 
+
+> j,i
+
+(t) = (w(ℓ)
+
+> j,i
+
+)⊤b(ℓ)(t), w(ℓ) 
+
+> j,i
+
+∈ RG. (3) Substituting ( 3) into ( 1) gives 
+
+x(ℓ+1)  
+
+> j
+
+=
+
+> nℓ
+
+∑
+
+> i=1
+
+(w(ℓ)
+
+> j,i
+
+)⊤b(ℓ)(
+
+x(ℓ)
+
+> i
+
+)
+
+, j = 1 , . . . , n ℓ+1 . (4) Define the stacked feature vector 
+
+B(ℓ)(z) = 
+
+
+
+b(ℓ)(z1)...
+
+b(ℓ)(znℓ )
+
+ ∈ RnℓG, z ∈ Rnℓ , (5) and the block coefficient matrix 
+
+W (ℓ) =
+
+(w(ℓ)1,1
+
+)⊤ · · · (w(ℓ)1,n ℓ
+
+)⊤
+
+... . . . ...
+
+(w(ℓ) 
+
+> nℓ+1 ,1
+
+)⊤ · · · (w(ℓ)
+
+> nℓ+1 ,n ℓ
+
+)⊤
+
+ ∈ Rnℓ+1 ×nℓG. (6) Then the layer can be written compactly as 
+
+x(ℓ+1) = W (ℓ)B(ℓ)(
+
+x(ℓ))
+
+. (7) Hence, once the feature map is fixed, the layer is linear in the coefficients W (ℓ), while the nonlinearity is determined by the chosen univariate basis. The feature map b(ℓ) induces the scalar kernel 
+
+kℓ(s, t ) = (b(ℓ)(s))⊤b(ℓ)(t), s, t ∈ R, (8) and therefore the layer kernel 
+
+Kℓ(z, z ′) = (B(ℓ)(z))⊤B(ℓ)(z′) = 
+
+> nℓ
+
+∑
+
+> i=1
+
+kℓ(zi, z ′
+
+> i
+
+), z, z ′ ∈ Rnℓ . (9) 3Thus, each basis-expanded KAN layer has an exact additive kernel structure across coordinates. This interpretation is exact at the layer level; the full deep KAN is a composition of finite-feature layers rather than a single shallow kernel machine. In the Gaussian KAN studied here, the shared dictionary is chosen as a finite Gaussian basis. We fix centers 
+
+C = {c1, . . . , c G} ⊂ [0 , 1] (10) and a shared Gaussian scale parameter 
+
+ǫ > 0. (11) The input variables of the first layer are scaled to [0 , 1], but deeper-layer coordinates are generally not confined to that interval. For this reason, the Gaussian feature map is defined on all of R:
+
+ϕ : R → RG, ϕ(t) = 
+
+
+
+exp 
+
+(
+
+− (t − c1)2
+
+ǫ2
+
+)
+
+...exp 
+
+(
+
+− (t − cG)2
+
+ǫ2
+
+)
+
+. (12) Each Gaussian edge function is therefore 
+
+ψ(ℓ) 
+
+> j,i
+
+(t) = (w(ℓ)
+
+> j,i
+
+)⊤ϕ(t), w(ℓ) 
+
+> j,i
+
+∈ RG, (13) and the layer takes the form 
+
+x(ℓ+1) = W (ℓ)Φ
+
+(
+
+x(ℓ))
+
+, (14) where Φ( z) = 
+
+
+
+ϕ(z1)...
+
+ϕ(znℓ )
+
+ ∈ RnℓG. (15) Thus, a Gaussian KAN layer is a finite Gaussian feature map followed by a linear coefficient map. The induced scalar kernel becomes 
+
+kǫ(s, t ) = ϕ(s)⊤ϕ(t) = 
+
+> G
+
+∑
+
+> g=1
+
+exp 
+
+(
+
+− (s − cg)2
+
+ǫ2
+
+)
+
+exp 
+
+(
+
+− (t − cg)2
+
+ǫ2
+
+)
+
+. (16) This is the finite-dimensional kernel generated by the fixed-center Gaussian feature map. In general, it is not identical to the classical translation-invariant Gaussian kernel exp 
+
+(
+
+− (s − t)2
+
+ǫ2
+
+)
+
+.
+
+Accordingly, the Gaussian KAN considered here should be interpreted as a finite-feature Gaussian expansion with induced kernel ( 16 ). For the first layer, let 
+
+x =
+
+
+
+x1
+
+...
+
+xd
+
+ ∈ [0 , 1] d, d = n0. (17) Its Gaussian feature representation is Φ( x) = 
+
+
+
+ϕ(x1)...
+
+ϕ(xd)
+
+ ∈ RdG , (18) and the first hidden representation satisfies 
+
+x(1) = W (0) Φ( x), W (0) ∈ Rn1×dG . (19) The associated first-layer kernel between two inputs x, x ′ ∈ [0 , 1] d is 
+
+K0(x, x ′) = Φ( x)⊤Φ( x′) = 
+
+> d
+
+∑
+
+> i=1
+
+kǫ(xi, x ′
+
+> i
+
+). (20) 4Hence, the first Gaussian KAN layer induces an additive kernel across the original input coordinates. For a finite sample set 
+
+X = {x1, . . . , x N } ⊂ [0 , 1] d, (21) define the coordinate-wise feature matrices Φ(i) =
+
+
+
+ϕ(x1 
+
+> i
+
+)⊤
+
+...
+
+ϕ(xNi )⊤
+
+ ∈ RN ×G, i = 1 , . . . , d, (22) and the full first-layer feature matrix Φ = [Φ(1) · · · Φ(d)] ∈ RN ×dG . (23) The corresponding empirical first-layer kernel matrix is 
+
+K0 = ΦΦ ⊤ =
+
+> d
+
+∑
+
+> i=1
+
+Φ(i)(Φ(i))⊤ ∈ RN ×N . (24) This matrix form will be used later to analyze approximation quality, numerical rank, and conditioning of the first layer. Finally, define the Gaussian layer operator 
+
+F (ℓ) : Rnℓ → Rnℓ+1 , F (ℓ)(z) = W (ℓ)Φ( z). (25) A deep Gaussian KAN with L layers is then the composition 
+
+f = F (L−1) ◦ F (L−2) ◦ · · · ◦ F (0) , f : [0 , 1] n0 → RnL . (26) Thus, the full model is obtained by composing Gaussian finite-feature layers. In particular, the first layer is structurally distinguished because it acts directly on the original scaled input variables, making it the natural starting point for the kernel and conditioning analysis developed later. 
+
+## 2.1 Shepard-Type Partition-of-Unity Normalization in Gaussian KANs 
+
+A useful variant of the Gaussian KAN is obtained by normalizing the Gaussian basis so that it forms a partition of unity. We refer to this model as the partition-of-unity Gaussian KAN (PU-GKAN). The construction is Shepard-type because it follows the same normalization principle as Shepard’s method: local weights are divided by their sum so that the normalized weights add to one. This idea is closely connected to the meshfree interpretation of Shepard approximation as a normalized weighted average or kernel-based quasi-interpolant [ 45 , 46 ]. In its classical form, Shepard’s approximant on a set of sites {x1, . . . , x N } is written as 
+
+Pf (x) = 
+
+> N
+
+∑
+
+> n=1
+
+f (xn) Ψ n(x), (27) where the generating functions are Ψn(x) = w(xn , x )
+
+∑Nm=1 w(xm , x ) . (28) Hence N∑
+
+> n=1
+
+Ψn(x) = 1 , (29) so the approximant is built from normalized weights that define a partition of unity [ 45 ]. When the weight w is radial, the construction depends only on relative distance to the sites. In the present work, we do not use Shepard’s method as a data-site interpolant. Instead, we transfer its normalization principle to the Gaussian basis underlying each KAN edge function. Let 
+
+C = {c1, . . . , c G} ⊂ [0 , 1] (30) be the fixed set of Gaussian centers introduced earlier, and let 
+
+φg (t) = exp 
+
+(
+
+− (t − cg )2
+
+ǫ2
+
+)
+
+, g = 1 , . . . , G. (31) 5Define the local normalization factor 
+
+Sǫ(t) = 
+
+> G
+
+∑
+
+> h=1
+
+φh(t). (32) Since every Gaussian basis function is strictly positive, one has Sǫ(t) > 0 for all t ∈ R, and the normalized basis is therefore well defined: 
+
+˜φg (t) = φg (t)
+
+Sǫ(t) =exp 
+
+(
+
+− (t−cg )2
+
+> ǫ2
+
+)
+
+∑Gh=1 exp 
+
+(
+
+− (t−ch)2
+
+> ǫ2
+
+) , g = 1 , . . . , G. (33) Equivalently, 
+
+˜ϕ(t) = 
+
+˜φ1(t)...
+
+˜φG(t)
+
+ ∈ RG. (34) By construction, G∑
+
+> g=1
+
+˜φg (t) = 1 , t ∈ R, (35) so ˜ϕ is a partition-of-unity basis over the fixed Gaussian centers. In this sense, ( 33 ) is a Shepard-type normalization of the Gaussian basis. It is important to distinguish this construction from the partition-of-unity mechanism used in finite-basis KANs (FBKANs). FBKANs use a domain-decomposition strategy inspired by finite-basis PINNs, where the physical domain is covered by overlapping subdomains and each subdomain has a smooth partition-of-unity window [ 22 , 52 –55 ]. The global model is then assembled as a weighted sum of local KANs, 
+
+f (x) ≈
+
+> L
+
+∑
+
+> j=1
+
+ωj (x)Kj (x; θj ),
+
+> L
+
+∑
+
+> j=1
+
+ωj (x) = 1 ,
+
+where the functions ωj are overlapping window functions defined over subdomains. Thus, the partition of unity in FBKANs acts at the model-decomposition level : it blends several local subnetworks and requires multiple local KAN components. By contrast, PU-GKAN uses partition-of-unity normalization at the basis-function level inside each edge. There are no overlapping subdomains, no separate local KANs, and no additional domain-decomposition machinery. The original KAN architecture is retained; only the Gaussian feature vector on each edge is rescaled pointwise so that its components sum to one. Therefore, PU-GKAN should be viewed as a Shepard-type normalized Gaussian edge basis, not as a finite-basis or domain-decomposition PoU method. This makes the construction simpler and potentially more efficient, since the normalization does not multiply the number of local subnetworks and only modifies the evaluation of the existing Gaussian basis. Using ˜ϕ, each PU-GKAN edge function is represented as 
+
+˜ψ(ℓ) 
+
+> j,i
+
+(t) = ( ˜w(ℓ)
+
+> j,i
+
+)⊤ ˜ϕ(t), ˜w(ℓ) 
+
+> j,i
+
+∈ RG. (36) The corresponding layer map becomes 
+
+x(ℓ+1)  
+
+> j
+
+=
+
+> nℓ
+
+∑
+
+> i=1
+
+˜ψ(ℓ)
+
+> j,i
+
+(
+
+x(ℓ)
+
+> i
+
+)
+
+=
+
+> nℓ
+
+∑
+
+> i=1
+
+( ˜w(ℓ)
+
+> j,i
+
+)⊤ ˜ϕ
+
+(
+
+x(ℓ)
+
+> i
+
+)
+
+, j = 1 , . . . , n ℓ+1 . (37) Introducing the stacked normalized feature vector 
+
+˜Φ( z) = 
+
+˜ϕ(z1)...
+
+˜ϕ(znℓ )
+
+ ∈ RnℓG, z ∈ Rnℓ , (38) and the corresponding block coefficient matrix ˜W (ℓ) ∈ Rnℓ+1 ×nℓG, (39) the PU-GKAN layer admits the compact form 
+
+x(ℓ+1) = ˜W (ℓ) ˜Φ
+
+(
+
+x(ℓ))
+
+. (40) 6This normalization has an immediate structural consequence. Since ( 35 ) holds identically, constants are reproduced exactly at the edge level: if ˜w(ℓ) 
+
+> j,i
+
+= α1G for some scalar α, then 
+
+˜ψ(ℓ) 
+
+> j,i
+
+(t) = α
+
+> G
+
+∑
+
+> g=1
+
+˜φg (t) = α, t ∈ R. (41) Thus, the Shepard-type partition-of-unity property gives exact constant reproduction, analogous to the role played by normalized weights in classical Shepard approximation. The normalized feature map also induces a normalized finite-dimensional kernel 
+
+˜kǫ(s, t ) = ˜ϕ(s)⊤ ˜ϕ(t) = 
+
+∑Gg=1 exp 
+
+(
+
+− (s−cg )2
+
+> ǫ2
+
+)
+
+exp 
+
+(
+
+− (t−cg )2
+
+> ǫ2
+
+)
+
+Sǫ(s) Sǫ(t) , s, t ∈ R. (42) Hence the first PU-GKAN layer acting on x, x ′ ∈ [0 , 1] d has the additive kernel representation 
+
+˜K0(x, x ′) = ˜Φ( x)⊤ ˜Φ( x′) = 
+
+> d
+
+∑
+
+> i=1
+
+˜kǫ(xi, x ′
+
+> i
+
+). (43) Therefore, PU-GKAN remains within the same finite-feature kernel framework as the standard Gaussian KAN (GKAN), but with Gaussian basis functions rescaled pointwise to form a partition of unity. It is also important to distinguish PU-GKAN from the original Shepard interpolant. In classical Shepard approxima-tion, the normalization is performed over data sites and the coefficients are prescribed by observed function values. In PU-GKAN, the normalization is performed over fixed Gaussian centers {cg}Gg=1 , while the coefficients ˜w(ℓ) 
+
+> j,i
+
+are trainable parameters learned from data. Accordingly, PU-GKAN is best interpreted as a Shepard-type partition-of-unity Gaussian KAN , rather than as a direct implementation of classical Shepard interpolation. To examine how Shepard-type partition-of-unity normalization affects the internal coordinates seen by the Gaussian basis, we compare GKAN with PU-GKAN under identical settings for target function ( 45 ). Both models use architecture (2 , 12 , 12 , 1) with G = 20 Gaussian centers per layer and ǫ = 0 .1. Training is performed for 5000 epochs using AdamW with learning rates 10 −3 for the coefficients and 10 −2 for the scale parameter. We use N = 300 Halton training points and 7000 Halton validation points, without added noise. For this architecture, the third layer receives a 12-dimensional input vector 
+
+x(2) = (x(2) 1 , . . . , x (2) 12 
+
+),
+
+and each component x(2)  
+
+> i
+
+is the scalar argument fed into the Gaussian basis of neuron ni in that layer. Figure 1 plots the empirical samples {
+
+x(2)  
+
+> i
+
+(xn)
+
+}Nn=1 , i = 1 , . . . , 12 ,
+
+for the twelve third-layer neurons. Thus, the horizontal labels n1, . . . , n 12 denote the neurons of the third layer, while the vertical axis shows the corresponding scalar inputs entering their Gaussian expansions. This comparison is meaningful because each Gaussian feature is evaluated as 
+
+φg (t) = exp 
+
+(
+
+− (t − cg )2
+
+ǫ2
+
+)
+
+, cg ∈ [0 , 1] .
+
+Hence, the usefulness of the Gaussian basis depends directly on how the internal coordinates t = x(2)  
+
+> i
+
+are distributed relative to the fixed centers. If these inputs are overly clustered or drift too far from the center region, then only a small subset of Gaussian functions contributes effectively, while many basis functions are weakly used. By contrast, a more balanced distribution allows the Gaussian basis to participate more uniformly across neurons. As shown in Fig. 1, PU-GKAN produces a visibly more compact and regular distribution of third-layer inputs, with fewer extreme excursions than GKAN. This behavior is observed across all layers, although the imbalance becomes more pronounced in deeper layers, where GKAN inputs tend to be more poorly distributed. The result indicates a more balanced use of the Gaussian basis and is consistent with the lower validation error observed for the partition-of-unity normalized model. 7n 
+
+> n
+> n
+> n
+> n
+> n
+> n
+> n
+> n
+> n
+> n
+> n
+
+#   
+
+#   
+
+#   
+
+#  
+
+#  
+
+#  #  '# &$$!!"&% 
+
+#     
+
+> !
+> !
+> !
+> !
+> !
+> !
+> !
+> !
+> !
+> !
+> !
+> !
+
+#       
+
+Figure 1: Empirical distributions of the third-layer inputs x(2)  
+
+> i
+
+entering the Gaussian basis functions for neurons n1, . . . , n 12 
+
+in GKAN and PU-GKAN. The Shepard-type partition-of-unity normalization yields a more compact and regular distri-bution across neurons and attains lower validation error. 
+
+# 3 Reference Scale Range for the Gaussian Scale Parameter 
+
+The Gaussian scale parameter ǫ controls the overlap of the univariate basis functions and therefore strongly affects both approximation accuracy and numerical stability. In this work, we do not aim to rederive a complete scale-selection theory. Instead, we use the practical scale range developed in our companion study [ 44 ] and briefly recall the main reasoning here for completeness. For a training set 
+
+X = {x1, . . . , x N } ⊂ [0 , 1] d,
+
+let 
+
+Aǫ ∈ RN ×dG 
+
+denote the first-layer feature matrix. For the standard Gaussian KAN, Aǫ = Φ ǫ, while for the Shepard-normalized model, 
+
+Aǫ = ˜Φǫ. Since the first layer is the only layer whose inputs are the original scaled variables and whose centers are fixed on [0 , 1], its feature matrix gives the most direct diagnostic of the effect of ǫ. Deeper layers act on learned intermediate variables, so their conditioning also depends on training dynamics and is less suitable as a scale-selection reference. The basic numerical issue can be seen from the fixed-feature least-squares problem min 
+
+> w∈RdG
+
+1
+
+2 ‖Aǫw − y‖22,
+
+whose normal equations involve 
+
+A⊤ 
+
+> ǫ
+
+Aǫw = A⊤ 
+
+> ǫ
+
+y. 
+
+Thus, loss of rank or near-collinearity in Aǫ is amplified in the Gram matrix, with 
+
+κ(A⊤ 
+
+> ǫ
+
+Aǫ) = κ(Aǫ)2
+
+whenever Aǫ has full column rank. Following [ 44 ], we use the numerical-rank condition 
+
+σmin (Aǫ) > max( N, dG ) σmax (Aǫ) εmach 
+
+together with the practical float32 stability criterion 
+
+κ(Aǫ) < 3 × 10 3.
+
+This criterion marks the onset of severe first-layer ill-conditioning. For uniformly spaced Gaussian centers cg ∈ [0 , 1], the adjacent-center spacing is 
+
+h = 1
+
+G − 1 .
+
+8The lower reference scale follows from requiring one Gaussian to have value e−1 at the neighboring center: exp 
+
+(
+
+− h2
+
+ǫ2
+
+)
+
+= e−1, ⇒ ǫ = h = 1
+
+G − 1 .
+
+The upper scale is based on the empirical conditioning boundary described above. In [ 44 ], this boundary was found to scale approximately as 
+
+ǫcond (N, G ) ≈ 2
+
+G − 1 ,
+
+with the dependence on G dominating the weaker dependence on N once the domain is sufficiently sampled. We therefore use the practical interval 
+
+ǫ ∈
+
+[ 1
+
+G − 1 , 2
+
+G − 1
+
+]
+
+(44) as the reference range for reporting errors and comparing the standard and Shepard-normalized Gaussian KANs. Figure 2 illustrates the same mechanism on a representative example. The validation error follows the first-layer conditioning trend more closely than the deeper-layer condition numbers, and the transition to poorer accuracy occurs near the first-layer conditioning boundary. The collapse experiment also shows that damaging the first layer produces the largest error increase, while collapsing deeper layers is less harmful. This supports using the first-layer feature matrix as the reference object for choosing ǫ; the full derivation and additional evidence are given in [ 44 ]. 
+
+# 1   1  1 1 
+
+## ε
+
+# 1   
+
+# 1   
+
+# 1  1 
+
+>  '#" 
+
+#   
+
+#  
+
+# )%#" 
+
+# )%#" 
+
+# )%#" 
+
+#     # $&)% 
+
+#    
+
+#    
+
+#    
+
+>  '#"
+
+# '# )%# $&#"%%#% 
+
+#  
+
+#  
+
+#   
+
+#  
+
+#  
+
+#   
+
+#  
+
+#  
+
+#  
+
+> #"'#""(!%  
+
+Figure 2: First-layer conditioning and layer-collapse effects for F 1 with N = 961 and G = 14. The left panel compares validation RMSE with layer-wise condition numbers; the red dotted line marks the first-layer conditioning threshold 
+
+κ(Aǫ) ≈ 3 × 10 3. The right panel shows that collapsing the first layer causes the largest degradation, supporting the use of the first-layer feature matrix as the reference object for selecting ǫ.
+
+# 4 Numerical Examples 
+
+## 4.1 Target Functions 
+
+We consider seven two-dimensional target functions defined on either [0 , 1] 2 or [ −1, 1] 2. They are denoted by F 1, . . . , F 7, plotted in Fig. 3, and listed below. 9F 1( x, y ) = 0 .75 exp 
+
+(
+
+− (9 x − 2) 2 + (9 y − 2) 2
+
+4
+
+)
+
++ 0 .75 exp 
+
+(
+
+− (9 x + 1) 2
+
+49 − (9 y + 1) 2
+
+10 
+
+)
+
++ 0 .5 exp 
+
+(
+
+− (9 x − 7) 2 + (9 y − 3) 2
+
+4
+
+)
+
+− 0.2 exp (−(9 x − 4) 2 − (9 y − 7) 2) , (x, y ) ∈ [0 , 1] 2, (45) 
+
+F 2( x, y ) = 1
+
+9
+
+(64 − 81 (|x − 1 
+
+> 2
+
+| + |y − 1 
+
+> 2
+
+|)) − 1
+
+2 , (x, y ) ∈ [0 , 1] 2, (46) 
+
+F 3( x, y ) = sin(4 πx ) sin(4 πy ), (x, y ) ∈ [0 , 1] 2, (47) 
+
+F 4( x, y ) = 1
+
+1 + 100( x2 − y2)2 , (x, y ) ∈ [−1, 1] 2, (48) 
+
+F 5( x, y ) = 1
+
+1 + 10 3 (( x2 − 0.25) 2(y2 − 0.25) 2) , (x, y ) ∈ [−1, 1] 2, (49) 
+
+F 6( x, y ) = tanh(10 x) tanh(10 y)
+
+tanh 2(10) + cos(5 x), (x, y ) ∈ [−1, 1] 2. (50) For the discontinuous target, define 
+
+s(x) = sin(2 πx ) + sin(4 πx ) + sin(6 πx ) + sin(8 πx ). (51) Then 
+
+F 7( x, y ) = 
+
+{(5 + s(x)) (1 + 0 .15 sin(2 πy )) , x < 1 
+
+> 2
+
+,
+
+cos(20 πx ) (1 + 0 .15 sin(2 πy )) , x ≥ 1 
+
+> 2
+
+, (x, y ) ∈ [0 , 1] 2. (52) 
+
+Figure 3: Target functions used in this study for validation. 
+
+## 4.2 Experimental Setup and Error Metric 
+
+All input variables are affinely normalized to [0 , 1] before being passed to the first KAN layer. The Gaussian centers are fixed on this normalized interval, and errors are evaluated in the original physical coordinates. Unless stated otherwise, only the trainable edge coefficients are optimized; the Gaussian scale parameter ǫ is fixed during each training run. All models are trained using the AdamW optimizer with learning rate 10 −3.For the scale-sensitivity experiments, the Gaussian scale parameter is swept over 
+
+ǫ ∈ [0 .005 , 10] ,
+
+using 100 logarithmically spaced values. For each value of ǫ, the model is trained for 10 ,000 epochs, and the validation error is recorded. Training points are generated using Halton sequences, which are commonly used in meshfree and quasi-Monte Carlo approximation settings [ 45 ]. For the two-dimensional function-approximation examples, validation is performed on a uniform 90 × 90 grid. In these experiments, N denotes the number of collocation points used for function approximation problems, while for PDE problems it denotes the total number of training points, including interior, boundary, and initial-condition points when applicable. The parameter G denotes the number of Gaussian grid centers used in each edge basis. Unless stated otherwise, the results reported in the figures and tables are geometric averages over at least four random seeds. 10 The validation error is measured by the root-mean-square error (RMSE), RMSE = 
+
+(
+
+1
+
+Nval 
+
+> Nval
+
+∑
+
+> i=1
+
+|uθ (xi) − u(xi)|2
+
+)1/2
+
+, (53) where uθ is the model prediction, u is the exact target function or exact PDE solution, and Nval is the number of validation points. For each experiment, the optimal Gaussian scale is selected as the value that gives the smallest validation RMSE. For the standard Gaussian KAN, we denote this value by 
+
+ǫ∗ 
+
+> GKAN
+
+= arg min  
+
+> ǫ
+
+RMSE GKAN (ǫ), (54) while for the Shepard-normalized Gaussian KAN, we denote it by 
+
+ǫ∗ 
+
+> P U −GKAN
+
+= arg min  
+
+> ǫ
+
+RMSE P U −GKAN (ǫ). (55) Here, RMSE GKAN (ǫ) and RMSE P U −GKAN (ǫ) are the validation RMSE values obtained by the standard Gaussian and Shepard-normalized Gaussian models, respectively, at scale ǫ.The percentage improvement reported in the tables is computed as Imp . = RMSE GKAN − RMSE P U −GKAN 
+
+RMSE GKAN 
+
+× 100% . (56) Thus, positive values indicate that the Shepard-normalized model is more accurate, while negative values indicate that the standard Gaussian KAN gives the lower RMSE. 
+
+## 4.3 Representative Error Curves 
+
+We first compare the standard Gaussian KAN and the Shepard-normalized Gaussian KAN on four representative targets before presenting the full parameter sweeps. Figure 4 reports the validation RMSE as a function of ǫ for F 1, F 3, F 5, and 
+
+F 7, with N = 1000 and G = 20. The vertical lines mark the reference scales ǫ = 1 /(G − 1) and ǫ = 2 /(G − 1). The error curves show the expected sensitivity to ǫ: very small and very large scales are generally unfavorable. For 
+
+F 1, F 3, and F 5, Shepard normalization gives lower error over a broad part of the relevant range and usually a lower minimum. For the discontinuous target F 7, the improvement is less uniform, which is expected since discontinuities are harder to represent with smooth radial bases. These examples motivate the systematic comparisons with respect to N ,
+
+G, architecture, and PDE settings in the following subsections. 
+
+1   1  1 1  1 1
+
+ε
+
+1   
+
+1   
+
+1  1 
+
+>   
+
+1
+
+1   1  1 1  1 1
+
+ε
+
+1   
+
+1   
+
+1  1 
+
+1  
+
+1   1  1 1  1 1
+
+ε
+
+1   
+
+1  1 
+
+
+
+1   1  1 1  1 1
+
+ε
+
+1  1 
+
+1 
+
+
+
+   
+
+Figure 4: Validation RMSE versus ǫ for F 1, F 3, F 5, and F 7, comparing the Gaussian KAN and the Shepard-normalized Gaussian KAN with N = 1000 and G = 20. The vertical lines mark ǫ = 1 /(G − 1) and ǫ = 2 /(G − 1). 
+
+## 4.4 Effect of the Sample Size N
+
+We next study the effect of the number of training samples N at fixed G = 20. For each target and each value of N ,Table 1 reports the best validation RMSE over the reference interval 
+
+ǫ ∈
+
+[ 1
+
+G − 1 , 2
+
+G − 1
+
+]
+
+.
+
+11 The reported errors are obtained by first taking the geometric mean over seeds at each ǫ, and then selecting the best ǫ in this interval. The Shepard-normalized Gaussian KAN gives lower RMSE for most targets and sample sizes. The improvement is especially clear for the smooth and moderately regular targets F 1, F 2, F 3, F 4, F 5, and F 6. The discontinuous target F 7is less uniform: the standard Gaussian KAN is better for N = 500 and N = 1500, while the normalized model becomes better at N = 2000. Figure 5 shows the validation RMSE during training for representative targets at N = 2000, G = 20, and ǫ = 0 .1. The normalized model generally converges to a lower error and remains below the standard Gaussian KAN for most of the training process, although the improvement is less pronounced for the discontinuous target. 
+
+0 000 000 000 000 0000 
+
+0  
+
+0  
+
+0   
+
+> "!'!$#
+
+#  
+
+0 000 000 000 000 0000 
+
+0  
+
+0  
+
+0   
+
+# 
+
+0 000 000 000 000 0000 
+
+# %$ 
+
+0  
+
+0   
+
+> "!'!$#
+
+# 
+
+0 000 000 000 000 0000 
+
+# %$ 
+
+0  
+
+0   
+
+0 0
+
+#  
+
+# "!'!$#(&%$  000 0 ε      
+
+    
+
+Figure 5: Validation RMSE versus epoch for representative targets with N = 2000, G = 20, and ǫ = 0 .1. 
+
+## 4.5 Effect of the Number of Centers G
+
+We next vary the number of Gaussian centers G at fixed N = 1000. For each target and each value of G, Table 2 reports the best validation RMSE over the corresponding range 
+
+ǫ ∈
+
+[ 1
+
+G − 1 , 2
+
+G − 1
+
+]
+
+,
+
+where the range changes with G. As before, errors are obtained by taking the geometric mean across seeds at each ǫ,followed by selecting the best ǫ in the admissible interval. The normalized Gaussian KAN gives lower RMSE for all tested values of G on F 1, F 2, F 3, F 4, F 5, and F 6. The gains remain clear as G increases, showing that the benefit of normalization is not limited to small feature dictionaries. For the discontinuous target F 7, the standard Gaussian KAN remains better for all tested G, indicating that the normalized basis is less effective for this case. 
+
+## 4.6 Extension to Mat´ ern Bases 
+
+We also test whether the same normalization idea applies beyond Gaussian bases. Here we use the Mat´ ern-5 basis 
+
+φM5 (ρ; ǫ) = 
+
+(
+
+1 + r + r2
+
+3
+
+)
+
+e−r, r =
+
+√10 ρ
+
+ǫ ,
+
+12 Table 1: Best validation RMSE over ǫ ∈ [1 /(G − 1) , 2/(G − 1)] for the Gaussian KAN (GKAN) and the partition-of-unity Gaussian KAN (PU-GKAN) at fixed G = 20. Positive improvement means that PU-GKAN is more accurate. 
+
+F N ǫ∗ 
+
+> GKAN
+
+ǫ∗ 
+
+> PU −GKAN
+
+GKAN PU-GKAN Imp. 
+
+F1 500 0.100 0.092 1.95e-03 5.05e-04 74.1% 1500 0.073 0.100 6.22e-04 2.68e-04 56.9% 2000 0.068 0.068 6.11e-04 3.71e-04 39.3% 
+
+F2 500 0.100 0.079 4.00e-02 1.73e-02 56.8% 1500 0.058 0.073 1.27e-02 6.27e-03 50.7% 2000 0.054 0.063 1.02e-02 5.02e-03 50.8% 
+
+F3 500 0.100 0.092 8.24e-03 2.05e-03 75.1% 1500 0.092 0.086 2.13e-03 7.79e-04 63.5% 2000 0.092 0.092 1.53e-03 7.32e-04 52.3% 
+
+F4 500 0.068 0.092 6.81e-02 4.35e-02 36.2% 1500 0.100 0.079 1.85e-02 6.11e-03 67.0% 2000 0.100 0.079 1.05e-02 4.17e-03 60.3% 
+
+F5 500 0.100 0.100 2.55e-02 1.44e-02 43.7% 1500 0.086 0.079 4.99e-03 2.84e-03 43.1% 2000 0.086 0.054 3.88e-03 1.83e-03 52.9% 
+
+F6 500 0.100 0.086 7.71e-03 1.68e-03 78.2% 1500 0.100 0.092 1.83e-03 8.53e-04 53.5% 2000 0.092 0.073 1.49e-03 7.22e-04 51.4% 
+
+F7 500 0.086 0.073 7.47e-02 9.17e-02 -22.7% 1500 0.073 0.073 1.22e-02 1.84e-02 -50.8% 2000 0.079 0.054 1.02e-02 7.02e-03 31.2% 
+
+where ρ denotes the distance to a center. The lower reference scale is chosen by the same adjacent-center overlap rule used for the Gaussian case. With h = 1 /(G − 1) and overlap level e−1, we solve 
+
+(
+
+1 + s + s2
+
+3
+
+)
+
+e−s = e−1, s ≈ 2.90463 ,
+
+which gives 
+
+ǫM5 low =
+
+√10 
+
+2.90463 h ≈ 1.09 
+
+G − 1 .
+
+The upper reference scale is determined by the first-layer conditioning boundary κ(Aǫ) ≈ 3 × 10 3. In the experiments, this boundary is typically farther to the right than in the Gaussian case, indicating that the Mat´ ern basis remains better conditioned for larger ǫ.Figure 6 compares the Mat´ ern KAN and its Shepard-normalized variant for F 1, F 3, F 5, and F 7. The normalized Mat´ ern model generally lowers the error for the smooth and moderately regular targets, while the discontinuous case remains less uniform. This confirms that the benefit of Shepard-type normalization is not restricted to Gaussian bases. 
+
+1   1  1 1  1 1
+
+> ε
+
+1   
+
+1   
+
+1  1 
+
+>   
+
+1
+
+1   1  1 1  1 1
+
+> ε
+
+1   
+
+1  1 
+
+1  
+
+1   1  1 1  1 1
+
+> ε
+
+1   
+
+1  1 
+
+
+
+1   1  1 1  1 1
+
+> ε
+
+1  1 
+
+1 
+
+
+
+    
+
+Figure 6: Validation RMSE versus ǫ for the Mat´ ern KAN and Shepard-normalized Mat´ ern KAN with N = 1000 and 
+
+G = 20. The vertical lines mark ǫM5 low ≈ 1.09 /(G − 1) and the first-layer conditioning boundary κ(Aǫ) ≈ 3 × 10 3.13 Table 2: Best validation RMSE over ǫ ∈ [1 /(G − 1) , 2/(G − 1)] for the Gaussian KAN (GKAN) and the partition-of-unity Gaussian KAN (PU-GKAN) at fixed N = 1000. The admissible ǫ-range is recomputed for each G. Positive improvement means that PU-GKAN is more accurate. 
+
+F G ǫ∗ 
+
+> GKAN
+
+ǫ∗ 
+
+> PU −GKAN
+
+GKAN PU-GKAN Imp. 
+
+F1 14 0.126 0.116 4.37e-04 2.51e-04 42.6% 18 0.108 0.108 4.78e-04 2.10e-04 56.1% 22 0.079 0.092 5.55e-04 2.16e-04 61.2% 
+
+F2 14 0.116 0.116 7.30e-03 4.95e-03 32.1% 18 0.100 0.068 7.00e-03 5.62e-03 19.7% 22 0.079 0.063 8.14e-03 5.88e-03 27.7% 
+
+F3 14 0.100 0.108 1.88e-03 9.97e-04 47.1% 18 0.092 0.100 1.88e-03 8.77e-04 53.3% 22 0.079 0.086 1.90e-03 6.38e-04 66.5% 
+
+F4 14 0.147 0.108 1.17e-02 4.92e-03 58.0% 18 0.100 0.100 1.38e-02 4.98e-03 63.9% 22 0.092 0.079 2.66e-02 7.25e-03 72.7% 
+
+F5 14 0.100 0.086 6.34e-03 4.62e-03 27.1% 18 0.073 0.068 7.69e-03 3.98e-03 48.2% 22 0.073 0.050 7.67e-03 2.92e-03 62.0% 
+
+F6 14 0.136 0.108 2.01e-03 9.89e-04 50.9% 18 0.086 0.092 1.89e-03 7.81e-04 58.7% 22 0.092 0.092 2.15e-03 7.70e-04 64.2% 
+
+F7 14 0.108 0.086 6.20e-02 6.64e-02 -7.1% 18 0.086 0.073 4.58e-02 8.52e-02 -86.0% 22 0.086 0.050 4.92e-02 6.34e-02 -28.8% 
+
+## 4.7 Higher Dimensions and Different Architectures 
+
+We next examine the dimension-dependent test problem 
+
+fd(x) = exp 
+
+(
+
+1
+
+d
+
+> d
+
+∑
+
+> i=1
+
+(
+
+sin( πx i) + 1
+
+2 x2
+
+> i
+
+))
+
+, x ∈ [0 , 1] d. (57) Training and evaluation points are generated on [0 , 1] d using Halton sequences. We compare the Gaussian KAN with its Shepard-normalized variant over four representative settings, where the dimension d, sample size N , and architecture are varied together. Figure 7 shows the validation RMSE as a function of ǫ. In all cases, the error curves are U-shaped, so both overly small and overly large values of ǫ are unfavorable. The two vertical reference lines indicate the interval 
+
+[ 1
+
+G − 1 , 2
+
+G − 1
+
+]
+
+.
+
+Across all four settings, the normalized Gaussian KAN attains a lower minimum RMSE and usually maintains a broader low-error region. Table 3 reports the best validation RMSE in this interval. The normalized model is more accurate in every tested case, with improvements ranging from 61 .5% to 77 .0%. These results show that the benefit of Shepard-type normalization is not restricted to the low-dimensional examples considered earlier and remains clear across the tested dimension–architecture pairs. 
+
+## 4.8 Physics-Informed Helmholtz Problem 
+
+We next consider the two-dimensional Helmholtz problem 
+
+−∆u − λu = f in Ω = (0 , 1) 2, (58) 14 Table 3: Best validation RMSE over ǫ ∈ [1 /(G − 1) , 2/(G − 1)] for the Gaussian KAN (GKAN) and the partition-of-unity Gaussian KAN (PU-GKAN) in the tested dimension–architecture settings. Positive improvement means that PU-GKAN is more accurate. 
+
+d N Arch. ǫ∗ 
+
+> GKAN
+
+ǫ∗ 
+
+> PU −GKAN
+
+GKAN PU-GKAN Imp. 
+
+1 30 [12] 0.100 0.100 2.88e-03 1.11e-03 61.5% 2 1000 [12,12] 0.092 0.092 1.37e-03 3.15e-04 77.0% 3 27000 [12,12,12] 0.092 0.058 2.22e-03 6.22e-04 72.0% 4 81000 [12,12,12] 0.054 0.092 1.55e-03 3.66e-04 76.4% 
+
+## 00 0 0 00 
+
+ε
+
+## 0  
+
+## 0   
+
+## 0   
+
+## 0   
+
+## 0 0
+
+>    
+
+##     
+
+##     
+
+ε
+
+##    
+
+##    
+
+##    
+
+##       
+
+##     
+
+ε
+
+##    
+
+##    
+
+##    
+
+##     
+
+##     
+
+ε
+
+##    
+
+##    
+
+##    
+
+##    
+
+##      
+
+Figure 7: Validation RMSE versus ǫ for the Gaussian and Shepard-normalized Gaussian KANs across four dimension– architecture settings. The vertical reference lines mark ǫ = 1 /(G − 1) and ǫ = 2 /(G − 1). with homogeneous Dirichlet boundary condition 
+
+u = 0 on ∂Ω, (59) and fix 
+
+λ = 100 .
+
+As a reference solution, we take 
+
+u(x, y ) = sin( a1πx ) sin( a2πy ), (x, y ) ∈ Ω, (60) with ( a1, a 2) = (1 , 4). Substituting ( 60 ) into ( 58 ) gives 
+
+f (x, y ) = ((a21 + a22)π2 − λ) u(x, y ). (61) Both models use the architecture (2 , 12 , 12 , 1) with G = 20 Gaussian centers per layer. We sample N = 2000 interior Halton points and 200 boundary points, and evaluate the solution on a 90 × 90 grid. The boundary-condition weight is 
+
+WBC = 100. We compare the standard Gaussian KAN and the Shepard-normalized Gaussian KAN by sweeping ǫ over [0 .005 , 10]. Figure 8 summarizes the results. In Fig. 8(a) , the normalized model attains a lower minimum validation RMSE and remains favorable over the useful range of ǫ. The advantage is most visible near the optimal region, where the standard Gaussian model reaches its best performance only over a narrower interval. Figure 8(b) shows the validation RMSE during training for one representative run at ǫ = 2 /(G − 1). After the initial stage, the normalized model continues to decrease and stays clearly below the standard Gaussian model. These results show that the benefit of Shepard-type normalization persists in this more challenging PDE setting. For 
+
+λ = 100, normalization improves both the ǫ-sensitivity and the final accuracy. 
+
+## 4.9 Physics-Informed Wave Equation 
+
+We next consider the one-dimensional wave equation on the space–time domain (x, t ) ∈ [0 , 1] × [0 , 3] .
+
+The governing equation is 
+
+utt (x, t ) − uxx (x, t ) = 0 , (x, t ) ∈ (0 , 1) × (0 , 3) , (62) 15 1   1  1 1  1 1
+
+ε
+
+## 1   
+
+## 1  1 
+
+## 1 
+
+>   
+
+ 
+
+  
+
+> (a)
+
+0 0000 0000 0000 0000 0000 
+
+##  
+
+0   
+
+0   
+
+>   
+
+  
+
+
+
+> (b)
+
+Figure 8: Helmholtz problem with λ = 100: (left) validation RMSE versus ǫ; (right) validation RMSE versus epoch for a representative run at ǫ = 2 /(G − 1). with homogeneous Dirichlet boundary conditions 
+
+u(0 , t ) = u(1 , t ) = 0 , t ∈ [0 , 3] , (63) and initial conditions 
+
+u(x, 0) = 1
+
+2 sin( πx ), (64) 
+
+ut(x, 0) = π sin(3 πx ). (65) These data are induced by the exact solution 
+
+u(x, t ) = 1
+
+2 sin( πx ) cos( πt ) + 1
+
+3 sin(3 πx ) sin(3 πt ), (x, t ) ∈ [0 , 1] × [0 , 3] , (66) which satisfies ( 62 )–( 65 ). We solve this problem using the Gaussian KAN and the Shepard-normalized Gaussian KAN under the same training setting. Figure 9(a) shows the validation RMSE versus ǫ for N = 6000, G = 20, and WBC = 100. Both models exhibit a clear low-error region near ǫ ≈ 10 −1, but the normalized model reaches a lower minimum error. Figure 9(b) shows the validation RMSE versus epoch at ǫ = 2 /(G − 1). In this case, the normalized model converges to a smaller error and maintains a more favorable training trajectory. Overall, the wave-equation experiment is consistent with the regression and Helmholtz results: Shepard normalization improves accuracy in the practically relevant range of ǫ.
+
+1   1  1 1  1 1
+
+> ε
+
+1   
+
+1   
+
+1  1 
+
+>   
+
+
+
+ 
+
+> (a)
+
+0 0000 0000 0000 0000 0000 
+
+##  
+
+0   
+
+0   
+
+0   
+
+>   
+
+  
+
+
+
+> (b)
+
+Figure 9: Wave equation results for the Gaussian KAN and the Shepard-normalized Gaussian KAN. (a) Validation RMSE versus ǫ for N = 6000 and G = 20. (b) Validation RMSE versus epoch at ǫ = 2 /(G − 1). 16 5 Conclusion 
+
+We introduced the partition-of-unity Gaussian KAN (PU-GKAN), a Shepard-type normalized Gaussian KAN in which each Gaussian edge basis is divided by its local sum over fixed centers. This simple modification converts the raw Gaussian basis into a partition-of-unity feature map while preserving the standard edge-based structure of KANs. Consequently, PU-GKAN keeps essentially the same trainable coefficient structure as GKAN, reproduces constants exactly at the edge level, and admits a normalized finite-feature kernel interpretation. We also formulated both GKAN and PU-GKAN layers from a finite-feature and additive-kernel viewpoint. This formulation makes the induced kernels and empirical feature matrices explicit, providing a natural framework for discussing rank, conditioning, and scale-parameter effects. Using the first-layer feature matrix as the reference object, we adopted a practical scale-selection interval for ǫ, whose lower endpoint is determined by adjacent-center overlap and whose upper endpoint is associated with a conservative conditioning threshold. The numerical results show that the upper reference scale ǫ = 2 /(G − 1) often performs very well and gives accuracy close to the best value obtained from full ǫ-sweeps. The experiments demonstrate that Shepard-type partition-of-unity normalization improves the behavior of Gaussian KANs in several settings. Across sample-size and center-number sweeps, PU-GKAN gives lower validation error for most smooth and moderately non-smooth targets, while also reducing sensitivity to ǫ. The same trend is observed in higher-dimensional tests, in Mat´ ern-based KANs, and in physics-informed examples involving Helmholtz and wave equations. The discontinuous target is the main exception, where the advantage of PU-GKAN is less uniform, which is consistent with the difficulty of approximating discontinuities using smooth radial bases. Overall, the results indicate that Shepard-type partition-of-unity normalization is an effective and inexpensive stabi-lization mechanism for RBF-based KANs. Unlike purely empirical architectural modifications, the proposed normalization is supported by classical Shepard approximation, partition-of-unity ideas, finite-feature kernel structure, and conditioning analysis. It improves the use of local basis functions, regularizes the internal feature representation, and makes Gaussian and related RBF bases less sensitive to the precise choice of scale parameter. Future work may study adaptive or trainable normalized scales, higher-order partition-of-unity constructions, and extensions to operator-learning and time-dependent PDE settings. 
+
+# References 
+
+[1] Z. Liu, Y. Wang, S. Vaidya, F. Ruehle, J. Halverson, M. Soljaˇ ci´ c, T. Y. Hou, and M. Tegmark, “KAN: Kolmogorov-Arnold networks,” arXiv preprint arXiv:2404.19756, 2024. [2] Z. Liu, P. Ma, Y. Wang, W. Matusik, and M. Tegmark, “KAN 2.0: Kolmogorov-Arnold networks meet science,” 
+
+arXiv preprint arXiv:2408.10205, 2024. [Online]. Available: https://github.com/KindXiaoming/pykan 
+
+[3] M. Raissi, P. Perdikaris, and G. E. Karniadakis, “Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations,” J. Comput. Phys. , vol. 378, pp. 686–707, 2019. [4] G. E. Karniadakis, I. G. Kevrekidis, L. Lu, P. Perdikaris, S. Wang, and L. Yang, “Physics-informed machine learning,” 
+
+Nat. Rev. Phys. , vol. 3, no. 6, pp. 422–440, 2021. [5] A. Noorizadegan, R. Cavoretto, D. L. Young, and C. S. Chen, “Stable weight updating: A key to reliable PDE solutions using deep learning,” Engineering Analysis with Boundary Elements , vol. 168, p. 105933, 2024. [6] S. Wang, A. K. Bhartari, B. Li, and P. Perdikaris, “Gradient alignment in physics-informed neural networks: Asecond-order optimization perspective,” arXiv preprint arXiv:2502.00604, 2025. [7] A. Noorizadegan, Y. C. Hon, D.-L. Young, and C.-S. Chen, “Enhancing supervised surface reconstruction through implicit weight regularization,” Engineering Analysis with Boundary Elements , vol. 180, p. 106439, 2025. doi: 
+
+https://doi.org/10.1016/j.enganabound.2025.106439 .[8] A. Noorizadegan, D. L. Young, Y. C. Hon, and C. S. Chen, “Power-enhanced residual network for function ap-proximation and physics-informed inverse problems,” Applied Mathematics and Computation , vol. 480, p. 128910, 2024. [9] S. Wang, Y. Teng, and P. Perdikaris, “Understanding and mitigating gradient flow pathologies in physics-informed neural networks,” SIAM Journal on Scientific Computing , vol. 43, no. 5, pp. A3055–A3081, 2021. 17 [10] A. Noorizadegan, S. Wang, , L. Ling, and J.P. Dominguez-Morales, A Practitioner’s Guide to Kolmogorov-Arnold Networks. arXiv preprint arXiv:2510.25781, 2025. [11] S. Sidharth, K. A. R., and A. K. P., “Chebyshev polynomial-based Kolmogorov-Arnold networks: An efficient archi-tecture for nonlinear function approximation,” arXiv preprint arXiv:2405.07200, 2024. [12] N. A. Daryakenari, K. Shukla, and G. E. Karniadakis, “Representation meets optimization: Training PINNs and PIKANs for gray-box discovery in systems pharmacology,” arXiv preprint arXiv:2504.07379, 2025. [13] J. D. Toscano, L.-L. Wang, and G. E. Karniadakis, “KKANs: Kurkova-Kolmogorov-Arnold networks and their learning dynamics,” Neural Netw. , vol. 191, p. 107831, 2025. [14] A. A. Aghaei, “fKAN: Fractional Kolmogorov-Arnold networks with trainable Jacobi basis functions,” arXiv preprint 
+
+arXiv:2406.07456, 2024. [Online]. Available: https://github.com/alirezaafzalaghaei/fKAN 
+
+[15] A. Kashefi and T. Mukerji, “Kolmogorov–Arnold PointNet: Deep learning for prediction of fluid fields on irregular geometries,” arXiv preprint arXiv:2504.06327, 2025. [Online]. Available: 
+
+https://github.com/Ali-Stanford/Physics_Informed_KAN_PointNet 
+
+[16] J. Xu, Z. Chen, J. Li, S. Yang, W. Wang, X. Hu, and E. C. H. Ngai, “FourierKAN-GCF: Fourier Kolmogorov-Arnold network—An effective and efficient feature transformation for graph collaborative filtering,” arXiv preprint 
+
+arXiv:2406.01034, 2024. [Online]. Available: https://github.com/Jinfeng-Xu/FKAN-GCF 
+
+[17] J. Zhang, Y. Fan, K. Cai, and K. Wang, “Kolmogorov-Arnold Fourier networks,” arXiv preprint arXiv:2502.06018, 2025. [Online]. Available: https://github.com/kolmogorovArnoldFourierNetwork/KAF 
+
+[18] Q. Qiu, T. Zhu, H. Gong, L. Chen, and H. Ning, “ReLU-KAN: New Kolmogorov-Arnold networks that only need matrix addition, dot multiplication, and ReLU,” arXiv preprint arXiv:2406.02075, 2024. [Online]. Available: 
+
+https://github.com/quiqi/relu_kan 
+
+[19] C. C. So and S. P. Yung, “Higher-order ReLU-KANs (HRKANs) for solving physics-informed neural networks (PINNs) more accurately, robustly, and faster,” arXiv preprint arXiv:2409.14248, 2024. [20] S. Rigas, M. Papachristou, T. Papadopoulos, F. Anagnostopoulos, and G. Alexandridis, “Adaptive training of grid-dependent physics-informed Kolmogorov-Arnold networks,” IEEE Access , vol. 12, pp. 176982–176998, 2024. [Online]. Available: https://github.com/srigas/jaxKAN 
+
+[21] Z. Bozorgasl and H. Chen, “Wav-KAN: Wavelet Kolmogorov-Arnold networks,” arXiv preprint arXiv:2405.12832, 2024. [Online]. Available: https://github.com/zavareh1/Wav-KAN 
+
+[22] A. A. Howard, B. Jacob, S. H. Murphy, A. Heinlein, and P. Stinis, “Finite basis Kolmogorov-Arnold networks: Domain decomposition for data-driven and physics-informed problems,” arXiv preprint arXiv:2406.19662, 2024. [Online]. Available: https://github.com/pnnl/neuromancer/tree/feature/fbkans/examples/KANs 
+
+[23] S. T. Seydi, “Exploring the potential of polynomial basis functions in Kolmogorov-Arnold networks: A comparative study of different groups of polynomials,” arXiv preprint arXiv:2406.02583, 2024. [24] J. A. Actor, G. Harper, B. Southworth, and E. C. Cyr, “Leveraging KANs for expedient training of multichannel MLPs via preconditioning and geometric refinement,” arXiv preprint arXiv:2505.18131, 2025. [25] A. A. Howard, N. Zolman, B. Jacob, S. L. Brunton, and P. Stinis, “SINDy-KANs: Sparse identification of nonlinear dynamics through Kolmogorov-Arnold networks,” 2026. [26] S. Rigas, D. Verma, G. Alexandridis, and Y. Wang, “Initialization schemes for Kolmogorov-Arnold networks: An em-pirical study,” arXiv preprint arXiv:2509.03417, 2025. https://github.com/srigas/KAN_Initialization_Schemes 
+
+[27] R. L. Hardy, Multiquadric equations of topography and other irregular surfaces, Journal of Geophysical Research (1896-1977), 76(8), 1905–1915, 1971. [28] E. Kansa, Multiquadrics scattered data approximation scheme with applications to computational fluid-dynamics solutions to parabolic, hyperbolic and elliptic partial differential equations, Computers and Mathematics with Appli-cations, 19(8), 147–161, 1990. [29] Z. Li, “Kolmogorov-Arnold networks are radial basis function networks,” arXiv preprint arXiv:2405.06721, 2024. [Online]. Available: https://github.com/ZiyaoLi/fast-kan 
+
+18 [30] B. C. Koenig, S. Kim, and S. Deng, “LeanKAN: A parameter-lean Kolmogorov-Arnold network layer with im-proved memory efficiency and convergence behavior,” arXiv preprint arXiv:2502.17844, 2025. [Online]. Available: 
+
+https://github.com/DENG-MIT/LeanKAN 
+
+[31] D. W. Abueidda, P. Pantidis, and M. E. Mobasher, “DeepOKAN: Deep operator network based on Kolmogorov-Arnold networks for mechanics problems,” Computer Methods in Applied Mechanics and Engineering , vol. 436, p. 117699, 2025. GitHub: https://github.com/DiabAbu/Dee 
+
+[32] S. T. Chiu, S. W. Cheung, U. Braga-Neto, C. S. Lee, and R. P. Li, “Free-RBF-KAN: Kolmogorov-Arnold Networks with Adaptive Radial Basis Functions for Efficient Function Learning,” arXiv preprint arXiv:2601.07760, 2026. [33] A. Delis, “FasterKAN,” GitHub repository, 2024. [Online]. Available: https://github.com/AthanasiosDelis/faster-kan 
+
+[34] M. Wolff, F. Eilers, and X. Jiang, “CVKAN: Complex-valued Kolmogorov-Arnold networks,” arXiv preprint 
+
+arXiv:2502.02417, 2025. [Online]. Available: https://github.com/M-Wolff/CVKAN 
+
+[35] R. Che, L. af Klinteberg, and M. Aryapoor, “Improved Complex-Valued Kolmogorov–Arnold Networks with Theo-retical Support,” in Proc. 24th EPIA Conf. on Artificial Intelligence (EPIA) , Faro, Portugal, Oct. 2025, Part I, pp. 439–451. Springer, Heidelberg. [36] Z. Chao, X. Liu, Z. Wu, and X. Li, “RBF-KAN: Radial Basis Function-Kolmogorov-Arnold Networks,” IEEE Internet Things J. , 2026. [37] A. Noorizadegan, C.-S. Chen, D. L. Young, and C. S. Chen, “Effective condition number for the selection of the RBF shape parameter with the fictitious point method,” Applied Numerical Mathematics , vol. 178, pp. 280–295, 2022. [38] C.-S. Chen, A. Noorizadegan, D. L. Young, and C. S. Chen, “On the selection of a better radial basis function and its shape parameter in interpolation problems,” Applied Mathematics and Computation , vol. 442, p. 127713, 2023. [39] A. Noorizadegan, A. Naji, T. L. Lee, R. Cavoretto, and D. L. Young, “Bending analysis of quasicrystal plates using adaptive radial basis function method,” J. Comput. Appl. Math. , vol. 450, p. 115990, 2024. [40] A. Noorizadegan, and R. Schaback, “Introducing the evaluation condition number: A novel assessment of conditioning in radial basis function methods. Engineering Analysis with Boundary Elements,” 166, p.105827, 2024. [41] R. Schaback, Error estimates and condition numbers for radial basis function interpolation. Advances in Computa-tional Mathematics, 3(3): 251–264, 1995. [42] R. Schaback, “Small errors imply large evaluation instabilities,” Advances in Computational Mathematics , vol. 49, no. 2, p. 25, 2023. [43] E. Larsson and R. Schaback, “Scaling of radial basis functions,” IMA Journal of Numerical Analysis , vol. 44, no. 2, pp. 1130–1152, 2024. [44] A. Noorizadegan and S. Wang, “Scaling of Gaussian Kolmogorov–Arnold networks,” arXiv preprint arXiv:2604.21174, 2026. doi: https://doi.org/10.48550/arXiv.2604.21174 
+
+[45] G. E. Fasshauer and J. G. Zhang, “On choosing “optimal” shape parameters for RBF approximation,” Numer. Algorithms , vol. 45, no. 1, pp. 345–368, 2007. [46] D. Shepard, “A two-dimensional interpolation function for irregularly-spaced data,” in Proceedings of the 23rd ACM National Conference , 1968, pp. 517–524. [47] M. Rosenblatt, “Remarks on some nonparametric estimates of a density function,” Ann. Math. Statist. , vol. 27, pp. 832–837, 1956. [48] E. Parzen, “On estimation of a probability density function and mode,” Ann. Math. Statist. , vol. 33, pp. 1065–1076, 1962. [49] E. A. Nadaraya, “On estimating regression,” Theory Probab. Appl. , vol. 9, pp. 141–142, 1964. [50] G. S. Watson, “Smooth regression analysis,” Sankhy¯ a Ser. A , vol. 26, pp. 359–372, 1964. [51] R. Franke, “Locally determined smooth interpolation at irregularly-spaced points in several variables,” J. Inst. Math. Applic. , vol. 19, pp. 471–482, 1977. 19 [52] B. Moseley, A. Markham, and T. Nissen-Meyer, “Finite basis physics-informed neural networks (FBPINNs): Ascalable domain decomposition approach for solving differential equations,” Advances in Computational Mathematics ,vol. 49, no. 4, p. 62, 2023. [53] V. Dolean, A. Heinlein, S. Mishra, and B. Moseley, “Finite basis physics-informed neural networks as a Schwarz domain decomposition method,” in DDM in Science and Engineering XXVII , pp. 165–172, Springer, 2024. [54] V. Dolean, A. Heinlein, S. Mishra, and B. Moseley, “Multilevel domain decomposition-based architectures for physics-informed neural networks,” Computer Methods in Applied Mechanics and Engineering , vol. 429, p. 117116, 2024. [55] A. Heinlein, A. A. Howard, D. Beecroft, and P. Stinis, “Multifidelity domain decomposition–based physics-informed neural networks for time-dependent problems,” arXiv preprint arXiv:2401.07888, 2024. [56] R. Cavoretto, A. De Rossi, and E. Perracchione, “Efficient computation of partition of unity interpolants through a block-based searching technique,” Computers & Mathematics with Applications , vol. 71, no. 12, pp. 2568–2581, 2016. [57] G. Garmanjani, R. Cavoretto, and M. Esmaeilbeigi, “A RBF partition of unity collocation method based on finite difference for initial–boundary value problems,” Computers & Mathematics with Applications , vol. 75, no. 11, pp. 4066–4090, 2018. [58] R. Cavoretto, S. De Marchi, A. De Rossi, E. Perracchione, and G. Santin, “Partition of unity interpolation using stable kernel-based techniques,” Applied Numerical Mathematics , vol. 116, pp. 95–107, 2017. 20

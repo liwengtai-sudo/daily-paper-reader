@@ -1,0 +1,325 @@
+Title: Knee-xRAI: An Explainable AI Framework for Automatic Kellgren-Lawrence Grading of Knee Osteoarthritis
+
+URL Source: https://arxiv.org/pdf/2604.23435v1
+
+Published Time: Tue, 28 Apr 2026 00:45:19 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+> PREPRINT VERSION. APRIL, 2026 1
+
+# Knee-xRAI: An Explainable AI Framework for Automatic Kellgren–Lawrence Grading of Knee Osteoarthritis 
+
+Azmul A. Irfan 1⋆, Nur Ahmad Khatim 2, Alfan Alfian Irfan 3, Achmad Zaki 1, Erike A. Suwarsono 1,and Mansur M. Arief 4
+
+Abstract —Radiographic grading of knee osteoarthritis (KOA) with the Kellgren–Lawrence (KL) system is limited by inter-reader variability and by the opacity of current deep learning approaches, which predict KL grades directly from images without decomposing the structural features that define disease severity. We present Knee-xRAI, a modular framework that independently quantifies the three cardinal radiographic features of KOA (joint space narrowing, osteophytes, and subchondral sclerosis) and integrates them into an explainable KL grade classification. The pipeline combines U-Net++ segmentation for contour-based JSN measurement, an SE-ResNet-50 multi-task network for per-site osteophyte grading on an OARSI-aligned ordinal scale, and a hybrid texture-CNN classifier for binary sclerosis quantification. The resulting 50-dimensional structured feature vector feeds two complementary classification paths. An XGBoost path supports SHAP-based, feature-based attribution. A ConvNeXt hybrid path combines the structured vector with a full-image encoder for better predictive performance. Evaluated on 8,260 knee radiographs from a publicly available OAI-derived dataset, the JSN module achieved a Dice coefficient of 0.8909 and an mJSW intraclass correlation of 0.8674 against manual annotations. The ConvNeXt hybrid path reached a test quadratic weighted kappa (QWK) of 0.8436 and AUC of 0.9017, while the transparent XGBoost path achieved a test QWK of 0.6294 with full feature-level audit capability. Ablation analysis confirmed JSN as the dominant tabular predictor (QWK = 0.6103 alone), with osteophyte features providing a consistent incremental gain ( ∆QWK = +0 .0183 )and sclerosis features contributing marginally on the current annotation scale. A complementary inference-time ablation of Path B confirmed that the structured pathway contributes materially beyond the image encoder, with QWK drops of 0.098 under feature zeroing and 0.284 under feature–image permutation. To our knowledge, Knee-xRAI is the first published framework to explicitly quantify all three KL-defining radiographic features within a single auditable pipeline. 
+
+Index Terms —Knee osteoarthritis, Kellgren–Lawrence grading, explainable artificial intelligence, joint space narrowing, osteo-phytes, subchondral sclerosis, deep learning. 
+
+> 1
+
+Azmul A. Irfan, Achmad Zaki, and Erike A. Suwarsono are with the Faculty of Medicine, UIN Syarif Hidayatullah Jakarta, Indonesia (e-mail: azmul.irfan@uinjkt.ac.id). 
+
+> 2
+
+Nur Ahmad Khatim is with Informatics Engineering, Institut Teknologi Sepuluh Nopember, Indonesia 
+
+> 3
+
+Alfan Alfian Irfan is with Information Technology, Universitas Muham-madiyah Yogyakarta, Indonesia. 
+
+> 4
+
+Mansur M. Arief is with Industrial and Systems Engineering, King Fahd University of Petroleum and Minerals, Saudi Arabia. 
+
+> ⋆
+
+Corresponding Author Code available at: https://github.com/naimackerman/patella-v6 
+
+I. I NTRODUCTION 
+
+# KNEE osteoarthritis (KOA) affects approximately 654 million adults aged 40 years and older [1] and is a leading cause of lower-limb disability worldwide [2]. The burden is particularly acute in low- and middle-income health systems. In Indonesia, a population of 26.8 million adults 60 years of age or older [3] is served by only 1.2 radiologists per 100,000 people [4]. In such settings, radiographic interpretation is routinely delegated to non-subspecialist clinicians. Interpretable diagnostic support, whose reasoning can be audited without the expertise of a radiologist, is therefore a practical rather than theoretical requirement, paralleling recent AI-driven knee radiograph analysis efforts in healthcare settings [5]. Radiographic severity follows the Kellgren–Lawrence (KL) score, a five-grade ordinal system (0 to 4) defined by three cardinal findings: JSN, osteophyte formation, and subchondral sclerosis [6]. Inter-reader variability, compounded by multiple divergent KL descriptions in the literature [7], carries direct clinical consequences. A single-grade disagreement can redirect a patient from conservative physiotherapy to intra-articular corticosteroid injection, or alter eligibility for orthopaedic referral [8]. Automated methods have emerged to address this shortfall. Deep learning approaches have reached QWK values of up to 0.83 and multiclass accuracies greater than 66% [9], yet they typically compress three distinct pathological features into a single opaque prediction justified by post-hoc saliency maps that produce no auditable artifact tied to a named clinical finding [10]. Partial advances exist. MediAI-OA [11] quantifies the JSN and osteophyte burden but omits sclerosis entirely, diverging from radiological best practice. To our knowledge, no published framework quantifies all three KL-defining features concurrently within a single auditable grade. This study addresses this gap with Knee-xRAI, an inter-pretable framework that explicitly quantifies the three principal structural components of KOA from plain radiographs and uses them to support the ordinal KL classification. We hypothesize that a concept-based, feature-decomposed design can deliver KL classification performance competitive with end-to-end deep learning models while substantially improving interpretability and clinical usability, and that the resulting feature-level outputs can serve as an audit surface for clinician readers in resource-constrained settings. 
+
+> arXiv:2604.23435v1 [cs.CV] 25 Apr 2026
+
+2 PREPRINT VERSION. APRIL, 2026 
+
+Table I. Comparison of Existing KOA AI Systems with Knee-xRAI. System JSN Osteo. Sclerosis KL XAI Type Chen et al. [12] – – – ✓ None Pi et al. [13] – – – ✓ Grad-CAM MediAI-OA [11] Quant. Quant. – ✓ Feature-level Kim et al. [14] – – Quant. – Grad-CAM VL-OrdinalFormer [15] Implicit Implicit Implicit ✓ CLIP maps 
+
+Knee-xRAI (ours) Quant. Quant. Quant. ✓ Multi-layer OAI Dataset   
+
+> (n=8,260
+> xray
+> images) CLAHE and
+> Augmentation ROI geomethric
+> extraction U-Nett++ JSN
+> measurement 2A. JSN QUANTIFICATION Annotated
+> femur-tibia
+> surface SE-ResNet-50 Reviewed 4
+> compartment
+> image 2B. OSTEOPHYTE QUANTIFICATION EfficientNet-B0 Texture
+> Analysis &
+> Classification
+> of sclerosis Subchondral
+> ROI 2C. SUBCOHONDRAL SCLEROSIS
+> QUANTIFICATION JSN_feature
+> ...
+> Osteophyte_feature
+> ...
+> Sclerosis_feature 50 dimensions
+> feature aggregation LT XGBoost
+> KL
+> Grade
+> 3
+> 2
+> 0
+> 1
+> 4ConvNeXt Hybrid Landmark
+> annotation
+> 2.ROI EXTRACTION LF
+> 1. DATA INPUT &
+> PREPROCESSING
+> 3.FEATURE AGGREGATION AND
+> KL GRADE CLASSIFICATION
+> 4. RESULT & CLINICAL REPORT DUAL-PATH
+> CLASSIFICATION
+> Osteophyte
+> grading
+
+Fig. 1. Overview of the Knee-xRAI four-stage pipeline. 
+
+II. R ELATED WORK 
+
+A. End-to-End KL Grade Classification 
+
+Most previous AI approaches predict the KL grade directly from the radiograph. Chen et al. [12] combined YOLOv2 detection with a CNN classifier, achieving 69.7% five-class accuracy, while Pi et al. [13] demonstrated that CNN ensembles improve robustness. More recently, Ullah and Kim [15] integrated a ViT-L16 backbone with CORAL ordinal regression and CLIP-based visual–language alignment, yielding state-of-the-art macro F1 on the OAI dataset. Hierarchical CNN ensembles [16] further illustrate this end-to-end paradigm. None of these methods explicitly identifies the structural findings that support the predicted grade, a limitation that largely reflects the cost and scarcity of per-feature annotations and constrains adoption in clinical workflows where transparency is essential. 
+
+B. Feature-Specific Quantification 
+
+For JSN, Guo et al. [17] applied TransUNet for joint-space segmentation, achieving Dice = 0.889 and ICC =
+
+0.927, and subsequently combined JSW values with XGBoost for 72-month longitudinal prediction; MediAI-OA [11] nor-malizes mJSW to a continuous JSN rate, closely aligned with the approach adopted here. For osteophytes, Tiulpin and Saarakkala [9] trained SE-ResNet-50 and SE-ResNeXt-50 ensembles to simultaneously predict KL grades and six OARSI feature grades [18], achieving per-site osteophyte kappas of 0.79–0.94 on 11,743 knees, demonstrating the feasibility of per-site ordinal grading with attention-augmented CNNs. For subchondral sclerosis, Kim et al. [14] trained EfficientNet-B0 for three-level sclerosis classification on 4,019 knee radiographs, achieving AUC = 0.952, while Bayramoglu et al. [19] showed that LBP with an adaptive subchondral ROI strategy achieved AUC = 0.840, providing methodological justification for the hybrid texture–CNN design adopted in the sclerosis module. 
+
+C. Explainability in KOA Diagnosis 
+
+Grad-CAM [20] is the most widely used post-hoc visual-ization technique in medical imaging and has been applied to KOA by Karim et al. [21]. Weber et al. [10] documented that post-hoc heatmaps may not faithfully represent the features a model relies upon, a concern they term the interpretation gap . Broader critiques of post-hoc XAI have called for a paradigm shift toward mechanistically transparent systems [22]. VL-OrdinalFormer [15] moves toward concept-based modeling IRFAN et al. : KNEE-XRAI: AN EXPLAINABLE AI FRAMEWORK FOR KELLGREN–LAWRENCE GRADING OF KNEE OSTEOARTHRITIS 3Radiograph                    
+
+> KL 0: 9243046R KL 2: 9057327R KL 4: 9048789L
+> Predicted JSN mask Contours + mJSW
+> 2.5 5.0 7.5 10.0 12.5 15.0
+> Sample point
+> 17.5
+> 20.0
+> 22.5
+> 25.0
+> 27.5
+> JSW profile
+> 2.5 5.0 7.5 10.0 12.5 15.0
+> Sample point
+> 10
+> 15
+> 20
+> 25
+> 30
+> Medial Lateral
+> 2.5 5.0 7.5 10.0 12.5 15.0
+> Sample point
+> 0
+> 5
+> 10
+> 15
+> Medial JSN Lateral JSN
+
+Fig. 2. JSN module outputs for representative KL grades 0, 2, and 4. Table II. Per-Site Osteophyte Grading Performance (Manual-Label Framework, Held-Out Test Set, n=75 Per Site). Site Strategy Val κ Test κ Test Bal. Acc. Test AUC Medial femur Multitask 0.5707 0.5828 0.4427 0.6872 Lateral femur Refined site 0.6660 0.1048 0.3228 0.5623 Medial tibia Refined site 0.5200 0.4706 0.4539 0.7105 
+
+Lateral tibia Multitask 0.6652 0.3665 0.4551 0.6773 Mean — — 0.3812 0.4186 0.6593 
+
+through CLIP semantic alignment but encodes clinical concepts implicitly through embeddings rather than producing explicit, measurable outputs. In Knee-xRAI, interpretability is achieved instead through mechanistic transparency. Each structural feature is independently quantified and maps directly to a named clinical finding, ensuring that the KL grade is a deterministic function of measurable structural evidence. 
+
+D. Research Gap 
+
+As Table I summarizes, existing KOA models remain divided between end-to-end classifiers with strong performance but without structural decomposition and feature-specific stud-ies that have investigated JSN, osteophytes, and sclerosis predominantly in isolation. Knee-xRAI addresses this gap through a four-stage pipeline (JSN segmentation, osteophyte ROI grading, sclerosis texture classification, and dual-path feature aggregation) detailed in the following section. III. M ETHODS 
+
+A. Dataset, Preprocessing, and Evaluation Protocol 
+
+All experiments used the publicly available Knee Osteo-arthritis Severity Grading Dataset [12], [23], which comprises 8,260 grayscale posteroanterior knee radiographs at 224 × 224 
+
+pixels, partitioned 70:10:20 into training ( n=5 ,778 ), validation (n=826 ), and test ( n=1 ,656 ) sets. The grade distribution is markedly imbalanced across all splits, with KL0 dominant (39.4%, n=3 ,253 ) and KL4 rare (3.0%, n=251 ). Feature-level annotations were compiled on subsets of 400–500 images each. These comprised polyline articular contours for JSN segmentation, OARSI ordinal grades per-site (0–3) at 4 PREPRINT VERSION. APRIL, 2026 ImageID  Compartment  Probability(present)  Class               
+
+> 1
+> Medial 0.2558 none
+> Lateral 0.1984 none
+> 2
+> Medial 0.5329 present
+> Lateral 0.1905 none
+> 3
+> Medial 0.6613 present
+> Lateral 0.4289 present
+> M
+> M
+> M
+> L
+> L
+> L
+> KL 0: Left (1)
+> KL 0: Right (2)
+> KL 3: Right (3)
+> Plain Radiograph + ROI Medial ROI Lateral ROI
+> Output (Threshold= 0.4227)
+> Fig. 3. Sclerosis module ROI extraction and classification for representative cases.
+
+four anatomical sites for osteophytes following the OARSI radiographic atlas [18], and binary sclerosis labels (none or present). The test set was withheld until the final evaluation. The images were preprocessed with CLAHE (clip limit 3.0, tile grid 8 × 8 px), clipping of the 5th–99th percentile intensity, normalization to [0 , 1] , and ImageNet standardization (μ=0 .485 , σ=0 .229 ). Training-time augmentation included random rotation ( ±10 ◦), horizontal flip ( p=0 .5), brightness and contrast jitter ( ±15% ), and affine scaling within [0 .9, 1.1] .We addressed class imbalance through batch sampling with inverse-frequency and an ordinal soft-label cross-entropy loss with Gaussian smoothing ( σ=0 .5). Two module-specific prepro-cessing distinctions apply. For the osteophyte stage, full-image CLAHE precedes 140 × 140 patch extraction but is not re-applied to extracted ROIs, to avoid double enhancement. For the sclerosis stage, CLAHE is deliberately withheld because the hybrid classifier relies on handcrafted texture descriptors (GLCM statistics, fractal dimension) that are sensitive to the natural subchondral intensity distribution. Evaluation metrics were selected per module. JSN segmen-tation used the Dice coefficient and HD95, with ICC against manual mJSW as the primary measurement-fidelity criterion. Osteophyte grading was performed with quadratic-weighted kappa per-site ( κ) and AUC, and sclerosis classification used macro F1, balanced accuracy, and AUC. The KL prediction was evaluated primarily by QWK, with accuracy, macro F1, and macro AUC as secondary metrics. Two complementary ablation studies quantified per-family contributions under Path A and the marginal contribution of the structured pathway under Path B. Where reported, 95% confidence intervals were obtained by percentile bootstrap with 1,000 resamples. All models were implemented in PyTorch 2.0 with PyTorch Lightning on a single NVIDIA RTX 4090. 
+
+B. Knee-xRAI Framework 
+
+Knee-xRAI decomposes KL grading into four sequential stages (Fig. 1). 
+
+1) Stage 1: JSN Segmentation and Quantification: 
+
+We trained a U-Net++ [24] with an ImageNet-pretrained EfficientNet-B4 encoder [25] to produce three-class masks (background, medial joint space, lateral joint space) from full 224 × 224 radiographs, using DiceCE loss with Adam (lr = 1 ×10 −4) and cosine annealing. Checkpoint selection used minimum mJSW MAE rather than peak Dice to prioritize measurement fidelity. For each compartment c ∈ { med , lat },we sampled 16 equidistant femoral landmark points along the mediolateral axis with endpoint trimming to suppress false minima. The minimum joint space width is defined as 
+
+mJSW c = min  
+
+> i=1 ,..., 16
+
+d(f ci , t ci ) , (1) where f ci and tci denote the i-th equidistant femoral and tibial contour points for compartment c, and d(·, ·) is the Euclidean distance. The JSN narrowing rate is normalized against the KL-0 population reference, 
+
+JSN rate c = 100 × 1 − mJSW c
+
+^mJSW KL0 
+
+!
+
+, (2) and compartmental asymmetry as 
+
+Asymmetry = |mJSW med − mJSW lat |
+
+mJSW med + mJSW lat 
+
+. (3) The JSN feature sub-vector is 22-dimensional, comprising two mJSW values, 16 JSW profile samples, two JSN rates, one medial-to-lateral ratio, and one asymmetry score. IRFAN et al. : KNEE-XRAI: AN EXPLAINABLE AI FRAMEWORK FOR KELLGREN–LAWRENCE GRADING OF KNEE OSTEOARTHRITIS 5                                        
+
+> Table III. KL Grade Classification Performance for Path A (XGBoost on the 50-Dimensional Structured Vector) and Path B (ConvNeXt-Small Hybrid). Point Estimates Are Shown with 95% Bootstrap CIs in Brackets. †Path A Validation QWK Derives from 5-Fold Cross-Validation on the Training Split. Model Val QWK Test QWK Test Acc. Test F1 Test AUC Path A 0.6467 ±0.0109 †0.6294 0.5399 0.5238 0.8046 [0.5958, 0.6625] [0.5163, 0.5640] [0.4940, 0.5503] [0.7922, 0.8169] Path B 0.7966 0.8436 0.6636 0.6693 0.9017
+> [0.8256, 0.8603] [0.6407, 0.6860] [0.6409, 0.6942] [0.8920, 0.9104] Table IV. Per-Class Test F1 for Path A (XGBoost) and Path B (ConvNeXt Hybrid). KL Grade Path A F1 Path B F1 ∆F1 (B −A) KL0 0.6407 0.7807 +0 .1400
+> KL1 0.0817 0.3798 +0 .2981
+> KL2 0.4291 0.6470 +0 .2179
+> KL3 0.7294 0.7619 +0 .0325
+> KL4 0.7379 0.7769 +0 .0390
+
+2) Stage 2: Osteophyte ROI Extraction and Ordinal Grading: 
+
+Site patches of 140 × 140 pixels at four anatomical locations (medial and lateral femur, medial and lateral tibia) were located through a three-tier cascade: Stage-1 segmentation landmarks as the primary source, a heuristic anatomical estimator as fallback where the mask was absent or too small, and fixed geometric crops as a last resort. Ordinal grading was performed by a multi-task SE-ResNet-50 [26] with four site-specific MLP heads trained using ordinal cross-entropy loss. Site-specific fine-tuning was applied to the lateral femur and medial tibia based on validation performance, a choice we revisit in the Discussion. The osteophyte sub-vector is 10-dimensional, encoding four site-specific grades, total burden, maximum site grade, and four composite scores. 
+
+3) Stage 3: Sclerosis ROI Extraction and Binary Classifi-cation: Subchondral ROIs were defined as the bone region immediately inferior to the tibial plateau from the Stage-1 mask, following the anatomy-guided strategy of Bayramoglu 
+
+et al. [19]. A hybrid classifier combined handcrafted tex-ture features (multi-scale LBP histograms at radii 1, 2, 3; GLCM statistics; fractal dimension; per-compartment intensity statistics) with a parallel EfficientNet-B0 image branch, fused through a two-layer MLP. A binary formulation (none vs. present) was adopted after the three-class scheme proved unstable under the available mild-sclerosis annotation volume. The decision threshold was optimized on the validation set at 
+
+τ =0 .4227 to maximize macro F1. The sclerosis sub-vector is 18-dimensional. 
+
+4) Stage 4: Feature Aggregation and KL Classification: 
+
+The three sub-vectors are concatenated and z-score normalized into a 50-dimensional structured feature vector, 
+
+x = x(22) JSN ∥ x(10) OSP ∥ x(18) SCL 
+
+ ∈ R50 , (4) which feeds two complementary classification paths. Path A (XGBoost) trains a gradient-boosted classifier [27] (300 estimators, depth 6, lr = 0 .05 , L1/L2 regularisation) with 5-fold stratified cross-validation, with SHAP [28] attribution providing fully auditable feature-level explanations. Path B (ConvNeXt Hybrid) concatenates a ConvNeXt-Small [29] image encoding (768-dim) with an MLP-projected feature vector (256-dim), fused through a fusion MLP for five-class ordinal prediction with soft-label cross-entropy ( σ=0 .5). A Gradio interface exposes three explainability layers: feature-level outputs (mJSW, JSN rates, per-site OARSI grades, texture statistics), spatial overlays from directly measured features rather than post-hoc gradients, and a path toggle with updated class probabilities. The full pipeline processes a single radiograph in under 10 seconds. IV. E XPERIMENTS AND RESULTS 
+
+A. JSN Segmentation and Measurement Performance 
+
+We evaluated U-Net++ performance on the 60-image an-notated evaluation subset. The manual-teacher checkpoint achieved Dice = 0.8904 and HD95 = 1.4734 px, comparable to the TransUNet benchmark of Guo et al. [17] (Dice = 0.889), with ICC = 0.8699 indicating good-to-excellent reproducibility of mJSW (ICC ≥ 0.75 per Koo and Li [30]). The self-trained variant achieved a similar Dice (0.8894) but incurred a higher MAE (1.7217 vs. 1.7020 px) and a lower ICC (0.8645 vs. 0.8699). Because downstream feature quality depends on measurement fidelity rather than segmentation overlap alone, we selected the manual-teacher checkpoint, yielding a deployed result of Dice = 0.8909, HD95 = 1.4964 px, MAE = 1.7041 px, and ICC = 0.8674. Qualitative JSN visualizations are shown in Fig. 2. 
+
+B. Osteophyte Grading Performance 
+
+The grading performance was heterogeneous across the four anatomical sites (Table II). The medial femur achieved the strongest held-out test kappa ( κ=0 .5828 , AUC = 0.6872), followed by the medial tibia ( κ=0 .4706 , AUC = 0.7105). The lateral femur exhibited a substantial validation-to-test gap, with a validation kappa of 0.6660 falling to 0.1048 in the test set. This reflects the limited per-site annotation volume combined with the inherent ambiguity of lateral femoral osteophytes in two-dimensional AP projections. The pseudo-label expansion amplified the teacher bias rather than resolving the gap (expanded mean test κ=0 .3791 vs. 0.3812 for the manual-teacher framework). We therefore retained the manual-teacher framework for all downstream feature extraction, though the lateral femur standalone output should be interpreted with caution. 6 PREPRINT VERSION. APRIL, 2026 
+
+Table V. Path A Feature Ablation Study (XGBoost, Held-Out Test Set, n=1 ,656 ). Feature Configuration Dims Test QWK Test Accuracy JSN only 22 0.6103 0.5242 Osteophyte only 10 0.4078 0.4312 Sclerosis only 18 0.2396 0.3865 Osteophyte + Sclerosis 28 0.4263 0.4275 JSN + Osteophyte 32 0.6286 0.5386 
+
+JSN + Osteophyte + Sclerosis (full) 50 0.6294 0.5399 JSN          
+
+> Osteophyte
+> Sclerosis
+> Osteophyte +
+> Sclerosis
+> JSN +
+> Osteophyte
+> Full
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> 0.7
+> Test QWK
+> 0.6103
+> 0.4078
+> 0.2396
+> 0.4263
+> 0.6286 0.6294
+> A. Feature-family ablation
+> 1.5 1.0 0.5 0.0 0.5 1.0 1.5 2.0 2.5
+> SHAP contribution to predicted KL class
+> JSW asymmetry
+> JSN rate medial
+> OSP sum
+> JSW ratio
+> SCL fractal med
+> JSW profile 7
+> JSW profile 0
+> JSW profile 4
+> JSW profile 15
+> JSW profile 10
+> SCL GLCM correlation med
+> SCL intensity medial
+> B. Global SHAP feature attribution
+> Low
+> High
+> Feature value
+
+Fig. 4. Path A feature-family ablation QWK (left) and global SHAP feature attributions across the test set (right). 
+
+C. Subchondral Sclerosis Classification 
+
+Threshold optimization on the validation set identified 
+
+τ =0 .4227 as the value maximizing macro F1. On the annotated subset ( n=150 per split), the classifier reached a validation macro F1 of 0.6212 [95% CI 0.5390, 0.6866] and AUC of 0.6709 [0.5867, 0.7552], with test macro F1 = 0.5785 [0.4977, 0.6582] and AUC = 0.6114 [0.5245, 0.7003]; accuracy and balanced accuracy tracked these values within 0.01 on both splits. Comparison against five classical texture-based baselines confirmed that the hybrid classifier was competitive. Extra Trees, the strongest baseline, reached a test macro F1 of 0.5696 and AUC of 0.6204. Representative ROI outputs are shown in Fig. 3. As the test-set AUC CI lower bound approaches 0.52, we return to this module’s modest absolute performance in the Discussion. 
+
+D. KL Grade Classification 
+
+Path A (XGBoost) achieved a test QWK of 0.6294 (5-fold CV QWK 0.6467 ± 0.0109 ), accuracy 0.5399, macro F1 0.5238, and AUC 0.8046, while Path B (ConvNeXt hybrid) substantially outperformed with a test QWK of 0.8436, accuracy 0.6636, macro F1 0.6693, and AUC 0.9017 (Table III). Per-class analysis (Table IV) identified KL grade 1 as the most difficult category for both paths, with F1 scores of 0.0817 and 0.3798, respectively, consistent with the inherent diagnostic ambiguity of doubtful disease characterised by possible osteophytes without definite JSN. Path B’s largest absolute gains over Path A occurred at KL2 ( ∆=+0 .2179 ) and KL0 ( ∆=+0 .1400 ), the two grades for which fine-grained visual context most supplements the handcrafted feature representation. 
+
+1) Path A Feature Ablation: Table V reports six feature-subset configurations evaluated on the held-out test set under Path A. JSN features alone were the strongest single-family predictor (QWK = 0.6103), substantially above osteophyte-only (0.4078) and sclerosis-only (0.2396) subsets. Adding osteophyte features produced a consistent incremental gain (∆QWK=+0 .0183 , from 0.6103 to 0.6286), confirming that per-site osteophyte burden carries independent predictive information beyond the joint space profile. Including sclerosis in the full tri-feature vector yielded only marginal additional improvement ( ∆QWK=+0 .0008 ), reflecting the constrained signal available from the current binary representation. Fig. 4 shows the ablation QWK chart alongside the SHAP beeswarm plot. 
+
+2) Path B Structured-Pathway Ablation: To quantify the structured vector’s marginal contribution, we applied inference-time zeroing and permutation to the trained ConvNeXt hybrid without retraining (Table VI). Zeroing all 50 dimensions drops IRFAN et al. : KNEE-XRAI: AN EXPLAINABLE AI FRAMEWORK FOR KELLGREN–LAWRENCE GRADING OF KNEE OSTEOARTHRITIS 7                                                   
+
+> Table VI. Inference-Time Structured-Pathway Ablation of Path B on the Held-Out Test Set ( n=1 ,656 ), with ∆QWK Reported Relative to the Full-Model Baseline of 0.8436. Intervention Feature group Dims Test QWK ∆QWK Test AUC — (full) none 00.8436 0.0000 0.9017 Zero All 50 0.7453 −0.0983 0.8543 Permute All 50 0.5593 −0.2843 0.7685 Zero JSN 22 0.7410 −0.1027 0.8538 Permute JSN 22 0.5851 −0.2586 0.7672 Zero Osteophyte 10 0.8392 −0.0044 0.9024
+> Permute Osteophyte 10 0.8359 −0.0077 0.8999 Zero Sclerosis 18 0.8346 −0.0090 0.8995 Permute Sclerosis 18 0.8343 −0.0093 0.8971
+
+QWK by 0.098, while permutation reduces it by 0.284, roughly three times larger, confirming that Path B exploits feature– image alignment rather than treating the vector as a static side channel. This contribution is dominated by the JSN sub-vector, where zeroing and permutation depress QWK by 0.103 and 0.259, respectively, whereas osteophyte and sclerosis dimensions each shift QWK by less than 0.01, consistent with the Path A hierarchy and indicating that the ConvNeXt encoder recovers those signals directly from the image. V. D ISCUSSION 
+
+A. Key Findings and Clinical Interpretation 
+
+Because KL grades 2–4 are operationally defined by the presence and severity of JSN [6], the joint-space profile emerges as the most decisive single predictor, with per-site osteophyte features encoding complementary information not fully captured by the JSW profile alone. The lateral femur validation-to-test gap reflects limited annotation volume compounded by the inherent two-dimensional ambiguity of lateral femoral osteophytes in AP projections. The sclerosis performance gap relative to Kim et al. [14] (AUC 0.611 vs. 0.952) is attributable to structural differences in experimental design rather than an absence of radiographic signal, and at its present annotation scale the sclerosis module serves primarily as a structural completeness component that closes the three-feature claim and enables feature-level reporting. 
+
+B. Transparency–Performance Trade-off 
+
+The QWK gap between Path A and Path B quantifies the cost of mechanistic transparency, yet the inference-time ablation establishes that the structured pathway is not redundant with the image encoder. The three-fold difference between zeroing and permutation confirms feature–image alignment rather than static-covariate use, with the contribution concentrated in the JSN sub-vector. Although osteophyte and sclerosis dimensions add little to Path B beyond what ConvNeXt recovers from the image, both remain indispensable for Path A’s audit surface through SHAP-based attribution [28] to named radiographic concepts of direct value in radiologist-shortage settings. 
+
+C. Limitations 
+
+The 224 ×224 px PNG format lacks calibrated DICOM pixel spacing, so mJSW values are pixel-based and millimetre conver-sion requires a user-supplied scale factor. Feature-level annota-tion sets are small (400–500 images per module), constraining generalisation most acutely at the lateral femur site, where the sclerosis test AUC CI lower bound approaches chance. Inter-annotator reliability was not formally quantified; annotations were expert-reviewed by two orthopaedic practitioners but lack a kappa agreement score. Finally, no external validation has been conducted, and pipeline robustness to institutional and acquisition variability, including the Indonesian-deployment contexts motivating this work, remains to be established. VI. C ONCLUSION 
+
+Knee-xRAI demonstrates that interpretability in AI-assisted KOA grading need not depend on post-hoc saliency attribution but can instead be built into the diagnostic pipeline through explicit, independently quantified structural features from each step of the KL grading process. By decomposing the KL grade into its three cardinal radiographic constituents and exposing each as a measurable, named clinical finding, the framework produces a grade that is a deterministic function of auditable evidence rather than an opaque model output. The primary contribution is not incremental accuracy improvement over end-to-end models but the demonstration that a clinically structured, feature-decomposed pipeline can approach deep learning classification performance while producing the kind of transparent reasoning that clinicians in resource-constrained settings can inspect, question, and trust. 
+
+REFERENCES [1] A. Cui, H. Li, D. Wang, J. Zhong, Y. Chen, and H. Lu, “Global, regional prevalence, incidence and risk factors of knee osteoarthritis in population-based studies,” EClinicalMedicine , vol. 29–30, p. 100587, 2020. [2] J. D. Steinmetz, G. T. Culbreth, L. M. Haile, Q. Rafferty, J. Lo, K. G. Fukutaki, J. A. Cruz, A. E. Smith, S. E. Vollset, P. M. Brooks, et al. ,“Global, regional, and national burden of osteoarthritis, 1990–2020 and projections to 2050: a systematic analysis for the Global Burden of Disease Study 2021,” The Lancet Rheumatology , vol. 5, no. 9, pp. e508– e522, 2023. [3] Badan Pusat Statistik, Statistik Indonesia 2019: Statistical Yearbook of Indonesia 2019 . Jakarta, Indonesia: Badan Pusat Statistik, 2019. [Online]. Available: https://www.bps.go.id/ [4] R. E. Yunus, “Radiology loading and coverage hours in Indonesia,”       
+
+> Korean Journal of Radiology , vol. 25, no. 7, pp. 597–599, 2024. [5] A. Rey-Blanes and E. Dominguez, “Applying deep learning based super-resolution to knee imaging,” in Artificial Intelligence in Healthcare: First International Conference, AIiH 2024, Swansea, UK, September 4–6, 2024, Proceedings, Part II , ser. Lecture Notes in Computer Science, vol. 14976. Springer, 2024, pp. 77–88. [6] J. H. Kellgren and J. S. Lawrence, “Radiological assessment of osteo-arthrosis,” Annals of the Rheumatic Diseases , vol. 16, no. 4, pp. 494–502, 1957. 8PREPRINT VERSION. APRIL, 2026
+
+[7] D. Schiphof, M. Boers, and S. M. Bierma-Zeinstra, “Differences in descriptions of Kellgren and Lawrence grades of knee osteoarthritis,” 
+
+Annals of the Rheumatic Diseases , vol. 67, no. 7, pp. 1034–1036, 2008. [8] A. G. Culvenor, C. N. Engen, B. E. Øiestad, L. Engebretsen, and M. A. Risberg, “Defining the presence of radiographic knee osteoarthritis: a comparison between the Kellgren and Lawrence system and OARSI atlas criteria,” Knee Surgery, Sports Traumatology, Arthroscopy , vol. 23, no. 12, pp. 3532–3539, 2015. [9] A. Tiulpin and S. Saarakkala, “Automatic grading of individual knee osteoarthritis features in plain radiographs using deep convolutional neural networks,” Diagnostics , vol. 10, no. 11, p. 932, 2020. [10] R. O. Weber, A. J. Johs, P. Goel, and J. M. Silva, “XAI is in trouble,” 
+
+AI Magazine , vol. 45, no. 3, pp. 300–316, 2024. [11] J. S. Yoon, C.-J. Yon, D. Lee, J. J. Lee, C. H. Kang, S.-B. Kang, N.-K. Lee, and C. B. Chang, “Assessment of a novel deep learning-based software developed for automatic feature extraction and grading of radiographic knee osteoarthritis,” BMC Musculoskeletal Disorders , vol. 24, no. 1, p. 869, 2023. [12] P. Chen, L. Gao, X. Shi, K. Allen, and L. Yang, “Fully automatic knee osteoarthritis severity grading using deep neural networks with a novel ordinal loss,” Computerized Medical Imaging and Graphics , vol. 75, pp. 84–92, 2019. [13] S.-W. Pi, B.-D. Lee, M. S. Lee, and H. J. Lee, “Ensemble deep-learning networks for automated osteoarthritis grading in knee X-ray images,” 
+
+Scientific Reports , vol. 13, no. 1, p. 22887, 2023. [14] S.-B. Kim, Y. J. Kim, J.-Y. Jung, and K. G. Kim, “Classification of grades of subchondral sclerosis from knee radiographic images using artificial intelligence,” Sensors , vol. 25, no. 8, p. 2535, 2025. [15] Z. Ullah and J. Kim, “VL-OrdinalFormer: Vision–Language-guided ordinal transformers for interpretable knee osteoarthritis grading,” Math-ematics , vol. 14, no. 6, p. 963, 2026. [16] J. Pan, Y. Wu, Z. Tang, K. Sun, M. Li, J. M. Sun, J. Liu, J. Tian, and B. Shen, “Automatic knee osteoarthritis severity grading based on X-ray images using a hierarchical classification method,” Arthritis Research & Therapy , vol. 26, no. 1, p. 203, 2024. [17] J. Guo, P. Yan, H. Luo, Y. Ma, Y. Jiang, C. Ju, W. Chen, M. Liu, S. Lv, and Y. Qin, “Predicting joint space changes in knee osteoarthritis over 6 years: a combined model of TransUNet and XGBoost,” Quantitative Imaging in Medicine and Surgery , vol. 15, no. 2, pp. 1396–1410, 2025. [18] R. D. Altman and G. E. Gold, “Atlas of individual radiographic features in osteoarthritis, revised,” Osteoarthritis and Cartilage , vol. 15, no. Suppl A, pp. A1–A56, 2007. [19] N. Bayramoglu, A. Tiulpin, J. Hirvasniemi, M. T. Nieminen, and S. Saarakkala, “Adaptive segmentation of knee radiographs for selecting the optimal ROI in texture analysis,” Osteoarthritis and Cartilage , vol. 28, no. 7, pp. 941–952, 2020. [20] R. R. Selvaraju, M. Cogswell, A. Das, R. Vedantam, D. Parikh, and D. Batra, “Grad-CAM: Visual explanations from deep networks via gradient-based localization,” International Journal of Computer Vision ,vol. 128, no. 2, pp. 336–359, 2020. [21] M. R. Karim, J. Jiao, T. Doehmen, M. Cochez, O. Beyan, D. Rebholz-Schuhmann, and S. Decker, “DeepKneeExplainer: Explainable knee osteoarthritis diagnosis from radiographs and magnetic resonance imag-ing,” IEEE Access , vol. 9, pp. 39 757–39 780, 2021. [22] S. Afroogh, S. I. Ahmed, P. Ahrweiler, D. Alvarez-Melis, M. M. Arief, E. Barakova, F. J. Bargagli-Stoffi, E. Biyik, H. Chen, X. A. Chen, et al. ,“Beyond explainable AI (XAI): An overdue paradigm shift and post-XAI research directions,” arXiv preprint arXiv:2602.24176 , 2026. [23] P. Chen, “Knee osteoarthritis severity grading dataset,” Mendeley Data ,vol. 1, no. 10.17632, p. 30784984, 2018. [24] Z. Zhou, M. M. R. Siddiquee, N. Tajbakhsh, and J. Liang, “UNet++: A nested U-Net architecture for medical image segmentation,” in Deep Learning in Medical Image Analysis and Multimodal Learning for Clinical Decision Support . Springer, 2018, pp. 3–11. [25] M. Tan and Q. V. Le, “EfficientNet: Rethinking model scaling for convolutional neural networks,” 2020. [26] J. Hu, L. Shen, S. Albanie, G. Sun, and E. Wu, “Squeeze-and-Excitation Networks,” 2019. [27] T. Chen and C. Guestrin, “XGBoost: A scalable tree boosting system,” in Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining , 2016, pp. 785–794. [28] S. M. Lundberg and S.-I. Lee, “A unified approach to interpreting model predictions,” in Advances in Neural Information Processing Systems , I. Guyon, U. V. Luxburg, S. Bengio, H. Wallach, R. Fergus, S. Vishwanathan, and R. Garnett, Eds., vol. 30. Curran Associates, Inc., 2017, pp. 4765–4774. [29] Z. Liu, H. Mao, C.-Y. Wu, C. Feichtenhofer, T. Darrell, and S. Xie, “A ConvNet for the 2020s,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 11 976–11 986. [30] T. K. Koo and M. Y. Li, “A guideline of selecting and reporting intraclass correlation coefficients for reliability research,” Journal of Chiropractic Medicine , vol. 15, no. 2, pp. 155–163, 2016.
