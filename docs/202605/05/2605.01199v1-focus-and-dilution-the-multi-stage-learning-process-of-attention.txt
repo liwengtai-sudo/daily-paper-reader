@@ -1,0 +1,8700 @@
+Title: Focus and Dilution: The Multi-stage Learning Process of Attention
+
+URL Source: https://arxiv.org/pdf/2605.01199v1
+
+Published Time: Tue, 05 May 2026 00:22:32 GMT
+
+Number of Pages: 55
+
+Markdown Content:
+# Focus and Dilution: The Multi-stage Learning Process of Attention 
+
+Zheng-An Chen * 1 Pengxiao Lin * 1 2 Zhi-Qin John Xu 1 2 3 4 Tao Luo 1 2 3 5 
+
+## Abstract 
+
+Transformer-based models have achieved remark-able success across a wide range of domains, yet our understanding of their training dynamics re-mains limited. In this work, we identify a re-current focus–dilution cycle in attention learn-ing and provide a rigorous explanation in a one-layer Transformer setting for Markovian data via gradient-flow analysis. Using stage-wise lin-earization around critical points, we show that a single focus–dilution cycle can be decomposed into a sequence of distinct stages. First, embed-ding and projection rapidly condense to a rank-one structure, while attention parameters remain effectively frozen. Then, the attention param-eters begin to increase, inducing a frequency-driven focus toward high-frequency tokens. As attention continues to evolve, it generates next-order perturbations in embeddings, leading to a mass-redistribution mechanism that progressively dilutes this focus. Finally, small asymmetries among low-frequency tokens lift a degenerate crit-ical point, opening new embedding directions and initiating the next cycle. Experiments on synthetic Markovian data as well as WikiText and TinySto-ries corroborate the predicted stages and cyclical dynamics. 
+
+## 1. Introduction 
+
+Transformer models (Vaswani et al., 2017) have become the dominant architecture for sequence modeling. While their approximation power is now well understood in a variety of regimes (P ´erez et al., 2019; Yun et al., 2020a;b), we still lack 
+
+> *
+
+Equal contribution . 1School of Mathematical Sciences, Shang-hai Jiao Tong University. 2Institute of Natural Sciences, Shanghai Jiao Tong University. 3MOE-LSC, Shanghai Jiao Tong Univer-sity. 4Shanghai Seres Information Technology Co., Ltd, Shanghai 200040, China. 5CMA-Shanghai, Shanghai Jiao Tong University. Correspondence to: Zhi-Qin John Xu <xuzhiqin@sjtu.edu.cn >,Tao Luo <luotao41@sjtu.edu.cn >.
+
+Proceedings of the 43 rd International Conference on Machine Learning , Seoul, South Korea. PMLR 306, 2026. Copyright 2026 by the author(s). 
+
+a mechanistic theory for how attention itself evolves during training. Most existing analyses gain tractability by intro-ducing additional technical condition, such as reparameteri-zations (Zhang et al., 2024a) or proxy dynamics (Tarzanagh et al., 2023), which may obscure the native coupling among embeddings, projection, and attention. Moreover, recent work suggests that Transformer training often undergoes multiple stages (Chang et al., 2024; Varre et al., 2025), and that attention can shift from highly concentrated to more diffuse patterns (Tian et al., 2024). These observations point to a need for a dynamical picture that remains faithful to the coupled dynamics and can explain both attention amplifica-tion and its subsequent dissipation. In this work, we combine theory and experiments to show that attention can be understood as a cyclical learning pro-cess. Within each cycle, attention first amplifies a frequency-driven preference over tokens ( focus ), and then gradually weakens this preference as the embedding structure adapts (dilution ). We identify the dynamical origin of each stage and explain how the interaction between embeddings and attention progressively decomposes the learning problem. To keep the analysis tractable while preserving essential sequential structure, we study population gradient flow for a one-layer Transformer trained by cross-entropy on Markov data (Chang et al., 2024; Makkuva et al., 2024; 2025). Our explanation is stage-wise and built on linearizations around critical points. Under small initialization, the trajectory is first governed by the linearization near the origin, which forces a rank-one condensation of the embedding and pro-jection components, consistent with the condensation phe-nomenon in Chen & Luo (2025). We further observed that the condensed direction is explicitly determined by the sta-tionary distribution. In contrast, the attention parameters remain small in this initial stage because the leading-order driving term for (WQ, W K ) vanishes at the origin. After condensation, the trajectory follows the same low-rank ray until it reaches a second critical point. We show that this point is generically a saddle: the Jacobian admits a local block decomposition into (i) a contracting embed-ding/output subsystem and (ii) an attention subsystem with a single unstable mode. Consequently, once the trajectory enters this neighborhood, (WQ, W K ) align with the unsta-ble eigendirection and grow exponentially, and attention 1
+
+> arXiv:2605.01199v1 [cs.LG] 2 May 2026 Submission and Formatting Instructions for ICML 2026
+
+acquires a bias toward high-frequency tokens, initiating the focus phase. Going beyond the focus phase requires a more refined de-scription than the local saddle analysis. Once (WQ, W K )
+
+align with the unstable direction, dynamics enters to a rank-one invariant manifold and induces a closed reduced system. This reduced flow exposes a mass-redistribution mechanism in the embeddings. As the attention amplitude evolves, it generates next-order perturbations, causing the embeddings of the main token and the remaining tokens to move in op-posite directions. As a result, the earlier high-frequency focus is gradually weakened, leading to an attention dilution phase. Finally, the model must learn new embedding directions that distinguish low-frequency tokens. However, we show that the training dynamics become trapped at a degenerate critical point on the rank-one manifold, where the driv-ing forces vanish and no new directions can emerge. To model realistic asymmetries and eliminate degeneration, we introduce a small symmetry-breaking perturbation among low-frequency tokens and analyze the resulting bifurcation of critical points. This mechanism explains how new em-bedding directions are unlocked, thereby initiating the next focus–dilution cycle. Experiments on synthetic Markovian data as well as WikiText and TinyStories corroborate the predicted stages and cyclical dynamics. 
+
+Our contributions. 
+
+1. We identify a focus–dilution cycle in the training dynam-ics of attention and introduce a minimal tractable setting that captures this phenomenon. 2. We develop a stage-wise analysis based on linearization at critical points that explains the different stages within single cycle. 3. We empirically validate the predicted stages and transi-tions, demonstrating that the focus–dilution cycle persists on synthetic Markov data as well as realistic data. 
+
+## 2. Preliminaries 
+
+2.1. Basic Notations. 
+
+For any N ∈ N, let [N ] := {1, . . . , N }. Let V := [ d]
+
+be the vocabulary set with d ≥ 2. We identify tokens with indices in [d] and write {ei}di=1 for the canonical basis of Rd. For α ∈ Rn and A ∈ Rn×n, ∥α∥2 and ∥A∥F
+
+denote Euclidean norm and Frobenius norm separately, with the subscript omitted when clear from context. We write 
+
+∥α∥C := √α⊺C α for the seminorm induced by positive semidefinite matrix C ⪰ 0. For α ∈ Rn, define the variance matrix Var( α) := diag( α) − αα ⊺.
+
+2.2. Markov data generation 
+
+We generate the dataset D = {(Xi, y i)}Ni=1 with Xi =(xi, 1, . . . , x i,s ) ∈ V s and yi := xi,s +1 , by a Markov chain. 
+
+Definition 2.1 (Markovian data) . Let P ∈ Rd×d be row-stochastic. For each i ∈ [N ], sample xi, 1 ∼ Unif( V)
+
+and xi,j ∼ Pxi,j −1 for j = 2, . . . , s + 1 . Set Xi =(xi, 1, . . . , x i,s ) and yi = xi,s +1 .To model one high-frequency token together with a group of low-frequency tokens that may exhibit mild heterogeneity, we consider a stationary distribution of the form π⊺(δ) := (π1, . . . , π d) with 
+
+πi = 1 − π1
+
+d − 1 + ciδ, ∀ 2 ≤ i ≤ d, (1) where 1−π1 
+
+> d−1
+
+< π 1 < 1, Pdi=2 ci = 0 , and δ ≥ 0 is a small parameter chosen so that π(δ) remains entrywise nonnega-tive. The first term describes two-group setting, one high-frequency token and the rest symmetrical low-frequency tokens. The second term is an O(δ) perturbation that breaks symmetry within the low-frequency group. Unless stated otherwise, we treat the first term as the leading-order com-ponent and regard the second term as a small perturbation that can be neglected in early-stage analyses. The transition matrix is defined as 
+
+P = λI + (1 − λ)1π⊺, 0 < λ < 1, (2) where 1 ∈ Rd is the all-ones vector. A direct computation verifies that π⊺P = π⊺, hence π is stationary for P .
+
+2.3. One-layer transformer 
+
+Since the next token depends only on the current token under the Markov assumption, a single attention block is sufficient to capture the relevant dependency. We therefore study a one-layer Transformer and its training dynamics. 
+
+Definition 2.2 (One-layer transformer) . Given input se-quence X = ( x1, . . . , x s), let EX = ( ex1 , . . . , e xs )⊺ ∈
+
+Rs×d. Let W0 ∈ Rd×m be the embedding matrix and de-fine the embedded sequence EX W0 ∈ Rs×m. For any 
+
+Z ∈ Rs×m, the attention block is 
+
+Attn( Z) = softmax 
+
+
+
+ZW QW ⊺ 
+
+> K
+
+Z⊺
+
+Z. 
+
+Let W1 ∈ Rm×d be the output projection. The output logits are 
+
+fθ (X) = Attn( EX W0)W1
+
+For notational convenience, we define WQK := WQW ⊺ 
+
+> K
+
+,
+
+Φ := W0WQW ⊺ 
+
+> K
+
+W ⊺ 
+
+> 0
+
+and M := W0W1.2Submission and Formatting Instructions for ICML 2026 
+
+Figure 1. Overview of the setting and the focus–dilution training pattern. (Left ) Sequences are generated by a Markov chain with stationary distribution π. We extract dataset S0, S 1, S 2 from the training set, which differ only in the identity of the final token in each sequence. ( Right ) The loss curves exhibit four stages: initial condensation, attention growth, attention dilution, and the emergence of a new direction. 
+
+2.4. Training objective and gradient-flow dynamics 
+
+Given (Xi, y i) ∈ D , define the cross-entropy at the last token ℓ (fθ (Xi)s, y i) := − log exp (fθ (Xi)s,y i )Pdj=1 exp( fθ (Xi)s,j ) . Then 
+
+L(θ) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+ℓ (fθ (Xi)s, y i) . (3) We study the gradient flow ˙θ = −∇L (θ).
+
+Proposition 2.3 (Gradient flow and population-gradient limit) . The gradient flow dynamics satisfy 
+
+
+
+dW0
+
+dt = − ∂L
+
+∂M W ⊺ 
+
+> 1
+
+− ∂L
+
+∂Φ W0W ⊺ 
+
+> QK
+
+−
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQK ,
+
+dW1
+
+dt = −W ⊺
+
+> 0
+
+∂L
+
+∂M ,
+
+dWQ
+
+dt = −W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0WK ,
+
+dWK
+
+dt = −W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQ.
+
+(4) 
+
+Moreover, define the token-level proxy attention matrix A ∈
+
+Rd×d by Ai,j = πj exp( e⊺       
+
+> iΦej)
+> P
+> j′πj′exp( e⊺
+> iΦej′)
+
+and the model output distribution P ∈ Rd×d by Pi,j = exp( AiM e j )P   
+
+> j′exp( AiM e j′)
+
+, where 
+
+Ai and Pi denote the i-th row. Then, in the large sample-size and long-context limit 
+
+(N, s ) → ∞ , the empirical gradients converge to 
+
+lim 
+
+> N,s →∞
+
+∂L
+
+∂M = −
+
+> d
+
+X
+
+> i=1
+
+πi A⊺
+
+> i
+
+ Pi − Pi
+
+,
+
+lim 
+
+> N,s →∞
+
+∂L
+
+∂Φ = −
+
+> d
+
+X
+
+> i=1
+
+πi ei
+
+ Pi − Pi
+
+M ⊺ Var( Ai).
+
+(5) 
+
+## 3. Theoretical results 
+
+3.1. Idea: stage-wise linearization around saddle points 
+
+Under small initialization, attention training often exhibits a multi-stage pattern: the trajectory spends a long time near a low-dimensional structure and then abruptly departs in a new direction. We explain this behavior via a stage-wise analysis around successive critical points. At each stage, the parameters enter a neighborhood of a saddle point where the gradient flow is well-approximated by its linearization. The linearized dynamics exposes (i) stable directions that keep the trajectory confined to a low-dimensional manifold, and (ii) unstable directions that eventually dominate and trigger the transition to the next stage. Concretely, we consider the gradient flow ˙θ = −∇L (θ).Let θ∗ be a critical point, and define ∆θ := θ − θ∗. ATaylor expansion yields 
+
+ddt ∆θ = −∇ 2L(θ∗) ∆ θ + higher-order terms .
+
+The next lemma characterizes the linearization in which the nonlinear flow is governed by the linearized system, and formalizes the alignment with the most unstable direction. 
+
+Lemma 3.1 (Linearization near a saddle point) . Let ˙θ =
+
+F (θ) be an ODE with F ∈ C2, and let θ∗ satisfy F (θ∗) = 0 .Let J := DF (θ∗) and assume there exist r > 0 and L > 0
+
+such that for all ∥∆θ∥ ≤ r,
+
+∥F (θ∗ + ∆ θ) − J∆θ∥ ≤ L∥∆θ∥2. (6) 
+
+Let θ(t) be the solution with ∥∆θ(0) ∥ = ε ≤ r/ 2, and 
+
+˜∆θ(t) := e Jt ∆θ(0) be the solution of the linearized system 
+
+˙˜∆θ = J ˜∆θ. Define μ := sup {ℜ (λ) : λ ∈ σ(J)}. Then for all t such that ∥ ˜∆θ(t)∥ ≤ r/ 2,
+
+∥∆θ(t) − ˜∆θ(t)∥ ≤ C ε 2 e2μt (7) 3Submission and Formatting Instructions for ICML 2026 
+
+for some constant C = C(J, L ). In particular, if μ > 0,then the nonlinear dynamics is well-approximated by the linearized dynamics up to times t = Θ(log(1 /ε )) .Moreover, suppose J is symmetric and has a simple eigen-value μ > 0 with eigenvector vu and a spectral gap ρ > 0
+
+in the sense that λ ≤ μ − ρ for all λ ∈ σ(J) \ { μ}. Then for any initialization with ⟨∆θ(0) , v u⟩̸ = 0 ,
+
+∆θ(t)
+
+∥∆θ(t)∥ → ± vu
+
+∥vu∥ (8) 
+
+for any sequence t = t(ε) with t(ε) → ∞ and εeμt (ε) → 0.
+
+At initialization, each entry of every parameter matrix is sampled i.i.d. from N (0 , ε 2) with ε ≪ 1. Thus θ(0) lies in an O(ε)-neighborhood of the origin, which is a critical point of the gradient flow. By Lemma 3.1, the dynamics in the early time window of length Θ(log(1 /ε )) is governed by the linearization at θ = 0 . A key consequence is that the linearized system admits a single unstable direction, so trajectories rapidly align with a rank-one direction. In our setting, this direction is not arbitrary: it is explicitly pinned down by the stationary distribution π of the underlying token Markov chain. 
+
+Theorem 3.2 (Initial condensation (rephrased from Thm. 2 in (Chen & Luo, 2025))) . The origin is a critical point and 
+
+∂L
+
+∂M θ=0 
+
+= −π
+
+
+
+π − 1
+
+d 1
+
+⊺
+
+, ∂L
+
+∂Φ θ=0 
+
+= 0 . (9) 
+
+The effective dynamics near θ = 0 is 
+
+d∆ W0
+
+dt = − ∂L
+
+∂M θ=0 
+
+∆W ⊺ 
+
+> 1
+
+, d∆ W1
+
+dt = −∆W ⊺
+
+> 0
+
+∂L
+
+∂M θ=0 
+
+(10) 
+
+Consequently, there exist a vector α1 such that the following limit holds as ε → 0 at t = Θ(log 1 
+
+> ε
+
+):
+
+W0
+
+∥W0∥ → π
+
+∥π∥ α⊺ 
+
+> 1
+
+, W1
+
+∥W1∥ → α1
+
+π⊺ − 1 
+
+> d
+
+1⊺
+
+∥π⊺ − 1 
+
+> d
+
+1⊺∥ . (11) Theorem 3.2 characterizes the first stage of training dy-namics in our model. Although it is rephrased from Thm. 2 in (Chen & Luo, 2025), we emphasize a more con-crete interpretation relevant to data. As a result, (W0, W 1)
+
+rapidly condense onto a π-driven rank-one structure within time T1 = Θ(log(1 /ε )) . In contrast, the attention block 
+
+(WQ, W K ) stays O(ε) throughout this stage because the linear term in its dynamics vanishes at the origin, i.e., 
+
+∂L/∂ Φ|θ=0 = 0 .
+
+3.2. Focus of Attention 
+
+After initial condensation stage, outer parameters (W0, W 1)
+
+rapidly become approximately rank-one, while the attention parameters (WQ, W K ) remain O(ε). Empirically, the tra-jectory then stays close to the rank-one condensation ray where the outer parameters evolve along the same direction until it enters a neighborhood of a second critical point. 
+
+Proposition 3.3 (Existence of a second critical point on the condensation ray) . Assume π1 > π 2 = · · · = πd. Then there exists κ1 > 0 such that the parameter tuple θ1
+
+> c
+
+W0 = κ1
+
+π
+
+∥π∥ α⊺ 
+
+> 1
+
+, W 1 = κ1α1
+
+π⊺ − 1 
+
+> d
+
+1⊺
+
+π − 1 
+
+> d
+
+1 , W Q, W K = 0 ,
+
+(12) 
+
+satisfies Pi = π⊺ for all i and ∂L 
+
+> ∂M θ=θ1
+> c
+
+= 0 . Moreover, θ1
+
+> c
+
+is a critical point of the full gradient flow. 
+
+The key point is that θ1 
+
+> c
+
+is typically a saddle: the (W0, W 1)-subsystem is contracting (or neutrally stable due to symme-try), while the (WQ, W K )-subsystem contains an unstable mode. 
+
+Proposition 3.4 (Linearized dynamics and its unique unsta-ble direction) . At critical point θ1 
+
+> c
+
+defined in Prop. 3.3, the linearization of the gradient flow admits the block form 
+
+ddt
+
+
+
+∆W0
+
+∆W1
+
+∆WQ
+
+∆WK
+
+ =
+
+Jout 00 Jatt 
+
+
+
+∆W0
+
+∆W1
+
+∆WQ
+
+∆WK
+
+ (13) 
+
+where Jout is negative semi-definite and Jatt is positive semi-definite. It indicates that the current dynamics are dominated by the attention subsystem. In particular, the attention block satisfies the explicit closed system 
+
+ddt ∆WQ = c α 1α⊺ 
+
+> 1
+
+∆WK , ddt ∆WK = c α 1α⊺ 
+
+> 1
+
+∆WQ,
+
+(14) 
+
+where c = λκ 41    
+
+> ∥π∥4Var( π)
+> π−1
+> d1∥π∥3
+
+> 0. Therefore the attention block has an exponentially unstable mode. 
+
+By Lemma 3.1, once the trajectory enters an O(ε)-neighborhood of θ1 
+
+> c
+
+, the dynamics is governed by the lin-earization for a duration Θ(log(1 /ε )) . It implies that the attention parameters (WQ, W K ) converge into the direction depending on the condensation direction. As a result, the attention structure prioritizes tokens that appear frequently in the steady-state distribution, indicating that the attention mechanism has become specific. 
+
+Theorem 3.5 (High frequency token bias) . Suppose the trajectory enters an O(ε)-neighborhood of θ1 
+
+> c
+
+. Within the linearization neighborhood of Lemma 3.1, there exists a unit vector ˜α1 ∈ Rm such that, for generic small initialization of (WQ, W K ),
+
+WQ(t)
+
+∥WQ(t)∥ → α1 ˜α⊺ 
+
+> 1
+
+, WK (t)
+
+∥WK (t)∥ → α1 ˜α⊺ 
+
+> 1
+
+. (15) 4Submission and Formatting Instructions for ICML 2026 
+
+Consequently, along the unstable ray WQ = WK =
+
+κ α 1 ˜α⊺ 
+
+> 1
+
+, the attention score matrix satisfies 
+
+Φ
+
+∥Φ∥ = W0WQW ⊺ 
+
+> K
+
+W ⊺
+
+> 0
+
+∥W0WQW ⊺ 
+
+> K
+
+W ⊺ 
+
+> 0
+
+∥ = ππ ⊺. (16) 
+
+Then for each i ∈ [d] the attention distribution exhibits a high-frequency bias: 
+
+lim  
+
+> κ→∞
+
+Ai(W0, W 1, κα 1 ˜α⊺ 
+
+> 1
+
+, κα 1 ˜α⊺ 
+
+> 1
+
+) = e⊺ 
+
+> 1
+
+. (17) 
+
+3.3. Dilution of Attention 
+
+Sec. 3.2 shows that the second critical point θ1 
+
+> c
+
+is a saddle whose unique unstable direction lies in the attention subsys-tem: after a transient of length Θ(log(1 /ε )) , the attention parameters become approximately rank-1 and aligned while the outer parameters remain close to their initial values on the condensation ray. In this subsection, we stay in the same neighborhood of θ1 
+
+> c
+
+but go beyond linearization: Condi-tioned on the rank-1 manifold, we resolve the next-order perturbations in embeddings induced by the evolution of attention. This refinement reveals a redistribution effect in the embeddings that gradually undermines the previously formed focus, leading to the dilution phase. Motivated by the alignment result in Sec. 3.2, we model the post-transient phase by the rank-one parametrization 
+
+W0 = γ(t) α⊺ 
+
+> 1
+
+, W1 = α1 β(t)⊺,WQ = λQ(t) α1 ˜α⊺ 
+
+> 1
+
+, WK = λK (t) α1 ˜α⊺ 
+
+> 1
+
+, (18) where γ(t), β (t) ∈ Rd and λQ(t), λ K (t) ∈ R. At the entry time t0 of this phase, 
+
+γ(t0) = κ1
+
+π
+
+∥π∥ , β(t0) = κ1
+
+π − 1 
+
+> d
+
+1
+
+π − 1 
+
+> d
+
+1 ,λQ(t0) = λK (t0) = o(1) .
+
+(19) For notational convenience, we also define the attention am-plitude η(t) := λQ(t)λK (t) which is the only combination that enters the reduced dynamics below. 
+
+Proposition 3.6 (Invariant rank-one manifold) . Assume 
+
+π1 > π 2 = · · · = πd. Define 
+
+W := 
+
+n
+
+θ satisfying (18) for some (γ, β, λ Q, λ K )
+
+o
+
+.
+
+If (W0, W 1, W Q, W K ) ∈ W at time t0, then the gradi-ent flow (4) remains in W for all t ≥ t0. Moreover, if 
+
+γ2(t0) = · · · = γd(t0) and β2(t0) = · · · = βd(t0), it will be preserved for any t ≥ t0.
+
+Restricting the gradient flow to W yields a closed system in 
+
+(γ, β, η ):
+
+˙γ = − ∂L
+
+∂M β − η
+
+ ∂L
+
+∂Φ +
+
+ ∂L
+
+∂Φ
+
+⊺
+
+γ, 
+
+˙β = −
+
+ ∂L
+
+∂M 
+
+⊺
+
+γ, ˙η = −2η γ ⊺ ∂L
+
+∂Φ γ. 
+
+(20) By Proposition 3.6, it suffices to track two-group coordi-nates 
+
+γ1, γ2 = · · · = γ|V| := γi̸=1 ,β1, β2 = · · · = β|V| := βi̸=1 ,
+
+and denote ∆γ := γ1 − γi̸=1 , ∆β := β1 − βi̸=1 . Intuitively, this reduces the post-alignment dynamics to an effective two-group system (token 1 versus all others). Importantly, we are still analyzing the flow near the same critical point 
+
+θ1 
+
+> c
+
+; the difference from Sec. 3.2 is that we can keep the attention direction fixed and resolve the next-order feedback that governs redistribution on the rank-one manifold. 
+
+Theorem 3.7 (Mass redistribution) . Consider the lineariza-tion of reduced dynamics (20) on W at critical point corre-sponding to θ1 
+
+> c
+
+. There exists c > 0 such that 
+
+(1 − π1)γ1(t) − (d − 1) π1γi̸=1 (t) ∝ exp( ct ). (21) 
+
+Consequently, γ1(t) and γi̸=1 (t) cannot move in the same direction: a weighted contrast between high-frequency to-ken and the remaining tokens is exponentially amplified. 
+
+Theorem 3.7 explains the mechanism behind the dilution phase. After alignment, the attention direction is essentially fixed, and the attention amplitude η(t) feeds back into ˙γ
+
+through the η(∂L/∂ Φ) γ term in (20) . The redistribution effect forces a growing separation between γ1 and γi̸=1 , so the embedding mass cannot remain concentrated along π.Therefore, the logit difference that causes high-frequency bias gradually weakens: the attention weights corresponding to low-frequency tokens are no longer concentrated on high-frequency tokens. This marks a shift from focus to dilution. 
+
+3.4. Emergence of a new direction via data asymmetry 
+
+In Sec. 3.3, the dynamics collapses onto a rank-one invariant manifold, effectively reducing learning to a “token 1 vs. all others” two-group system. Further learning requires separating low-frequency states, which demands growth of embeddings along directions that distinguish low-frequency tokens. However, for perfectly symmetric data among low-frequency tokens, the rank-one manifold may contain a degenerate critical point where both driving forces vanish: 
+
+∂L/∂M = 0 and ∂L/∂ Φ = 0 . Crucially, the degeneracy is not only tangential, but also transverse. As a consequence, linearization does not generate a mechanism that pushes the trajectory away from the rank-one manifold. 
+
+Proposition 3.8 (Degenerate critical point) . Assume perfect symmetry among low-frequency tokens. On the rank-one invariant manifold W (Proposition 3.6), there exists a crit-ical point, which is a neutrally stable equilibrium for the linearized dynamics, such that ∂L 
+
+> ∂M
+
+= 0 and ∂L 
+
+> ∂Φ
+
+= 0 .
+
+5Submission and Formatting Instructions for ICML 2026 
+
+The solution to remove degeneracy is to introduce perturba-tions that breaks the symmetry. In practice, low-frequency tokens rarely have identical frequencies. To model a mini-mal asymmetry while keeping calculations simple, we focus on d = 3 and perturb the stationary distribution by a small parameter δ:
+
+π⊺ = ( π1, 1−π1 
+
+> 2
+
+, 1−π1 
+
+> 2
+
+) ⇒ ˜π⊺ = ( π1, 1−π1 
+
+> 2
+
++δ, 1−π1 
+
+> 2
+
+−δ)
+
+We study stationary points of the perturbed gradient field 
+
+−∇ θ L(θ, δ ) = 0 near the degenerate critical point. Af-ter shifting coordinates so that θ = 0 corresponds to the degenerate critical point, a formal expansion takes the form 
+
+−∇L (θ, δ ) = J0θ + δf 1 + h.o.t. , (22) where J0 = −∇ 2 
+
+> θ
+
+L at δ = 0 .If J0 were invertible, the implicit function theorem would apply, and we could directly obtain the solution θ(δ). Un-fortunately, due to symmetry, J0 is degenerate, so we use the standard Lyapunov–Schmidt reduction. Let QK =(k1, . . . , k dK ) and QR = (q1, . . . , q dR ) be orthonormal bases for the kernel and range subspaces of J0:
+
+Rp = Ker( J0) ⊕ Ran( J0), θ = QK x + QRy, 
+
+where p is the parameter dimension. Projecting the stationar-ity condition onto the range and kernel yields the equivalent system 
+
+−Q⊺
+
+> R
+
+∇L (θ, δ ) = 0 , −Q⊺ 
+
+> K
+
+∇L (θ, δ ) = 0 . (23) The range equation can be solved by the implicit function theorem since Q⊺
+
+> R
+
+J0QR is invertible, yielding a smooth map y = ζ(x, δ ). Substituting back into the kernel equation produces a reduced low-dimensional problem in x whose solutions describe nearby stationary points. The key effect of the perturbation is that it splits the pre-viously flat transverse directions. A genuinely transverse positive eigenvalue of order Θ( δ) appears, while tangential instability is at most O(δ2). This fast transverse instabil-ity is what drives the trajectory away from the rank-one manifold and seeds a new embedding direction. 
+
+Theorem 3.9 (Asymmetry lifts degeneracy and induces a new direction) . Consider the perturbed stationary distribu-tion with parameter δ above. There exists a point θ(δ) near the degenerate critical point such that 
+
+∥∇ θ L(θ(δ), δ )∥ = O(δ3). (24) 
+
+Moreover, the Hessian at θ(δ) exhibits two distinct scales: 1. Slow tangential instability. Any positive eigenvalues created from the previously degenerate directions are at most O(δ2).2. Fast normal instability. Under mild condition, in direc-tions transverse to the rank-one manifold, there exists a positive eigenvalue of order Θ( δ).
+
+Theorem 3.9 shows that any generic low-frequency asymme-try lifts this degeneracy and produces a fast transverse unsta-ble mode of size Θ( δ). Once the trajectory enters the neigh-borhood of θ(δ), this transverse instability drives it away from the degenerate rank-one configuration and enables the emergence of a genuinely new embedding direction, allow-ing the model to further differentiate low-frequency tokens beyond the two-group description. 
+
+## 4. Empirical evidence 
+
+In this section, leveraging the simplified transformer model, we analyze the training behavior on Markovian data and empirically validate the theoretical derivation describing the transition of attention from focus to dilution. In parallel, we evaluate the model on real-world WikiText corpora and on the TinyStories corpus, which exhibits basic linguistic structure, to assess whether our observations generalize to the training dynamics of large-scale language models in realistic settings. 
+
+4.1. Synthetic Experiments 
+
+We construct synthetic datasets using four distinct transition matrices P , designed to share a common stationary distri-bution π = (0 .75 , 0.19 , 0.05 , 0.01) . To reveal the low-rank structure of parameters caused by condensation, we mea-sured the cosine similarity between neuronal input weights for analysis (Chen & Luo, 2025; Xu et al., 2025b). Additionally, we visualize the embedding trajectory evo-lution by applying Principal Component Analysis (PCA) to the concatenated embedding snapshots across all steps (Lorch, 2016; Antognini & Sohl-Dickstein, 2018). Detailed experimental setups are provided in Appendix E. The over-all evolution of the training dynamics is visualized in Fig. 2. We identify four distinct stages during the training process. In the following, we provide a detailed analysis of each stage to demonstrate the consistency between our experimental observations and theoretical results. 
+
+Stage I: Initial Condensation Our theoretical analysis predicts that during this stage, the outer layers W0, W 1
+
+evolve from an initialized full-rank state to a low-rank struc-ture, while the inner attention parameters remain largely invariant. This is depicted by Fig. 2(A), which demonstrates that the outer weights rapidly evolve into rank-1, whereas the WQ, W K maintain the high-rank nature of their initial-ization. Simultaneously, Fig. 2(B1) illustrates that the em-beddings of all tokens evolve towards a uniform direction, further validating our theoretical analysis. 
+
+Stage II: Growth of Attention During this stage, the outer parameters remain largely invariant, while WQ and 
+
+WK transition into a condensed state. This phase coincides 6Submission and Formatting Instructions for ICML 2026 10 1 10 2 10 3 10 4
+
+Step 
+
+> 0
+> 1
+> 2
+> 3
+> 4
+> Train Loss
+
+A        
+
+> Stage 1
+> Stage 2
+> Stage 3
+> Stage 4
+> S0loss
+> S1loss
+> S2loss
+> 01000 2000 3000 4000 5000
+> Step
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> Attention Entropy
+
+D1      
+
+> 0
+> 1
+> 2
+> 3
+> 01000 2000 3000 4000 5000
+> Step
+> 0.0
+> 0.5
+> 1.0
+> Norm of  W0
+
+D2      
+
+> 0
+> 1
+> 2
+> 3
+> Stage 1
+> Stage 2
+> Stage 3
+> Stage 4
+> 01000 2000 3000 4000 5000
+> Step
+> 0.0
+> 0.5
+> 1.0
+> Norm of  W0[1 : ]
+
+D3    
+
+> 0
+> 1
+> 2
+> 3
+> Stage 1
+> Stage 2
+> Stage 3
+> Stage 4
+> 0.2 0.0 0.2 0.4
+> 0.2
+> 0.0
+> 0.2
+> 0.4
+
+B1     
+
+> 50 200 50 200 50 200 50 200
+
+Stage 1 & 2    
+
+> 0
+> 1
+> 2
+> 3
+> previous
+> current
+> 0.2 0.0 0.2 0.4
+
+B2     
+
+> 200 650 200 650 200 650 200 650
+
+Stage 3    
+
+> 0
+> 1
+> 2
+> 3
+> previous
+> current
+> 0.2 0.0 0.2 0.4
+
+B3     
+
+> 650 1250 650 1250 650 1250 650 1250
+
+Stage 4    
+
+> 0
+> 1
+> 2
+> 3
+> previous
+> current
+> 0.2 0.0 0.2 0.4
+
+B4     
+
+> 1250 2000 1250 2000 1250 2000 1250 2000
+
+After Stage 4 
+
+> 0
+> 1
+> 2
+> 3
+> previous
+> current
+> 26
+> 126
+> 226
+> 326
+> 427
+> 527
+> 627
+> 728
+> 828
+> 928
+> Step
+> 0
+> 1
+> 2
+> 3
+> Key Token
+
+C1 Query Token 0 
+
+> 26
+> 126
+> 226
+> 326
+> 427
+> 527
+> 627
+> 728
+> 828
+> 928
+> Step
+
+C2 Query Token 1 
+
+> 26
+> 126
+> 226
+> 326
+> 427
+> 527
+> 627
+> 728
+> 828
+> 928
+> Step
+
+C3 Query Token 2 
+
+> 26
+> 126
+> 226
+> 326
+> 427
+> 527
+> 627
+> 728
+> 828
+> 928
+> Step
+
+C4 Query Token 3 
+
+0.1 
+
+0.2 
+
+0.3 
+
+0.4 
+
+Figure 2. Empirical focus–dilution cycle. (A) Loss curves for S0, S 1, S 2, accompanied by cosine-similarity matrices for 
+
+(W0, W Q, W K , W 1). (B) PCA of embeddings reveals one-directional growth (Stage I & II), retraction during dilution (Stage III), and expansion into new directions (Stage IV). (C) Attention maps transition from focus to dilution. Between steps 350 and 550, the attention given to the first token by all query pairs increases synchronously. Afterward, the first token focuses attention on itself, while other tokens reduce their attention towards it. (D1) Attention entropy; (D2), (D3) The embedding norm and the norm of perpendicular component onto the first token. 
+
+with a significant drop in training loss, marking the evolu-tion of parameters from the origin to the next critical point. According to our theory, the attention mechanism evolves such that high-frequency tokens are gradually focused by the remaining tokens. This phenomenon is clearly visualized in Fig. 2(C). 
+
+Stage III: Dilution of Attention In Stage III, although the parameters remain confined to the rank-1 manifold (evidenced by the unchanged condensation heatmap in Fig. 2(A)), Fig. 2(B2) reveals that all tokens, except for token 0, exhibit a retraction trajectory. This implies that while the training dynamics are strictly constrained within the low-rank manifold, the model begins to differentiate between tokens. As shown in Fig. 2(C, D), low-frequency tokens pay less attention to high-frequency token in this phase, accompanied by a significant drop in the embed-ding norms of low-frequency tokens. Consequently, outer parameters of the network revert to an unstable state. 
+
+Stage IV: Emergence of New Direction In Stage IV, the accumulated instability drives the model to escape the con-straints of the rank-1 manifold, initiated by the growth of new directions in the outer layers. This transition is clearly observable in Fig. 2(B3). To further quantify this, in Fig. 2(D3), we project the embeddings of low-frequency tokens ( W0[1 :] ) onto the direction orthogonal to token 0 (denoted as W0[0] ⊥) and calculate the projection norms. The results indicate that, for the first time, the remaining token embeddings significantly deviate from the direction 7Submission and Formatting Instructions for ICML 2026 the 
+
+> ,
+> Whitespace ter
+> end
+> continued
+> 200
+> 2200
+> 4200
+> 6200
+> 8200
+> 10200
+> 12200
+> 14200
+> 16200
+> Training Steps
+
+A1 Query: [continued]      
+
+> 02000 4000 6000 8000 10000
+> Steps
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> Norm of  W0
+
+A2 
+
+> the
+> ,
+> whitespace
+> ter
+> end
+> continued
+> .
+> ,
+> a
+> full
+> been
+> 200
+> 1200
+> 2200
+> 3200
+> 4200
+> 5200
+> Training Steps
+
+B1 Query: [,]   
+
+> ini 1000 2000
+> Steps
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> Norm of  W0
+
+B2 
+
+> .
+> ,
+> a
+> full
+> been
+> Sara
+> was
+> very
+> excited
+> .
+> She
+> was
+> going
+> outside
+> to
+> fly
+> a
+> k
+> ite
+> .
+> Her
+> mom
+> helped
+> her
+> prepare
+> the
+> k
+> ite
+> .
+> She
+> had
+> to
+> tie
+> string
+> to
+> the
+> middle
+> so
+> the
+> k
+> ite
+> could
+> fly
+> high
+> .
+> Sara
+> was
+> very
+> excited
+> .
+> She
+> was
+> going
+> outside
+> to
+> fly
+> a
+> k
+> ite
+> .
+> Her
+> mom
+> helped
+> her
+> prepare
+> the
+> k
+> ite
+> .
+> She
+> had
+> to
+> tie
+> string
+> to
+> the
+> middle
+> so
+> the
+> k
+> ite
+> could
+> fly
+> high
+> .
+
+C1 Step ini 
+
+> Sara
+> was
+> very
+> excited
+> .
+> She
+> was
+> going
+> outside
+> to
+> fly
+> a
+> k
+> ite
+> .
+> Her
+> mom
+> helped
+> her
+> prepare
+> the
+> k
+> ite
+> .
+> She
+> had
+> to
+> tie
+> string
+> to
+> the
+> middle
+> so
+> the
+> k
+> ite
+> could
+> fly
+> high
+> .
+
+C2 Step 1400 
+
+> Sara
+> was
+> very
+> excited
+> .
+> She
+> was
+> going
+> outside
+> to
+> fly
+> a
+> k
+> ite
+> .
+> Her
+> mom
+> helped
+> her
+> prepare
+> the
+> k
+> ite
+> .
+> She
+> had
+> to
+> tie
+> string
+> to
+> the
+> middle
+> so
+> the
+> k
+> ite
+> could
+> fly
+> high
+> .
+
+C3 Step 2200 
+
+> Sara
+> was
+> very
+> excited
+> .
+> She
+> was
+> going
+> outside
+> to
+> fly
+> a
+> k
+> ite
+> .
+> Her
+> mom
+> helped
+> her
+> prepare
+> the
+> k
+> ite
+> .
+> She
+> had
+> to
+> tie
+> string
+> to
+> the
+> middle
+> so
+> the
+> k
+> ite
+> could
+> fly
+> high
+> .
+
+C4 Step 15000 
+
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 0.2
+> 0.4
+> 0.6
+> 0
+> 0.01
+> 0.1
+> 0.3
+> 0.6
+> 1
+> 0
+> 0.01
+> 0.1
+> 0.3
+> 0.6
+> 1
+> 0
+> 0.01
+> 0.1
+> 0.3
+> 0.6
+> 1
+> 0
+> 0.01
+> 0.1
+> 0.3
+> 0.6
+> 1
+
+Figure 3. Experimental results on real-world datasets. (A) Results on WikiText. (A1) The attention evolution of the medium-frequency token ’continue’ given the input sequence [the, comma , whitespace , ter, end, continue]. The attention scores exhibit a distinct four-phase transition: dilution → focus on the high-frequency whitespace → secondary dilution → final focus on continue itself. (A2) The evolution of ∥W0∥2 for selected tokens. The dominant whitespace token shows continuous growth, while other tokens display a clear retraction. (B) Results on TinyStories. We observe similar dynamics using the input sequence [the, comma , a, full, been], mirroring the phenomena in (A). (C) Visualization of attention shifts. The evolution of attention for a single test sample across different training steps, with tokens exhibiting self-attention scores ≥ 0.75 highlighted. 
+
+of token 0. 
+
+After Stage IV: Subsequent Training Dynamics Fig. 2(D) further illustrates the later stages of the training pro-cess, revealing a distinct periodicity in the embedding norms. Specifically, the focus and dilution pattern repeats recur-sively: as the network proceeds to learn Token 1, the remain-ing tokens (2–3) undergo the same retraction and regrowth process, continuing sequentially until training concludes. We hypothesize that after Stage IV, the model has effec-tively converged on Token 0. Consequently, the system evolves into a sub-dynamic regime governed by Tokens 1–3. In this reduced state, the parameter dynamics can be re-analyzed within our original theoretical framework. 
+
+4.2. Real-world Experiments Experimental Results. We validate the correctness of our theorem on two real-world datasets: WikiText (Merity et al., 2016) and TinyStories (Eldan & Li, 2023). We employ the same simplified Transformer architecture and maintain hyperparameter settings consistent with the synthetic data experiments. To investigate the “focus-and-dilution” charac-teristics of the attention mechanism, we track the top-three most frequent tokens alongside three randomly sampled medium-frequency tokens (frequency > 10% ) from the training set. As illustrated in the figure, across both WikiText and TinyS-tories, the attention mechanism exhibits a consistent pattern: it initially prioritizes high-frequency tokens (e.g., “the”, “a”, and whitespace) before subsequently losing this focus—a process we term “dilution.” Concurrently, by monitoring the embedding evolution of these selected tokens, we observe a distinct “retraction” phenomenon. Notably, due to the high variance in batch composition inherent to the 1-epoch train-ing regime on real-world corpora, we occasionally observe this retraction even in the most frequent tokens. 
+
+Validity of the Markov Approximation. Existing stud-ies (Chang & Bergen, 2022; Chang et al., 2024) indicate a curriculum in Transformer learning, starting from 1-gram to n-gram statistics. Our analysis of attention patterns in TinyStories supports this: distinct tokens gradually shift from uniform attention to self-attention. This behavior in-dicates that the model functions as a pseudo-2-gram model during early training phases, despite the non-Markovian na-ture of real text. These observations indirectly validate our experimental design, confirming that our synthetic Markov data acts as a suitable proxy for understanding real-world training dynamics. 
+
+## 5. Conclusion 
+
+This work advances the theoretical understanding of trans-former training dynamics by providing a mechanistic ac-count of how attention evolves. We identify a recurring focus–dilution cycle and develop a stage-wise gradient-flow 8Submission and Formatting Instructions for ICML 2026 
+
+framework that characterizes rank-one condensation, saddle-to-saddle transitions, and the impact of symmetry breaking, offering a rigorous basis for phenomena often reported em-pirically. While the formal analysis is derived in a restricted setting, the same qualitative signatures appear on real cor-pora, suggesting the framework remains a useful lens for interpreting early-stage attention dynamics beyond the ide-alized regime. 
+
+## Limitation 
+
+This paper provides a minimal analytical framework for studying the coupled evolution of embeddings and attention, and identifies the focus–dilution cycle as a concrete mecha-nism. Experiments on synthetic data and small-scale natural language data provide preliminary support for this mecha-nism. Owing to the limitations of the theoretical framework, our analysis mainly focuses on the training dynamics of single-layer attention, and thus does not yet capture the ef-fects of layer interactions or multi-head structure. Extending the analysis to multi-layer and multi-head architectures, and studying how common components such as LayerNorm af-fect the dynamics, are important directions for future work. 
+
+## Impact Statement 
+
+This paper aims to advance the theoretical understanding of transformer training dynamics by providing a mechanistic analysis of attention evolution. While improved understand-ing of learning dynamics may inform future model design and training practices, we do not foresee any direct negative ethical or societal consequences arising specifically from this work. 
+
+## Acknowledgements 
+
+This work is sponsored by the National Key R &D Program of China Grant No. 2022YFA1008200 (T. L., Z. X.). We also thank Shanghai Institute for Mathematics and Inter-disciplinary Sciences (SIMIS) for their financial support. This research was funded by SIMIS under grant number SIMISID-2025-ST (T. L.). The authors are grateful for the resources and facilities provided by SIMIS, which were essential for the completion of this work. This work is also sponsored by the National Natural Science Founda-tion of China Grant No. 92270001 (Z. X.), 12371511 (Z. X.), 12422119 (Z. X.), 2025 Key Technology R&D Pro-gram “New Generation Information Technology” Project of Shanghai Municipal Science and Technology Commission (Z. X.). 
+
+## References 
+
+Antognini, J. and Sohl-Dickstein, J. Pca of high dimensional random walks with comparison to neural network training. In Bengio, S., Wallach, H., Larochelle, H., Grauman, K., Cesa-Bianchi, N., and Garnett, R. (eds.), Advances in Neural Information Processing Systems , volume 31. Curran Associates, Inc., 2018. URL https://proc eedings.neurips.cc/paper_files/paper /2018/file/7a576629fef88f3e636afd33b 09e8289-Paper.pdf .Arora, S., Du, S. S., Hu, W., Li, Z., Salakhutdinov, R. R., and Wang, R. On exact computation with an infinitely wide neural net. Advances in neural information process-ing systems , 32, 2019. Bietti, A., Cabannes, V., Bouchacourt, D., Jegou, H., and Bottou, L. Birth of a transformer: A memory viewpoint. In Thirty-seventh Conference on Neural Information Pro-cessing Systems , 2023. URL https://openreview .net/forum?id=3X2EbBLNsk .Chang, T. A. and Bergen, B. K. Word acquisition in neural language models. Transactions of the Association for Computational Linguistics , 10:1–16, 2022. doi: 10.1162/ tacl a 00444. URL https://aclanthology.org /2022.tacl-1.1/ .Chang, T. A., Tu, Z., and Bergen, B. K. Characterizing learn-ing curves during language model pre-training: Learn-ing, forgetting, and stability. Transactions of the Asso-ciation for Computational Linguistics , 12:1346–1362, 2024. doi: 10.1162/tacl a 00708. URL https: //aclanthology.org/2024.tacl-1.74/ .Chen, S., Sheen, H., Wang, T., and Yang, Z. Unveiling induction heads: Provable training dynamics and feature learning in transformers. In Globerson, A., Mackey, L., Belgrave, D., Fan, A., Paquet, U., Tomczak, J., and Zhang, C. (eds.), Advances in Neural Information Processing Sys-tems , volume 37, pp. 66479–66567. Curran Associates, Inc., 2024a. doi: 10.52202/079017-2127. URL https: //proceedings.neurips.cc/paper_files /paper/2024/file/7aae9e3ec211249e05b d07271a6b1441-Paper-Conference.pdf .Chen, Z.-A. and Luo, T. From condensation to rank col-lapse: A two-stage analysis of transformer training dy-namics. In The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025. URL https: //openreview.net/forum?id=gm5mkiTGOy .Chen, Z.-A., Li, Y., Luo, T., Zhou, Z., and Xu, Z.-Q. J. Phase diagram of initial condensation for two-layer neural networks. CSIAM Transactions on Applied Mathematics ,5(3):448–514, 2024b. ISSN 2708-0579. doi: https: 9Submission and Formatting Instructions for ICML 2026 
+
+//doi.org/10.4208/csiam-am.SO-2023-0016. URL 
+
+https://global-sci.com/article/91025 /phase-diagram-of-initial-condensatio n-for-two-layer-neural-networks .Chen, Z.-A., Luo, T., and Wang, G. On multi-stage loss dynamics in neural networks: Mechanisms of plateau and descent stages. arXiv preprint arXiv:2410.20119 , 2024c. Eldan, R. and Li, Y. Tinystories: How small can language models be and still speak coherent english?, 2023. URL 
+
+https://arxiv.org/abs/2305.07759 .Gao, C., Cao, Y., Li, Z., He, Y., Wang, M., Liu, H., Klu-sowski, J. M., and Fan, J. Global convergence in training large-scale transformers. In Globerson, A., Mackey, L., Belgrave, D., Fan, A., Paquet, U., Tomczak, J., and Zhang, C. (eds.), Advances in Neural Information Processing Sys-tems , volume 37, pp. 29213–29284. Curran Associates, Inc., 2024. doi: 10.52202/079017-0921. URL https: //proceedings.neurips.cc/paper_files /paper/2024/file/33b47b3d2441a17b953 44cd635f3dd01-Paper-Conference.pdf .Jacot, A., Gabriel, F., and Hongler, C. Neural tangent ker-nel: Convergence and generalization in neural networks. 
+
+Advances in neural information processing systems , 31, 2018. Ji, Z. and Telgarsky, M. Gradient descent aligns the layers of deep linear networks. In International Conference on Learning Representations , 2019. URL https://open review.net/forum?id=HJflg30qKX .Kim, J. and Suzuki, T. Transformers learn nonlinear features in context: Nonconvex mean-field dynamics on the atten-tion landscape. In Salakhutdinov, R., Kolter, Z., Heller, K., Weller, A., Oliver, N., Scarlett, J., and Berkenkamp, F. (eds.), Proceedings of the 41st International Conference on Machine Learning , volume 235 of Proceedings of Machine Learning Research , pp. 24527–24561. PMLR, 21–27 Jul 2024. URL https://proceedings.ml r.press/v235/kim24af.html .Kumar, A. and Haupt, J. Early directional convergence in deep homogeneous neural networks for small initializa-tions. arXiv preprint arXiv:2403.08121 , 2024. Li, Y., Li, Y., and Risteski, A. How do transformers learn topic structure: Towards a mechanistic understanding, 2023. URL https://arxiv.org/abs/2303.0 4245 .Lorch, E. Visualizing deep network training trajectories with pca. In ICML Workshop on Visualization for Deep Learning , 2016. Lu, H., Mao, Y., and Nayak, A. On the dynamics of training attention models. In International Conference on Learning Representations , 2021. URL https: //openreview.net/forum?id=1OCTOShAmqB .Luo, T., Xu, Z.-Q. J., Ma, Z., and Zhang, Y. Phase diagram for two-layer relu neural networks at infinite-width limit. 
+
+The Journal of Machine Learning Research , 22(1):3327– 3373, 2021. Makkuva, A. V., Bondaschi, M., Girish, A., Nagle, A., Kim, H., Gastpar, M., and Ekbote, C. Local to global: Learn-ing dynamics and effect of initialization for transform-ers. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. URL https: //openreview.net/forum?id=OX4yll3X53 .Makkuva, A. V., Bondaschi, M., Girish, A., Nagle, A., Jaggi, M., Kim, H., and Gastpar, M. Attention with markov: A curious case of single-layer transformers. In 
+
+The Thirteenth International Conference on Learning Representations , 2025. URL https://openreview .net/forum?id=SqZ0KY4qBD .Mei, S., Montanari, A., and Nguyen, P.-M. A mean field view of the landscape of two-layer neural networks. Pro-ceedings of the National Academy of Sciences , 115(33): E7665–E7671, 2018. Merity, S., Xiong, C., Bradbury, J., and Socher, R. Pointer sentinel mixture models, 2016. P ´erez, J., Marinkovi ´c, J., and Barcel ´o, P. On the turing completeness of modern neural network architectures. In 
+
+International Conference on Learning Representations ,2019. URL https://openreview.net/forum ?id=HyGBdo0qFm .Rajaraman, N., Jiao, J., and Ramchandran, K. An analysis of tokenization: Transformers under markov data. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. URL https://openrevi ew.net/forum?id=wm9JZq7RCe .Rotskoff, G. and Vanden-Eijnden, E. Parameters as inter-acting particles: long time convergence and asymptotic error scaling of neural networks. Advances in neural information processing systems , 31, 2018. Sheen, H., Chen, S., Wang, T., and Zhou, H. H. Implicit regularization of gradient flow on one-layer softmax at-tention, 2024. URL https://arxiv.org/abs/24 03.08699 .Snell, C. B., Zhong, R., Klein, D., and Steinhardt, J. Ap-proximating how single head attention learns. ArXiv ,abs/2103.07601, 2021. URL https://api.semant icscholar.org/CorpusID:232232786 .10 Submission and Formatting Instructions for ICML 2026 
+
+Tarzanagh, D. A., Li, Y., Thrampoulidis, C., and Oymak, S. Transformers as support vector machines. arXiv preprint arXiv:2308.16898 , 2023. Tian, Y., Wang, Y., Zhang, Z., Chen, B., and Du, S. S. JoMA: Demystifying multilayer transformers via joint dynam-ics of MLP and attention. In The Twelfth International Conference on Learning Representations , 2024. URL 
+
+https://openreview.net/forum?id=LbJq RGNYCf .Varre, A., Y ¨uce, G., and Flammarion, N. Learning in-context $n$-grams with transformers: Sub-$n$-grams are near-stationary points. In Forty-second International Conference on Machine Learning , 2025. URL https: //openreview.net/forum?id=OMwdvGDeHL .Varre, A. V., Vladarean, M.-L., Pillaud-Vivien, L., and Flammarion, N. On the spectral bias of two-layer lin-ear networks. In Thirty-seventh Conference on Neural Information Processing Systems , 2023. URL https: //openreview.net/forum?id=FFdrXkm3Cz .Vasudeva, B., Deora, P., and Thrampoulidis, C. Implicit bias and fast convergence rates for self-attention. Transactions on Machine Learning Research , 2025. ISSN 2835-8856. URL https://openreview.net/forum?id= pKilnjQsb0 .Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., and Polosukhin, I. At-tention is all you need. Advances in neural information processing systems , 30, 2017. Wang, M. and Ma, C. Understanding multi-phase opti-mization dynamics and rich nonlinear behaviors of reLU networks. In Thirty-seventh Conference on Neural In-formation Processing Systems , 2023. URL https: //openreview.net/forum?id=konBXvt2iS .Williams, F., Trager, M., Panozzo, D., Silva, C., Zorin, D., and Bruna, J. Gradient dynamics of shallow univariate relu networks. Advances in neural information processing systems , 32, 2019. Wu, D., Shevchenko, A., Oymak, S., and Mondelli, M. Attention with trained embeddings provably selects im-portant tokens, 2025. URL https://arxiv.org/ abs/2505.17282 .Xu, Z., Min, H., Luo, J., MacDonald, L. E., Tarmoun, S., Mallada, E., and Vidal, R. Understanding the learning dy-namics of loRA: A gradient flow perspective on low-rank adaptation in matrix factorization. In The 28th Interna-tional Conference on Artificial Intelligence and Statistics ,2025a. URL https://openreview.net/forum ?id=hphdX8WlcT .Xu, Z.-Q. J., Zhang, Y., and Zhou, Z. An overview of condensation phenomenon in deep learning, 2025b. URL 
+
+https://arxiv.org/abs/2504.09484 .Yang, H., Kailkhura, B., Wang, Z., and Liang, Y. Train-ing dynamics of transformers to recognize word co-occurrence via gradient flow analysis. In Globerson, A., Mackey, L., Belgrave, D., Fan, A., Paquet, U., Tomczak, J., and Zhang, C. (eds.), Advances in Neural Information Processing Systems , volume 37, pp. 46047–46117. Cur-ran Associates, Inc., 2024. doi: 10.52202/079017-1465. URL https://proceedings.neurips.cc/p aper_files/paper/2024/file/520416e27 d3b0cef3cd70a083e2991c7-Paper-Confere nce.pdf .Yang, T., Huang, Y., Liang, Y., and Chi, Y. Multi-head trans-formers provably learn symbolic multi-step reasoning via gradient descent. In The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025. URL 
+
+https://openreview.net/forum?id=qFC7 28XyeM .Yun, C., Bhojanapalli, S., Rawat, A. S., Reddi, S., and Kumar, S. Are transformers universal approximators of sequence-to-sequence functions? In International Conference on Learning Representations , 2020a. URL 
+
+https://openreview.net/forum?id=ByxR M0Ntvr .Yun, C., Chang, Y.-W., Bhojanapalli, S., Rawat, A. S., Reddi, S., and Kumar, S. O (n) connections are expressive enough: Universal approximability of sparse transform-ers. Advances in Neural Information Processing Systems ,33:13783–13794, 2020b. Zhang, R., Frei, S., and Bartlett, P. L. Trained transform-ers learn linear models in-context. Journal of Machine Learning Research , 25(49):1–55, 2024a. Zhang, Y., Xu, Z.-Q. J., Luo, T., and Ma, Z. A type of generalization error induced by initialization in deep neu-ral networks. In Mathematical and Scientific Machine Learning , pp. 144–164. PMLR, 2020. Zhang, Y., Singh, A. K., Latham, P. E., and Saxe, A. M. Training dynamics of in-context learning in linear atten-tion. In Forty-second International Conference on Ma-chine Learning , 2025a. URL https://openreview .net/forum?id=aFNq67ilos .Zhang, Z., Lin, P., Wang, Z., Zhang, Y., and Xu, Z.-Q. J. Initialization is critical to whether transformers fit com-posite functions by inference or memorizing, 2024b. URL 
+
+https://arxiv.org/abs/2405.05409 .11 Submission and Formatting Instructions for ICML 2026 
+
+Zhang, Z., Lin, P., Wang, Z., Zhang, Y., and Xu, Z.-Q. J. Complexity control facilitates reasoning-based compo-sitional generalization in transformers. arXiv preprint arXiv:2501.08537 , 2025b. Zhou, H., Zhou, Q., Luo, T., Zhang, Y., and Xu, Z.-Q. To-wards understanding the condensation of neural networks at initial training. Advances in Neural Information Pro-cessing Systems , 35:2184–2196, 2022. Zhou, Z., Zhou, H., Li, Y., and Xu, Z.-Q. J. Understanding the initial condensation of convolutional neural networks. 
+
+arXiv preprint arXiv:2305.09947 , 2023. Zucchet, N., D’Angelo, F., Lampinen, A. K., and Chan, S. C. The emergence of sparse attention: impact of data distribution and benefits of repetition. In The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025. URL https://openreview.net /forum?id=jMhRbV47pS .12 Submission and Formatting Instructions for ICML 2026 
+
+## A. Related Works 
+
+Training dynamics of attention and multi-stage analysis Given the scale of modern models and the complexity of optimizers, studying the training dynamics of attention remains a challenging problem. A common practice is to introduce various simplifications to the research object, such as constructing task-specific synthetic data, utilizing reparameterization or simplified model and optimization function (Sheen et al., 2024; Kim & Suzuki, 2024; Varre et al., 2023; Chen et al., 2024a; Wu et al., 2025; Gao et al., 2024; Zhang et al., 2025a; Vasudeva et al., 2025; Yang et al., 2025). Among these, (Lu et al., 2021) establishes key dynamical identities using a controllable text classification task where sentences consist of a “topic word” plus random noise. (Snell et al., 2021) suggests that models first capture word co-occurrence before adjusting attention to focus on relevant tokens. (Li et al., 2023) examines the dynamical effects of fixing specific attention components within a topic-word task framework. Following these previous works, (Tian et al., 2024) proposed a novel mathematical framework for analyzing the joint dynamics of MLP and attention blocks, successfully explaining the sparsity of attention score matrices. (Zucchet et al., 2025) also discussed the emergence of sparse attention and the timing of training dynamics. Furthermore, (Yang et al., 2024) provides a clear and rigorous discussion of the two-stage training dynamics under classifiable text tasks. Similarly, (Chen & Luo, 2025) offers a more rigorous proof of dynamical separation in more general scenarios. Regarding multi-stage analysis, (Xu et al., 2025a) analyzes LoRA’s cross-stage dynamics, while (Wang & Ma, 2023) provides a full-process characterization of two-layer ReLU networks across four distinct training phases, from initialization to convergence. (Varre et al., 2025) shows in an analyzable in-context n-gram setting that lower-order sub-n-gram solutions are near-stationary points, explaining the plateau-to-drop training dynamics as Transformers gradually learn to retrieve longer contexts. However, the aforementioned literature either relies on data settings that deviate significantly from real-world scenarios or requires overly stringent analytical conditions. 
+
+Transformers on Markov chains A significant body of influential work employs Markov chains to understand how Transformers, as probabilistic models, learn continuous linguistic data. (Chang et al., 2024) discovers that LLM learning can be summarized as “early n-gram learning followed by the gradual refinement of low-probability (tail) n-gram predictions.” (Bietti et al., 2023) analyzes the formation mechanism of induction heads using Markov-like data. (Rajaraman et al., 2024) investigates the impact of tokenization on Markovian data, proving that appropriate tokenization assists Transformers in modeling Markov processes. Additionally, (Makkuva et al., 2024) and (Makkuva et al., 2025) explore training dynamics and convergence analysis specifically under Markovian data settings. 
+
+Small initialization The initialization of a neural network significantly affects its learning outcomes (Arora et al., 2019; Williams et al., 2019; Mei et al., 2018; Jacot et al., 2018; Rotskoff & Vanden-Eijnden, 2018; Zhang et al., 2020). Small initialization is a common setting investigated in the study of neural network optimization dynamics, which contrasts with the Neural Tangent Kernel (NTK) perspective prevalent in infinitely wide networks. For linear models, (Ji & Telgarsky, 2019) theoretically establish results regarding matrix alignment. For nonlinear models, (Zhou et al., 2022) found that small initialization similarly promotes parameter condensation, thereby reducing model complexity. Theoretically, (Luo et al., 2021; Chen et al., 2024b; Zhou et al., 2023; Kumar & Haupt, 2024) have further deepened the understanding of this phenomenon. A recent survey article (Xu et al., 2025b) systematically synthesizes these empirical and theoretical findings. 
+
+## B. Theoretical details in Sec. 2 
+
+B.1. Property of markov process 
+
+We will use two standard asymptotic properties of Markov chains. For the sake of completeness, we provide a detailed proof. 
+
+Proposition B.1 (Basic Markov properties) . Given the transition matrix P in (2) and any initial distribution μ0:1. Convergence. The marginal distribution converges to π. That is lim t→∞ μ⊺ 
+
+> 0
+
+P t = π⊺.2. Ergodicity. Along a single trajectory, the empirical state frequencies converge to π. That is lim s→∞ 1
+
+> s
+
+Psj=1 1xj = π⊺,where 1xj ∈ Rd is the one-hot vector of token xj .Proof. Throughout, we work on the finite state space V = {1, . . . , |V|} . By the definition of the transition matrix P defined in (2) , P is irreducible and aperiodic with strictly positive entries. Thus, P is ergodic. In particular, P admits a unique stationary distribution π satisfying π⊺P = π⊺ and πi > 0 for all i.13 Submission and Formatting Instructions for ICML 2026 
+
+1) Convergence of marginals. Since P is ergodic on a finite state space, it is primitive. By the Perron–Frobenius theorem, the eigenvalue 1 of P is simple and all other eigenvalues satisfy |λ| < 1. Let 1 ∈ R|V| denote the all-ones vector. Because 
+
+P is row-stochastic, we have P 1 = 1; because π is stationary, we have π⊺P = π⊺. Define the rank-one projector 
+
+Π := 1 π⊺.
+
+Then Π2 = Π , P Π = Π P = Π , and we can write 
+
+P = Π + Q, where Q := P − Π.
+
+Note that Q1 = 0 and π⊺Q = 0 . Moreover, the spectrum of Q equals the spectrum of P with the eigenvalue 1 removed, hence its spectral radius satisfies ρ(Q) < 1. Therefore, Qt → 0 as t → ∞ (in any matrix norm), and 
+
+P t = (Π + Q)t = Π + Qt −−−→ 
+
+> t→∞
+
+Π = 1 π⊺. (25) For any initial distribution μ0 (a row vector with nonnegative entries summing to 1), 
+
+μ⊺ 
+
+> 0
+
+P t −−−→ 
+
+> t→∞
+
+μ⊺ 
+
+> 0
+
+(1 π⊺) = ( μ⊺ 
+
+> 0
+
+1) π⊺ = π⊺,
+
+which proves the convergence claim. 
+
+2) Ergodicity of empirical frequencies. Let (Xt)t≥0 be the Markov chain with transition matrix P and arbitrary initial distribution μ0. Fix a reference state, say state 1, and define the (strict) return times 
+
+τ0 := 0 , τk+1 := inf {t > τ k : Xt = 1 }, k ≥ 0.
+
+By irreducibility on a finite state space, the chain is positive recurrent, hence τk < ∞ almost surely for all k and E1[τ1] < ∞.For each cycle k ≥ 0, define the cycle length and the state-i visit count within the cycle: 
+
+Sk := τk+1 − τk, Rk(i) := 
+
+> τk+1 −1
+
+X
+
+> t=τk
+
+1{Xt = i}.
+
+By the strong Markov property, conditional on Xτk = 1 the post-τk evolution is independent of the past, and therefore the pairs {(Sk, R k(i)) }k≥1 are i.i.d. under PMC  
+
+> 1
+
+(and also after the chain first hits state 1 when started from an arbitrary μ0). Let 
+
+N (T ) := max {k : τk ≤ T } be the number of completed cycles up to time T . Then for each fixed i, 
+
+> T−1
+
+X
+
+> t=0
+
+1{Xt = i} =
+
+> τ1−1
+
+X
+
+> t=0
+
+1{Xt = i}
+
+| {z }
+
+> initial transient
+
++  
+
+> N(T)−1
+
+X
+
+> k=1
+
+Rk(i) +  
+
+> T−1
+
+X  
+
+> t=τN(T)
+
+1{Xt = i}
+
+| {z }
+
+> remainder
+
+. (26) Divide by T . The initial transient term is O(1 /T ) almost surely. The remainder term is at most one cycle, hence bounded by SN (T ), and thus also negligible after dividing by T because τN (T ) ≤ T < τ N (T )+1 implies SN (T ) ≤ τN (T )+1 and 
+
+τN (T ) → ∞ .It remains to analyze the dominant sum over complete cycles. By the strong law of large numbers applied to the i.i.d. sequences {Sk} and {Rk(i)},
+
+1
+
+n
+
+> n
+
+X
+
+> k=1
+
+Sk → E1[S1] = E1[τ1], 1
+
+n
+
+> n
+
+X
+
+> k=1
+
+Rk(i) → E1[R1(i)] a.s. (27) Moreover, by the definition of τk, we know 
+
+τN (T )+1 =  
+
+> N(T)
+
+X
+
+> k=0
+
+Sk ≥ T, τN (T ) =  
+
+> N(T)−1
+
+X
+
+> k=0
+
+Sk ≤ T − 1
+
+14 Submission and Formatting Instructions for ICML 2026 
+
+which implies 
+
+N (T )
+
+T → 1
+
+E1[τ1] a.s. Combining with (26) and (27), we obtain 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+1{Xt = i} a.s. 
+
+−−−−→ 
+
+> T→∞
+
+E1[R1(i)] 
+
+E1[τ1] . (28) Take i = 1 , we get the right-hand side is π1 by the computation about expectation of first return time. Since the above proof process is independent of the choice of the reference state, by considering all possible reference states, we obtain the result. 
+
+B.2. Gradient-flow dynamics 
+
+In this section, we will supplement the proof details of Proposition 2.3. 
+
+Proof. We first derive Eq. (4), using the standard trace theorem and chain rule. Taking the total differential of the loss, we get 
+
+dL =
+
+ ∂L
+
+∂M , dM
+
+
+
++
+
+ ∂L
+
+∂Φ , dΦ 
+
+
+
+(29) Using the chain rule, we get 
+
+ ∂L
+
+∂M , dM
+
+
+
+=
+
+ ∂L
+
+∂M , dW0W1 + W0dW1
+
+ ∂L
+
+∂Φ , dΦ 
+
+
+
+=
+
+ ∂L
+
+∂Φ , dW0WQW ⊺ 
+
+> K
+
+W ⊺ 
+
+> 0
+
++ W0dWQW ⊺ 
+
+> K
+
+W ⊺ 
+
+> 0
+
++ W0WQdW ⊺ 
+
+> K
+
+W ⊺ 
+
+> 0
+
++ W0WQW ⊺ 
+
+> K
+
+dW ⊺
+
+> 0
+
+ (30) We derive the evolution equation for W0, and the other derivations are similar. We collect items related to dW0:
+
+ ∂L
+
+∂M , dW0W1
+
+
+
++
+
+ ∂L
+
+∂Φ , dW0WQW ⊺ 
+
+> K
+
+W ⊺ 
+
+> 0
+
++ W0WQW ⊺ 
+
+> K
+
+dW ⊺
+
+> 0
+
+
+
+= tr 
+
+ ∂L
+
+∂M 
+
+⊺
+
+dW0W1
+
+
+
++ tr 
+
+ ∂L
+
+∂Φ
+
+⊺
+
+(d W0WQW ⊺ 
+
+> K
+
+W ⊺ 
+
+> 0
+
++ W0WQW ⊺ 
+
+> K
+
+dW ⊺ 
+
+> 0
+
+)
+
+
+
+= tr 
+
+
+
+W1
+
+ ∂L
+
+∂M 
+
+⊺
+
+dW0
+
+
+
++ tr 
+
+
+
+WQW ⊺ 
+
+> K
+
+W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+dW0
+
+
+
++ tr 
+
+
+
+WK W ⊺
+
+> Q
+
+W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+
+
+dW0
+
+
+
+=
+
+ ∂L
+
+∂M W ⊺ 
+
+> 1
+
++ ∂L
+
+∂Φ W0WK W ⊺ 
+
+> Q
+
++
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQW ⊺ 
+
+> K
+
+, dW0
+
+
+
+(31) Therefore, we obtain an expression for ∂L 
+
+> ∂W 0
+
+. Since we are considering gradient descent, the evolution of the parameters follows the direction of the negative gradient. Then we derive the expression of ∂L 
+
+> ∂M
+
+and ∂L 
+
+> ∂Φ
+
+in large N and s limit. Taking the total differential of the loss and taking the term about dM , we get 
+
+ ∂L
+
+∂M , dM
+
+
+
+= 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+−
+
+> s
+
+X
+
+> l=1
+
+As,l (Xi)e⊺
+
+> x,l
+
+dM e yi + 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j
+
+pyj (Xi)
+
+> s
+
+X
+
+> l=1
+
+As,l (Xi)e⊺
+
+> x,l
+
+dM e yj (32) Here, As,l (Xi) = exp( e⊺      
+
+> xi,s Φexi,l )
+> Psl′=1 exp( e⊺
+> xi,s Φexi,l ′)
+
+. Based on Proposition B.1, we find that 
+
+As,l (Xi) =  
+
+> 1
+> s
+
+exp( e⊺ 
+
+> xi,s
+
+Φexi,l )
+
+> 1
+> s
+
+Psl′=1 exp( e⊺ 
+
+> xi,s
+
+Φexi,l ′ ) = 
+
+> 1
+> s
+
+exp( e⊺ 
+
+> xi,s
+
+Φexi,l )
+
+Pdj=1 πj exp( e⊺ 
+
+> xi,s
+
+Φej ) (33) 15 Submission and Formatting Instructions for ICML 2026 
+
+Then, for sufficiently large sequence length s,
+
+> s
+
+X
+
+> l=1
+
+As,l (Xi)e⊺ 
+
+> xi,l
+
+= 1
+
+Pdj=1 πj exp( e⊺ 
+
+> xi,s
+
+Φej )
+
+> s
+
+X
+
+> l=1
+
+1
+
+s exp( e⊺ 
+
+> xi,s
+
+Φexi,l )e⊺
+
+> xi,l
+
+= 1
+
+Pdj=1 πj exp( e⊺ 
+
+> xi,s
+
+Φej )
+
+> d
+
+X
+
+> j′=1
+
+πj′ exp( e⊺ 
+
+> xi,s
+
+Φej′ )e⊺ 
+
+> j′
+
+= Axi,s 
+
+(34) It implies that the output probability p(Xi) actually depends on the last token xi,s . That is 
+
+pj (Xi) = exp( Axi,s M e yj )
+
+Pdj′=1 exp( Axi,s M e y′ 
+
+> j
+
+) = Pxi,s ,j (35) Based on this fact and Eq. (34), Eq. (32) can be reformulated by using the notations about A and P.
+
+ ∂L
+
+∂M , dM
+
+
+
+= − 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Axi,s dM e yi + 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Axi,s dM P⊺ 
+
+> xi,s
+
+. (36) Based on Proposition B.1, we have xi,s ∼ π⊺ when s is sufficiently large. Thus, we get 
+
+ ∂L
+
+∂M , dM
+
+
+
+= −
+
+> d
+
+X
+
+> i=1
+
+πiAidM (Pi − Pi)⊺ (37) Using the trace theorem again, we have 
+
+∂L
+
+∂M = −
+
+> d
+
+X
+
+> i=1
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi). (38) Then we derive ∂L 
+
+> ∂Φ
+
+. By direct computation, we get 
+
+ ∂L
+
+∂Φ , dΦ 
+
+
+
+= 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+−
+
+> s
+
+X
+
+> l=1
+
+As,l d  e⊺
+
+> x,s
+
+Φex,l 
+
+ − As,l 
+
+X
+
+> l′
+
+As,l ′ d  e⊺
+
+> x,s
+
+Φex,l ′
+
+!
+
+e⊺
+
+> x,l
+
+M e yi
+
+!
+
++ 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+X
+
+> j
+
+pyj
+
+> s
+
+X
+
+> l=1
+
+As,l d  e⊺
+
+> x,s
+
+Φex,l 
+
+ − As,l 
+
+X
+
+> l′
+
+As,l ′ d  e⊺
+
+> x,s
+
+Φex,l ′
+
+!
+
+e⊺
+
+> x,l
+
+M e yj
+
+! (39) Using the notations we introduced, the derivative can be reformulated as 
+
+ ∂L
+
+∂Φ , dΦ 
+
+
+
+= − X
+
+> i
+
+πi
+
+> s
+
+X
+
+> l=1
+
+Axi,l e⊺ 
+
+> xi
+
+dΦ( el − A⊺ 
+
+> i
+
+)
+
+!
+
+e⊺ 
+
+> l
+
+M (Pi − Pi)⊺
+
+= − X
+
+> i
+
+πie⊺ 
+
+> xi
+
+dΦ (diag( A⊺ 
+
+> i
+
+) − A⊺ 
+
+> i
+
+Ai) M (Pi − Pi)⊺
+
+(40) As a result, using the trace theorem, we get the expression about ∂L 
+
+> ∂Φ
+
+as follows: 
+
+∂L
+
+∂Φ = − X
+
+> i
+
+πiexi (Pi − Pi)M ⊺ (diag( A⊺ 
+
+> i
+
+) − A⊺ 
+
+> i
+
+Ai) (41) 
+
+## C. Theoretical details in Sec. 3 
+
+C.1. Theoretical details in Sec. 3.1 Proof of Lemma 3.1 
+
+16 Submission and Formatting Instructions for ICML 2026 
+
+Proof. Let ∆θ(t) := θ(t) − θ∗. Since F (θ∗) = 0 and J = DF (θ∗), we can write 
+
+˙∆θ(t) = J∆θ(t) + R(∆ θ(t)) , R(∆ θ) := F (θ∗ + ∆ θ) − J∆θ. (42) By assumption (6), for all ∥∆θ∥ ≤ r,
+
+∥R(∆ θ)∥ ≤ L∥∆θ∥2. (43) 
+
+Step 1: Variation-of-constants representation. Let ˜∆θ(t) := e Jt ∆θ(0) be the solution of the linearized system. From (42), the solution satisfies the Duhamel formula 
+
+∆θ(t) = e Jt ∆θ(0) + 
+
+Z t
+
+> 0
+
+eJ(t−s)R(∆ θ(s))d s = ˜∆θ(t) + 
+
+Z t
+
+> 0
+
+eJ(t−s)R(∆ θ(s))d s. (44) Define the linearization error E(t) := ∆ θ(t) − ˜∆θ(t). Then E(0) = 0 and by (44), 
+
+E(t) = 
+
+Z t
+
+> 0
+
+eJ(t−s)R(∆ θ(s))d s. (45) 
+
+Step 2: A standard bound on the semigroup eJt . Let μ := sup {ℜ (λ) : λ ∈ σ(J)}. In finite dimension, for the chosen operator norm there exists a constant K ≥ 1 such that 
+
+∥eJt ∥ ≤ Keμt , ∀t ≥ 0. (46) 
+
+Step 3: Bootstrap control inside the neighborhood. Fix a time horizon T > 0 such that 
+
+∥ ˜∆θ(t)∥ ≤ r
+
+2 , ∀t ∈ [0 , T ]. (47) We will show that for ε := ∥∆θ(0) ∥ sufficiently small (depending on J, L, r ), the trajectory stays in the ball ∥∆θ(t)∥ ≤ r
+
+on [0 , T ], so that (43) applies. Indeed, from (44), (46), and (43), as long as ∥∆θ(s)∥ ≤ r for all s ∈ [0 , t ], we have 
+
+∥E(t)∥ ≤ 
+
+Z t
+
+> 0
+
+∥eJ(t−s)∥ ∥ R(∆ θ(s)) ∥ds ≤ KL 
+
+Z t
+
+> 0
+
+eμ(t−s)∥∆θ(s)∥2ds. (48) Also ∥ ˜∆θ(t)∥ ≤ ∥ eJt ∥ ∥ ∆θ(0) ∥ ≤ Kε eμt .We now bootstrap the bound 
+
+∥∆θ(t)∥ ≤ 2∥ ˜∆θ(t)∥ for all t ∈ [0 , T ]. (49) Assuming (49) holds on [0 , t ], then ∥∆θ(s)∥ ≤ 2∥ ˜∆θ(s)∥ ≤ r by (47), so (48) applies and yields 
+
+∥E(t)∥ ≤ KL 
+
+Z t
+
+> 0
+
+eμ(t−s) 2∥ ˜∆θ(s)∥2ds = 4 KL 
+
+Z t
+
+> 0
+
+eμ(t−s)∥ ˜∆θ(s)∥2ds
+
+≤ 4KL 
+
+Z t
+
+> 0
+
+eμ(t−s) Kε eμs 2ds = 4 K3L ε 2 eμt 
+
+Z t
+
+> 0
+
+eμs ds. (50) If μ > 0, then R t 
+
+> 0
+
+eμs ds = (e μt − 1) /μ ≤ eμt /μ , and thus 
+
+∥E(t)∥ ≤ 4K3Lμ ε2 e2μt . (51) If μ = 0 , then R t 
+
+> 0
+
+eμs ds = t and (50) gives 
+
+∥E(t)∥ ≤ 4K3L ε 2 t. (52) (For μ < 0, one may similarly bound the integral by a constant and obtain a uniform O(ε2) error.) 17 Submission and Formatting Instructions for ICML 2026 
+
+Now choose ε small enough such that on [0 , T ],
+
+∥E(t)∥ ≤ ∥ ˜∆θ(t)∥ ∀t ∈ [0 , T ]. (53) This is possible because by (47) we have ∥ ˜∆θ(t)∥ ≤ r/ 2, while (51) shows ∥E(t)∥ is O(ε2) times an exponential factor; e.g. it suffices to require 
+
+4K3Lμ ε eμT ≤ 12 (μ > 0) , or 4K3L ε T ≤ 12 (μ = 0) ,
+
+and recall T is such that ∥ ˜∆θ(t)∥ ≤ r/ 2 on [0 , T ], hence eμT is at most on the order of 1/ε when μ > 0. Under (53), 
+
+∥∆θ(t)∥ ≤ ∥ ˜∆θ(t)∥ + ∥E(t)∥ ≤ 2∥ ˜∆θ(t)∥ ≤ r, 
+
+so the bootstrap is self-consistent and (51) (or (52) ) holds for all t ∈ [0 , T ]. This proves (7) with C = 4K3Lμ for μ > 0 and 
+
+C = 4 K3L for μ = 0 .
+
+Step 4: The Θ(log(1 /ε )) window when μ > 0. If μ > 0, then ∥ ˜∆θ(t)∥ ≤ Kε eμt . Therefore the condition ∥ ˜∆θ(t)∥ ≤ 
+
+r/ 2 holds at least up to times 
+
+t ≤ 1
+
+μ log r
+
+2Kε = Θ(log(1 /ε )) ,
+
+which is exactly the linearization window claimed in the lemma. 
+
+Step 5: Alignment with the unstable eigenvector with positive spectral gap. Assume now that J has a simple eigenvalue 
+
+μ > 0 with eigenvector vu and a spectral gap: ℜ(λ) ≤ μ − δ for all other eigenvalues. Let Πu be the spectral projection onto span {vu} and Πs = I − Πu. Then there exist constants Ku, K s such that 
+
+∥ΠueJt ∥ ≤ Kueμt , ∥ΠseJt ∥ ≤ Kse(μ−δ)t, ∀t ≥ 0. (54) Write ˜∆θ(t) = Π u ˜∆θ(t) + Π s ˜∆θ(t). If ⟨∆(0) , v u⟩̸ = 0 , then Πu ˜∆θ(t) = a0eμt vu for some a0̸ = 0 , while 
+
+∥Πs ˜∆θ(t)∥ ≤ Ksεe(μ−δ)t.
+
+Hence ˜∆θ(t)
+
+∥ ˜∆θ(t)∥ → ± vu
+
+∥vu∥ as t → ∞ , (55) and the convergence rate is O(e −δt ).For the nonlinear trajectory, decompose ∆θ(t) = u(t) + s(t) with u(t) := Π u∆θ(t) and s(t) := Π s∆θ(t). Projecting (44) onto the two subspaces and using (54) gives 
+
+u(t) = Π u ˜∆θ(t) + 
+
+Z t
+
+> 0
+
+ΠueJ(t−s)R(∆ θ(s)) d s, s(t) = Π s ˜∆θ(t) + 
+
+Z t
+
+> 0
+
+ΠseJ(t−s)R(∆ θ(s)) d s. (56) Inside the linearization window we have ∥∆θ(s)∥ ≤ r, so (43) applies and, using also ∥∆θ(s)∥ ≲ εeμs from the bootstrap in Step 3, we obtain 
+
+∥R(∆( s)) ∥ ≤ L∥∆θ(s)∥2 ≲ Lε 2e2μs .
+
+Plugging into (56) yields, for t in the linearization window, 
+
+∥u(t) − Πu ˜∆θ(t)∥ ≤ 
+
+Z t
+
+> 0
+
+∥ΠueJ(t−s)∥ ∥ R(∆ θ(s)) ∥ds ≲ ε2e2μt , (57) 
+
+∥s(t) − Πs ˜∆θ(t)∥ ≤ 
+
+Z t
+
+> 0
+
+∥ΠseJ(t−s)∥ ∥ R(∆ θ(s)) ∥ds ≲ ε2e2μt . (58) Therefore, 
+
+∥s(t)∥ ≤ ∥ Πs ˜∆θ(t)∥ + ∥s(t) − Πs ˜∆θ(t)∥ ≲ εe(μ−δ)t + ε2e2μt ,
+
+18 Submission and Formatting Instructions for ICML 2026 
+
+while 
+
+∥u(t)∥ ≥ ∥ Πu ˜∆θ(t)∥ − ∥ u(t) − Πu ˜∆θ(t)∥ ≳ εeμt − ε2e2μt .
+
+Hence, for times t such that εeμt is still sufficiently small (which holds throughout a Θ(log(1 /ε )) interval inside the linearization window), we have 
+
+∥s(t)∥∥u(t)∥ ≲ e−δt + εeμt . (59) Now let t increase while remaining in the linearization window (so t → ∞ is possible as ε → 0), and choose any sequence 
+
+t = t(ε) such that 
+
+t(ε) → ∞ , εeμt (ε) → 0 (e.g. t(ε) = 12μ log(1 /ε )) .
+
+Then (59) implies ∥s(t)∥/∥u(t)∥ → 0, so 
+
+∆θ(t)
+
+∥∆θ(t)∥ = u(t) + s(t)
+
+∥u(t) + s(t)∥ → ± vu
+
+∥vu∥ .
+
+This proves (8). 
+
+Proof of Theorem 3.2 
+
+Proof. The claim follows by a direct evaluation of the gradients at the origin. By Lemma 3.1, the early-time dynamics is governed by the linearization at θ = 0 , so we substitute θ = 0 into (5). At θ = 0 , the definitions of Ai and Pi yield 
+
+Ai = π⊺, Pi = 1
+
+d 1⊺, for all i. 
+
+Moreover, since π⊺ is stationary, we have π⊺P = π⊺, and hence 
+
+X
+
+> i
+
+πiPi = π⊺.
+
+Plugging these identities into the expression of ∂L 
+
+> ∂M
+
+in (5), we obtain 
+
+∂L
+
+∂M θ=0 
+
+= − π
+
+
+
+π − 1
+
+d 1
+
+⊺
+
+.
+
+This is exactly the desired formula, completing the proof. 
+
+Analysis of transition between stage I and II Although linearization reveals the characteristics of the first stage, gaps remain in the transition from the first to the second stage. At this point, simple linearization provides an error estimate that is too loose to accurately represent the stage transition. Therefore, a more refined error estimate is needed. To achieve this, we extend the techniques in (Chen et al., 2024c) or (Xu et al., 2025a) and prove a rigorous stage transition. Without loss of generality, we assume π⊺ 
+
+> ∥π∥
+
+W0, W 1     
+
+> π−1
+> d1
+> ∥π−1
+> d1∥
+
+∼ Θ( ε). First, we introduce two quantities to show the magnitudes that distinguish the outer and inner parameters: 
+
+Wout, max = max {∥ W0∥F, ∥W1∥F} , Win, max = max {∥ WQ∥F, ∥WK ∥F} . (60) Then, recalling the definition of dynamics (4), we have the estimate of error term in transition of stage I and stage II: 
+
+∂L
+
+∂Φ W0W ⊺ 
+
+> QK
+
+,
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQK ≲ W 3
+
+> out, max
+
+W 2
+
+> in, max
+
+, (61) and 
+
+W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0WK , W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQ ≲ W 4
+
+> out, max
+
+Win, max . (62) 19 Submission and Formatting Instructions for ICML 2026 
+
+Moreover, we decompose W0, W 1 into condensation directions and normal directions: 
+
+W0 = π
+
+∥π∥
+
+π⊺
+
+∥π∥ W0 + R0, W1 = W1
+
+π − 1 
+
+> d
+
+1
+
+∥π − 1 
+
+> d
+
+1∥
+
+π⊺ − 1 
+
+> d
+
+1⊺
+
+∥π − 1 
+
+> d
+
+1∥ + R1. (63) We begin the estimate by decomposing ∂L 
+
+> ∂M
+
+:
+
+∂L
+
+∂M = −
+
+> d
+
+X
+
+> i=1
+
+πiAi(Pi − Pi) = −π(π⊺ − P) + E1, (64) where Pj = exp( π⊺M e j )P   
+
+> j′exp( π⊺M e j′)
+
+and ∥E1∥ ≲ W 2
+
+> out, max
+
+W 2
+
+> in, max
+
+. Here, we use the expansion of Ai. Next, we will further elaborate on P. By the definition of P, it can be viewed as softmax( π⊺M ). Using the decompositions of W0 and W1, we get 
+
+P = softmax ( π⊺qq ⊺W0W1uu ⊺ + π⊺R0W1uu ⊺ + π⊺qq ⊺W0R1 + R0R1) .
+
+Here we denote q = π 
+
+> ∥π∥
+
+and u = π− 1    
+
+> d1
+> ∥π−1
+> d1∥
+
+for simplicity. Using the fact that d softmax( z) = Var(softmax( z)) , we have 
+
+P = psym + ( π⊺R0W1uu ⊺ + π⊺qq ⊺W0R1 + π⊺R0R1) Var( psym ) + ˜E2
+
+= psym + ( π⊺R0W1uu ⊺ + π⊺qq ⊺W0R1) Var( psym ) + E2
+
+(65) where E2 satisfies ∥E2∥ ≲ ∥R0∥2 + ∥R1∥2. Substituting this equation into the expression of ∂L 
+
+> ∂M
+
+, we get 
+
+∂L
+
+∂M = −π(π⊺ − psym ) + π (π⊺R0W1uu ⊺ + π⊺qq ⊺W0R1) Var( psym ) + E1 + E2 (66) Before we begin the error estimate, we emphasize the following two facts. First, π⊺ − psym ∝ u⊺ under the setting of one high frequency token and other low frequency tokens. Second, for vector u⊥ which is orthogonal to u and 1, we have 
+
+Var( psym )u⊥ = psym ,i ̸=1 u⊥. For 1, we have Var( psym )1 = 0 . Both of these two facts can be verified directly. Then we begin the error estimate. For q⊺
+
+> ⊥
+
+W0, we have 
+
+ddt q⊺
+
+> ⊥
+
+W0 = q⊺
+
+> ⊥
+
+(E1 + E2) + q⊺
+
+> ⊥
+
+∂L
+
+∂Φ W0W ⊺ 
+
+> QK
+
++
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQK (67) Thus, we have 
+
+∥q⊺
+
+> ⊥
+
+W0(t)∥ ≤ ∥ q⊺
+
+> ⊥
+
+W0(0) ∥ + C
+
+Z t
+
+> 0
+
+W 2
+
+> out, max
+
+W 2 
+
+> in, max
+
++ ∥R0∥2 + ∥R1∥2ds. (68) Sum them up, we get 
+
+∥R0(t)∥ ≤ ∥ R0(0) ∥ + C
+
+Z t
+
+> 0
+
+W 2
+
+> out, max
+
+W 2 
+
+> in, max
+
++ ∥R0∥2 + ∥R1∥2ds. (69) For W1u⊥, we have 
+
+ddt W1u⊥ = −W ⊺ 
+
+> 0
+
+π (π⊺R0W1uu ⊺ + π⊺qq ⊺W0R1) Var( psym )u⊥ − W ⊺ 
+
+> 0
+
+(E1 + E2)u⊥ (70) Using the fact that Var( psym )u⊥ = psym ,i ̸=1 u⊥, we get 
+
+ddt W1u⊥ = −psym ,i ̸=1 W ⊺ 
+
+> 0
+
+π (π⊺qq ⊺W0R1) u⊥ − W ⊺ 
+
+> 0
+
+(E1 + E2)u⊥ (71) Then, we get 
+
+ddt ∥W1u⊥∥2 = −2∥π∥2psym ,i ̸=1 u⊺
+
+> ⊥
+
+W ⊺ 
+
+> 1
+
+W ⊺ 
+
+> 0
+
+qq ⊺W0W1u⊥ − 2u⊺
+
+> ⊥
+
+W ⊺ 
+
+> 1
+
+W ⊺ 
+
+> 0
+
+(E1 + E2)u⊥
+
+≲ ∥R1∥  W 2
+
+> out, max
+
+W 2 
+
+> in, max
+
++ ∥R0∥2 + ∥R1∥2 (72) 20 Submission and Formatting Instructions for ICML 2026 
+
+Sum them up, we get 
+
+ddt ∥R1∥2 ≲ ∥R1∥  W 2
+
+> out, max
+
+W 2 
+
+> in, max
+
++ ∥R0∥2 + ∥R1∥2 (73) After establish the error estimate of the normal terms, We formally begin the proof of the phase transition. We divide the entire phase transition into two parts. The first part can be seen as a plateau period, where the condensation direction grows significantly and is about to become O(1) , while the normal direction remains small due to our fine error estimation. In the second part, the condensation direction rapidly reaches the neighborhood of the critical point. We define 
+
+T1 = sup 
+
+n
+
+t ≥ 0 | Wout,max ≲ ε 1
+
+> n
+
+o
+
+(74) Moreover, let Tp be the first time when the condensation component reaches the plateau scale: 
+
+Tp := 1 − 1
+
+> n
+
+∥π∥∥ π − 1 
+
+> d
+
+1∥ log 1
+
+ε . (75) 
+
+Lemma C.1 (Refined error estimate) . For every t ≤ min {T1, T p}, one has 
+
+∥WQ(t)∥F + ∥WK (t)∥F ≤ Cε, (76) 
+
+and 
+
+∥R0(t)∥F + ∥R1(t)∥F ≤ Cε, (77) 
+
+provided the initialization satisfies ∥WQ(0) ∥F + ∥WK (0) ∥F + ∥R0(0) ∥F + ∥R1(0) ∥F ≲ ε and ε > 0 is sufficiently small. Proof. We start from the equations 
+
+dW Q
+
+dt = −W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0WK , dW K
+
+dt = −W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQ.
+
+By the definition of Wout ,max , on [0 , min {T1, T p}] we have 
+
+W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0 + W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0 ≤ CW 4out ,max ≤ Cε 4 
+
+> n
+
+.
+
+Hence ddt 
+
+ ∥WQ∥F + ∥WK ∥F
+
+ ≤ Cε 4
+
+> n
+
+ ∥WQ∥F + ∥WK ∥F
+
+.
+
+By Gronwall’s inequality and the assumption on the initialization, (76) follows. Next, recall the expansion 
+
+∂L
+
+∂M = −π(π⊺ − psym ) + π
+
+
+
+π⊺R0 W1uu ⊺ + π⊺qq ⊺W0R1
+
+
+
+Var( psym ) + E, (78) where 
+
+∥E∥ ≤ C
+
+
+
+W 2out ,max W 2in ,max + ∥R0∥2F + ∥R1∥2F
+
+
+
+. (79) Projecting the W0-equation to the orthogonal complement of q, we obtain 
+
+ddt 
+
+ (I − qq ⊺)W0
+
+ = ( I − qq ⊺)
+
+
+
+− ∂L
+
+∂M W ⊺ 
+
+> 1
+
+− ∂L
+
+∂Φ W0W ⊺ 
+
+> QK
+
+−
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQK 
+
+
+
+.
+
+Since π(π⊺ − psym ) lies in the span of q, its contribution vanishes under the projection I − qq ⊺. Thus 
+
+ddt ∥R0∥F ≤ C
+
+
+
+W 2out ,max W 2in ,max + ∥R0∥2F + ∥R1∥2F
+
+
+
+.
+
+Similarly, projecting the W1-equation to the orthogonal complement of u, we get 
+
+ddt (W1(I − uu ⊺)) = −W ⊺
+
+> 0
+
+∂L
+
+∂M (I − uu ⊺).
+
+21 Submission and Formatting Instructions for ICML 2026 
+
+Using the key identities 
+
+(π⊺ − psym )( I − uu ⊺) = 0 , Var( psym )1 = 0 ,
+
+and the fact that Var( psym ) acts as a scalar on the subspace {v : ⟨v, 1⟩ = ⟨v, u ⟩ = 0 }, we obtain 
+
+ddt ∥R1∥2F ≤ C∥R1∥F
+
+
+
+W 2out ,max W 2in ,max + ∥R0∥2F + ∥R1∥2F
+
+
+
+.
+
+Combining the two inequalities, using (76), and applying a standard bootstrap argument yields (77). Next, we show that Tp ≤ T1 by error estimate. 
+
+Proposition C.2. For sufficiently small ε, one has 
+
+Tp ≤ T1.
+
+Proof. By Lemma C.1, for all t ≤ min {T1, T p},
+
+Win ,max (t) ≤ Cε, ∥R0(t)∥F + ∥R1(t)∥F ≤ Cε. 
+
+The only possible mechanism that can terminate the bootstrap interval before T1 is the growth of the condensation component itself. Define the two condensation variables 
+
+a(t) := q⊺W0(t) ∈ Rm, b(t) := W1(t)u ∈ Rm. (80) By projecting the dynamics of W0 and W1 onto q and u, and using (78), we obtain 
+
+˙a = ∥π∥ ∥ π − psym (z)∥ b + Ea, ˙b = ∥π∥ ∥ π − psym (z)∥ a + Eb, (81) where 
+
+z(t) := ⟨a(t), b (t)⟩, (82) and the error terms satisfy 
+
+∥E a∥ + ∥E b∥ ≤ C
+
+
+
+W 2out ,max W 2in ,max + W 2out ,max ∥R0∥F + W 2out ,max ∥R1∥F
+
+
+
+. (83) Considering the linearized version: 
+
+˙˜a = λ∗˜b, ˙˜b = λ∗˜a (84) Since the linearized system is just the system linearized at θ = 0 , using the same argument as Lemma 3.1, we get for 
+
+t ∈ [0 , T p]
+
+∥a(t) − ˜a(t)∥ + ∥b(t) − ˜b(t)∥ ≲ ε 2 
+
+> n
+
+. (85) Considering the solution of linearized system, we get: 
+
+∥˜a(Tp)∥, ∥˜b(Tp)∥ ∼ ε 1 
+
+> n
+
+(86) Combined this with the error estimate, we finish the proof. 
+
+Remark C.3 . At first glance, this proposition resembles the previous linearization result. However, the key distinction is that here we obtain a significantly stronger control of the dynamics in the normal directions. This stronger control is essential for carrying out the cross-stage analysis. To complete the cross-stage analysis, we need a dynamics so that we can work with a significant condensation direction. Specifically, observing the Eq. (81), we find that 
+
+˙z = ∥π∥ ∥ π − psym (z)∥ (∥a∥2 + ∥b∥2) + ⟨E a, b ⟩ + ⟨E b, a ⟩ (87) 22 Submission and Formatting Instructions for ICML 2026 
+
+Thus, if can establish the conservation law in this case. we can get the dynamics of z which is solvable. For given small δ,we define 
+
+T2 = sup {t ≥ 0 | ∥ π − psym ∥ ≥ δ} , (88) 
+
+T3 = sup {t ≥ 0 | Wout,max ≲ 1} (89) and give a estimate of T2, T 3 by 
+
+Td = Tp + 2
+
+∥π∥
+
+q dd−1 n  π1 − 1
+
+> d
+
+ log 1
+
+ε . (90) Then first we get similar error estimate, the proof is similar to Lemma C.1. Thus we omit its proof. 
+
+Lemma C.4 (Refined error estimate) . For every t ≤ min {T2, T 3, T d}, one has 
+
+∥WQ(t)∥F + ∥WK (t)∥F ≤ Cε 23 , (91) 
+
+and 
+
+∥R0(t)∥F + ∥R1(t)∥F ≤ Cε. (92) Then we show the monotonicity of key variables. Before we do this, we derive the aprroximate conservation law: 
+
+ddt ⟨a, b ⟩ − 12 (∥a∥2 + ∥b∥2) = ∥π∥ ∥ π − psym (z)∥ (∥a∥2 + ∥b∥2 − 2⟨a, b ⟩) + ⟨E a, b ⟩ + ⟨E b, a ⟩ − ⟨E a, b ⟩ − ⟨E b, a ⟩≥ ⟨E a, b ⟩ + ⟨E b, a ⟩ − ⟨E a, b ⟩ − ⟨E b, a ⟩
+
+(93) Then we have 
+
+⟨a, b ⟩(t) − 12 (∥a∥2 + ∥b∥2)( t) ≳ −ε 3 
+
+> n
+
+−
+
+Z tTp
+
+|⟨E a, b ⟩| + |⟨E b, a ⟩| + |⟨E a, b ⟩| + |⟨E b, a ⟩| ds (94) For t such that 12 (∥a∥2 + ∥b∥2)( t) ≳ ε 2 
+
+> n
+
+and t ≤ min {T2, T 3, T d}, the right hand can be controlled by 
+
+ε 12n (∥a∥2 + ∥b∥2) (95) As a result, we get for t such that 12 (∥a∥2 + ∥b∥2)( t) ≳ ε 2 
+
+> n
+
+and t ≤ min {T2, T 3, T d}, there is 
+
+(1 − ε 1 
+
+> n
+
+) 12 (∥a∥2 + ∥b∥2)( t) ≤ ⟨ a, b ⟩(t) ≤ 12 (∥a∥2 + ∥b∥2)( t) (96) 
+
+Proposition C.5. For Tp ≤ t ≤ min {T2, T 3, T d}, one has ⟨a, b ⟩, ∥a∥2 + ∥b∥2 increase monotonically. Proof. We begin the discussion with z = ⟨a, b ⟩. Taking the derivative, we get 
+
+˙z = ∥π∥ ∥ π − psym (z)∥ (∥a∥2 + ∥b∥2) + ⟨E a, b ⟩ + ⟨E b, a ⟩ (97) From the estimate at Tp, we find that 
+
+|⟨E a, b ⟩| ≲ ε 12 δ∥b∥2, |⟨E b, a ⟩| ≲ ε 12 δ∥a∥2 (98) Here, we use the fact that ∥E a∥, ∥E b∥ ≲ ε and ∥a∥, ∥b∥ ≳ ε 1 
+
+> n
+
+. Using the continuity, we get z will increase monotonically at a time period. Then we consider ∥a∥2 + ∥b∥2:
+
+ddt
+
+ ∥a∥2 + ∥b∥2 = 4 ∥π∥∥ π − psym ∥⟨ a, b ⟩ + 2 ⟨E a, b ⟩ + 2 ⟨E b, a ⟩≥ 2∥π∥∥ π − psym ∥(1 − ε 1 
+
+> n
+
+− ε 12 )( ∥a∥2 + ∥b∥2)
+
+(99) Thus ∥a∥2 + ∥b∥2 will increase at a time period. Since the above estimate we use will maintain if z and ∥a∥2 + ∥b∥2
+
+increase. We find that z and ∥a∥2 + ∥b∥2 will increase during Tp ≤ t ≤ min {T2, T 3, T d}.23 Submission and Formatting Instructions for ICML 2026 
+
+We are now ready to finish the entire cross-stage analysis. First, we find that during Tp ≤ t ≤ min {T2, T 3, T d}, and there exists a constant 
+
+cπ := ∥π∥
+
+π − 1 
+
+> d
+
+1 (π1 − πi̸=1 ) (100) such that 
+
+psym ,1(z) = 11 + ( d − 1) e−cπ z , psym ,j (z) = 1 − psym ,1(z)
+
+d − 1 , j ≥ 2. (101) Consequently, 
+
+∥π − psym (z)∥ =
+
+r dd − 1
+
+ π1 − psym ,1(z). (102) Thus, we get the following dynamics based on similar estimate used in Proposition C.5 
+
+(2 − ε 12n )∥π∥
+
+r dd − 1 z π1 − 11 + ( d − 1) e−cπ z
+
+!
+
+≤ ˙z ≤ (2 + ε 12n )∥π∥
+
+r dd − 1 z π1 − 11 + ( d − 1) e−cπ z
+
+!
+
+. (103) Here we abuse the notation between critical point and critical value. We identify the critical value 
+
+θ1 
+
+> c
+
+:= 1
+
+cπ
+
+log (d − 1) π1
+
+1 − π1
+
+, (104) which is exactly the unique solution of 
+
+psym ,1(θ1 
+
+> c
+
+) = π1.
+
+Let 
+
+A± := (2 ± ε 12n )∥π∥
+
+r dd − 1 , G(z) := π1 − 11 + ( d − 1) e−cπ z . (105) Then the reduced dynamics satisfies 
+
+A−zG (z) ≤ ˙z ≤ A+zG (z). (106) Recall that the critical value is 
+
+θ1 
+
+> c
+
+= 1
+
+cπ
+
+log (d − 1) π1
+
+1 − π1
+
+, (107) and G(θ1 
+
+> c
+
+) = 0 . Moreover, G(z) > 0 for 0 < z < θ 1 
+
+> c
+
+, hence z(t) is strictly increasing as long as z(t) < θ 1 
+
+> c
+
+.For 0 < δ ≪ 1, define zδ ∈ (0 , θ 1 
+
+> c
+
+) by 
+
+G(zδ ) = δ. (108) Equivalently, 
+
+zδ = 1
+
+cπ
+
+log (d − 1)( π1 − δ)1 − π1 + δ . (109) Then the definition of T2 can be rewritten as 
+
+T2 := inf {t ≥ Tp : z(t) ≥ zδ }. (110) This is exactly the first time when 
+
+π1 − 11 + ( d − 1) e−cπ z(t) = O(δ).
+
+Proposition C.6 (Time to the O(δ)-neighborhood of the critical point) . Assume 
+
+z(Tp) = Θ 
+
+
+
+ε 2
+
+> n
+
+
+
+.
+
+Then 1
+
+A+
+
+Z zδ
+
+> z(Tp)
+
+dz z G (z) ≤ T2 − Tp ≤ 1
+
+A−
+
+Z zδ
+
+> z(Tp)
+
+dz z G (z) . (111) 24 Submission and Formatting Instructions for ICML 2026 
+
+Moreover, there exists a constant C > 0, independent of sufficiently small ε, δ , such that 
+
+Z zδ
+
+> z(Tp)
+
+dz z G (z) − 1
+
+π1 − 1
+
+> d
+
+log 1
+
+z(Tp) − 1
+
+θ1 
+
+> c
+
+cπ π1(1 − π1) log 1
+
+δ ≤ C. (112) 
+
+Consequently, 
+
+T2 − Tp = 12∥π∥
+
+q dd−1
+
+"
+
+2
+
+n  π1 − 1
+
+> d
+
+ log 1
+
+ε + 1
+
+θ1 
+
+> c
+
+cπ π1(1 − π1) log 1
+
+δ
+
+#
+
++ O(1) . (113) 
+
+In particular, if δ > 0 is fixed, then 
+
+T2 − Tp = 1
+
+∥π∥
+
+q dd−1 n  π1 − 1
+
+> d
+
+ log 1
+
+ε + O(1) . (114) 
+
+Proof. Since G(z) > 0 on (0 , θ 1 
+
+> c
+
+), the solution is monotone increasing there. Separating variables in (106) yields (111) immediately. Hence it remains to estimate the integral 
+
+I(z0, z δ ) := 
+
+Z zδ
+
+> z0
+
+dz z G (z) , z0 := z(Tp).
+
+The point is that the integrand has two logarithmic singularities: one at z = 0 , coming from the factor 1/z , and one at 
+
+z = θ1 
+
+> c
+
+, coming from the simple zero of G.First, near z = 0 ,
+
+G(z) = G(0) + O(z) = 
+
+
+
+π1 − 1
+
+d
+
+
+
++ O(z), (115) since 
+
+G(0) = π1 − 11 + ( d − 1) = π1 − 1
+
+d .
+
+Therefore 1
+
+z G (z) = 1
+
+π1 − 1
+
+> d
+
+1
+
+z + O(1) , z → 0. (116) Next, near z = θ1 
+
+> c
+
+, we use that G(θ1 
+
+> c
+
+) = 0 and 
+
+G′(z) = − cπ (d − 1) e−cπ z
+
+ 1 + ( d − 1) e−cπ z 2 . (117) By the defining relation of θ1 
+
+> c
+
+,
+
+(d − 1) e−cπ θ1 
+
+> c
+
+= 1 − π1
+
+π1
+
+,
+
+hence 
+
+G′(θ1 
+
+> c
+
+) = −cπ π1(1 − π1). (118) Thus 
+
+G(z) = cπ π1(1 − π1)( θ1 
+
+> c
+
+− z) + O (θ1 
+
+> c
+
+− z)2, z → θ1 
+
+> c
+
+−, (119) and so 1
+
+z G (z) = 1
+
+θ1 
+
+> c
+
+cπ π1(1 − π1)1
+
+θ1 
+
+> c
+
+− z + O(1) , z → θ1 
+
+> c
+
+− . (120) Therefore, after subtracting the two poles, 
+
+R(z) := 1
+
+z G (z) − 1
+
+π1 − 1
+
+> d
+
+1
+
+z − 1
+
+θ1 
+
+> c
+
+cπ π1(1 − π1)1
+
+θ1 
+
+> c
+
+− z (121) 25 Submission and Formatting Instructions for ICML 2026 
+
+extends to a bounded function on (0 , θ 1 
+
+> c
+
+). Integrating, we obtain 
+
+I(z0, z δ ) = 1
+
+π1 − 1
+
+> d
+
+log zδ
+
+z0
+
++ 1
+
+θ1 
+
+> c
+
+cπ π1(1 − π1) log θ1 
+
+> c
+
+− z0
+
+θ1 
+
+> c
+
+− zδ
+
++ O(1) = 1
+
+π1 − 1
+
+> d
+
+log 1
+
+z0
+
++ 1
+
+θ1 
+
+> c
+
+cπ π1(1 − π1) log 1
+
+θ1 
+
+> c
+
+− zδ
+
++ O(1) ,
+
+(122) which is (112) up to the relation between θ1 
+
+> c
+
+− zδ and δ.Now from (109), 
+
+θ1 
+
+> c
+
+− zδ = 1
+
+cπ
+
+log π1(1 − π1 + δ)(1 − π1)( π1 − δ) = δcπ π1(1 − π1) + O(δ2), (123) hence 
+
+log 1
+
+θ1 
+
+> c
+
+− zδ
+
+= log 1
+
+δ + O(1) . (124) Also, by assumption, 
+
+z(Tp) = Θ 
+
+
+
+ε 2
+
+> n
+
+
+
+, so log 1
+
+z(Tp) = 2
+
+n log 1
+
+ε + O(1) . (125) Substituting these two estimates into (112) gives 
+
+I(z(Tp), z δ ) = 2
+
+n  π1 − 1
+
+> d
+
+ log 1
+
+ε + 1
+
+θ1 
+
+> c
+
+cπ π1(1 − π1) log 1
+
+δ + O(1) . (126) Finally, substituting this into (111) and using 
+
+A−1 
+
+> ±
+
+= 12∥π∥
+
+q dd−1
+
++ o(1) 
+
+yields (113). Finally, we can prove that T2 ≤ min {T3, T d} by direct computation. Thus, we finish the cross stage analysis and show that parameters will enter into a δ neighborhood of θ1 
+
+> c
+
+.
+
+C.2. Theoretical details in Sec. 3.2 Proof of Proposition 3.3 
+
+Proof. Since attention parameters (WQ, W K ) are chosen to be zero, for any i we have Ai = π⊺, and hence Pi = Pj for 
+
+i̸ = j. By definition, 
+
+Pi,j =exp 
+
+
+
+κ2∥π∥2(πj − 1 
+
+> |V|
+
+)
+
+P 
+
+> j′
+
+exp 
+
+
+
+κ2∥π∥2(πj′ − 1 
+
+> |V|
+
+)
+
+ = exp  κ2∥π∥2πj
+
+P 
+
+> j′
+
+exp( κ2∥π∥2πj′ ) . (127) As κ → 0, Pi → 1 
+
+> |V|
+
+1⊺; as κ → ∞ , Pi → e⊺ 
+
+> 1
+
+since π1 = max j πj . The map κ 7 → Pi, 1 is continuous, hence by the intermediate value theorem there exists κ1 > 0 such that Pi, 1 = π1. Together with the symmetry assumption πi = πj for 
+
+i, j ≥ 2, this implies Pi = π⊺.Substituting Pi = π⊺ and Ai = π⊺ into ∂L 
+
+> ∂M
+
+= − P|V|  
+
+> i=1
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi) yields 
+
+∂L
+
+∂M = −π
+
+> |V|
+
+X
+
+> i=1
+
+πi(Pi − π⊺). (128) Using π⊺P = π⊺, we obtain ∂L 
+
+> ∂M
+
+= 0 . Finally, WQ = WK = 0 at this point, so it is indeed a critical point. 26 Submission and Formatting Instructions for ICML 2026 
+
+We first record the derivatives needed for the linearization. 
+
+Proposition C.7 (Derivatives at the second critical point) . At θ1 
+
+> c
+
+in (12) , we have 
+
+∂L
+
+∂Φ θ1
+
+> c
+
+= −λκ 21 Var( π) π − 1 
+
+> |V|
+
+1
+
+π − 1 
+
+> |V|
+
+1
+
+π⊺
+
+∥π∥ Var( π), (129) 
+
+and the total differential of ∂L 
+
+> ∂M
+
+satisfies 
+
+d ∂L
+
+∂M θ1
+
+> c
+
+= ππ ⊺ dM
+
+
+
+diag( π) − ππ ⊺
+
+. (130) 
+
+Proof of Proposition C.7 
+
+Proof. First, we compute the specific expression of ∂L 
+
+> ∂Φ
+
+. Using the expression derived in Eq. (5), 
+
+∂L
+
+∂Φ = − X
+
+> i
+
+πiei (Pi − Pi) M ⊺ (diag( A⊺ 
+
+> i
+
+) − A⊺ 
+
+> i
+
+Ai)
+
+Using the fact that Pi = π⊺ and Ai = π⊺ and substituting M = κ21 π     
+
+> ∥π∥
+> π⊺−1
+> d1⊺
+> ∥π−1
+> d1∥
+
+into the equation, we get 
+
+∂L
+
+∂Φ = −κ21
+
+X
+
+> i
+
+πiei(Pi − π⊺) π − 1 
+
+> d
+
+1
+
+∥π − 1 
+
+> d
+
+1∥
+
+π⊺
+
+∥π∥ (diag( π) − ππ ⊺)= −κ21 (diag( π)P − ππ ⊺) π − 1 
+
+> d
+
+1
+
+∥π − 1 
+
+> d
+
+1∥
+
+π⊺
+
+∥π∥ (diag( π) − ππ ⊺)
+
+(131) By the definition of P , we have 
+
+diag( π)P − ππ ⊺ = diag( π) ( λI + (1 − λ)1π⊺) − ππ ⊺
+
+= λ (diag( π) − ππ ⊺) (132) Combining Eqs (131) and (132), we get the expression of ∂L 
+
+> ∂Φ
+
+at θ1 
+
+> c
+
+. Then, we consider the total differential of the gradient of the loss function with respect to M . Firstly, using Eq. (5) again, we get 
+
+∂L
+
+∂M = − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi)
+
+By chain rule, we get 
+
+d ∂L
+
+∂M = − X
+
+> i
+
+πidA⊺ 
+
+> i
+
+(Pi − Pi) − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+(−dPi). (133) Let’s consider these two items separately. By the definition of Ai, we find that 
+
+dAi,j = Ai,j e⊺ 
+
+> i
+
+dΦ ej − Ai,j 
+
+X
+
+> j′
+
+Ai,j ′ e⊺ 
+
+> i
+
+dΦ ej′
+
+= Ai,j e⊺ 
+
+> i
+
+dΦ( ej − A⊺ 
+
+> i
+
+)
+
+(134) As a result, it can be verified that dAi = e⊺ 
+
+> i
+
+dΦ (diag( A⊺ 
+
+> i
+
+) − A⊺ 
+
+> i
+
+Ai). However, this term will be zero because it contains the intersection terms WQW ⊺ 
+
+> K
+
+which will be zero by the chain rule and the condition WQ = 0 and WK = 0 . Thus, we focus on the second term. Recall the definition of Pi,j = exp( AiM e j )P   
+
+> j′exp( AiM e j′)
+
+and take the total differential of it: 
+
+dPi,j = Pi,j d( AiM )ej − Pi,j 
+
+X
+
+> j′
+
+Pi,j ′ d( AiM )ej′
+
+= Pi,j d( AiM )( ej − P⊺ 
+
+> i
+
+).
+
+(135) 27 Submission and Formatting Instructions for ICML 2026 
+
+Similar to the derivation of dAi, dPi can be reformulated as d( AiM )(diag( P⊺ 
+
+> i
+
+) − P⊺ 
+
+> i
+
+Pi). In particular, at this critical point, 
+
+dPi = AidM (diag( P⊺ 
+
+> i
+
+) − P⊺ 
+
+> i
+
+Pi) = π⊺dM Var( π). (136) Substitute this expression into Eq. (133), we get 
+
+d ∂L
+
+∂M = X
+
+> i
+
+πiA⊺ 
+
+> i
+
+π⊺dM Var( π) = ππ ⊺dM Var( π). (137) 
+
+Proof of Proposition 3.4 
+
+Proof. We linearize the gradient flow (4) at θ1 
+
+> c
+
+. Since ∂L 
+
+> ∂M θ1
+> c
+
+= 0 and WQ = WK = 0 , the only first-order contribution in the (W0, W 1) subsystem comes from the first variation of ∂L 
+
+> ∂M
+
+, whereas the (WQ, W K ) subsystem is driven by the constant matrix ∂L 
+
+> ∂Φθ1
+> c
+
+. More specifically, the linearized subsystems with respect to (W0, W 1) and (WQ, W K ) are two decoupled systems which separately follow 
+
+d∆ W0
+
+dt = d ∂L
+
+∂M W ⊺
+
+> 1
+
+d∆ W1
+
+dt = W ⊺ 
+
+> 0
+
+d ∂L
+
+∂M 
+
+(138) and 
+
+d∆ WQ
+
+dt = −W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0∆WK
+
+d∆ WK
+
+dt = −W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0∆WQ
+
+(139) 
+
+Step 1: the (W0, W 1)-subsystem is contracting along α1. By Proposition C.7, 
+
+d
+
+ ∂L
+
+∂M 
+
+
+
+> θ1
+> c
+
+= ππ ⊺ dM Var( π)
+
+At θ1 
+
+> c
+
+, Proposition 3.3 gives the rank-one form 
+
+W0,0 = κ1q α ⊺ 
+
+> 1
+
+, W1,0 = κ1α1 u⊺, q := π
+
+∥π∥ , u := π − 1 
+
+> |V|
+
+1
+
+π − 1 
+
+> |V|
+
+1 . (140) A direct substitution into Eq. (138) shows that for any v ⊥ α1,
+
+ddt ∆W0 v = 0 , ddt v⊺∆W1 = 0 ,
+
+i.e. the linearization is degenerate in the normal directions. Therefore we focus on the α1-component and calculate the specific expansion: 
+
+d∆ W0α1
+
+dt = −ππ ⊺(∆ W0W1 + W0∆W1) Var( π)W ⊺
+
+> 1
+
+= −κ21ππ ⊺∆W0α1
+
+π⊺ − 1 
+
+> d
+
+1⊺
+
+∥π − 1 
+
+> d
+
+1∥ Var( π) π − 1 
+
+> d
+
+1
+
+∥π − 1 
+
+> d
+
+1∥− κ21ππ ⊺ π
+
+∥π∥ α⊺ 
+
+> 1
+
+∆W1 Var( π) π − 1 
+
+> d
+
+1
+
+∥π − 1 
+
+> d
+
+1∥
+
+(141) 28 Submission and Formatting Instructions for ICML 2026 
+
+and 
+
+d∆ W ⊺ 
+
+> 1
+
+α1
+
+dt = − Var( π)( W ⊺ 
+
+> 1
+
+∆W ⊺ 
+
+> 0
+
++ ∆ W ⊺ 
+
+> 1
+
+W ⊺ 
+
+> 0
+
+)ππ ⊺W0
+
+= −κ21 Var( π) π − 1 
+
+> d
+
+1
+
+∥π − 1 
+
+> d
+
+1∥ α⊺ 
+
+> 1
+
+∆W ⊺ 
+
+> 0
+
+ππ ⊺ π
+
+∥π∥− κ21 Var( π)∆ W ⊺ 
+
+> 1
+
+α1
+
+π⊺
+
+∥π∥ ππ ⊺ π
+
+∥π∥
+
+(142) Finally, we have 
+
+d
+
+ ∆W0α1
+
+∆W ⊺ 
+
+> 1
+
+α1
+
+
+
+= −κ21
+
+     
+
+> π⊺−1
+> d1⊺
+> ∥π−1
+> d1∥
+
+Var( π) π− 1    
+
+> d1
+> ∥π−1
+> d1∥
+
+ππ ⊺ π⊺ π 
+
+> ∥π∥
+
+π π⊺− 1    
+
+> d1⊺
+> ∥π−1
+> d1∥
+
+Var( π)
+
+π⊺ π 
+
+> ∥π∥
+
+Var( π) π− 1    
+
+> d1
+> ∥π−1
+> d1∥
+
+π⊺ π⊺ 
+
+> ∥π∥
+
+ππ ⊺ π 
+
+> ∥π∥
+
+Var( π)
+
+ ∆W0α1
+
+∆W ⊺ 
+
+> 1
+
+α1
+
+
+
+(143) We introduce the notations: 
+
+x := ∆ W0α1 ∈ R|V| , y := ∆ W ⊺ 
+
+> 1
+
+α1 ∈ R|V| .
+
+Eq. (143) can be rewritten in the following concise form 
+
+ddt
+
+xy
+
+
+
+= −κ21A
+
+xy
+
+
+
+, (144) where 
+
+A := 
+
+ a ππ ⊺ b π u ⊺Cb Cu π ⊺ b2C
+
+
+
+, a := u⊺Cu, b := π⊺q = ∥π∥. (145) The matrix A is symmetric by construction. Moreover, for arbitrary x, y define α := π⊺x and β := u⊺Cy . Then the quadratic form is 
+
+ x⊺ y⊺ A
+
+xy
+
+
+
+= a α 2 + 2 b αβ + b2 y⊺Cy. 
+
+Introducing the C-inner product ⟨v, w ⟩C := v⊺Cw (with seminorm ∥v∥C = √v⊺Cv ), we have a = ∥u∥2 
+
+> C
+
+≥ 0 and 
+
+|β| = |⟨ u, y ⟩C | ≤ ∥ u∥C ∥y∥C = √a√y⊺Cy . Hence 
+
+a α 2 + 2 b αβ + b2 y⊺Cy ≥  √a |α| − bpy⊺Cy 2 ≥ 0,
+
+so A ⪰ 0. Therefore all eigenvalues of −λ2A in (144) are non-positive, and the (x, y )-subsystem is contracting (or neutrally stable in the degenerate directions). 
+
+Step 2: effective coupling for (WQ, W K ). Recall Eq. (139), 
+
+ddt ∆WQ = −W ⊺
+
+> 0
+
+∂L
+
+∂Φ θ0
+
+W0 ∆WK , ddt ∆WK = −W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+> θ0
+
+W0∆WQ
+
+Substitute the expression of ∂L 
+
+> ∂Φ
+
+into above equation, we take d∆ WQ 
+
+> dt
+
+as an example: 
+
+d∆ WQ
+
+dt = κ21α1
+
+π⊺
+
+∥π∥ λκ 21
+
+
+
+diag( π) − ππ ⊺ π − 1 
+
+> |V|
+
+1
+
+π − 1 
+
+> |V|
+
+1
+
+π⊺
+
+∥π∥
+
+
+
+diag( π) − ππ ⊺ π
+
+∥π∥ α⊺ 
+
+> 1
+
+∆WK
+
+= c1α1α⊺ 
+
+> 1
+
+∆WK .
+
+(146) Left-multiplying by α⊺ 
+
+> 1
+
+yields the results. Moreover, c1 is positive by its definition. Thus, it is an unstable direction. It implies that the effective dynamics near the critical point is the subsystem about WQ and WK
+
+29 Submission and Formatting Instructions for ICML 2026 
+
+C.3. Theoretical details in Sec. 3.3 Proof of Proposition 3.6 We complete the proof of Proposition 1 in two steps. First, we directly verify that a rank-one manifold is an invariant manifold. Then, we utilize data symmetry and permutation equivariance to prove the conservation of low-frequency tokens. 
+
+Proof. (i) Invariance of the rank-one form. Plug (18) into (4) and check that each right-hand side remains in the same rank-one span. Since W ⊺ 
+
+> 1
+
+= β α ⊺ 
+
+> 1
+
+,
+
+− ∂L
+
+∂M W ⊺ 
+
+> 1
+
+= −
+
+ ∂L
+
+∂M β
+
+
+
+α⊺ 
+
+> 1
+
+,
+
+which is of the form ˙γ α ⊺ 
+
+> 1
+
+.Next, using ˜α⊺ 
+
+> 1
+
+˜α1 = 1 ,
+
+WK W ⊺ 
+
+> Q
+
+= λK λQ α1(˜ α⊺ 
+
+> 1
+
+˜α1)α⊺ 
+
+> 1
+
+= η α 1α⊺ 
+
+> 1
+
+, W0WK W ⊺ 
+
+> Q
+
+= η γ (α⊺ 
+
+> 1
+
+α1)α⊺ 
+
+> 1
+
+= η γ α ⊺ 
+
+> 1
+
+.
+
+Therefore the Φ-driven terms in ˙W0 satisfy 
+
+− ∂L
+
+∂Φ W0WK W ⊺ 
+
+> Q
+
+= −η
+
+ ∂L
+
+∂Φ γ
+
+
+
+α⊺ 
+
+> 1
+
+, −
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQW ⊺ 
+
+> K
+
+= −η
+
+ ∂L
+
+∂Φ
+
+⊺
+
+γ
+
+
+
+α⊺ 
+
+> 1
+
+,
+
+so ˙W0 stays in the span of {· α⊺ 
+
+> 1
+
+} and hence W0(t) = γ(t)α⊺ 
+
+> 1
+
+.Similarly, since W ⊺ 
+
+> 0
+
+= α1γ⊺,
+
+˙W1 = −W ⊺
+
+> 0
+
+∂L
+
+∂M = −α1
+
+
+
+γ⊺ ∂L
+
+∂M 
+
+
+
+,
+
+which is of the form α1 ˙β⊺.Finally, 
+
+˙WQ = − W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0WK = −λK
+
+ γ⊺ ∂L
+
+∂Φ γ α1 ˜α⊺ 
+
+> 1
+
+,
+
+so WQ remains in the form λQ(t)α1 ˜α⊺ 
+
+> 1
+
+. The argument for WK is identical. Thus the flow stays in W.(ii) Preservation of the low-frequency symmetry. Let 
+
+G := {σ : {1, . . . , V } → { 1, . . . , V }| σ(1) = 1 }. (147) and let σ ∈ G be the permutation matrix. Define the group action as 
+
+ρσ (θ) := (Π σ W0, W 1Π⊺ 
+
+> σ
+
+, W Q, W K ).
+
+Under this action, ones check that Pi,j (ρσ (θ)) = Pσ(i),σ (j)(θ). Since the loss function can be viewed as L(θ) = 
+
+− P 
+
+> i
+
+πi
+
+P 
+
+> j
+
+Pi,j log Pi,j , we find 
+
+L(ρσ (θ)) = − X
+
+> i
+
+πi
+
+X
+
+> j
+
+Pi,j log Pσ(i),σ (j) = − X
+
+> i
+
+πσ−1(i)
+
+X
+
+> j
+
+Pσ−1(i),σ −1(j) log Pi,j . (148) Under the symmetry assumption on the data and the definition of the transition probability matrix P , L(ρσ (θ)) = L(θ).Hence if θ(t) solves the gradient flow, so does ρσ (θ(t)) . If θ(t0) = ρσ (θ(t0)) for all σ ∈ G which is equivalent to 
+
+γ2 = · · · = γd and β2 = · · · = βd at t0, uniqueness of ODE solutions implies θ(t) = ρσ (θ(t)) for all t ≥ t0, which proves the symmetry is preserved. 30 Submission and Formatting Instructions for ICML 2026 
+
+Proof of Theorem 3.7 We proceed with the proof of Theorem 3.7. First, we introduce some notation to show that the dynamics on a rank-one manifold will be further simplified in the case of low-frequency symmetry. Next, since we are still near the critical point described in Proposition 1, this means that we are also near the critical point for the dynamics on a rank-one manifold. Therefore, we continue using linearization methods to obtain the key conservation law results. First, we find that the proxy attention matrix A has the form on W by direct computation, 
+
+A =
+
+
+
+ξ1 1−ξ1 
+
+> |V|− 1
+
+· · · 1−ξ1
+
+> |V|− 1
+
+ξ2 1−ξ2 
+
+> |V|− 1
+
+· · · 1−ξ2
+
+> |V|− 1
+
+... ... ...
+
+ξ2 1−ξ2 
+
+> |V|− 1
+
+· · · 1−ξ2
+
+> |V|− 1
+
+ ,
+
+where 
+
+ξ1 = π1 exp  ηγ 21
+
+
+
+π1 exp  ηγ 21
+
+ + (1 − π1) exp  ηγ 1γi̸=1 
+
+ , (149) 
+
+ξ2 = π1 exp  ηγ 1γi̸=1 
+
+
+
+π1 exp  ηγ 1γi̸=1 
+
+ + (1 − π1) exp  ηγ 2
+
+> i̸=1
+
+ . (150) Define the row-wise scalar projections 
+
+m1 := A1γ, m2 := A2γ. 
+
+Then 
+
+m1 = γi̸=1 + ξ1∆γ, m2 = γi̸=1 + ξ2∆γ. 
+
+Since AiM = ( Aiγ)β⊺ = miβ⊺, the model probability of predicting the first token is 
+
+ˆpi := Pi, 1 = exp( miβ1)exp( miβ1) + ( |V| − 1) exp( miβi̸=1 ) = σ mi∆β − log( |V| − 1) , i ∈ { 1, 2}, (151) where σ is the sigmoid function. Here, we only consider the first and second probability because Pi, 1 = Pj, 1 for i, j ̸ = 1 .Moreover, there exists a key term (Pi − Pi)β in the following computation. By direct computation, 
+
+(Pi − Pi)β = ( Pi, 1 − Pi, 1)β1 + ((1 − Pi, 1 − (1 − Pi, 1))) βi̸=1 
+
+= ( Pi, 1 − Pi, 1)∆ β. (152) It implies that (Pi − Pi)β = ( Pj − Pj )β for i, j ̸ = 1 . Let the residuals be 
+
+ri := Pi, 1 − ˆpi, i ∈ { 1, 2}. (153) For i > 2, we let ri = r2.We now derive the explicit dynamics for γ1 and γi̸=1 by expanding the two contributions in ˙γ in (20). (1). The M -driven term − ∂L 
+
+> ∂M
+
+β. By the definition of ∂L 
+
+> ∂M
+
+, we obtain 
+
+− ∂L
+
+∂M β = X
+
+> i
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi)β = ∆ β
+
+
+
+π1r1A⊺ 
+
+> 1
+
++ (1 − π1)r2A⊺
+
+> 2
+
+
+
+.
+
+Taking the first coordinate and a generic low-token coordinate yields 
+
+˙γ1 M = ∆ βπ1r1ξ1 + (1 − π1)r2ξ2
+
+, ˙γi̸=1 M = ∆β
+
+|V| − 1
+
+π1r1(1 − ξ1) + (1 − π1)r2(1 − ξ2). (154) (2). The Φ-driven term −η[( ∂L/∂ Φ) + ( ∂L/∂ Φ) ⊺]γ. Using ∂L 
+
+> ∂Φ
+
+= − P 
+
+> i
+
+πiei(Pi − Pi)M ⊺ Var( Ai) and (Pi − Pi)M ⊺ =∆β r i γ⊺, we get 
+
+∂L
+
+∂Φ = −∆β X
+
+> i
+
+πiri ei γ⊺ Var( Ai).
+
+31 Submission and Formatting Instructions for ICML 2026 
+
+Thus, the Φ-driven term is 
+
+−η
+
+ ∂L
+
+∂Φ
+
+
+
++
+
+ ∂L
+
+∂Φ
+
+⊺
+
+γ = η∆β X
+
+> i
+
+πiri (eiγ⊺ Var( Ai)γ + γi Var( Ai)γ)
+
+By direct computation, we find that 
+
+Var( Ai)γ = ξi(1 − ξi)∆ γ
+
+
+
+1, − 1
+
+d − 1 , . . . , − 1
+
+d − 1
+
+⊺
+
+,γ⊺ Var( Ai)γ = ξi(1 − ξi)(∆ γ)2
+
+Substituting into the equation, we get the Φ- driven term: 
+
+˙γ1 Φ = η∆β
+
+h
+
+π1r1 ξ1(1 − ξ1) (∆ γ)2 + a∆γ + (1 − π1)r2 b ξ 2(1 − ξ2)∆ γ
+
+i
+
+, (155) 
+
+˙γi̸=1 Φ = η∆β
+
+|V| − 1
+
+h
+
+− π1r1 a ξ 1(1 − ξ1)∆ γ + (1 − π1)r2 ξ2(1 − ξ2) (∆ γ)2 − b∆γi
+
+. (156) Combining (154)–(156) gives the closed ODEs for (a, b ) on the invariant manifold. Plug the above equations into the dynamics of γ1, γ i̸=1 
+
+We now formally proceed with the proof of Theorem 3.7. We linearize the reduced system around the entry state of this phase and denote base values by superscript 0 and first-order variations by superscript 1.
+
+Proof. The test for the critical point is the same as for Proposition 3.3, because the parameters are essentially located near the same minimum point. We then linearize terms in (154)–(156) in a fixed order. 1. Linearization about M -driven term. We take the expansion up to the first order about ξi and ˆpi and then substitute then into the expression of M -driven term. (1). Linearization of the proxy attention weights ξ1, ξ 2. Take ξ1 as an example, 
+
+ξ1 = 11 + 1−π1 
+
+> π1
+
+exp ( −ηγ 1∆γ) = π1 + π1(1 − π1)η1γ01 ∆γ0 + O(∥θ∥2)
+
+in which we use the fact that parameters locate near η = 0 . Thus, 
+
+ξ 11 = π1(1 − π1)η1γ01 ∆γ0, ξ 12 = π1(1 − π1)η1γ0
+
+> i̸=1
+
+∆γ0.
+
+(2). Linearization of the prediction probabilities ˆpi and residuals ri. Recall ˆpi = σ(mi∆β − log( |V| − 1)) with 
+
+mi = b + ξi∆γ. Expanding ˆpi to first order gives (writing m0 
+
+> i
+
+for the base value) 
+
+ˆp 11 = π1(1 − π1)
+
+
+
+(b1 + π1∆γ1)∆ β0 + π1(1 − π1)η a 0∆γ0∆β0 + m01∆β1
+
+,
+
+ˆp 12 = π1(1 − π1)
+
+
+
+(b1 + π1∆γ1)∆ β0 + π1(1 − π1)η b 0∆γ0∆β0 + m02∆β1
+
+.
+
+Since ri = Pi, 1 − ˆpi, we have r 1 
+
+> i
+
+= −ˆp 1 
+
+> i
+
+.2. Linearization about Φ-driven term. Using the fact that parameters locate near η = 0 , the linearization of Eq (154) – (156) corresponds to the right-hand side except that eta takes a value at the initial point. Substituting the above expansions into (154)–(156), and keeping only first-order terms, yields 
+
+˙γ11 = ∆ β0 π21 (−ˆp 11 ) + π1(1 − π1)( −ˆp 12 ) + 3 λ η 1π21 (1 − π1)2 ∆β0(∆ γ0)2,
+
+˙γ1 
+
+> i̸=1
+
+= ∆β0
+
+|V| − 1
+
+ π1(1 − π1)( −ˆp 11 ) + (1 − π1)2(−ˆp 12 ) − 1
+
+|V| − 1 3λη 1π21 (1 − π1)2 ∆β0(∆ γ0)2.
+
+32 Submission and Formatting Instructions for ICML 2026 
+
+Taking the linear combination (1 − π1) ˙ γ11 − (|V| − 1) π1 ˙γ1 
+
+> i̸=1
+
+cancels the (−ˆp 1 
+
+> i
+
+) terms and yields 
+
+(1 − π1) ˙ γ11 − (|V| − 1) π1 ˙γ1 
+
+> i̸=1
+
+= 3 λπ 21 (1 − π1)2∆β0(∆ γ0)2η1. (157) Considering the linearized dynamics about η, there exists c > 0 such that 
+
+˙η1 = cη 1,
+
+which indicating that η1 admits a solution as 
+
+η1(t) = η1(t0) exp c(t − t0). (158) Substituting the above equation into Eq. (157) and integrating both sides of the equation, we get 
+
+(1 − π1)γ11 (t) − (|V| − 1) π1γ1
+
+> i̸=1
+
+(t) = c′ (exp( c(t − t0)) − 1) (159) Here, we use the fact that 
+
+(1 − π1)γ1(t0) − (d − 1) π1γi̸=1 (t0) = 0 .
+
+## D. Theoretical details in Sec. 3.4 
+
+This appendix provides detailed proofs for Section 4.4. We focus on the minimal vocabulary size d = 3 to exhibit the separation between secondary high frequency and secondary low frequency. Throughout, we use the rank-one parametrization on the invariant manifold (cf. Proposition 3.6) 
+
+M = γβ ⊺, Φ = η γγ ⊺, θ = ( γ, β ) ∈ R3 × R3.
+
+Here, we do not need to consider η, because calculations show that its derivatives up to the second order are zero, so it will not affect our analysis. 
+
+D.1. A degenerate critical point on the rank-one manifold 
+
+We first formalize the “bad” critical point on the rank-one manifold under symmetric frequencies. This critical point is degenerate in the sense that the key driving terms ∂L/∂M and ∂L/∂ Φ vanish, hence linearization on the manifold cannot explain the escape to new embedding directions. The following is the proof of Proposition 3.8. 
+
+Proof. We construct a critical point on the rank-one manifold and show it is a local minimum for the linearized dynamics. The critical point is constructed as follows. Take γ1γi̸=1 < 0 as shown in Theorem 3.7. When η is sufficiently large, the attention proxy satisfies A1 ≈ e1 and Ai̸=1 ≈ ˆe1 := (0 , 12 , 12 ). Choose β1 > β i̸=1 so that softmax( kβ ⊺) → e1 as k → +∞
+
+and softmax( kβ ⊺) → ˆe1 as k → −∞ . Thus we may choose γ1 > 0 and γi̸=1 < 0 so that 
+
+P1 = P1, Pi̸=1 = 12 (P2 + P3).
+
+By direct computation and symmetry of the data, we have ∂L 
+
+> ∂M
+
+= 0 and ∂L 
+
+> ∂Φ
+
+= 0 at this point (refer to Lemma D.4). Substituting this fact into Eq. (4), it implies that our construction gives a critical point. To verify local minimality for the linearized dynamics, we linearize the dynamics in Eq. (4). We compute d  ∂L
+
+> ∂M
+
+ and 
+
+d  ∂L
+
+> ∂Φ
+
+. At the constructed symmetric point, Lemma D.5 implies P 
+
+> i
+
+πi dA⊺ 
+
+> i
+
+(Pi − Pi) = 0 and hence 
+
+d ∂L
+
+∂M = X
+
+> i
+
+πiA⊺ 
+
+> i
+
+dPi̸ = 0 .
+
+Moreover, Lemma D.5 shows that dPi = Ai dM Var( Pi). Since A2 = A3, it implies that dP2 = d P3. In addition, Lemma D.5 gives d( ∂L/∂ Φ) = 0 .33 Submission and Formatting Instructions for ICML 2026 
+
+As a result, the linearized dynamics on (γ, β, η ) reduces to 
+
+d∆ γ
+
+dt = −d
+
+ ∂L
+
+∂M 
+
+
+
+β, d∆ β
+
+dt = −d
+
+ ∂L
+
+∂M 
+
+⊺
+
+γ, d∆ η
+
+dt = 0 , (160) and the Jacobian J0 = −∇ 2 
+
+> θ
+
+L admits the explicit block form in Lemma D.6. In particular, J0 is negative semidefinite with a nontrivial kernel. Hence, the critical point we constructed is a neutrally stable equilibrium for the linearized dynamics, which motivates the Lyapunov–Schmidt reduction in the main text. 
+
+D.2. Breaking the degeneracy: frequency perturbation and Lyapunov–Schmidt reduction 
+
+To eliminate the degeneracy, we perturb the frequencies between the two low-frequency states: 
+
+π⊺ =
+
+
+
+c, 1 − c
+
+2 , 1 − c
+
+2
+
+
+
+⇒ ˜π⊺ =
+
+
+
+c, 1 − c
+
+2 + δ, 1 − c
+
+2 − δ
+
+
+
+. (161) The dynamics becomes ˙θ = −∇ θ L(θ, δ ).
+
+We study the perturbed critical point by solving 
+
+−∇ θ L(θ, δ ) = 0 (162) near the degenerate minimum, which we shift to θ = 0 for convenience. We use the formal expansion (at θ = 0 ): 
+
+−∇ θ L(θ, δ ) = J0θ + δf 1 + 12 B(θ, θ ) + δJ 1θ + 12 δ2f2 + h.o.t. , (163) where 
+
+J0 = −∇ 2 
+
+> θ
+
+L, f1 = ∂δ (−∇ θ L), B(·, ·) = −∇ 3 
+
+> θ
+
+L, J1 = ∂δ J0, f2 = ∂2 
+
+> δ
+
+(−∇ θ L).
+
+Since J0 is singular, we apply Lyapunov–Schmidt reduction. D.2.1. K ERNEL /RANGE DECOMPOSITION OF J0
+
+Proposition D.1 (Kernel and range bases) . Assume ∥γ∥ = ∥β∥ and β⊺1 = 0 at the symmetric degenerate minimum. Then 
+
+dim ker( J0) = 3 and one convenient orthonormal basis is 
+
+k1 = 1
+
+√2 ((0 , 1, −1) , (0 , 0, 0)) ,k2 = 1
+
+√3 ((0 , 0, 0) , (1 , 1, 1)) ,k3 = 1
+
+p∥γ∥2 + ∥β∥2 (−γ, β ).
+
+(164) 
+
+An orthonormal basis for Range( J0) can be taken as 
+
+q1 = 1
+
+p4γ22 + 2 γ21
+
+(( −2γ2, γ 1, γ 1), (0 , 0, 0)) ,q2 = 1
+
+√2 ((0 , 0, 0) , (0 , 1, −1)) ,q3 = 1
+
+p∥γ∥2 + ∥β∥2 (γ, β ).
+
+(165) Let QK = ( k1, k 2, k 3) and QR = ( q1, q 2, q 3), and denote projections PK = QK Q⊺ 
+
+> K
+
+, PR = QRQ⊺
+
+> R
+
+. Write θ =
+
+QK x + QRy.34 Submission and Formatting Instructions for ICML 2026 
+
+D.2.2. S OLVING THE RANGE EQUATION 
+
+Recall the Lyapunov–Schmidt decomposition θ = QK x + QRy and define the range equation 
+
+FR(x, y, δ ) := −Q⊺
+
+> R
+
+∇θ L(QK x + QRy, δ ) = 0 . (166) 
+
+Proposition D.2 (Range solution and first-order expansion) . Given a perturbation of the data parameterized by δ, the range equation (166) admits a unique solution y = ζ(x, δ ) in a neighborhood of (x, δ ) = (0 , 0) . Moreover, it satisfies the expansion 
+
+ζ(x, δ ) = δ
+
+
+
+0
+
+√2 λγ i̸=1 + (1 − λ)( π1γ1 + (1 − π1)γi̸=1 )
+
+π1γ21 P1,2 + (1 − π1)γ2
+
+> i̸=1
+
+Pi̸=1 ,2
+
+0
+
+ + O(δ2 + ∥x∥2), (167) 
+
+where the denominator 
+
+c1 := π1γ21 P1,2 + (1 − π1)γ2
+
+> i̸=1
+
+Pi̸=1 ,2
+
+is strictly positive under our standing assumptions (in particular γ1, γ i̸=1 ̸ = 0 and P1,2, Pi̸=1 ,2 > 0). Proof. We expand FR around (x, y, δ ) = (0 , 0, 0) . Writing θ = QK x + QRy and using 
+
+−∇ θ L(θ, δ ) = J0θ + δf 1 + O(∥θ∥2 + δ2),
+
+we obtain 
+
+FR(x, y, δ ) = Q⊺
+
+> R
+
+(J0QR y + δf 1) + O(∥θ∥2 + δ2) = Λ R y + δ Q ⊺
+
+> R
+
+f1 + O(∥x∥2 + ∥y∥2 + δ2), (168) where ΛR := Q⊺
+
+> R
+
+J0QR.By Lemma D.7 we have an explicit expression for Q⊺
+
+> R
+
+f1, and by Lemma D.8 the matrix ΛR is invertible on the range coordinates; in particular, its (2 , 2) -entry equals −c1 < 0 and hence (Λ −1 
+
+> R
+
+)22 = −1/c 1.Therefore, ∂y FR(0 , 0, 0) = Λ R is invertible, and the implicit function theorem yields a unique smooth function y = ζ(x, δ )
+
+solving FR(x, ζ (x, δ ), δ ) = 0 locally, with 
+
+ζ(x, δ ) = −Λ−1 
+
+> R
+
+δ Q ⊺
+
+> R
+
+f1 + O(δ2 + ∥x∥2). (169) Since Q⊺
+
+> R
+
+f1 has only a nonzero second component (Lemma D.7), and (Λ −1 
+
+> R
+
+)22 = −1/c 1 (Lemma D.8), the second coordinate of ζ equals 
+
+ζ2(x, δ ) = −
+
+
+
+− 1
+
+c1
+
+
+
+δ · √2 λγ i̸=1 + (1 − λ)( π1γ1 + (1 − π1)γi̸=1 ) + O(δ2 + ∥x∥2),
+
+which is exactly (167). This completes the proof. D.2.3. R EDUCED KERNEL EQUATION AND APPROXIMATE CRITICAL POINT 
+
+Plugging y = ζ(x, δ ) into the kernel equation gives 
+
+−Q⊺ 
+
+> K
+
+∇L (QK x + QRζ(x, δ ), δ ) = 0 .
+
+Because J0QK = 0 and Q⊺ 
+
+> K
+
+f1 = 0 , the leading contributions are second order: 
+
+Q⊺
+
+> K
+
+ 12 B(θ, θ ) + δJ 1θ + 12 δ2f2
+
+
+
++ h.o.t. = 0 , θ = QK x + QRζ(x, δ ).
+
+Theorem D.3 (Existence of an approximate critical point and its two-scale stability) . Let ζ(x, δ ) be given by Proposition D.2. Then x = 0 is an approximate solution of the reduced kernel equation up to second order, i.e. 
+
+∇θ L(QRζ(0 , δ ), δ ) = O(δ3).
+
+Moreover, the linear stability splits into two scales: 
+
+35 Submission and Formatting Instructions for ICML 2026 
+
+1. Slow manifold directions (within the rank-one manifold): any positive eigenvalues created from the kernel directions are at most O(δ2).2. Fast transverse directions (escaping the manifold): Under condition in Lem. D.17, there exists a transverse positive eigenvalue of order Θ( δ).Proof. The estimate ∥∇L∥ = O(δ3) follows by inserting θ = QRζ(0 , δ ) into the kernel expansion and using the explicit expressions: (1). 12 Q⊺ 
+
+> K
+
+B(q2y2, q 2y2) (From Lem. D.13): 
+
+12 Q⊺ 
+
+> K
+
+B(q2y2, q 2y2) = 1
+
+p∥γ∥2 + ∥β∥2
+
+
+
+00
+
+π1γ21 P1,2 + (1 − π1)γ22 Pi̸=1 ,2
+
+ y22 .
+
+(2). δQ ⊺ 
+
+> K
+
+J1(q2y2) (From Lem. D.10): 
+
+δQ ⊺ 
+
+> K
+
+J1(q2y2) = −δ
+
+√2
+
+p∥γ∥2 + ∥β∥2
+
+
+
+00
+
+π1γ1(1 − λ) + γi̸=1 (λ + (1 − π1)(1 − λ)) 
+
+ y2.
+
+(3). δ2f2 vanishes (From Lem. D.14). Substitute y2 = √2 λγ i̸=1 +(1 −λ)( π1γ1+(1 −π1)γi̸=1 )  
+
+> π1γ21P1,2+(1 −π1)γ2
+> i̸=1 Pi̸=1 ,2
+
+δ. We found that the second-order terms cancel each other out automati-cally. For stability, we write the perturbed Hessian at the approximate critical point as 
+
+∇2 
+
+> θ
+
+L(θ, δ ) = J0 + δH 1 + O(δ2), H1 := −
+
+  0 BB⊺ 0
+
+
+
++
+
+0 00 C
+
+ 
+
++ J1,
+
+with (B, C ) computed from the second-order kernel reduction (see Lem. D.15). We take the basis as Q = ( QK , Q R):
+
+Q⊺JQ =
+
+ 0 00 Λ
+
+
+
++ δ
+
+ G EE⊺ F
+
+
+
++ O(δ2) (170) where Λ = Q⊺
+
+> R
+
+J0QR, G = Q⊺ 
+
+> K
+
+H1QK , E = Q⊺ 
+
+> K
+
+H1QR, and F = Q⊺
+
+> R
+
+H1QR. Let λ be a small eigenvalue and the corresponding eigenvector is (x, y ), the equation is 
+
+(δGx + δEy + O(δ2) = λx 
+
+Λy + δE ⊺x + O(δ)y = λy (171) Since the new positive eigenvalue is small, we can solve y as 
+
+y = −(Λ − λI )−1δE ⊺x + O(δ2) = −δΛ−1E⊺x + O(δ2) (172) Substitute this expression into the the first equation, we get 
+
+(δG − δ2EΛ−1E⊺)x = λx + O(δ3) (173) Hence λ = O(δ2) provided G = Q⊺ 
+
+> K
+
+H1QK = 0 . This vanishing is proved in Lemma D.16. 36 Submission and Formatting Instructions for ICML 2026 
+
+Finally, we compute the eigenvalue of the normal directions. Recall the linearization of the whole dynamics is 
+
+
+
+d∆ W0
+
+dt = ∆ 
+
+
+
+− ∂L
+
+∂M W ⊺ 
+
+> 1
+
+− ∂L
+
+∂Φ W0WK W ⊺ 
+
+> Q
+
+−
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQW ⊺
+
+> K
+
+
+
+d∆ W1
+
+dt = ∆ 
+
+
+
+−W ⊺
+
+> 0
+
+∂L
+
+∂M 
+
+
+
+d∆ WQ
+
+dt = ∆ 
+
+
+
+−W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0WK
+
+
+
+d∆ WK
+
+dt = ∆ 
+
+
+
+−W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQ
+
+
+
+(174) We find that 
+
+d∆ W0α1,⊥
+
+dt = − ∂L
+
+∂M ∆W ⊺ 
+
+> 1
+
+α1,⊥ − ∂L
+
+∂Φ W0WK ∆W ⊺
+
+> Q
+
+α1,⊥ −
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQ∆W ⊺ 
+
+> K
+
+α1,⊥
+
+dα⊺
+
+> 1,⊥
+
+∆W1
+
+dt = −α⊺
+
+> 1,⊥
+
+∆W ⊺
+
+> 0
+
+∂L
+
+∂M 
+
+dα⊺
+
+> 1,⊥
+
+∆WQ
+
+dt = −∆W ⊺
+
+> 0
+
+∂L
+
+∂Φ W0WK
+
+dα⊺
+
+> 1,⊥
+
+∆WK
+
+dt = −∆W ⊺
+
+> 0
+
+ ∂L
+
+∂Φ
+
+⊺
+
+W0WQ
+
+(175) Since ∂δ ∂L 
+
+> ∂Φ
+
+= 0 and d ∂L 
+
+> ∂Φ
+
+= 0 , we find that ∂L 
+
+> ∂Φ
+
+= O(δ2). So the main term is 
+
+
+
+d∆ W0α1,⊥
+
+dt = − ∂L
+
+∂M ∆W ⊺ 
+
+> 1
+
+α1,⊥
+
+dα⊺
+
+> 1,⊥
+
+∆W1
+
+dt = −α⊺
+
+> 1,⊥
+
+∆W ⊺
+
+> 0
+
+∂L
+
+∂M 
+
+(176) From Lemma D.17, under some mild condition, We find that 
+
+∂L
+
+∂M = Θ( δ) (177) Thus, there exists positive eigenvalue at least order Θ( δ).
+
+D.3. Derivative toolbox 
+
+This section collects all derivative computations referenced in the proofs above. D.3.1. V ANISHING OF GRADIENTS 
+
+Lemma D.4 (∂L/∂M = 0 and ∂L/∂ Φ = 0 at the constructed point) . At the symmetric degenerate minimum in Proposi-tion 3.8, we have ∂L
+
+∂M = 0 , ∂L
+
+∂Φ = 0 .
+
+Proof. By direct computation, we get P1 = P1 and P2 = P3 = 12 (P2 + P3). Thus, the terms in the gradients cancel after summing with π2 = π3.D.3.2. F IRST -ORDER VARIATIONS 
+
+Lemma D.5 (First-order variations with respect to parameters) . At the critical point in Proposition 3.8, the first-order variations have the following form: 1. The variation of the attention proxy satisfies dA1 = 0 and dAi̸=1 = ηγ i̸=1 
+
+ 0, 14 (d γ2 − dγ3), − 14 (d γ2 − dγ3) for 
+
+i̸ = 1 .
+
+37 Submission and Formatting Instructions for ICML 2026 
+
+2. The variation of the output probability satisfies dPi = AidM Var( Pi).3. The variation of ∂L 
+
+> ∂M
+
+and ∂L 
+
+> ∂Φ
+
+admit the following expression: 
+
+d ∂L
+
+∂M = X
+
+> i
+
+πiA⊺ 
+
+> i
+
+dPi, d ∂L
+
+∂Φ = 0 .
+
+Proof. We calculate the first-order variation in sequence. 1. At A1 = e1, we have diag( e1) − e1e⊺ 
+
+> 1
+
+= 0 , hence dA1 = 0 . For i̸ = 1 , using Ai = ˆ e1 and Φ = ηγγ ⊺,
+
+e⊺ 
+
+> i
+
+dΦ = e⊺ 
+
+> i
+
+d( ηγγ ⊺) = d( ηγ iγ⊺).
+
+Since Var( Ai̸=1 ) = diag(ˆ e1) − ˆe1 ˆe⊺ 
+
+> 1
+
+equals to 
+
+
+
+0 0 00 14 − 14
+
+0 − 1414
+
+ ,
+
+we obtain the displayed vector form. 2. By definition, 
+
+dPi = d( AiM ) Var( Pi) = (d Ai M + Ai dM ) Var( Pi).
+
+Under M = γβ ⊺,
+
+dAi M = d Ai γβ ⊺ = (d Ai γ)β⊺.
+
+For i = 1 , dA1 = 0 , hence dA1M = 0 . For i̸ = 1 , dAi̸=1 = ηγ i̸=1 
+
+ 0, 14 (d γ2 − dγ3), − 14 (d γ2 − dγ3). Thus, 
+
+dAi̸=1 γ = ηγ i̸=1 (0 , 14 (d γ2 − dγ3), − 14 (d γ2 − dγ3)) · (γ1, γ 2, γ 3) = 14 ηγ i̸=1 (d γ2 − dγ3)( γ2 − γ3) = 0 ,
+
+since γ2 = γ3 at the symmetric point. Hence dAi̸=1 M = 0 . Therefore dPi = Ai dM Var( Pi).Because A2 = A3 = ˆ e1 and Var( P2) = Var( P3) under symmetry, we also have dP2 = d P3.3. By definition of ∂L 
+
+> ∂M
+
+and the chain rule, 
+
+d ∂L
+
+∂M = − X
+
+> i
+
+πidA⊺ 
+
+> i
+
+(Pi − Pi) − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+d( −Pi)
+
+At the symmetric point, P1 − P1 = 0 and P
+
+> i̸=1
+
+(Pi − Pi) = 0 , while dA2 = d A3 and π2 = π3. Therefore the i = 2 , 3
+
+contributions cancel, giving P 
+
+> i
+
+πi dA⊺ 
+
+> i
+
+(Pi − Pi) = 0 . It yields the claimed form. By the definition of ∂L 
+
+> ∂Φ
+
+and the chain rule, 
+
+d ∂L
+
+∂Φ = −d
+
+ X 
+
+> i
+
+πi ei (Pi − Pi) M ⊺ Var( Ai)
+
+
+
+= − X
+
+> i
+
+πieid( −Pi)M ⊺ Var( Ai) − X
+
+> i
+
+πiei(Pi − Pi)d M ⊺ Var( Ai) − X
+
+> i
+
+πiei(Pi − Pi)M ⊺d Var( Ai).
+
+Using the expression of Var( Ai), we get γ⊺ Var( Ai) = 0 since γ2 = γ3, which implies that the first term vanishes. Similarly, using the chain rule, we get dM ⊺ = d βγ ⊺ + βdγ⊺. Combined with (Pi − Pi)β = 0 and γ⊺ Var( Ai) = 0 ,the second term vanishes. The third term vanishes due to the same reason. 38 Submission and Formatting Instructions for ICML 2026 
+
+D.3.3. H ESSIAN MATRIX J0
+
+Lemma D.6 (Computation of J0 on the rank-one manifold) . At the critical point in Proposition 3.8, the linearization restricted to the rank-one manifold yields the Hessian J0 = −∇ 2 
+
+> θ
+
+L(θ, 0) in the matrix form: 
+
+J0 = −
+
+
+
+c1 0 0 v1
+
+0 c2 c2 v2
+
+0 c2 c2 v2
+
+v⊺ 
+
+> 1
+
+v⊺ 
+
+> 2
+
+v⊺ 
+
+> 2
+
+C
+
+ (178) 
+
+where c1 := π1∥β∥2Var( P1), c2 := 14 (1 − π1)∥β∥2Var( Pi̸=1 ), v1 := π1γ1β⊺ Var( P1), v2 := 12 (1 − π1)γi̸=1 β⊺ Var( Pi̸=1 ), and 
+
+C := π1γ21 Var( P1) + (1 − π1)γ2 
+
+> i̸=1
+
+Var( Pi̸=1 ). Moreover, J0 is negative semidefinite. Proof. As shown in Eq. (160), the linearized dynamics on the rank-one manifold can be written as 
+
+d∆ γ
+
+dt = −
+
+
+
+d ∂L
+
+∂M 
+
+
+
+β, 
+
+d∆ β
+
+dt = −
+
+
+
+d ∂L
+
+∂M 
+
+⊺
+
+γ, 
+
+d∆ η
+
+dt = 0 ,
+
+where we used d( ∂L/∂ Φ) = 0 at the symmetric point. We calculate the Jacobian corresponding to d∆ γ 
+
+> dt
+
+and d∆ β
+
+> dt
+
+respectively. 1. The ∆γ equation. Using d ∂L 
+
+> ∂M
+
+= π1A⊺ 
+
+> 1
+
+dP1 + (1 − π1)A⊺
+
+> i̸=1
+
+dPi̸=1 and A1 = e⊺ 
+
+> 1
+
+, Ai̸=1 = ˆ e⊺ 
+
+> 1
+
+= (0 , 12 , 12 ), we obtain 
+
+d∆ γ
+
+dt = −π1A⊺ 
+
+> 1
+
+dP1β − (1 − π1)A⊺
+
+> i̸=1
+
+dPi̸=1 β
+
+= −π1A⊺
+
+> 1
+
+
+
+dγ1β⊺ Var( P1)β + γ1dβ⊺ Var( P1)β
+
+
+
+− (1 − π1)A⊺
+
+> i̸=1
+
+ 12 (d γ2 + d γ3) β⊺ Var( Pi̸=1 )β + γi̸=1 dβ⊺ Var( Pi̸=1 )β
+
+
+
+,
+
+(179) where we used the rank-one identity dM = d( γβ ⊺) = (d γ)β⊺ + γ(d β)⊺ and dPi = Ai dM Var( Pi) at the symmetric point. Let dθ := (d γ1, dγ2, dγ3, dβ), where dβ ∈ R3. Collecting the coefficients in (179) gives the matrix form 
+
+d∆ γ
+
+dt = −
+
+
+
+c1 0 0 v1
+
+0 c2 c2 v2
+
+0 c2 c2 v2
+
+ dθ. (180) 2. The ∆β equation. Similarly, 
+
+d∆ β
+
+dt = −π1dP⊺ 
+
+> 1
+
+A1γ − (1 − π1)d P⊺
+
+> i̸=1
+
+Ai̸=1 γ. (181) Using again dPi = Ai dM Var( Pi) and A1 = e⊺ 
+
+> 1
+
+, Ai̸=1 = ˆ e⊺ 
+
+> 1
+
+, we obtain the compact matrix form 
+
+d∆ β
+
+dt = −   v⊺ 
+
+> 1
+
+v⊺ 
+
+> 2
+
+v⊺ 
+
+> 2
+
+C  dθ. (182) Combining (180) and (182), the linearization reads 
+
+ddt
+
+∆γ
+
+∆β
+
+
+
+= J0 dθ, 
+
+where J0 is exactly the block matrix. 39 Submission and Formatting Instructions for ICML 2026 
+
+We now verify that J0 is negative semidefinite. Let dθ = (d γ1, dγ2, dγ3, dβ) and define 
+
+dγ+ := 12 (d γ2 + d γ3), dγ− := 12 (d γ2 − dγ3).
+
+A direct expansion of the quadratic form induced by (178) yields 
+
+dθ⊺J0 dθ = −π1 dγ1 β + γ1 dβ 2Var( P1) − (1 − π1) dγ+ β + γi̸=1 dβ 2Var( Pi̸=1 ). (183) Indeed, for the i = 1 block one checks 
+
+−π1
+
+
+
+(d γ1)2β⊺ Var( P1)β + 2 γ1 dγ1 dβ⊺ Var( P1)β + γ21 dβ⊺ Var( P1)d β
+
+
+
+= −π1∥dγ1β + γ1dβ∥2Var( P1).
+
+For the low-frequency block, the coefficients 14 (1 − π1) in the (d γ2, dγ3)-submatrix imply 
+
+− 14 (1 − π1)∥β∥2Var( Pi̸=1 )
+
+ dγ2 + d γ3
+
+2 = −(1 − π1)∥dγ+β∥2Var( Pi̸=1 ),
+
+and the cross/ (d β, dβ) terms match exactly the remaining pieces of −(1 − π1)∥dγ+β + γi̸=1 dβ∥2Var( Pi̸=1 ), giving (183). Since Var( P1) ⪰ 0 and Var( Pi̸=1 ) ⪰ 0, the right-hand side of (183) is always non-positive, hence J0 ⪯ 0. Moreover, dγ−
+
+does not appear in (183) , which already produces a nontrivial kernel direction; additional kernel directions arise from the scaling invariance (d γ, dβ) ∝ (−γ, β ) on the rank-one parametrization. Therefore, the equilibrium is a degenerate local minimum restricted to the rank-one manifold. D.3.4. C OMPUTATION OF f1 AND Q⊺
+
+> R
+
+J0QR FOR THE RANGE EQUATION 
+
+Lemma D.7 (Computation of f1 and Q⊺
+
+> R
+
+f1). At the symmetric rank-one critical point, we have 
+
+∂δ
+
+∂L
+
+∂Φ = 0 , −∂δ
+
+ ∂L
+
+∂M 
+
+
+
+β = 0 , −
+
+
+
+∂δ
+
+ ∂L
+
+∂M 
+
+ ⊺
+
+γ =  λγ i̸=1 + (1 − λ)( π1γ1 + (1 − π1)γi̸=1 ) (0 , 1, −1) ⊺.
+
+Consequently, 
+
+f1 =  λγ i̸=1 + (1 − λ)( π1γ1 + (1 − π1)γi̸=1 )
+
+00001
+
+−1
+
+
+
+, (184) 
+
+and for the range basis QR = ( q1, q 2, q 3) with q2 = 1√2 (0 , 0, 0, 0, 1, −1) ,
+
+Q⊺
+
+> R
+
+f1 =
+
+
+
+0
+
+√2 λγ i̸=1 + (1 − λ)( π1γ1 + (1 − π1)γi̸=1 )
+
+0
+
+ . (185) 
+
+Proof. We differentiate the explicit gradient formula with respect to δ. We calculate the partial derivatives of ∂L 
+
+> ∂M
+
+and ∂L
+
+> ∂Φ
+
+with respect to δ, respectively. 1. Computation of ∂∂δ ∂L 
+
+> ∂M
+
+. By definition, 
+
+∂∂δ ∂L
+
+∂M = ∂∂δ − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi)
+
+!
+
+= − X
+
+> i
+
+∂δ πiA⊺ 
+
+> i
+
+(Pi − Pi) − X
+
+> i
+
+πi∂δ A⊺ 
+
+> i
+
+(Pi − Pi) − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+∂δ (Pi − Pi)
+
+40 Submission and Formatting Instructions for ICML 2026 
+
+Using Pi = λe ⊺ 
+
+> i
+
++ (1 − λ)π⊺, the first term is computed as 
+
+− X
+
+> i
+
+∂δ πiA⊺ 
+
+> i
+
+(Pi − Pi) = −A⊺ 
+
+> i̸=1
+
+(( P2 − P2) − (P3 − P3)) = −A⊺
+
+> i̸=1
+
+(0 , λ, −λ)
+
+Since η is sufficiently large and γ1γi̸=1 < 0, we get 
+
+∂δ A1 = (0 , 0, 0) , ∂δ Ai̸=1 =
+
+
+
+0, 11 − π1
+
+, − 11 − π1
+
+
+
+Using P
+
+> i̸=1
+
+(Pi − Pi) = 0 , the second term vanishes. For the last term, we get 
+
+∂δ Pi = (0 , 1 − λ, −(1 − λ)) , ∂δ Pi = 0 
+
+As a result, 
+
+∂∂δ ∂L
+
+∂M = −
+
+
+
+0
+
+> 1212
+
+ (0 , λ, −λ) −
+
+
+
+π112 (1 − π1) 
+
+> 12
+
+(1 − π1)
+
+ (0 , 1 − λ, −(1 − λ)) . (186) 2. Computation of ∂∂δ ∂L 
+
+> ∂Φ
+
+. By definition, 
+
+∂∂δ ∂L
+
+∂Φ = ∂∂δ − X
+
+> i
+
+πiei(Pi − Pi)M ⊺ Var( Ai)
+
+!
+
+= − X
+
+> i
+
+∂δ πiei(Pi − Pi)M ⊺ Var( Ai) − X
+
+> i
+
+πiei∂δ (Pi − Pi)M ⊺ Var( Ai) − X
+
+> i
+
+πiei(Pi − Pi)M ⊺∂δ Var( Ai)
+
+Similar to the computation about ∂∂δ ∂L 
+
+> ∂M
+
+, ones can check that ∂∂δ ∂L 
+
+> ∂Φ
+
+vanishes. Multiplying (186) by β on the right yields zero because it is proportional to (0 , 1, −1) and β2 = β3 at the symmetric point. Taking transpose and multiplying by γ on the right yields a multiple of (0 , 1, −1) ⊺, with the scalar coefficient 
+
+λγ i̸=1 + (1 − λ)( π1γ1 + (1 − π1)γi̸=1 ), which gives the stated formula for f1 in (184) under the definition of f1 in the expansion of −∇ θ L.Finally, (185) follows from q⊺ 
+
+> 2
+
+f1 = √2 · (scalar ) and q⊺ 
+
+> 1
+
+f1 = q⊺ 
+
+> 3
+
+f1 = 0 by orthogonality. 
+
+Lemma D.8 (Structure of Q⊺
+
+> R
+
+J0QR on the range) . Let ΛR := Q⊺
+
+> R
+
+J0QR. Then ΛR is nonsingular, and in particular, 
+
+(Λ R)22 = −c1, c1 := π1γ21 P1,2 + (1 − π1)γ2
+
+> i̸=1
+
+Pi̸=1 ,2 > 0. (187) 
+
+Equivalently, ΛR has the block structure 
+
+ΛR = −
+
+
+
+∗ 0 ∗
+
+0 c1 0
+
+∗ 0 ∗
+
+ ,
+
+where the starred entries are finite constants determined by the symmetric point, and are not needed in Proposition D.2. Proof. This follows by substituting the explicit expression of J0 (computed from the linearization on the rank-one manifold) into the orthonormal basis QR = ( q1, q 2, q 3).The key point is the q2 direction. Recall q2 = 1√2 (0 , 0, 0, 0, 1, −1) , i.e., it lies purely in the β-difference direction. At the symmetric point, the β-block of J0 equals 
+
+J0,ββ = − π1γ21 Var( P1) + (1 − π1)γ2 
+
+> i̸=1
+
+Var( Pi̸=1 ).
+
+A direct computation gives 
+
+q⊺ 
+
+> 2
+
+J0q2 = −
+
+
+
+π1γ21 q⊺ 
+
+> 2
+
+Var( P1)q2 + (1 − π1)γ2 
+
+> i̸=1
+
+q⊺ 
+
+> 2
+
+Var( Pi̸=1 )q2
+
+
+
+= − π1γ21 P1,2 + (1 − π1)γ2
+
+> i̸=1
+
+Pi̸=1 ,2
+
+,
+
+where we used q⊺ 
+
+> 2
+
+Var( Pi)q2 = Pi, 2 under the symmetric specialization Pi, 2 = Pi, 3 (hence Var( Pi) acts diagonally on the 
+
+(2 , −3) difference). This proves (187) . The remaining entries are obtained similarly and yield the stated block structure, implying ΛR is invertible on the range. 41 Submission and Formatting Instructions for ICML 2026 
+
+D.3.5. C OMPUTATION OF CROSS TERM J1
+
+Lemma D.9 (Derivation of the mixed operator J1). Write θ = ( γ, β ) ∈ R3 × R3, and view J1 as a 2 × 2 block operator with respect to the (γ, β )-splitting. Then 
+
+J1 = −
+
+ J1,γγ J1,γβ 
+
+J1,βγ 0
+
+
+
++
+
+ 0 AA⊺ 0
+
+
+
+, (188) 
+
+where 
+
+J1,γγ =
+
+ 0 0 00 β⊺ Var( Pi̸=1 )β 00 0 −β⊺ Var( Pi̸=1 )β
+
+ , J1,γβ =
+
+ 0
+
+γi̸=1 β⊺ Var( Pi̸=1 )
+
+−γi̸=1 β⊺ Var( Pi̸=1 )
+
+ , (189) 
+
+J1,βγ =
+
+
+
+0, γ i̸=1 Var( Pi̸=1 )β, −γi̸=1 Var( Pi̸=1 )β
+
+
+
+,
+
+and 
+
+A =
+
+
+
+0 π1(1 − λ) −π1(1 − λ)0 12
+
+ λ + (1 − π1)(1 − λ) − 12
+
+ λ + (1 − π1)(1 − λ)
+
+0 12
+
+ λ + (1 − π1)(1 − λ) − 12
+
+ λ + (1 − π1)(1 − λ) . (190) 
+
+Proof. We compute the mixed differential 
+
+J1 = ∂δ
+
+
+
+∇θ
+
+ − ∇ θ L(θ, δ )
+
+> (θ,δ )=( θ∗,0)
+
+.
+
+On the rank-one manifold, the (γ, β )-dynamics involve the two components 
+
+− ∂L
+
+∂M β, −
+
+ ∂L
+
+∂M 
+
+⊺
+
+γ, 
+
+while the Φ-part does not contribute to J1 at the symmetric point (see Step 2 below). Therefore it suffices to compute 
+
+∂δ ∇θ
+
+
+
+− ∂L
+
+∂M β
+
+
+
+, ∂δ ∇θ
+
+
+
+−
+
+ ∂L
+
+∂M 
+
+⊺
+
+γ
+
+
+
+.
+
+We follow the same route as in the derivation of J0: we first compute d( ∂L/∂M ) and d( ∂L/∂ Φ) , then take ∂δ and finally reassemble the induced variation of the rank-one gradients. 
+
+Step 1: computing ∂δ ∇θ (∂L/∂M ). Recall 
+
+∂L
+
+∂M = − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi).
+
+Taking θ-differential gives 
+
+d ∂L
+
+∂M = − X
+
+> i
+
+πi(d A⊺ 
+
+> i
+
+)( Pi − Pi) − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+d( Pi − Pi),
+
+and since dPi = 0 , we have d( Pi − Pi) = −dPi. Differentiating w.r.t. δ and using the product rule yields 
+
+∂δ d ∂L
+
+∂M = − X
+
+> i
+
+(∂δ πi) (d A⊺ 
+
+> i
+
+)( Pi − Pi) − X
+
+> i
+
+πi ∂δ dA⊺ 
+
+> i
+
+(Pi − Pi) − X
+
+> i
+
+πi (d A⊺ 
+
+> i
+
+) ∂δ (Pi − Pi)
+
+− X
+
+> i
+
+(∂δ πi) A⊺ 
+
+> i
+
+(−dPi) − X
+
+> i
+
+πi (∂δ A⊺ 
+
+> i
+
+)( −dPi) − X
+
+> i
+
+πi A⊺ 
+
+> i
+
+∂δ (−dPi).
+
+(191) We now analyze each term. (All computations are evaluated at the symmetric point.) 42 Submission and Formatting Instructions for ICML 2026 
+
+1. The term − P
+
+> i
+
+(∂δ πi) (d A⊺ 
+
+> i
+
+)( Pi − Pi): using the structure of dAi and (Pi − Pi)β = 0 , its contribution vanishes when paired with β and with γ, i.e., 
+
+
+
+− X
+
+> i
+
+(∂δ πi) (d A⊺ 
+
+> i
+
+)( Pi − Pi)
+
+
+
+β = 0 ,
+
+
+
+·
+
+⊺
+
+γ = 0 .
+
+2. The term − P 
+
+> i
+
+πi ∂δ dA⊺ 
+
+> i
+
+(Pi − Pi): Since dAi = e⊺ 
+
+> i
+
+Φ Var( Ai), we get ∂δ dAi = e⊺ 
+
+> i
+
+Φ ( ∂δ Var( Ai)) . For i = 1 , we have ∂δ Var( A1) = 0 since A1 = e⊺ 
+
+> 1
+
+. For i̸ = 1 ,
+
+∂δ Var( Ai) = (1 − π1)
+
+ 0 0 00 1 00 0 −1
+
+ −
+
+ 01
+
+−1
+
+
+
+0, 12 , 12
+
+
+
+−
+
+
+
+0
+
+> 1212
+
+ (0 , 1, −1) 
+
+ = 0 
+
+Hence this term is zero. 3. The term − P 
+
+> i
+
+πi (d A⊺ 
+
+> i
+
+) ∂δ (Pi − Pi): since ∂δ (Pi − Pi) = ∂δ Pi, we obtain 
+
+− X
+
+> i
+
+πi (d A⊺ 
+
+> i
+
+) ∂δ (Pi − Pi) = X
+
+> i
+
+πi(d A⊺ 
+
+> i
+
+) (0 , 1 − λ, −(1 − λ)) .
+
+By the symmetric specialization β2 = β3 and γ2 = γ3, this term also satisfies 
+
+
+
+·
+
+
+
+β = 0 ,
+
+
+
+·
+
+⊺
+
+γ = 0 .
+
+4. The term − P
+
+> i
+
+(∂δ πi) A⊺ 
+
+> i
+
+(−dPi): using ∂δ π2 = −∂δ π3 and A2 = A3 at δ = 0 , we get 
+
+− X
+
+> i
+
+(∂δ πi) A⊺ 
+
+> i
+
+(−dPi) = −A⊺ 
+
+> 2
+
+(−dP2) + A⊺ 
+
+> 3
+
+(−dP3) = 0 .
+
+5. The term − P 
+
+> i
+
+πi∂δ A⊺ 
+
+> i
+
+(−dPi): We have 
+
+− X
+
+> i
+
+πi∂δ A⊺ 
+
+> i
+
+(−dPi) = 
+
+
+
+01
+
+−1
+
+ Ai̸=1 dM Var( Pi) (192) 6. The term − P 
+
+> i
+
+πiA⊺ 
+
+> i
+
+∂δ (−dPi):
+
+− X
+
+> i
+
+πiA⊺ 
+
+> i
+
+∂δ (−dPi) = X
+
+> i
+
+πiA⊺ 
+
+> i
+
+∂δ (d AiM Var( Pi) + AidM Var( Pi)) 
+
+Similar to the previous computation, we have 
+
+− X
+
+> i
+
+πiA⊺ 
+
+> i
+
+∂δ (−dPi) = A⊺
+
+> i̸=1
+
+(0 , 1, −1)(d γ)β⊺ Var( Pi̸=1 ). (193) The last two terms, − P 
+
+> i
+
+πi (∂δ A⊺ 
+
+> i
+
+)( −dPi) and − P 
+
+> i
+
+πi A⊺ 
+
+> i
+
+∂δ (−dPi), produce the only nonzero contribution to 
+
+∂δ d( ∂L/∂M )β along the (2 , −3) antisymmetric direction. Collecting them gives 
+
+∂δ d
+
+ ∂L
+
+∂M 
+
+
+
+β =
+
+
+
+0 0 0 00 β⊺ Var( Pi̸=1 )β 0 γi̸=1 β⊺ Var( Pi̸=1 )0 0 −β⊺ Var( Pi̸=1 )β −γi̸=1 β⊺ Var( Pi̸=1 )
+
+ d( γ, β ), (194) which exactly corresponds to the J1,γγ and J1,γβ blocks in (189). 
+
+Step 2: ∂δ d( ∂L/∂ Φ) = 0 . We differentiate 
+
+∂L
+
+∂Φ = − X
+
+> i
+
+πiei(Pi − Pi)M ⊺ Var( Ai),
+
+and check term by term (product rule) that every contribution vanishes at the symmetric point: the ∂δ πi-terms cancel by symmetry and the ∂δ -dependence of Var( Ai) does not contribute at δ = 0 . Hence ∂δ d( ∂L/∂ Φ) = 0 .43 Submission and Formatting Instructions for ICML 2026 
+
+Step 3: contribution from ∂δ (∂L/∂M ) d β. Using the explicit formula of ∂δ (∂L/∂M ) (computed previously), we obtain the linear map acting on dβ:
+
+∂δ
+
+ ∂L
+
+∂M 
+
+
+
+dβ = −
+
+
+
+0 π1(1 − λ) −π1(1 − λ)0 12 (λ + (1 − π1)(1 − λ)) − 12 (λ + (1 − π1)(1 − λ)) 0 12 (λ + (1 − π1)(1 − λ)) − 12 (λ + (1 − π1)(1 − λ)) 
+
+ dβ, (195) which is exactly the A block in (190) (placed in the (γ, β ) off-diagonal). 
+
+Step 4: assembling J1 from the two dynamics components. By the chain rule, 
+
+∂δ d
+
+
+
+− ∂L
+
+∂M β
+
+
+
+= −
+
+
+
+∂δ d ∂L
+
+∂M 
+
+
+
+β −
+
+
+
+∂δ
+
+∂L
+
+∂M 
+
+
+
+dβ, 
+
+so combining (194) and (195) yields the γ-equation blocks in (188). Similarly, 
+
+∂δ d
+
+
+
+−
+
+ ∂L
+
+∂M 
+
+⊺
+
+γ
+
+
+
+= −
+
+
+
+∂δ d ∂L
+
+∂M 
+
+⊺
+
+γ −
+
+
+
+∂δ
+
+∂L
+
+∂M 
+
+⊺
+
+dγ, 
+
+which gives the (β, γ ) block J1,βγ together with the transpose A⊺ in (188). Next, we will calculate the identity needed in Theorem D.3. 
+
+Lemma D.10. Let θ = q2y2 be the leading-order reduction (since ζ(0 , δ ) ∼ δq 2). Then 
+
+Q⊺ 
+
+> K
+
+J1(q2y2) = −√2
+
+p∥γ∥2 + ∥β∥2
+
+ 00
+
+π1γ1(1 − λ) + γi̸=1 (λ + (1 − π1)(1 − λ)) 
+
+ y2.
+
+Proof. This can be verified using the expression in Lem. D.9 and by direct calculation. D.3.6. C OMPUTATION OF THE BILINEAR FORM B(·, ·)
+
+Before proceeding with the specific calculations, let’s review the following lemma. 
+
+Lemma D.11 (Second differential) . Let f : Rd → R be C2. Then for any h ∈ Rd,
+
+f (θ + h) = f (θ) + d f (θ)[ h] + 12 d2f (θ)[ h, h ] + O(∥h∥3), (196) 
+
+where d2f (θ)[ u, v ] = u⊺∇2f (θ) v is the (symmetric) bilinear form induced by the Hessian. The same expansion applies componentwise to vector-valued maps; in particular, for the gradient map g(θ) = ∇f (θ),
+
+g(θ + h) = g(θ) + Dg (θ) h + 12 D2g(θ)[ h, h ] + O(∥h∥3). (197) Also, we have the following lemma which simplifies the computation. 
+
+Lemma D.12 (A useful identity: d Var( Ai̸=1 ) = 0 for the antisymmetric direction) . At Ai̸=1 = ˆ e1 = (0 , 12 , 12 ), if 
+
+dAi̸=1 = (0 , a, −a) for some a, then d Var( Ai̸=1 ) = 0 .Proof. By definition, d Var( A) = diag(d A) − (d A)A⊺ − A(d A)⊺. Substituting A = ˆ e1 and dA = (0 , a, −a) gives exact cancellation of all entries. Consequently, in our regime the second differential of Ai simplifies to 
+
+d2Ai = d 2(η γ iγ⊺) Var( Ai), (198) because the potentially present term d( ηγ iγ⊺) d Var( Ai) vanishes (identically for i = 1 since dA1 = 0 , and by Lemma D.12 for i̸ = 1 ). Now we will begin the calculation of the bilinear term B.44 Submission and Formatting Instructions for ICML 2026 
+
+Second differential of ∂L 
+
+> ∂M
+
+. Recall 
+
+∂L
+
+∂M = − X
+
+> i
+
+πi A⊺ 
+
+> i
+
+(Pi − Pi). (199) Differentiating once (with πi fixed) yields 
+
+d ∂L
+
+∂M = − X
+
+> i
+
+πi dA⊺ 
+
+> i
+
+(Pi − Pi) + X
+
+> i
+
+πi A⊺ 
+
+> i
+
+dPi, (200) since d( Pi − Pi) = −dPi. Differentiating again gives the decomposition 
+
+d2 ∂L
+
+∂M = − X
+
+> i
+
+πi d2A⊺ 
+
+> i
+
+(Pi − Pi) + 2 X
+
+> i
+
+πi dA⊺ 
+
+> i
+
+dPi + X
+
+> i
+
+πi A⊺ 
+
+> i
+
+d2Pi. (201) The coefficient 2 in the middle term is the standard product-rule contribution: it comes once from differentiating 
+
+− P πi dA⊺ 
+
+> i
+
+(Pi − Pi) and once from differentiating + P πi A⊺ 
+
+> i
+
+dPi.
+
+On d2Pi. Using dPi = d( AiM ) Var( Pi), we have 
+
+d2Pi = d 2(AiM ) Var( Pi) + d( AiM ) d Var( Pi). (202) Moreover, 
+
+d2(AiM ) = d 2Ai M + 2 d Ai dM + Ai d2M. (203) 
+
+From d2 ∂L 
+
+> ∂M
+
+to the quadratic term in the vector field In the rank-one dynamics, the γ-component contains the factor 
+
+( ∂L 
+
+> ∂M
+
+)β. At the critical point, ∂L 
+
+> ∂M
+
+= 0 , hence 
+
+d2
+
+ ∂L
+
+∂M β
+
+
+
+=
+
+
+
+d2 ∂L
+
+∂M 
+
+
+
+β + 2 
+
+
+
+d ∂L
+
+∂M 
+
+
+
+dβ. (204) An analogous identity holds for d2 ( ∂L 
+
+> ∂M
+
+)⊺γ.
+
+Decomposition into explicit matrix blocks. We decompose the resulting bilinear form B(·, ·) into contributions coming from the different terms in (201)–(202) and from d2 ∂L 
+
+> ∂Φ
+
+. Concretely, for each output coordinate k,
+
+Bk(·, ·) = X
+
+> ℓ
+
+B(ℓ) 
+
+> k
+
+(·, ·), (205) where B(1) –B(5) come from the M -part and B(6) comes from the Φ-part. We calculate bilinear term for 1 ≤ k ≤ 3 and 4 ≤ k ≤ 6 respectively. 1. The computation of Bk for 1 ≤ k ≤ 3. We take the second differential of − ∂L 
+
+> ∂M
+
+β − η
+
+ ∂L 
+
+> ∂Φ
+
++   ∂L
+
+> ∂Φ
+
+⊺
+
+γ,
+
+−d2
+
+ ∂L
+
+∂M β
+
+
+
+− d2
+
+
+
+η
+
+ ∂L
+
+∂Φ +
+
+ ∂L
+
+∂Φ
+
+⊺
+
+γ
+
+
+
+The computation of M -term and Φ-term is computed as follows. 
+
+M -term. 
+
+(a) Contribution from 2(d( ∂L/∂M )) d β. This produces the blocks denoted by B(1)  
+
+> k
+
+:
+
+B(1) 1 (·, ·) = −π1
+
+
+
+0 0 0 β⊺ Var( P1)0 0 0 00 0 0 0Var( P1)β 0 0 2γ1 Var( P1)
+
+ ,B(1) 2 (·, ·) = B(1) 3 (·, ·) = −(1 − π1)
+
+
+
+0 0 0 00 0 0 14 β⊺ Var( Pi̸=1 )0 0 0 14 β⊺ Var( Pi̸=1 )0 14 Var( Pi̸=1 )β 14 Var( Pi̸=1 )β (1 − π1)γi̸=1 Var( Pi̸=1 )
+
+ .
+
+(206) 45 Submission and Formatting Instructions for ICML 2026 
+
+(b) Contribution from P 
+
+> i
+
+d2A⊺ 
+
+> i
+
+(Pi − Pi)β. This term vanishes due to (Pi − Pi)β = 0 for each i.(c) Contribution from −2 P 
+
+> i
+
+πidA⊺ 
+
+> i
+
+dPiβ. Using the expression of dAi and dPi,
+
+−2 X
+
+> i
+
+πidA⊺ 
+
+> i
+
+dPiβ = −2(1 − π1)ηγ i̸=1 
+
+
+
+0 
+
+> 14
+
+(d γ2 − dγ3)
+
+− 14 (d γ2 − dγ3)
+
+ d( AiM ) Var( Pi)β
+
+= − 12 (1 − π1)ηγ i̸=1 
+
+
+
+0dγ2 − dγ3
+
+−(d γ2 − dγ3)
+
+ AidM Var( Pi)β
+
+This produces the blocks denoted by B(2)  
+
+> k
+
+:
+
+B(2) 1 (·, ·) = 0 ,B(2) 2 (·, ·) = − 12 (1 − π1)ηγ i̸=1 
+
+
+
+0 0 0 00 12 ∥β∥2Var( Pi̸=1 ) 0 12 γi̸=1 β⊺ Var( Pi̸=1 )0 0 − 12 ∥β∥2Var( Pi̸=1 ) − 12 γi̸=1 β⊺ Var( Pi̸=1 )0 12 γi̸=1 Var( Pi̸=1 )β − 12 γi̸=1 Var( Pi̸=1 )β 0
+
+ ,B(2) 3 (·, ·) = −B(2) 2 (·, ·).
+
+(207) (d) Contribution from − P 
+
+> i
+
+πiA⊺ 
+
+> i
+
+d2Piβ. We further split into: • Terms contributed by −2 P 
+
+> i
+
+πiA⊺ 
+
+> i
+
+dAidM Var( Pi)β:
+
+B(3) 1 (·, ·) = 0 
+
+B(3) 2 (·, ·) = − 14 (1 − π1)ηγ i̸=1 
+
+
+
+0 0 0 00 β⊺ Var( Pi̸=1 )β −β⊺ Var( Pi̸=1 )β 00 −β⊺ Var( Pi̸=1 )β β⊺ Var( Pi̸=1 )β 00 0 0 0
+
+
+
+B(3) 3 (·, ·) = B(3) 2 (·, ·)
+
+(208) • Terms contributed by − P 
+
+> i
+
+πiA⊺ 
+
+> i
+
+Aid2M Var( Pi)β. The matrix form is 
+
+B(4) 1 = −π1
+
+
+
+0 0 0 β⊺ Var( P1)0 0 0 00 0 0 0Var( P1)β 0 0 0
+
+
+
+B(4) 2 = B(4) 3 = −(1 − π1)
+
+
+
+0 0 0 00 0 0 14 β⊺ Var( Pi̸=1 )0 0 0 14 β⊺ Var( Pi̸=1 )0 14 Var( Pi̸=1 )β 14 Var( Pi̸=1 )β 0
+
+
+
+(209) • Terms contributed by − P 
+
+> i
+
+πiA⊺ 
+
+> i
+
+d( AiM )d Var( Pi)β. The matrix form is of the shape The matrix form is of the shape 
+
+B(5) 1 = −π1
+
+
+
+c1 0 0 c2
+
+0 0 0 00 0 0 0
+
+c⊺ 
+
+> 2
+
+0 0 c3
+
+ (210) where 
+
+c1 = β⊺ diag(Var( P1)) β − 2( P1β)∥β∥2Var( P1)
+
+c2 = 12 γ1
+
+ β⊙2,⊺ Var( P1) + β⊺ ⊙ β⊺ Var( P1) − 3( P1β)β⊺ Var( P1) − β⊺ Var( P1)βP1
+
+ (211) 46 Submission and Formatting Instructions for ICML 2026 
+
+And 
+
+c3(d β, dβ) = γ21 (d β⊺ diag(d β⊺ Var( P1)) β − dβ⊺P⊺ 
+
+> 1
+
+dβ⊺ Var P1β − dβ⊺ Var( P1)d βP1β) .
+
+Writing into the matrix, we get 
+
+c3 = γ21
+
+
+
+diag( P1 ⊙ β) − 12 (( P⊺ 
+
+> 1
+
+P1 ⊙ β) + ( P⊺ 
+
+> 1
+
+P1 ⊙ β)⊺)
+
+− 12 (( P⊺ 
+
+> 1
+
+β⊺ Var( P1)) + ( P⊺ 
+
+> 1
+
+β⊺ Var( P1)) ⊺) − (P1β) Var( P1)
+
+ (212) And 
+
+B(5) 2 = B(5) 3 = − 12 (1 − π1)
+
+
+
+0 0 0 00 c4 c4 c5
+
+0 c4 c4 c5
+
+0 c⊺ 
+
+> 5
+
+c⊺ 
+
+> 5
+
+c6
+
+ (213) where c6(d β, dβ) = γ2
+
+> i̸=1
+
+
+
+dβ⊺ diag(d β⊺ Var( Pi̸=1 )) β − dβ⊺P⊺
+
+> i̸=1
+
+dβ⊺ Var Pi̸=1 β − dβ⊺ Var( P1)d βPi̸=1 β
+
+
+
+and the matrix form is: 
+
+c6 = diag( Pi̸=1 ⊙ β) − 12
+
+
+
+(P⊺
+
+> i̸=1
+
+Pi̸=1 ⊙ β) + ( P⊺
+
+> i̸=1
+
+Pi̸=1 ⊙ β)⊺
+
+− 12
+
+
+
+(P⊺
+
+> i̸=1
+
+β⊺ Var( Pi̸=1 )) + ( P⊺
+
+> i̸=1
+
+β⊺ Var( Pi̸=1 )) ⊺
+
+− (Pi̸=1 β) Var( Pi̸=1 )
+
+(214) 
+
+Φ-term. Using the fact that ∂L 
+
+> ∂Φ
+
+= 0 and d ∂L 
+
+> ∂Φ
+
+= 0 , we get 
+
+−d2
+
+
+
+η
+
+ ∂L
+
+∂Φ +
+
+ ∂L
+
+∂Φ
+
+⊺
+
+γ
+
+
+
+= −η d2
+
+ ∂L
+
+∂Φ +
+
+ ∂L
+
+∂Φ
+
+⊺
+
+γ
+
+Differentiating twice ∂L 
+
+> ∂Φ
+
+= − P 
+
+> i
+
+πiei(Pi − Pi)M ⊺ Var( Ai) gives 
+
+d2 ∂L
+
+∂Φ = 2 X
+
+> i
+
+πiei dPi dM ⊺ Var( Ai) − X
+
+> i
+
+πiei(Pi − Pi) d 2M ⊺ Var( Ai), (215) where the second term vanishes after contraction with γ at the critical point by the same symmetry used in the first-order analysis. The first term yields B(6) blocks: 
+
+B(6) 1 (·, ·) = 0 ,B(6) 2 (·, ·) = −B(6) 3 (·, ·) = − 12 ηγ i̸=1 (1 − π1)
+
+
+
+0 0 0 00 12 ∥β∥2Var( Pi̸=1 ) 0 12 β⊺ Var( Pi̸=1 )0 0 − 12 ∥β∥2Var( Pi̸=1 ) − 12 β⊺ Var( Pi̸=1 )0 12 Var( Pi̸=1 )β − 12 Var( Pi̸=1 )β 0
+
+ .
+
+(216) 2. The computation of Bk for 4 ≤ k ≤ 6. Similarly, we compute the d2
+
+  ∂L
+
+> ∂M
+
+⊺ γ
+
+
+
+d2
+
+ ∂L
+
+∂M 
+
+⊺
+
+γ
+
+
+
+= d 2
+
+ ∂L
+
+∂M 
+
+⊺
+
+γ + 2d 
+
+ ∂L
+
+∂M 
+
+⊺
+
+dγ
+
+= 2 X
+
+> i
+
+πidA⊺ 
+
+> i
+
+dPi + X
+
+> i
+
+πiA⊺ 
+
+> i
+
+d2Pi
+
+!⊺
+
+γ + 2 X
+
+> i
+
+πiA⊺ 
+
+> i
+
+AidM Var( Pi)
+
+!⊺
+
+dγ
+
+= X
+
+> i
+
+πid2P⊺ 
+
+> i
+
+Aiγ + 2 X
+
+> i
+
+πi Var( Pi)d M ⊺A⊺ 
+
+> i
+
+Aidγ
+
+(217) 47 Submission and Formatting Instructions for ICML 2026 
+
+For the term 2 P 
+
+> i
+
+πi Var( Pi)d M ⊺A⊺ 
+
+> i
+
+Aidγ, we get 
+
+2 X
+
+> i
+
+πi Var( Pi)d M ⊺A⊺ 
+
+> i
+
+Aidγ = 2 π1 Var( P1)d( βγ 1)d γ1 + 2(1 − π1) Var( Pi̸=1 )d( 12 (γ2 + γ3)β)d( 12 (γ2 + γ3)) (218) Writing into the matrix form, we get 
+
+B(1)  
+
+> k
+
+= −2
+
+
+
+π1 Var( P1)k−3β 0 0 12 π1γ1 Var( P1)k−3
+
+0 0 0 00 0 0 0 
+
+> 12
+
+π1γ1 Var( P1)⊺ 
+
+> k−3
+
+0 0 0
+
+
+
+− 2
+
+
+
+0 0 0 00 14 (1 − π1) Var( Pi̸=1 )k−3β 14 (1 − π1) Var( Pi̸=1 )k−3β 14 Var( Pi̸=1 )k−3
+
+0 14 (1 − π1) Var( Pi̸=1 )k−3β 14 (1 − π1) Var( Pi̸=1 )k−3β 14 Var( Pi̸=1 )k−3
+
+0 14 Var( Pi̸=1 )⊺  
+
+> k−314
+
+Var( Pi̸=1 )⊺ 
+
+> k−3
+
+0
+
+
+
+(219) Recall that d2Pi = 2d AidM Var( Pi) + Aid2M Var( Pi) + d( AiM )d Var( Pi), we have 
+
+X
+
+> i
+
+πid2P⊺ 
+
+> i
+
+Aiγ = X
+
+> i
+
+πi(2d AidM Var( Pi) + Aid2M Var( Pi) + d( AiM )d Var( Pi)) ⊺Aiγ (220) The first term contributes to 
+
+B(2)  
+
+> k
+
+= − 12 (1 − π1)ηγ 2
+
+> i̸=1
+
+
+
+0 0 0 00 Var( Pi̸=1 )k−3β − Var( Pi̸=1 )k−3β 00 − Var( Pi̸=1 )k−3β Var( Pi̸=1 )k−3β 00 0 0 0
+
+ (221) The second term contributes to 
+
+B(3)  
+
+> k
+
+= −2π1γ1
+
+
+
+0 0 0 12 Var( P1)k−3
+
+0 0 0 00 0 0 0 
+
+> 12
+
+Var( P1)⊺ 
+
+> k−3
+
+0 0 0
+
+
+
+− 2(1 − π1)γi̸=1 
+
+
+
+0 0 0 00 0 0 14 Var( Pi̸=1 )k−3
+
+0 0 0 14 Var( Pi̸=1 )k−3
+
+0 14 Var( Pi̸=1 )⊺  
+
+> k−314
+
+Var( Pi̸=1 )⊺ 
+
+> k−3
+
+0
+
+
+
+(222) We consider the action of the last term on dβ2:
+
+
+
+B(4) 4
+
+B(4) 5
+
+B(4) 6
+
+ (d β, dβ) = −π1γ31 (diag(d β⊺ Var( P1)) − P⊺ 
+
+> 1
+
+(d β⊺ Var( P1)) − Var( P1)d βP1) d β
+
+− (1 − π1)γ3
+
+> i̸=1
+
+
+
+diag(d β⊺ Var( Pi̸=1 )) − P⊺
+
+> i̸=1
+
+(d β⊺ Var( Pi̸=1 )) − Var( Pi̸=1 )d βPi̸=1 
+
+
+
+dβ
+
+(223) 
+
+Lemma D.13 (Kernel-equation identities used in Theorem D.3) . Let θ = q2y2 be the leading-order reduction (since 
+
+ζ(0 , δ ) ∼ δq 2). Then 
+
+12 Q⊺ 
+
+> K
+
+B(q2y2, q 2y2) = 1
+
+p∥γ∥2 + ∥β∥2
+
+
+
+00
+
+π1γ21 P1,2 + (1 − π1)γ22 Pi̸=1 ,2
+
+ y22 .
+
+Proof. We first calculate B(q2y2, q 2y2), and then calculate its projection onto the kernel basis. We calculate the cases where 
+
+1 ≤ k ≤ 3 and 4 ≤ k ≤ 6 respectively, and then combine them into the form we want. 48 Submission and Formatting Instructions for ICML 2026 
+
+1. The computation of the cases where 1 ≤ k ≤ 3. From Eq. (206), we get 
+
+
+
+B(1) 1 (q2y2, q 2y2)
+
+B(1) 2 (q2y2, q 2y2)
+
+B(1) 3 (q2y2, q 2y2)
+
+ = − 12
+
+
+
+4π1γ1P1,2
+
+2(1 − π1)γi̸=1 Pi̸=1 ,2
+
+2(1 − π1)γi̸=1 Pi̸=1 ,2
+
+ y22 (224) For l from 2 to 4 and l = 6 , their contribution vanishes. For l = 5 , the contribution is 
+
+
+
+B(5) 1 (q2y2, q 2y2)
+
+B(5) 2 (q2y2, q 2y2)
+
+B(5) 3 (q2y2, q 2y2)
+
+ = − 12
+
+
+
+2π1γ21 (P1,2β2 − P1,2P1β)(1 − π1)γ2
+
+> i̸=1
+
+(Pi̸=1 ,2β2 − Pi̸=1 ,2Pi̸=1 β)(1 − π1)γ2
+
+> i̸=1
+
+(Pi̸=1 ,2β2 − Pi̸=1 ,2Pi̸=1 β)
+
+ y22 (225) 2. The computation of the cases where 4 ≤ k ≤ 6. For l = 1 , 2, 3, their contribution vanishes. Then contribution of l = 4 
+
+case is 
+
+− 12 π1γ31
+
+
+
+000
+
+0
+
+P1,2
+
+P1,2
+
+ − 2P1,2P⊺
+
+> 1
+
+
+
+− 12 (1 − π1)γ3
+
+> i̸=1
+
+
+
+000
+
+0
+
+Pi̸=1 ,2
+
+Pi̸=1 ,2
+
+ − 2Pi̸=1 ,2P⊺
+
+> i̸=1
+
+
+
+(226) Sum them up, we get B(q2y2, q 2y2). Then by direct computation, we get the projection onto the kernel directions. 
+
+12 Q⊺ 
+
+> K
+
+B(q2y2, q 2y2) = 14p∥γ∥2 + ∥β∥2
+
+
+
+004π1γ21 P1,2 + 4(1 − π1)γ22 Pi̸=1 ,2
+
+ y22 . (227) D.3.7. C OMPUTATION OF SECOND ORDER DERIVATIVE f2
+
+The calculation about f2 = ∂2 
+
+> δ
+
+(−∇L ) is summarized by following lemma. 
+
+Lemma D.14. The second derivative of −∇L with respect to perturbation parameter δ vanishes, i.e. f2 = 0 .Proof. We compute ∂2 
+
+> δ ∂L
+> ∂M
+
+and ∂2 
+
+> δ ∂L
+> ∂Φ
+
+as follows. 1. The computation of ∂2 
+
+> δ ∂L
+> ∂M
+
+. By definition, 
+
+∂2
+
+> δ
+
+∂L
+
+∂M = ∂2 
+
+> δ
+
+− X
+
+> i
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi)
+
+!
+
+= ∂δ − X
+
+> i
+
+∂δ πiA⊺ 
+
+> i
+
+(Pi − Pi) − X
+
+> i
+
+πi∂δ A⊺ 
+
+> i
+
+(Pi − Pi) − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+∂δ (Pi − Pi)
+
+!
+
+= − X
+
+> i
+
+∂2 
+
+> δ
+
+πiA⊺ 
+
+> i
+
+(Pi − Pi) − 2 X
+
+> i
+
+∂δ πi∂δ A⊺ 
+
+> i
+
+(Pi − Pi) − 2 X
+
+> i
+
+∂δ πiA⊺ 
+
+> i
+
+∂δ (Pi − Pi)
+
+− X
+
+> i
+
+πi∂2 
+
+> δ
+
+A⊺ 
+
+> i
+
+(Pi − Pi) − 2 X
+
+> i
+
+πi∂δ A⊺ 
+
+> i
+
+∂δ (Pi − Pi) − X
+
+> i
+
+πiA⊺ 
+
+> i
+
+∂2 
+
+> δ
+
+(Pi − Pi)= −2 X
+
+> i
+
+∂δ πi∂δ A⊺ 
+
+> i
+
+(Pi − Pi) − 2 X
+
+> i
+
+∂δ πiA⊺ 
+
+> i
+
+∂δ (Pi − Pi) − 2 X
+
+> i
+
+πi∂δ A⊺ 
+
+> i
+
+∂δ (Pi − Pi)
+
+The last equality uses the second order derivative of πi, Ai, and Pi − Pi with respect to δ vanishes. Using the fact that 
+
+∂δ Ai is of the shape like (0 , a, −a) and (Pi − Pi)β = 0 . The contribution of the first term vanishes. Similarly, the third term vanishes. For the second term, 
+
+−2 X
+
+> i
+
+∂δ πiA⊺ 
+
+> i
+
+∂δ (Pi − Pi) = −2A⊺
+
+> i̸=1
+
+(∂δ P2 − ∂δ P3) = 0 
+
+Thus, this term makes no contribution. 49 Submission and Formatting Instructions for ICML 2026 
+
+2. The computation of ∂2 
+
+> δ ∂L
+> ∂Φ
+
+. By definition, ∂2 
+
+> δ ∂L
+> ∂Φ
+
+= ∂2
+
+> δ
+
+ − P 
+
+> i
+
+πi ei
+
+ Pi − Pi
+
+M ⊺ Var( Ai). In particular, 
+
+∂δ − X
+
+> i
+
+∂δ πi ei
+
+ Pi − Pi
+
+M ⊺ Var( Ai) − X
+
+> i
+
+πi ei∂δ
+
+ Pi − Pi
+
+M ⊺ Var( Ai) − X
+
+> i
+
+πi ei
+
+ Pi − Pi
+
+M ⊺∂δ Var( Ai)
+
+!
+
+= − X
+
+> i
+
+∂2 
+
+> δ
+
+πi ei
+
+ Pi − Pi
+
+M ⊺ Var( Ai) − 2 X
+
+> i
+
+∂δ πi ei∂δ
+
+ Pi − Pi
+
+M ⊺ Var( Ai) − 2 X
+
+> i
+
+∂δ πi ei
+
+ Pi − Pi
+
+M ⊺∂δ Var( Ai)
+
+− X
+
+> i
+
+πi ei∂2
+
+> δ
+
+ Pi − Pi
+
+M ⊺ Var( Ai) − 2 X
+
+> i
+
+πi ei∂δ
+
+ Pi − Pi
+
+M ⊺∂δ Var( Ai) − X
+
+> i
+
+πi ei
+
+ Pi − Pi
+
+M ⊺∂2 
+
+> δ
+
+Var( Ai)
+
+By direct computation, this term is zero. D.3.8. S TABILITY ON THE KERNEL DIRECTIONS 
+
+To account for stability on the manifold, we need to calculate the perturbed Hessian matrix. By the expansion of −∇L , we get 
+
+−∇ 2 
+
+> θ
+
+L(θ, δ ) = J0 + 12 ∇θ B(θ, θ ) + δJ 1 + O(δ2)
+
+Substitute θ = q2y2 into the expression, we get the perturbed hessian matrix 
+
+Lemma D.15 (Perturbed hessian matrix) . The expression of the perturbed hessian matrix is 
+
+Jpert = J0 + H1 + O(δ2), (228) 
+
+where 
+
+H1 = −cδ 
+
+ 0 BB⊺ 0
+
+
+
++
+
+ 0 00 C
+
+ 
+
++ δJ 1, (229) 
+
+in which c = λγ i̸=1 +(1 −λ)( π1γ1+(1 −π1)γi̸=1 )  
+
+> π1γ21P1,2+(1 −π1)γ2
+> i̸=1 Pi̸=1 ,2
+
+,
+
+B =
+
+
+
+0 2π1γ1P1,2 −2π1γ1P1,2
+
+0 (1 − π1)γi̸=1 Pi̸=1 ,2 −(1 − π1)γi̸=1 Pi̸=1 ,2
+
+0 (1 − π1)γi̸=1 Pi̸=1 ,2 −(1 − π1)γi̸=1 Pi̸=1 ,2
+
+
+
++
+
+
+
+0 π1γ21 (P1,2β2 − P1,2(P1β)) −π1γ21 (P1,2β2 − P1,2(P1β)) 0 12 (1 − π1)γ2
+
+> i̸=1
+
+(Pi̸=1 ,2β2 − Pi̸=1 ,2(Pi̸=1 β)) − 12 (1 − π1)γ2
+
+> i̸=1
+
+(Pi̸=1 ,2β2 − Pi̸=1 ,2(Pi̸=1 β)) 0 12 (1 − π1)γ2
+
+> i̸=1
+
+(Pi̸=1 ,2β2 − Pi̸=1 ,2(Pi̸=1 β)) − 12 (1 − π1)γ2
+
+> i̸=1
+
+(Pi̸=1 ,2β2 − Pi̸=1 ,2(Pi̸=1 β)) 
+
+ ,
+
+and 
+
+C =π1γ31
+
+
+
+0 00
+
+
+
+0 −P1,1P1,2 P1,1P1,2
+
+−P1,1P1,2 P1,2 − 2P21,2 0
+
+P1,1P1,2 0 −(P1,2 − 2P21,2)
+
+
+
++ (1 − π1)γ3
+
+> i̸=1
+
+
+
+0 00
+
+
+
+0 −Pi̸=1 ,1Pi̸=1 ,2 Pi̸=1 ,1Pi̸=1 ,2
+
+−Pi̸=1 ,1Pi̸=1 ,2 Pi̸=1 ,2 − 2P2 
+
+> i̸=1 ,2
+
+0
+
+Pi̸=1 ,1Pi̸=1 ,2 0 −(Pi̸=1 ,2 − 2P2
+
+> i̸=1 ,2
+
+)
+
+
+
+Proof. We just need to compute B(q2y2) and substitute y2 as the solution of the range equation. Similar to previous computation, we divide into the cases of 1 ≤ k ≤ 3 and 4 ≤ k ≤ 6.50 Submission and Formatting Instructions for ICML 2026 
+
+The cases of 1 ≤ k ≤ 3.
+
+1. The contribution from l = 1 . Using the matrix form defined in Eq. (206), we get 
+
+B(1) 1 (q2y2) = − y2
+
+√2 (0 , 0, 0, 0, 2π1γ1P1,2, −2π1γ1P1,2)
+
+B(1) 2 (q2y2) = − y2
+
+√2 (0 , 0, 0, 0, (1 − π1)γi̸=1 Pi̸=1 ,2, −(1 − π1)γi̸=1 Pi̸=1 ,2)
+
+B(1) 3 (q2y2) = B(1) 2 (q2y2)
+
+2. The contributions from l = 2 , 3, 4, 6 vanish. 3. The contribution from l = 5 . Using the matrix defined in Eq. (212), we get 
+
+c3
+
+
+
+01
+
+−1
+
+ = −π1γ21 (0 , P1,2β2 − P1,2(P1β), −P1,2β2 − P1,2(P1β)) ,
+
+which implies 
+
+B(5) 1 (q2y2) = − y2
+
+√2 π1γ21 (0 , 0, 0, 0, P1,2β2 − P1,2(P1β), −(P1,2β2 − P1,2(P1β))) 
+
+Similarly, 
+
+B(5) 2 (q2y2) = B(5) 3 (q2y2) = − y2
+
+√212 (1 − π1)γ2
+
+> i̸=1
+
+(0 , 0, 0, 0, Pi̸=1 ,2β2 − Pi̸=1 ,2(Pi̸=1 β), −Pi̸=1 ,2β2 − Pi̸=1 ,2(Pi̸=1 β)) 
+
+The cases of 4 ≤ k ≤ 6.
+
+1. The contribution from l = 1 . By direct computation, 
+
+B(1) 4 (q2y2) = (0 , 0, 0, 0, 0, 0) 
+
+B(1) 5 (q2y2) = − y2
+
+√2 (π1γ1P1,2, 12 (1 − π1)γi̸=1 Pi̸=1 ,2, 12 (1 − π1)γi̸=1 Pi̸=1 ,2, 0, 0, 0) 
+
+B(1) 6 (q2y2) = −B(1) 5
+
+2. The contribution from l = 2 . This term vanishes. 3. The contribution from l = 3 . This term makes the same contribution as the first term. 4. The contribution from l = 4 . By definition, 
+
+− X
+
+> i
+
+πi(d( AiM )d Var( Pi)) ⊺Aiγ = −π1γ1(A1dM d Var( P1)) ⊺ − (1 − π1)γi̸=1 (Ai̸=1 dM d Var( Pi̸=1 )) ⊺
+
+Take the first term as an example, the cross term in (A1dM d Var( P1)) ⊺ is 
+
+γ1dγ1 (diag( β⊺ Var( P1)) − P⊺ 
+
+> 1
+
+β⊺ Var( P1) − Var( P1)βP1) d β
+
++ γ1dγ1 (diag(d β⊺ Var( P1)) − P⊺ 
+
+> 1
+
+dβ⊺ Var( P1) − Var( P1)d βP1)) β
+
+Write in entry form, for 4 ≤ k ≤ 6, we get 
+
+γ1dγ1 (( β⊺ Var( P1)) kdβk − P1,k β⊺ Var( P1)d β − (Var( P1)β)kP1dβ)+ γ1dγ1 (d β⊺ Var( P1)kβk − P1,k dβ⊺ Var( P1)β − Var( P1)kdβP1β)
+
+51 Submission and Formatting Instructions for ICML 2026 
+
+Writing into the matrix form, we get 
+
+ 0 12 (β⊺ Var( P1)) kE1,k  
+
+> 12
+
+(β⊺ Var( P1)) kE⊺ 
+
+> 1,k
+
+0
+
+
+
++
+
+ 0 12 βkek Var( P1)k 
+
+> 12
+
+βk Var( P1)⊺ 
+
+> k
+
+e⊺ 
+
+> k
+
+0
+
+
+
+− P1,k 
+
+ 0 e1β⊺ Var( P1)Var( P1)βe ⊺ 
+
+> 1
+
+0
+
+
+
+−
+
+ 0 12 (Var( P1)β)ke1P112 (Var( P1)β)kP⊺ 
+
+> 1
+
+e⊺ 
+
+> 1
+
+0
+
+
+
+−
+
+ 0 12 (P1β)e1 Var( P1)k 
+
+> 12
+
+(P1β) Var( P1)⊺ 
+
+> k
+
+e⊺ 
+
+> 1
+
+0
+
+
+
+Multiplying the matrix form by (0 , 0, 0, 0, 1, −1) on the right, we get 
+
+B4(q2y2) = 0 
+
+B5(q2y2) = − y2
+
+√2 π1γ21 ( 12 (β⊺ Var( P1)) 2 + 12 β2P1,2 − 12 (P1β)P1,2, 0, . . . , 0) = − y2
+
+√2 π1γ21 (β2P1,2 − (P1β)P1,2, 0, . . . , 0) 
+
+B6(q2y2) = −B5(q2y2)
+
+Similarly, the cross term in −(1 − π1)γi̸=1 (Ai̸=1 dM d Var( Pi̸=1 )) ⊺ contributes to 
+
+B4(q2y2) = 0 
+
+B5(q2y2) = − y2
+
+√212 (1 − π1)γ2
+
+> i̸=1
+
+(0 , β 2Pi̸=1 ,2 − (Pi̸=1 β)Pi̸=1 ,2, β 2Pi̸=1 ,2 − (Pi̸=1 β)Pi̸=1 ,2, 0, . . . , 0) 
+
+B6(q2y2) = −B5(q2y2)
+
+Finally, we compute the contribution from quadratic form. Take the first term as an example, 
+
+γ21 (diag(d β⊺ Var( P1)) − P⊺ 
+
+> 1
+
+Var P1 − Var( P1)d βP1) d β
+
+Writing into the matrix form, we get 
+
+Bk =
+
+ 0 00 12 (ek Var( P1)k + Var( P1)⊺ 
+
+> k
+
+e⊺ 
+
+> k
+
+)
+
+
+
+−
+
+ 0 00 P1,k Var( P1)
+
+
+
+−
+
+ 0 00 12 (P⊺ 
+
+> 1
+
+Var( P1)k + Var( P1)⊺ 
+
+> k
+
+P1)
+
+
+
+By direct computation, we get the contribution to the perturbed hessian is 
+
+− y2
+
+√2 π1γ31
+
+
+
+0 00
+
+
+
+0 −P1,1P1,2 P1,1P1,2
+
+−P1,1P1,2 P1,2 − 2P21,2 0
+
+P1,1P1,2 0 −(P1,2 − 2P21,2)
+
+
+
+− y2
+
+√2 (1 − π1)γ3
+
+> i̸=1
+
+
+
+0 00
+
+
+
+0 −Pi̸=1 ,1Pi̸=1 ,2 Pi̸=1 ,1Pi̸=1 ,2
+
+−Pi̸=1 ,1Pi̸=1 ,2 Pi̸=1 ,2 − 2P2 
+
+> i̸=1 ,2
+
+0
+
+Pi̸=1 ,1Pi̸=1 ,2 0 −(Pi̸=1 ,2 − 2P2
+
+> i̸=1 ,2
+
+)
+
+
+
+We obtain the result by summing all non-zero terms. 
+
+Lemma D.16 (Vanishing of the first-order perturbation on the kernel) . On the symmetric rank-one manifold ( γ2 = γ3 and 
+
+β2 = β3), we have Q⊺ 
+
+> K
+
+H1QK = 0 .Proof. We write any z ∈ R6 as z = ( zγ , z β ) with zγ , z β ∈ R3. Let 
+
+s := (0 , 1, −1) ⊺, u := (1 , 1, 1) ⊺.
+
+Then k1,γ = 1√2 s, k1,β = 0 ; k2,γ = 0 , k2,β = 1√3 u; and k3,γ ∝ − γ, k3,β ∝ β.52 Submission and Formatting Instructions for ICML 2026 
+
+Step 1: the off-diagonal block with respect to B For any x = ( xγ , x β ) and y = ( yγ , y β ),
+
+x⊺
+
+ 0 BB⊺ 0
+
+
+
+y = x⊺ 
+
+> γ
+
+By β + x⊺ 
+
+> β
+
+B⊺yγ .
+
+From Eq. (171), B has the structural identities 
+
+B·,1 = 0 , B·,3 = −B·,2, B2,· = B3,·.
+
+Hence 
+
+Bu = B(e1 + e2 + e3) = 0 , Bβ = β1B·,1 + β2(B·,2 + B·,3) = 0 ( since β2 = β3),
+
+and 
+
+s⊺B = (0 , 1, −1) B = B2,· − B3,· = 0 .
+
+Combining these, every matrix element k⊺
+
+> i
+
+ 0 BB⊺ 0
+
+
+
+kj vanishes: either a factor k1,β = 0 appears, or a factor s⊺B = 0 
+
+appears, or a factor Bu = 0 / Bβ = 0 appears. 
+
+Step 2: the lower-right block C. Here 
+
+x⊺
+
+0 00 C
+
+
+
+y = x⊺ 
+
+> β
+
+Cy β .
+
+Each summand of C in Eq. (172) has the pattern 
+
+C(ℓ) =
+
+
+
+0 −pℓ pℓ
+
+−pℓ aℓ 0
+
+pℓ 0 −aℓ
+
+ for some (pℓ, a ℓ), C = X
+
+> ℓ
+
+ωℓC(ℓ).
+
+A direct expansion gives, for any x, y ∈ R3,
+
+x⊺C(ℓ)y = pℓ(x3 − x2)y1 + pℓx1(y3 − y2) + aℓ(x2y2 − x3y3).
+
+Therefore, if x2 = x3 and y2 = y3, then x⊺C(ℓ)y = 0 and hence x⊺Cy = 0 . On the symmetric manifold we have 
+
+(k2,β )2 = ( k2,β )3 and (k3,β )2 = ( k3,β )3 (since β2 = β3), while k1,β = 0 . Thus, k⊺
+
+> i
+
+ 0 00 C
+
+
+
+kj = 0 for all i, j .
+
+Step 3: the J1 term. By Proposition 7.4, 
+
+J1 = eJ1 +
+
+ 0 AA⊺ 0
+
+
+
+,
+
+where A in Eq. (109) satisfies the same cancellation identities as B:
+
+A·,1 = 0 , A·,3 = −A·,2, A2,· = A3,·.
+
+Hence Au = 0 , Aβ = 0 (since β2 = β3), and s⊺A = 0 . Repeating Step 1 with B replaced by A, we get 
+
+Q⊺
+
+> K
+
+ 0 AA⊺ 0
+
+
+
+QK = 0 .
+
+For the remaining part eJ1, the explicit computation shows that its action on the kernel directions has no kernel component, i.e. Q⊺ 
+
+> K
+
+eJ1QK = 0 . Therefore Q⊺ 
+
+> K
+
+J1QK = 0 .
+
+Conclusion. Combining Step 1–3 yields Q⊺ 
+
+> K
+
+H1QK = 0 .53 Submission and Formatting Instructions for ICML 2026 
+
+D.3.9. F AST TRANSVERSE INSTABILITY : Θ( δ) EIGENVALUE 
+
+Lemma D.17 (A transverse eigenvalue of order Θ( δ)). Let c = λγ i̸=1 +(1 −λ)( π1γ1+(1 −π1)γi̸=1 )  
+
+> π1γ21P1,2+(1 −π1)γ2
+> i̸=1 Pi̸=1 ,2
+
+and assume that 
+
+c(1 − π1)γi̸=1 Pi̸=1 ,2 − (λ + (1 − π1)(1 − λ)) ̸ = 0 . (230) 
+
+At the perturbed point, ∂L/∂ Φ = O(δ2) while ∂L/∂M = Θ( δ). Consequently, linearizing the full dynamics (Eq. (174) )yields a transverse positive eigenvalue of size Θ( δ).Proof. Since d ∂L 
+
+> ∂Φ
+
+= 0 and ∂δ ∂L 
+
+> ∂Φ
+
+= 0 , we get ∂L 
+
+> ∂Φ
+
+= O(δ2) after perturbation. Next we compute perturbed ∂L 
+
+> ∂M
+
+. By Lemma D.5, we get the new term is 
+
+cπ 1γ1
+
+
+
+100
+
+ (0 , P1,2, −P1,2) + c(1 − π1)γi̸=1 
+
+
+
+0
+
+> 1212
+
+ (0 , Pi̸=1 ,2, −Pi̸=1 ,2)
+
+where c = λγ i̸=1 +(1 −λ)( π1γ1+(1 −π1)γi̸=1 )  
+
+> π1γ21P1,2+(1 −π1)γ2
+> i̸=1 Pi̸=1 ,2
+
+δ.However, from Eq. (186), we find that 
+
+∂∂δ ∂L
+
+∂M = −
+
+
+
+0
+
+> 1212
+
+ (0 , λ, −λ) −
+
+
+
+π112 (1 − π1) 
+
+> 12
+
+(1 − π1)
+
+ (0 , 1 − λ, −(1 − λ)) .
+
+The two terms cannot cancel each other out by our assumption (A parameter that does not meet the condition is a zero test set), thus resulting in an Θ( δ) term. 
+
+## E. Detailed Experiment Setup 
+
+E.1. Detailed Synthetic Experiment Setup Dataset To better induce an exponential decay in the stationary distribution, and to more clearly illustrate the phase transition, we adopt an exponentially decaying form 
+
+π0 =  1/2, 1/4, . . . , 1/2d, π = π0/∥π0∥.
+
+Following (Makkuva et al., 2025), diagonal dominant transition matrices are unfavorable local minima during optimization, we set λ = 0 .8 to ensure diagonal dominance. For a fixed sequence length of 20 , we sample 100 ,000 sequences {Xi}100 ,000 
+
+> i=1
+
+from the resulting Markov chain, and use the last token Xi[−1] as the training label. By the Markov property, this label is completely determined by the second-to-last token Xi[−2] . Accordingly, we group both the training and test sets by the value of Xi[−2] , denoting the group indexed by state k as Sk.
+
+Model We follow exactly the model specification in Def. 2.2, with embedding dimension m = 256 . Since our theoretical analysis is derived under small initialization, we adopt the initialization scheme of (Zhang et al., 2024b; 2025b), initializing each weight independently as N (0 , 1/m 2).
+
+Training We train the model using the Adam optimizer with a fixed learning rate of 1.5 × 10 −4 and do not use any learning-rate scheduler. 
+
+E.2. Analysis Tools Condensation Heatmap To quantify parameter condensation, we compute the pairwise cosine similarity between the input-weight vectors of neurons in the weight matrix W . Specifically, for the i-th and j-th neurons, we define 
+
+C(i, j ) = W [i, :] · W [j, :] 
+
+∥W [i, :] ∥2 ∥W [j, :] ∥2
+
+.
+
+For clearer visualization, we permute the rows and columns of the similarity matrix C and display the reordered matrix in Fig. 2(A). 54 Submission and Formatting Instructions for ICML 2026 
+
+Embedding Visualization Let W0,t denote the embedding parameters at training epoch t for t = 0 , . . . , T . We form the collection of embedding snapshots {W0,0, . . . , W 0,T } and apply principal component analysis (PCA) to obtain the leading eigen-directions ˆe1 and ˆe2. We then project the embedding vectors onto ˆe1 and ˆe2 to produce the two-dimensional visualization shown in Fig. 2(B). 55

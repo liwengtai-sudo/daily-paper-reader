@@ -1,0 +1,275 @@
+Title: RA-CMF: Region-Adaptive Conditional MeanFlow for CT Image Reconstruction
+
+URL Source: https://arxiv.org/pdf/2605.00901v1
+
+Published Time: Tue, 05 May 2026 00:10:28 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# RA-CMF: Region-Adaptive Conditional MeanFlow for CT Image Reconstruction 
+
+Md Shifatul Ahsan Apurba 
+
+Biomedical Informatics and Data Science University of Alabama at Birmingham 
+
+Birmingham, AL, United States mapurba@uab.edu 
+
+Md Selim 
+
+Computer Science Florida Polytechnic University 
+
+Lakeland, FL, United States mselim@floridapoly.edu 
+
+Jin Chen 
+
+Biomedical Informatics and Data Science University of Alabama at Birmingham 
+
+Birmingham, AL, United States jinchen@uab.edu 
+
+Abstract —The use of CT imaging is important for screening, diagnosis, therapy planning, and prognosis of lung cancers. Unfortunately, due to differences in imaging protocols and scanner models, CT images acquired by different means may show large differences in noise statistics, contrast, and texture. In this study, we develop a novel conditional MeanFlow pipeline for CT image reconstruction. We introduce a conditional MeanFlow network that models the enhancement trajectory by predicting image-conditioned flow fields given intermediate image states. The image enhancement network is trained with a MeanFlow consistency loss along with the image reconstruction loss. In order to provide an adaptive refinement process in terms of spatial location of enhancements, we integrate a regional reinforcement learning-driven policy network into our approach. The policy network receives information about the MeanFlow rollouts and provides predictions in terms of tile-wise refinement budgets, stopping criteria, and total budget allocation of enhancement processes. Our policy network is trained through reinforcement learning in a policy gradient framework, where the goal of the training reward is to maximize improvement of enhancements while minimizing unnecessary computations and avoiding insta-bilities. In this way, our approach combines conditional flow-based enhancement with reinforcement learning–based spatial enhancement control. This allows our approach to focus more attention on enhancing difficult areas while stabilizing areas already showing sufficient quality. Experimentally, we validate the effectiveness of our approach for CT image reconstruction. Our results show high accuracy in the tumor ROI, with the average radiomic feature CCC being 0.96, an average PSNR of 31.30 ± 4.16, and average SSIM of 0.94 ± 0.07. Moreover, there is an improvement in the overall quality of images, with an average PSNR of 34.23 ± 1.71 and average SSIM of 0.95 ± 0.01. 
+
+Index Terms —Computed tomography, CT image reconstruc-tion, image enhancement, conditional MeanFlow, reinforcement learning, region-aware refinement, medical image analysis. 
+
+I. I NTRODUCTION 
+
+Lung cancer is the primary cause of cancer-related deaths and continues to be the most common form of cancer around the globe [1], [2]. For instance, it was estimated that lung and bronchus cancer would be associated with 226,650 incident cases and 124,730 deaths in 2025 in the United States [3]. Overall, the 5-year survival rate of lung cancer is 28.1% but improves up to 64.7% upon detection of lung cancer at the localized stage [4]. CT is instrumental for lung can-cer screening, diagnosis, therapeutic planning, and prognosis. Specifically, lung cancer mortality can be reduced by roughly 20% via low-dose CT screening [5]. Besides detection, CT imaging allows for extracting quantitative features reflecting tumor phenotypes, heterogeneity, and dynamics to facilitate clinical decisions [6], [7]. However, despite the high value of CT imaging in the clinical setting, there are many sources of variability affecting CT images, which may include scanner vendors, imaging protocols, and reconstruction settings. Such variability results in different properties of CT images, including their noise level, contrast, and texture. The inconsistency can appear in both the same scanner using various imaging protocols and different scanners from various vendors [8]. Notably, the impact of imaging protocol inconsistency on CT image quality is not limited to the visual appearance of images, since it can negatively affect quantitative feature extraction from CT images. Moreover, variability introduced by imaging protocols can equalize or even surpass biological differences between tu-mors [8]. Such variability poses serious barriers for conducting large-scale multi-center experiments and adversely affects the robustness of lung cancer analysis based on quantitative CT imaging. Various post-image reconstruction approaches have been proposed as part of image harmonization tasks, typically focus-ing on specific anatomical regions and ineffective in clinical practice [9]. Image-level techniques involving deep learning showed promising performance; for example, a series of CT images across different reconstruction kernels can be trans-formed to increase the reproducibility of radiomic features [10]. Recently, diffusion-based models, such as DiffusionCT [11] proved to be effective in capturing complex distributions of images for CT standardization purposes. However, this approach depends on the careful selection of diffusion steps, and the results can become unstable across the z-dimension, leading to poor 3D feature consistency. Also, these techniques still rely on globally uniform transformation and ignore im-age degradation heterogeneity. MeanFlow has recently been introduced as an efficient generative modeling framework that learns average velocity fields over finite time intervals, enabling high-quality one-step or few-step generation [12]. In this work, we propose a reconstruction framework for im-age enhancement which we call the region adaptive conditional MeanFlow framework that combines image-conditioned flow-
+
+> arXiv:2605.00901v1 [cs.CV] 28 Apr 2026
+
+based reconstruction with region-aware adaptive refinement. The proposed framework is designed to selectively allocate refinement to spatially heterogeneous regions while preserving anatomical consistency in areas that already exhibit satis-factory image quality. By integrating conditional MeanFlow modeling with adaptive regional control, our approach aims to improve CT image quality and enhance the reliability of downstream quantitative radiomic analysis. II. B ACKGROUND 
+
+A. Radiomic Features 
+
+The radiomic features enable quantification through the analysis of intensity distributions and textures present in images beyond human observation. Radiomic features may capture biological and phenotypic attributes that relate to tissue heterogeneity and biological processes; they can therefore be utilized for quantitative tumor characterization and outcome prediction [6], [13]. Here, radiomic features are extracted based on the PyRa-diomics pipeline, a standardized and reliable implementa-tion of radiomic feature families commonly used in research [14]. Radiomic features defined here are consistent with the standards of radiomic features proposed by, e.g., the Image Biomarker Standardization Initiative (IBSI) [15]. The selected radiomic features are grouped into six categories. The first-order features capture information about voxel intensity char-acteristics like mean, variance, and entropy, ignoring any spa-tial interaction between voxels. The GLCM features quantify second-order spatial interactions using the model of gray-level value co-occurrence [16]. The GLDM features measure gray-level dependency relationships between neighboring voxels [17]. The GLRLM features represent the length of gray-level run sequences [18]. The GLSZM features capture the distri-bution of sizes of homogeneous gray-level regions regardless of their orientations [19]. The NGTDM features analyze gray-level differences in terms of a given voxel and the gray-levels of voxels in its vicinity. This feature type captures certain perceptual aspects of image texture like contrast, coarseness, and busyness [20]. Thus, the radiomic features listed above represent a set of measures of intensity and texture heterogeneity of CT scans, widely adopted by research and used in numerous radiomics studies [13], [15]. However, the radiomic feature values may differ depending on image acquisition, image reconstruction, preprocessing, and discretization parameters. Previous studies have revealed that radiomic features extracted from CT data are influenced both by intra-scanner variation and inter-scanner variation [8]. Other research showed the impact of voxel size and gray-level normalization on the values of CT radiomic features in lung cancer imaging [21]. Notably, sometimes the effect of scanner-specific variability may be equivalent to the effect of biology of different tumors, which poses a great barrier to multi-center radiomics studies and limits the robustness of radiomics-based clinical models [6], [8]. 
+
+Fig. 1: Conditional MeanFlow (CMF) backbone architecture. The current state xt and conditioning image xA are concate-nated channel-wise and processed by a U-Net. The reference time r and time t are encoded through an RT-embedding module and injected into residual blocks to predict the average velocity field uθ (xt, x A, r, t ).
+
+B. Prior CT Image Reconstruction and Harmonization 
+
+It is difficult to standardize CT acquisition and recon-struction protocols across institutions, primarily due to vari-ations in scanner hardware, clinical requirements, and site-specific workflow constraints. Consequently, post-acquisition harmonization has emerged as a practical strategy for improv-ing consistency in multi-center imaging studies. Feature-level techniques, such as ComBat, have been shown to reduce non-biological variability in extracted imaging biomarkers across different centers [22]. However, because these approaches are applied after feature extraction, they are inherently limited in their ability to correct spatially localized inconsistencies present in the original CT images. To address these limitations, image-level deep learning approaches have been investigated to directly transform CT images prior to feature extraction. For instance, a research demonstrated that deep learning–based reconstruction kernel conversion can enhance the reproducibility of radiomic fea-tures in pulmonary nodules and masses [10]. Building on this idea, GAN-based standardization frameworks such as STAN-CT [23] and RadiomicGAN [24] have shown that image-level harmonization can effectively reduce protocol-induced variability and improve radiomics reproducibility. Despite these advantages, adversarial learning approaches are known to suffer from issues such as training instability and mode collapse, which can limit their reliability in quantitative medical imaging applications [25]. More recently, diffusion-based generative models have emerged as a promising alternative for image synthesis and transformation, largely due to their improved stability and modeling capacity. Denoising diffusion probabilistic models introduced a progressive denoising process that enables the generation of high-quality images [26]. Building on this idea, latent diffusion models reformulate the process in a latent space, making high-resolution image generation more com-Fig. 2: Region adaptive conditional MeanFlow (RA-CMF) pipeline. The CMF backbone first predicts a coarse enhancement update. An actor-critic controller then extracts state features from the current image state, source condition, residual error, velocity magnitude, body mask, and step fraction. The agent predicts tile selection masks, local refinement budgets, a global budget, and an early stopping decision. Selected regions are refined through adaptive local micro-steps using soft spatial gates, while PPO supervision optimizes refinement quality, stability, and computational cost. putationally efficient [27]. In the context of CT imaging, DiffusionCT demonstrated that such models can be applied to standardize CT images while maintaining structural fi-delity [11]. Despite these advances, most existing image-level harmonization approaches still rely on globally applied transformations and do not explicitly address the spatially varying nature of CT image degradation. In lung CT imaging, degradation is often spatially non-uniform. Regions containing nodules, vessel boundaries, and complex parenchymal structures typically require more aggres-sive refinement compared to relatively homogeneous regions. This observation motivates the development of enhancement frameworks that can adapt to local image characteristics while maintaining anatomical consistency. Such adaptive strategies are essential for improving the reliability of radiomic features and enabling robust quantitative analysis across diverse imag-ing settings. III. M ETHOD 
+
+Our work introduces a unified conditional MeanFlow pipeline for CT image enhancement. Given an input CT image 
+
+xA ∈ RH×W , the goal is to generate an enhanced image 
+
+xB ∈ RH×W that improves overall image quality while preserving underlying anatomical structures. The proposed framework consists of two main components: a conditional MeanFlow backbone that models the enhancement trajectory, and a region-aware controller that adaptively distributes re-finement across spatial regions. The proposed region-aware conditional MeanFlow (RA-CMF) architecture is illustrated in Fig. 2. The MeanFlow backbone is motivated by recent de-velopments in MeanFlow generative modeling, which focuses on learning average velocity fields over finite time intervals rather than only instantaneous velocities, thereby enabling efficient one-step or few-step generation [12]. In contrast to the original MeanFlow formulation—primarily explored in the context of natural image generation with class-conditional settings; our approach conditions directly on the degraded CT image to perform image-to-image enhancement. To the best of our knowledge, MeanFlow has not yet been applied to CT image enhancement or reconstruction, and this work represents an initial step toward exploring conditional MeanFlow for medical image restoration. The design of the proposed framework is motivated by the observation that degradation in CT images is often spatially heterogeneous. As a result, applying a uniform enhancement strategy across the entire image may not be equally effective for all regions. This consideration is particularly relevant in lung CT imaging, where variations in image quality and texture can arise from differences in anatomical structures, acquisition protocols, and reconstruction settings, ultimately influencing the reliability of radiomic features [8], [10]. To address this, the region-aware controller is designed to se-lectively allocate refinement to more challenging regions, while avoiding unnecessary modifications in areas that already exhibit acceptable image quality. 
+
+A. Conditional MeanFlow enhancement backbone 
+
+The enhancement process is formulated as a continuous transformation defined over a normalized time variable t ∈
+
+[0 , 1] . Rather than learning a direct one-step mapping from 
+
+xA to xB , the model is trained using intermediate states constructed between the clean target image and Gaussian noise. Specifically, for a sampled time t, we define 
+
+xt = (1 − t)xB + te, e ∼ N (0 , I ), (1) where xt represents an intermediate point along the trajectory from the target image xB to a noise realization e. This formulation allows the model to learn enhancement as aprogressive transformation process instead of a single deter-ministic mapping. An important characteristic of the proposed approach is that the transformation is conditioned on the source CT image xA.The network predicts a MeanFlow field 
+
+uθ (xt, x A, r, t ), (2) where xt denotes the current intermediate state, xA is the input image, and (r, t ) defines a finite time interval with 
+
+0 ≤ r ≤ t ≤ 1. As shown in Fig. 1, the conditional MeanFlow (CMF) architecture concatenates xt and xA along the channel dimension and processes them using a U-Net backbone. The temporal variables (r, t, t − r) are embedded through an RTEmbedding MLP to produce cemb , which is injected into residual blocks throughout the network. This design enables the model to adapt its behavior across different stages of the transformation while preserving the anatomical structures present in xA.In contrast to standard denoising approaches that estimate instantaneous residuals, the proposed method follows the MeanFlow formulation and predicts the average transforma-tion over a finite time interval. Let 
+
+v = e − xB (3) denote the direction from the target image to the noise sample. The corresponding MeanFlow target is defined as 
+
+u = v − (t − r) du θ
+
+dt , (4) where the time derivative is computed using Jacobian-vector products. The MeanFlow loss is then given by 
+
+Lmf = ExA,x B ,e,r,t [|uθ (xt, x A, r, t ) − u|1] . (5) To further encourage accurate reconstruction, the target image is recovered by integrating the predicted transformation from time t back to 0:
+
+ˆx0 = xt − t, uθ (xt, x A, 0, t ). (6) The reconstructed image is supervised using an image-level loss 
+
+Limg = |ˆx0 − xB |1. (7) The overall training objective for the backbone is therefore defined as 
+
+Lbase = Lmf + λ1Limg . (8) 
+
+B. MeanFlow-based adaptive enhancement 
+
+After training, the backbone is employed to generate en-hanced images by applying the learned transformation condi-tioned on xA. In the RA-CMF rollout illustrated in Fig. 2, the current state of the process is denoted by xk, which corresponds to the state xt in the architectural formulation. The enhancement proceeds in a progressive manner, where at each step an initial coarse update is computed as 
+
+xcoarse  
+
+> k+1
+
+= xk − (tk − tk+1 ) uθ (xk, x A, t k+1 , t k), (9) with k indexing the refinement step. Rather than applying a uniform update across the entire image, the proposed framework incorporates a region-aware adaptive refinement strategy. Based on the current state, the controller predicts tile-wise refinement levels, spatial masks, a global refinement budget, and a stopping signal. As shown in Fig. 2, the controller takes as input multiple state-dependent feature maps, including the source image, current state, dif-ference map, update direction, body mask, step fraction, and residual error. These inputs are processed through spatial, global, and value heads to produce refinement actions along with PPO-based supervision. The tile-level predictions are translated into spatial masks 
+
+M (m) 
+
+> k
+
+∈ [0 , 1] H×W , which specify where additional re-finement should be applied. These masks act as continuous soft gates, consistent with the region-adaptive refinement mechanism depicted in Fig. 2. For each refinement level m,an additional MeanFlow update is computed and selectively applied within the masked regions: 
+
+x(m) 
+
+> k+1
+
+= M (m) 
+
+> k
+
+⊙
+
+
+
+x(m−1)  
+
+> k+1
+
+− ∆tlocal uθ (x(m−1)  
+
+> k+1
+
+, x A, t k+1 , t k)
+
+
+
++  1 − M (m)
+
+> k
+
+ ⊙ x(m−1)  
+
+> k+1
+
+.
+
+(10) where ⊙ denotes element-wise multiplication. This formula-tion ensures that refinement is concentrated in regions that require further improvement, while preserving regions that are already stable. After applying the selected local refinements, the result-ing state defines the updated image xk+1 . In addition, the controller predicts a global stopping decision, allowing the enhancement process to terminate early once sufficient image quality is achieved. As a result, the total number of refinement steps is determined adaptively rather than being fixed in advance. 
+
+C. Policy Optimization 
+
+The controller is trained using a reinforcement learning framework, in which an agent learns refinement strategies by maximizing a reward signal obtained through interaction with the enhancement process [28]. Each image state is treated as the environment state, and the corresponding refinement decisions define the action. In practice, the action space includes tile-selection decisions, local micro-step budgets, a global refinement budget, and an early stopping signal, as illustrated in Fig. 2. After each refinement step, a reward is computed based on the improvement in image quality: 
+
+rk = Q(xk+1 , x B ) − Q (xk, x B ) − α∥ak∥1, (11) where Q evaluates similarity to the target image using image-quality metrics such as PSNR and SSIM [29], [30]. Ad-ditionally, a focus-gradient term is incorporated to promote sharper local structures, following classical gradient-based focus measures [31]. The penalty term discourages excessive computation and unnecessary refinement. The policy is optimized using a PPO-based actor-critic framework, where the policy head outputs refinement actions and the value head estimates the expected return for advantage-based learning [32], [33]: 
+
+LRL = −E[log πϕ(ak|xk)Ak]. (12) 
+
+D. Training strategy 
+
+The conditional MeanFlow backbone is first trained on paired CT images using Lbase to capture the underlying enhancement dynamics. Once the backbone has converged, the controller is subsequently trained through interaction with the transformation process, where intermediate states are sampled to learn spatially adaptive refinement policies. During this phase, the backbone remains fixed, ensuring a stable and consistent transformation model. At inference time, both com-ponents are integrated into a unified pipeline. The conditional MeanFlow backbone performs global reconstruction, while the controller adaptively redistributes refinement across spatial regions, resulting in the final reconstructed CT image. IV. E XPERIMENTAL RESULTS 
+
+A. Experimental Data 
+
+Experiments are carried out using paired CT images ob-tained from the National Lung Screening Trial (NLST) dataset, which is publicly accessible through The Cancer Imaging Archive (TCIA) [34], [35]. This dataset consists of low-dose thoracic CT scans acquired for lung cancer screening. The NLST collection includes low-dose helical CT scans from participants in the CT arm of the study, with three annual screening exams acquired at baseline and during follow-up years [36]. To construct paired data, we restrict our selection to scans acquired from a single manufacturer (GE Healthcare), ensuring consistency in pairing. This choice is driven solely by the availability of compatible acquisition settings required for forming image pairs. The paired images are generated using scans with slice thicknesses of 1.25,mm and 2.5,mm, along with two reconstruction kernels: Lung and Standard . In this study, GE Lung is treated as the standard protocol, while Siemens Standard is considered non-standard. These pairings provide corresponding representations of the same anatomical regions under different acquisition conditions, enabling super-vised learning for image reconstruction. The dataset is split at the patient level to prevent data leakage, with 17 patients used for training, 4 for validation, and 2 for testing, corresponding to 15,000, 3,000, and 1,500 DICOM slice pairs, respectively. In addition, a separate subset of 5 patients with annotated tumor regions of interest (ROIs) is used for region-specific evaluation. These tumor annotations are obtained from the NLSTseg pixel-level lung cancer dataset, which is publicly available through Zenodo [37], [38]. The NLSTseg dataset is derived from NLST low-dose CT images and provides manu-ally reviewed pixel-level annotations of lung lesions, enabling targeted evaluation within clinically relevant tumor regions [37]. The inclusion of these ROIs facilitates a more detailed assessment of enhancement performance beyond global image quality metrics. Due to computational limitations, the number of slices included in each data split is restricted, while maintaining di-versity across anatomical structures and acquisition conditions. 
+
+B. Evaluation Metrics 
+
+Model performance was evaluated using radiomic feature consistency and image quality metrics. Radiomic features were extracted from tumor ROIs using PyRadiomics [14], including first-order, Gray Level Co-occurrence Matrix (GLCM), Gray Level Dependence Matrix (GLDM), Gray Level Run Length Matrix (GLRLM), Gray Level Size Zone Matrix (GLSZM), and Neighboring Gray Tone Difference Matrix (NGTDM). 
+
+Radiomic Consistency. We compute the Concordance Cor-relation Coefficient (CCC) for each radiomic feature [39]: 
+
+CCC (f ) = 2ρf σs,f σt,f 
+
+σ2 
+
+> s,f
+
++ σ2 
+
+> t,f
+
++ ( μs,f − μt,f )2 , (13) where s and t denote the reference and enhanced images. CCC is computed feature-wise and reported as class-wise and overall averages. 
+
+Image Quality. We use Peak Signal-to-Noise Ratio (PSNR) and Structural Similarity Index (SSIM), defined as 
+
+PSNR = 10 log 10 
+
+ M AX 2
+
+M SE 
+
+
+
+, (14) 
+
+SSIM( x, y ) = (2 μxμy + C1)(2 σxy + C2)
+
+DSSIM 
+
+, (15) 
+
+DSSIM = ( μ2 
+
+> x
+
++ μ2 
+
+> y
+
++ C1)( σ2 
+
+> x
+
++ σ2 
+
+> y
+
++ C2). (16) Both metrics are computed within tumor ROIs and over the full image. 
+
+Noise Analysis. Noise characteristics are analyzed using the Noise Power Spectrum (NPS) computed from homogeneous regions [40], [41]. 
+
+N P S (f ) = 1
+
+N |F{ x − ¯x}| 2 . (17) 
+
+C. Results and Discussion 1) Radiomic Feature Consistency on Tumor ROI: Table I presents the class-wise concordance correlation coefficient (CCC) computed within tumor ROIs. The baseline results exhibit notable variability, particularly for higher-order tex-ture features such as the Gray Level Co-occurrence Matrix (a) Target (b) Input (CCC = 0.60) (c) Baseline (CCC = 0.66)   
+
+> (d) STAN-CT (CCC = 0.85) (e) CMF (CCC = 0.91) (f) RA-CMF (CCC = 0.96)
+
+Fig. 3: CT images reconstructed using all compared methods are displayed within the intensity window of [−800 , 600] HU. Each image corresponds to the same tumor ROI, with the tumor region highlighted by a green circle. The comparison includes the target image, input image, baseline, STAN-CT, CMF, and RA-CMF. The reported CCC values represent the overall concordance correlation coefficient computed across all radiomic features within the ROI. The proposed RA-CMF method yields the most visually consistent enhancement relative to the target image while effectively preserving the local tumor structure. (GLCM) and Neighborhood Gray Tone Difference Matrix (NGTDM), highlighting their sensitivity to differences in acquisition settings. STAN-CT improves feature consistency across most cat-egories, achieving CCC values above 0.90 for first-order, GLCM, and GLDM features. However, its performance re-mains comparatively limited for NGTDM features. The con-ditional MeanFlow (CMF) model further enhances radiomic consistency, with a pronounced improvement in NGTDM features, achieving a CCC of 0.96 compared to 0.64 for STAN-CT. The proposed region-aware CMF (RA-CMF) demonstrates the strongest performance across all feature classes, with consistent gains observed in texture-based features such as GLRLM and GLSZM. The overall CCC values are summarized in Table II. RA-CMF attains the highest overall CCC of 0.96, outperforming CMF (0.91), STAN-CT (0.85), and the baseline (0.66). 
+
+2) Tumor ROI Image Quality: Table III summarizes image quality evaluation using peak signal-to-noise ratio (PSNR) and structural similarity index (SSIM) within tumor ROIs. The baseline results show relatively low PSNR (21.93,dB) and SSIM (0.72), reflecting the degradation typically observed in low-dose CT images. STAN-CT improves both metrics, achieving a PSNR of 26.58,dB and an SSIM of 0.88. The CMF model further enhances image quality, increasing PSNR to 29.15,dB and SSIM to 0.91. The proposed RA-CMF achieves the best performance among all methods, with a PSNR of 31.30,dB and an SSIM of 0.94. 
+
+3) Overall Image Quality Evaluation: The full-image PSNR and SSIM results are summarized in Table IV. The baseline and STAN-CT methods yield very similar PSNR val-ues (25.21,dB and 25.16,dB, respectively). However, STAN-CT shows a clear drop in SSIM, which suggests that, although the noise level remains comparable, the global harmonization process may introduce subtle structural distortions. TABLE I: Class-wise concordance correlation coefficient (CCC) for radiomic features within tumor ROIs. Each column indicates the mean±std CCC values of lung tumor ROIs for a specific radiomic feature group. Higher value is better.                                                                               
+
+> Method First-order GLCM GLRLM GLSZM GLDM NGTDM
+> Baseline 0.81 ±0.18 0.54 ±0.31 0.72 ±0.16 0.72 ±0.16 0.75 ±0.20 0.43 ±0.25
+> STAN-CT 0.94 ±0.07 0.92 ±0.04 0.85 ±0.12 0.85 ±0.12 0.92 ±0.05 0.64 ±0.37
+> CMF 0.98 ±0.04 0.92 ±0.16 0.85 ±0.19 0.85 ±0.19 0.91 ±0.08 0.96 ±0.05
+> RA-CMF (Ours) 0.99 ±0.01 0.94 ±0.12 0.94 ±0.08 0.94 ±0.08 0.98 ±0.01 0.96 ±0.03
+
+TABLE II: Overall CCC within tumor ROIs. Higher score is better.      
+
+> Method Overall CCC
+> Baseline 0.66 STAN-CT 0.85 CMF 0.91 RA-CMF (Ours) 0.96
+
+TABLE III: PSNR and SSIM within tumor ROIs. Higher score is better.                           
+
+> Method PSNR SSIM
+> Baseline 21.93 ±3.04 0.72 ±0.07 STAN-CT 26.58 ±2.48 0.88 ±0.16 CMF 29.15 ±2.62 0.91 ±0.07 RA-CMF (Ours) 31.30 ±4.16 0.94 ±0.07
+
+On the other hand, the proposed model exhibits a significant performance boost on these two aspects, achieving 32.09 dB PSNR and 0.90 SSIM. This implies that the proposed model performs well on image enhancement without sacrificing much of the anatomical structure in the reconstructed image. Further improvement can be seen using RA-CMF, which is able to generate image pairs with 34.23 dB PSNR and 0.95 SSIM in the full test set of 1,500 cases. TABLE IV: Comparison on overall image PSNR and SSIM. Higher score is better.                           
+
+> Method PSNR SSIM
+> Baseline 25 .21 ±2.44 0.81 ±0.05
+> STAN-CT 30 .41 ±1.76 0.90 ±0.03
+> CMF 32 .09 ±1.49 0.90 ±0.01
+> RA-CMF (Ours) 34 .23 ±1.71 0.95 ±0.01
+
+The first observation is that the modeling of image enhance-ment as a conditional transformation results in performance improvement over baseline and GAN-based models. The sec-ond conclusion drawn from this experiment is that region-aware refinement does not simply improve regions surrounding the tumor regions, but helps to produce overall image en-hancement with better structural preservation, especially for the higher SSIM score. 
+
+4) Spatial Refinement Analysis: The difference between the base tile grid and refinement regions selected by RA-CMF is shown in Figure 4. The base grid represents an initial and crude selection for image processing, whereas the selection of the refined regions depends on the actual content of the image. However, the refinement regions do not show a uniform spatial distribution. On the contrary, the majority of them appear to cluster in more complex structural regions, namely, the lung parenchyma, with a slight concentration in the vicinity of the tumor ROIs. It is worth noting that the clustering of refinement tiles implies that this approach focuses on more complex and harder-to-reconstruct anatomical regions. Contrary to the base tiling approach, where updates are applied universally, this region-aware strategy avoids updating of homogenous anatomical regions, thus limiting computation to areas of richer structural features. This selective refinement  
+
+> (a) Refinement on CMF (b) Refined by RA-CMF
+
+Fig. 4: Visualization of regions to be refined (red tile). No-tice the clustering of refinement tiles near the tumor ROI (yellow mask), implying that RA-CMF focuses refinement effort (green tile) on relevant regions (display HU window of [−800 , 600] ). results in improved local image quality, which is also observed in the improved radiomic feature consistency in the tumor regions. 
+
+5) Noise Power Spectrum Analysis: To further understand the characteristics of noise, we analyze the Noise Power Spectrum (NPS), which describes how variance in noise is distributed with respect to spatial frequencies. It is a com-monly used method to assess both the magnitude and noise distribution in CT imaging [40], [41]. The NPS calculation relies on a homogeneous ROI, as shown in Figure 5. The ROI is chosen from a region (60 slices) where the underlying structures are relatively homogeneous in order to measure only the noise characteristics. The NPS for the input image shows a pronounced peak near low spatial frequencies, indicating a structured noise pattern and inhomogeneity in the input image. However, both enhanced images show less dominance of the low frequencies and a relatively more even distribution of power across the spatial frequency domain. In particular, the RA-CMF recon-struction has a very similar NPS profile as the target image. The differences between the input image and target images are (a) Input (b) RA-CMF (c) Target 
+
+Fig. 5: Noise Power Spectrum (NPS) analysis computed from a homogeneous region (yellow box). The input image exhibits a noise–frequency distribution that differs from the target, whereas RA-CMF produces an NPS profile that more closely matches the target image, indicating improved noise characteristics and better preservation of frequency content. apparent. This analysis suggests that the proposed RA-CMF model is capable of generating realistic image reconstructions not only by controlling the magnitude but also by controlling the frequency characteristics of the target image noise pattern. V. C ONCLUSION 
+
+Radiomic feature extraction from CT images is highly sensitive to variations introduced during image acquisition, making enhancement an important step for improving reli-ability. In this work, we propose a conditional MeanFlow-based framework for CT image enhancement, combined with a region-aware refinement strategy to better handle spatially heterogeneous degradation. The method is evaluated on low-dose CT data from the NLST dataset, where it demonstrates consistent improvements in both radiomic feature reproducibility and overall image quality. In particular, RA-CMF achieves the highest concor-dance correlation coefficient (CCC) across all radiomic feature classes and shows clear improvements in PSNR and SSIM compared to both the baseline and STAN-CT methods. Further analysis shows that the region-aware refinement mechanism naturally focuses on structurally complex areas, such as regions near tumor ROIs, while avoiding unneces-sary updates in more homogeneous regions. This results in more effective local enhancement while avoiding unnecessary over-processing of the image. Furthermore, the Noise Power Spectrum (NPS) analysis suggests that the proposed approach more faithfully preserves the noise characteristics of the target image. In conclusion, the proposed framework offers a structured and effective approach to CT image enhancement by combin-ing conditional transformation modeling with adaptive spatial refinement. By improving both visual quality and quantitative consistency, while maintaining clinically meaningful struc-tures, the method demonstrates strong potential for enhancing the reliability of downstream radiomic analysis and supporting robust quantitative imaging workflows. REFERENCES [1] R. L. Siegel, A. N. Giaquinto, and A. Jemal, “Cancer statistics, 2024,”                                                     
+
+> CA: A Cancer Journal for Clinicians , vol. 74, no. 1, pp. 12–49, 2024. [Online]. Available: https://acsjournals.onlinelibrary.wiley.com/doi/full/ 10.3322/caac.21820 [2] World Health Organization, “Lung cancer,” https://www.who.int/ news-room/fact-sheets/detail/lung-cancer, 2026, accessed: 2026-04-25. [3] R. L. Siegel, A. N. Giaquinto, and A. Jemal, “Cancer statistics, 2025,”
+> CA: ACancer Journal for Clinicians ,vol. 75, no. 1, pp. 10–45, 2025. [Online]. Available: https://acsjournals.onlinelibrary.wiley.com/ doi/10.3322/caac.21871 [4] National Cancer Institute, “Cancer stat facts: Lung and bronchus can-cer,” https://seer.cancer.gov/statfacts/html/lungb.html, 2026, surveillance, Epidemiology, and End Results Program. Accessed: 2026-04-25. [5] D. R. Aberle, A. M. Adams, C. D. Berg, W. C. Black, J. D. Clapp, R. M. Fagerstrom, I. F. Gareen, C. Gatsonis, P. M. Marcus, and J. D. Sicks, “Reduced lung-cancer mortality with low-dose computed tomographic screening,” The New England Journal of Medicine , vol. 365, no. 5, pp. 395–409, 2011. [Online]. Available: https://www.nejm.org/doi/full/10.1056/NEJMoa1102873 [6] H. J. W. L. Aerts, E. R. Velazquez, R. T. H. Leijenaar, C. Parmar, P. Grossmann, S. Carvalho, J. Bussink, R. Monshouwer, B. Haibe-Kains, D. Rietveld, F. Hoebers, M. M. Rietbergen, C. R. Leemans, A. Dekker,
+
+J. Quackenbush, R. J. Gillies, and P. Lambin, “Decoding tumour phenotype by noninvasive imaging using a quantitative radiomics approach,” Nature Communications , vol. 5, p. 4006, 2014. [Online]. Available: https://doi.org/10.1038/ncomms5006 [7] P. Lambin, R. T. H. Leijenaar, T. M. Deist, J. Peerlings, E. E. C. de Jong, J. van Timmeren, S. Sanduleanu, R. T. H. M. Larue, A. J. G. Even, A. Jochems, Y. van Wijk, H. Woodruff, J. van Soest, T. Lustberg, E. Roelofs, W. van Elmpt, A. Dekker, F. M. Mottaghy, J. E. Wildberger, and S. Walsh, “Radiomics: the bridge between medical imaging and personalized medicine,” Nature Reviews Clinical Oncology , vol. 14, no. 12, pp. 749–762, 2017. [Online]. Available: https://pubmed.ncbi.nlm.nih.gov/28975929/ [8] D. Mackin, X. Fave, L. Zhang, D. Fried, J. Yang, B. Taylor, E. Rodriguez-Rivera, C. Dodge, A. K. Jones, and L. Court, “Measuring computed tomography scanner variability of radiomics features,” 
+
+Investigative Radiology , vol. 50, no. 11, pp. 757–765, 2015. [Online]. Available: https://pubmed.ncbi.nlm.nih.gov/26115366/ [9] F. Orlhac, S. Boughdad, C. Philippe, H. Stalla-Bourdillon, C. Nioche, L. Champion, M. Soussan, F. Frouin, V. Frouin, and I. Buvat, “A postreconstruction harmonization method for multicenter radiomic studies in PET,” Journal of Nuclear Medicine , vol. 59, no. 8, pp. 1321–1328, 2018. [Online]. Available: https://jnm.snmjournals.org/ content/59/8/1321 [10] J. Choe, S. M. Lee, K.-H. Do, G. Lee, J. B. Lee, S. M. Lee, and J. B. Seo, “Deep learning–based image conversion of CT reconstruction kernels improves radiomics reproducibility for pulmonary nodules or masses,” Radiology , vol. 292, no. 2, pp. 365–373, 2019. [Online]. Available: https://pubmed.ncbi.nlm.nih.gov/31210613/ [11] M. Selim, J. Zhang, M. A. Brooks, G. Wang, and J. Chen, “DiffusionCT: Latent diffusion model for CT image standardization,” in AMIA Annual Symposium Proceedings , 2024, pp. 624–633. [Online]. Available: https://pmc.ncbi.nlm.nih.gov/articles/PMC10785850/ [12] Z. Geng, M. Deng, X. Bai, J. Z. Kolter, and K. He, “Mean flows for one-step generative modeling,” arXiv preprint arXiv:2505.13447 , 2025. [Online]. Available: https://arxiv.org/abs/2505.13447 [13] P. Lambin, E. Rios-Velazquez, R. Leijenaar, S. Carvalho, R. G. P. M. van Stiphout, P. Granton, C. M. L. Zegers, R. Gillies, R. Boellard, A. Dekker, and H. J. W. L. Aerts, “Radiomics: Extracting more information from medical images using advanced feature analysis,” 
+
+European Journal of Cancer , vol. 48, no. 4, pp. 441–446, 2012. [Online]. Available: https://pubmed.ncbi.nlm.nih.gov/22257792/ [14] J. J. M. van Griethuysen, A. Fedorov, C. Parmar, A. Hosny, N. Aucoin, V. Narayan, R. G. H. Beets-Tan, J.-C. Fillion-Robin, S. Pieper, and H. J. W. L. Aerts, “Computational radiomics system to decode the radiographic phenotype,” Cancer Research , vol. 77, no. 21, pp. e104–e107, 2017. [Online]. Available: https://aacrjournals.org/cancerres/article/77/21/e104/662617/ Computational-Radiomics-System-to-Decode-the [15] A. Zwanenburg, M. Valli` eres, M. A. Abdalah, H. J. W. L. Aerts, V. Andrearczyk, A. Aditya, A. Saeed, S. Bakas, R. J. Beukinga, R. Boellaard et al. , “The image biomarker standardization initiative: Standardized quantitative radiomics for high-throughput image-based phenotyping,” Radiology , vol. 295, no. 2, pp. 328–338, 2020. [Online]. Available: https://pubmed.ncbi.nlm.nih.gov/32154773/ [16] R. M. Haralick, K. Shanmugam, and I. Dinstein, “Textural features for image classification,” IEEE Transactions on Systems, Man, and Cybernetics , vol. SMC-3, no. 6, pp. 610–621, 1973. [Online]. Available: https://doi.org/10.1109/TSMC.1973.4309314 [17] C. Sun and W. G. Wee, “Neighboring gray level dependence matrix for texture classification,” Computer Vision, Graphics, and Image Processing , vol. 23, no. 3, pp. 341–352, 1983. [Online]. Available: https://www.sciencedirect.com/science/article/pii/0734189X83900324 [18] M. M. Galloway, “Texture analysis using gray level run lengths,” 
+
+Computer Graphics and Image Processing , vol. 4, no. 2, pp. 172– 179, 1975. [Online]. Available: https://doi.org/10.1016/S0146-664X(75) 80008-6 [19] G. Thibault, B. Fertil, C. Navarro, S. Pereira, P. Cau, N. L´ evy, J. Sequeira, and J.-L. Mari, “Texture indexes and gray level size zone matrix: Application to cell nuclei classification,” in Proceedings of the 10th International Conference on Pattern Recognition and Information Processing , 2009. [20] M. Amadasun and R. King, “Textural features corresponding to textural properties,” IEEE Transactions on Systems, Man, and Cybernetics , vol. 19, no. 5, pp. 1264–1274, 1989. [Online]. Available: https://doi.org/10.1109/21.44046 [21] M. S. ul Hassan, K. Latifi, G. Zhang, G. Ullah, R. Gillies, and E. Moros, “Voxel size and gray level normalization of CT radiomic features in lung cancer,” Scientific Reports , vol. 8, p. 10545, 2018. [Online]. Available: https://www.nature.com/articles/s41598-018-28895-9 [22] F. Orlhac, J. J. Eertink, A.-S. Cottereau, J. M. Zijlstra, C. Thieblemont, M. Meignan, R. Boellaard, and I. Buvat, “A guide to ComBat harmonization of imaging biomarkers in multicenter studies,” Journal of Nuclear Medicine , vol. 63, no. 2, pp. 172–179, 2022. [Online]. Available: https://jnm.snmjournals.org/content/63/2/172 [23] M. Selim, J. Zhang, B. Fei, G.-Q. Zhang, and J. Chen, “STAN-CT: Standardizing CT image using generative adversarial networks,” AMIA Annual Symposium Proceedings , vol. 2020, pp. 1100–1109, 2020. [Online]. Available: https://pubmed.ncbi.nlm.nih.gov/33936486/ [24] ——, “CT image harmonization for enhancing radiomics studies,” in 2021 IEEE International Conference on Bioinformatics and Biomedicine , 2021, pp. 1057–1062. [Online]. Available: https://arxiv. org/abs/2107.01337 [25] M. Arjovsky, S. Chintala, and L. Bottou, “Wasserstein generative adversarial networks,” in Proceedings of the 34th International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 70. PMLR, 2017, pp. 214–223. [Online]. Available: https://proceedings.mlr.press/v70/arjovsky17a.html [26] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,” in Advances in Neural Information Processing Systems , vol. 33, 2020, pp. 6840–6851. [Online]. Available: https://proceedings.neurips. cc/paper/2020/hash/4c5bcfec8584af0d967f1ab10179ca4b-Abstract.html [27] R. Rombach, A. Blattmann, D. Lorenz, P. Esser, and B. Ommer, “High-resolution image synthesis with latent diffusion models,” in 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 10 684–10 695. [Online]. Available: https://openaccess.thecvf.com/content/CVPR2022/html/ Rombach High-Resolution Image Synthesis With Latent Diffusion Models CVPR 2022 paper.html [28] R. S. Sutton and A. G. Barto, Reinforcement Learning: An Introduction , 2nd ed. MIT Press, 2018. [Online]. Available: http://incompleteideas.net/book/the-book-2nd.html [29] Q. Huynh-Thu and M. Ghanbari, “Scope of validity of PSNR in image/video quality assessment,” Electronics Letters , vol. 44, no. 13, pp. 800–801, 2008. [Online]. Available: https://digital-library.theiet.org/ doi/10.1049/el:20080522 [30] Z. Wang, A. C. Bovik, H. R. Sheikh, and E. P. Simoncelli, “Image quality assessment: From error visibility to structural similarity,” IEEE Transactions on Image Processing , vol. 13, no. 4, pp. 600–612, 2004. [Online]. Available: https://ieeexplore.ieee.org/document/1284395 [31] S. K. Nayar and Y. Nakagawa, “Shape from focus,” Columbia University, Tech. Rep., 1989. [Online]. Available: https://cave.cs. columbia.edu/Statics/publications/pdfs/Nayar TR89.pdf [32] V. Mnih, A. P. Badia, M. Mirza, A. Graves, T. Lillicrap, T. Harley, D. Silver, and K. Kavukcuoglu, “Asynchronous methods for deep reinforcement learning,” in Proceedings of the 33rd International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 48. PMLR, 2016, pp. 1928–1937. [Online]. Available: https://proceedings.mlr.press/v48/mniha16.html [33] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Prox-imal policy optimization algorithms,” arXiv preprint arXiv:1707.06347 ,2017. [Online]. Available: https://arxiv.org/abs/1707.06347 [34] National Lung Screening Trial Research Team, “Data from the national lung screening trial (NLST),” The Cancer Imaging Archive, 2013. [Online]. Available: https://doi.org/10.7937/TCIA.HMQ8-J677 [35] K. Clark, B. Vendt, K. Smith, J. Freymann, J. Kirby, P. Koppel, S. Moore, S. Phillips, D. Maffitt, M. Pringle, L. Tarbox, and F. Prior, “The cancer imaging archive (TCIA): Maintaining and operating a public information repository,” Journal of Digital Imaging , vol. 26, no. 6, pp. 1045–1057, 2013. [Online]. Available: https://doi.org/10.1007/s10278-013-9622-7 [36] National Cancer Institute, “NLST CT images,” Cancer Data Access System, 2026, accessed: 2026-04-25. [Online]. Available: https: //cdas.cancer.gov/learn/nlst/images/ [37] K.-H. Chen et al. , “NLSTseg: A pixel-level lung cancer dataset based on NLST LDCT images,” Scientific Data , 2025. [Online]. Available: https://www.nature.com/articles/s41597-025-05742-x [38] Y. Lin, “NLSTseg: A pixel-level lung cancer dataset based on NLST LDCT images,” 2025. [Online]. Available: https://zenodo.org/records/ 14838349 [39] L. I.-K. Lin, “A concordance correlation coefficient to evaluate reproducibility,” Biometrics , vol. 45, no. 1, pp. 255–268, 1989. [Online]. Available: https://pubmed.ncbi.nlm.nih.gov/2720055/ [40] M. F. Kijewski and P. F. Judy, “The noise power spectrum of CT images,” Physics in Medicine and Biology , vol. 32, no. 5, pp. 565–575, 1987. [Online]. Available: https://doi.org/10.1088/0031-9155/32/5/003 [41] K. L. Boedeker, V. N. Cooper, and M. F. McNitt-Gray, “Application of the noise power spectrum in modern diagnostic MDCT: Part i. measurement of noise power spectra and noise equivalent quanta,” 
+
+Physics in Medicine and Biology , vol. 52, no. 14, pp. 4027–4046, 2007. [Online]. Available: https://doi.org/10.1088/0031-9155/52/14/002

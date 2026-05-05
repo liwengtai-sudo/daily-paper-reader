@@ -1,0 +1,1780 @@
+Title: Projection-Free Transformers via Gaussian Kernel Attention
+
+URL Source: https://arxiv.org/pdf/2605.02144v1
+
+Published Time: Tue, 05 May 2026 01:46:54 GMT
+
+Number of Pages: 69
+
+Markdown Content:
+# Projection-Free Transformers via Gaussian Kernel Attention 
+
+Debarshi Kundu, Archisman Ghosh, Swaroop Ghosh, and Vasant Honavar 
+
+The Pennsylvania State University, University Park, USA vuh14@psu.edu 
+
+Abstract. Self-attention in Transformers is typically implemented as 
+
+softmax( QK ⊤/√d)V , where Q = XW Q, K = XW K , and V = XW V
+
+are learned linear projections of the input X. We ask whether these learned projections are necessary, or whether they can be replaced by a simpler similarity-based diffusion operator. We introduce Gaussian Kernel Attention (GKA), a drop-in replacement for dot-product at-tention that computes token affinities directly using a Gaussian radial basis function (RBF) kernel applied to per-head token features. Each head learns only a bandwidth parameter σh, while a single output pro-jection WO preserves compatibility with the standard Transformer in-terface. GKA can be interpreted as normalized kernel regression over tokens, linking modern Transformer architectures to classical non-local filtering and kernel smoothing methods. We evaluate GKA in both vi-sion and language modeling settings. For autoregressive language mod-eling within the nanochat framework, we implement causal masking and sliding-window constraints by masking and renormalizing the Gaussian kernel. At depth 20, a GKA model with 0.42 × the parameters and 0.49 ×
+
+the total training FLOPs of a standard attention baseline trains sta-bly, exhibits a near-zero train-validation gap, and demonstrates compet-itive behavior on standard benchmarks, albeit with higher bits-per-byte (BPB) at this compute scale. Overall, GKA provides a minimal, inter-pretable attention mechanism with an explicit locality scale, offering a dimension in the accuracy-efficiency trade-off for Transformer design. 
+
+Keywords: Vision Transformer · Language Model · Self-Attention · Im-age Classification · Kernelized Attention · Projection-Free Transformers 
+
+## 1 Introduction 
+
+Vision Transformers (ViTs) [9] established global self-attention as a compet-itive alternative to convolution for large-scale image recognition. Subsequent refinements, like data-efficient training [31], hierarchical designs [19], and im-proved scaling, retain the same projection-based dot-product attention intro-duced in [33]. Despite extensive architectural innovation, the attention operator itself remains largely unchanged. In a standard attention block, 
+
+Attn( X) = softmax( QK ⊤/√d)V, Q = XW Q, K = XW K , V = XW V ,
+
+> arXiv:2605.02144v1 [cs.LG] 4 May 2026
+
+2 D.Kundu et al. Linear Projection of Flattened Patches           
+
+> 0*123456789
+> Transformer Encoder
+> Class
+> Tree
+> House
+> …
+> Patch + Pos.
+> Embedding
+> MLP
+> Head
+> Layer Norm
+> Gaussian
+> Kernel
+> Attention
+> Layer Norm
+> FFNN
+
+Fig. 1: GKA-Transformer . Projection-based self-attention is replaced with Gaussian Kernel Attention (see Fig. 2). 
+
+the learned projections WQ, W K , W V define the similarity geometry and ac-count for a substantial fraction of parameters and FLOPs. While prior work has proposed low-rank, kernelized, or linear approximations of softmax atten-tion [4, 5, 14, 21, 34, 36], these methods retain learned projections. We revisit this design choice and remove them entirely. 
+
+Gaussian Kernel Attention. We introduce Gaussian Kernel Attention (GKA) (Fig. 1), a projection-free attention operator that replaces query–key dot products with Gaussian kernel diffusion over token features. For each head h,affinities are computed using a Gaussian RBF kernel with learnable bandwidth 
+
+σh:
+
+K(h) 
+
+> ij
+
+= exp − ∥x(h) 
+
+> i
+
+− x(h) 
+
+> j
+
+∥22
+
+2σ2
+
+> h
+
+!
+
+, W (h) = row _norm( K(h)),
+
+followed by aggregation y(h) 
+
+> i
+
+= P 
+
+> j
+
+W (h) 
+
+> ij
+
+x(h) 
+
+> j
+
+and a standard output projection 
+
+WO .Each head learns only a single scalar controlling locality. GKA eliminates 
+
+WQ, W K , W V and decouples token mixing from learned projection geometry. Unlike kernelized approximations of softmax attention, GKA replaces projection-based similarity altogether with symmetric, normalized kernel diffusion. The for-mulation connects attention to classical non-local filtering [2,35] while remaining fully compatible with standard Transformer blocks. 
+
+ImageNet evaluation. We integrate GKA into DeiT-style ViTs and eval-uate on ImageNet classification. Across model scales, GKA substantially re-duces attention parameters and total training FLOPs while maintaining com-petitive top-1 accuracy. Training remains stable, and learned bandwidths special-ize across heads, revealing interpretable locality patterns. These results indicate Gaussian Kernel Attention 3
+
+that learned query–key geometry is not strictly required for effective global patch interaction and define a distinct accuracy–efficiency trade-off frontier. 
+
+Beyond vision. We further evaluate GKA in a GPT-style autoregressive lan-guage model using the nanochat framework [13], implementing causal masking and sliding-window constraints via masked kernel renormalization. In a depth-20 configuration (sequence length 2,048), GKA reduces parameters and total train-ing FLOPs to 0.49 × that of a standard baseline while training stably. Although bits-per-byte is higher at this scale, downstream DCLM-aligned evaluation shows competitive and task-dependent behavior, indicating that projection-free kernel diffusion remains viable under autoregressive constraints. 
+
+Contributions. The key contributions of the paper are: 
+
+– Projection-free attention. We introduce Gaussian Kernel Attention (GKA), removing WQ, W K , W V and replacing projection-based similarity with Gaus-sian kernel diffusion using only per-head bandwidth parameters. 
+
+– Competitive ViTs at reduced cost. GKA trains stably in DeiT-style ViTs and achieves competitive ImageNet accuracy while substantially re-ducing attention parameters and training FLOPs. 
+
+– Cross-modal validation. GKA remains trainable and competitive in causal language modeling under autoregressive masking. 
+
+– A new accuracy–efficiency frontier. By decoupling token mixing from learned projection geometry, GKA exposes an explicit locality scale per head and defines a distinct point in the Transformer design space. 
+
+## 2 Related Work 
+
+2.1 Transformers in vision and language 
+
+Transformers [33] parameterize token interactions via learned WQ, W K , W V pro-jections and softmax-normalized dot products. In vision, ViT [9] introduced patch tokens; DeiT [31] improved data-efficient ImageNet training; Swin [19] introduced hierarchical windowed attention for dense tasks. We remain within this backbone family (patch tokens, residual MLP blocks, LayerNorm) but modify the attention primitive itself: we remove WQ, W K , W V
+
+and replace dot-product softmax attention with Gaussian RBF similarity com-puted directly on per-head features. To test generality, we also evaluate GKA in causal language models using 
+
+nanochat [13], reporting language modeling quality and DCLM/DataComp-LM metrics [16, 23] with FineWeb-Edu pretraining [25]. Benchmarks include HellaSwag [39], LAMBADA [24], OpenBookQA [22], WinoGrande [28], and COPA [27]. This dual-domain setting stresses bidirectional mixing (vision) ver-sus causally masked mixing (LM). 4 D.Kundu et al.                                            
+
+> Table 1: Compact comparison of related attention mechanisms and approximations. Method Kernel Type QKV Projection Domain Notes Standard Attention [33] Softmax dot Product Yes Vision/NLP Baseline Attention Non-Local Means [2] Gaussian-like N/A Vision Similarity-weighted Averaging Non-Local NN [35] Learned Affinity Partial Vision/Video Non-local Block Linear Transformer [14] Feature-Map Kernel Yes NLP Kernel Feature Maps Performer [5] Softmax Approx (RFF) Yes Long-Sequence FAVOR+features Linformer [34] Low-Rank Approx Yes NLP Learned Low-Rank Projections Nyströmformer [36] Landmark Approx Yes NLP Nyström Reconstruction Kernelized RPE [21] Kernel + RPE Yes Vision/NLP FFT via Toeplitz RPE Skyformer [4] Gaussian Kernel Yes NLP Gaussian+Nystrom Krause [18] Distance+RBF Yes Vision/NLP Bounded-Confidence Sparsity
+> GKA (ours) Gaussian RBF No Vision/NLP Per-Head σh;Projection-Free
+
+2.2 Non-local aggregation and kernel smoothing 
+
+Long-range aggregation in vision predates Transformers. Non-Local Means [2] replaces a pixel/patch with a similarity-weighted average; Non-Local Neural Net-works [35] embed this principle as a neural block computing global weighted sums. GKA inherits this non-local motif, construct an affinity matrix from feature similarity, and apply normalized aggregation, but implements it as a Transformer-native attention replacement. Crucially, unlike non-local blocks and standard attention, GKA does not learn separate query/key/value embeddings: it per-forms Gaussian smoothing directly on per-head residual features and learns only a bandwidth σh (plus output projection WO ). Classical kernel methods motivate scalable similarity computation. Random Features [26] approximate shift-invariant kernels such as Gaussian RBF. While we compute exact Gaussian affinities at moderate sequence lengths, these methods inform potential scaling extensions. 
+
+2.3 Kernelized and efficient attention 
+
+A large literature reduces quadratic attention cost while preserving the Trans-former interface. Linear Transformers [14] express attention via kernel feature maps for O(n) complexity. Performer [5] approximates softmax with positive Gaussian Kernel Attention 5
+
+random features. Linformer [34] and Nyströmformer [36] exploit low-rank struc-ture. Kernelized RPE [21] leverages Toeplitz structure for O(n log n) compu-tation. Skyformer [4] replaces softmax with a Gaussian kernel combined with Nyström approximation. These methods modify or approximate the kernel inside projection-based at-tention . In contrast, GKA removes WQ, W K , W V entirely and computes Gaus-sian RBF similarity directly on per-head features. It is therefore not a softmax approximation, low-rank surrogate, or feature-map rewrite, but a projection-free diffusion operator embedded in the Transformer block. Optimized kernels such as FlashAttention [7] demonstrate that wall-clock efficiency depends on IO-aware implementations; this motivates careful systems evaluation for exact quadratic operators such as exact Gaussian kernel attention. 
+
+2.4 Distance-based and localized attention dynamics 
+
+Recent work revisits attention dynamics induced by kernel choice. Krause Syn-chronization Transformers [18] replace dot-product similarity with Euclidean distance mapped through an RBF kernel and impose bounded-confidence spar-sity to reduce complexity. Krause is complementary but distinct: while both use distance-based kernels and explicit scale parameters, Krause retains projection-based structure and focuses on sparsity dynamics. GKA instead studies a projection-free Gaussian diffusion operator and evaluates it consistently across vision and causal language modeling. Table 1 summaries various related works and situates our work. 
+
+## 3 Gaussian Kernel Attention 
+
+3.1 Preliminaries 
+
+Let X ∈ RB×N ×D denote token sequences (vision patches or text), where B is the batch size, N tokens, and D model width. A Transformer block alternates token mixing with an MLP under residual connections and normalization [33]. Standard multi-head attention computes 
+
+Attn( X) = Concat Hh=1 
+
+ softmax( Q(h)K(h)⊤/√d)V (h)WO , (1) with d = D/H and Q = XW Q, K = XW K , V = XW V .We retain this block interface while replacing projection-based softmax at-tention with projection-free kernel diffusion. 
+
+3.2 Gaussian Kernel Attention 
+
+The illustration in Fig. 2 shows the GKA computation for a single head. Given normalized tokens ˜X (e.g., pre-attention LayerNorm output), we reshape into heads:  ˜X 7 → ˜X(h) ∈ RB×N ×d, h = 1 , . . . , H.  (2) 6 D.Kundu et al. …
+
+# …
+
+0.5 0.8 0.6 
+
+k(2) 
+
+1
+
+q(2) 
+
+𝝎 22 
+
+“journey” 
+
+x(2) 
+
+0.0 0.8 0.5 
+
+k(T) 
+
+0.5 𝝎 2T 
+
+q(2) 
+
+“step” 
+
+x(T) 
+
+0.1 0.3 0.2 
+
+0.4 0.1 0.8 
+
+key k(1) 
+
+0.2 
+
+query q(2) 
+
+x(1) 
+
+“Your” 
+
+𝝎 21 
+
+ɑ2
+
+> 1
+
+ɑ22 ɑ2T 
+
+Context vector 𝓏 (2)           
+
+> Row -Normalized
+> Diffusion
+> 0.5 0.8 0.6 0.5 0.8 0.6
+> 0.5 0.8 0.6 0.5 0.8 0.6
+
+0.3 0.8 0.4 
+
+> The query vector
+> and key vector
+> are essentially
+> the same since
+> we use the
+> same input
+> features to
+> calculate the
+> kernel score.
+> Gaussian
+> Kernel
+> Score
+> The final
+> Gaussian Kernel
+> weights are
+> calculated by
+> row -
+> normalization.
+
+Fig. 2: Gaussian Kernel Attention (simplified illustrative example). For token 
+
+i, we compute Gaussian similarities to all tokens, row-normalize the affinities, and form the output as a weighted sum. Feature-similar tokens contribute more, yielding smooth normalized non-local aggregation. 
+
+For each head, we define a Gaussian RBF affinity: 
+
+K(h)
+
+ij = exp − ∥˜x(h)
+
+i − ˜x(h)
+
+j ∥22
+
+2σ2
+
+h
+
+!
+
+, (3) with learnable bandwidth σh = exp( ℓh).
+
+Row-stochastic diffusion. Affinities are converted into a row-stochastic mixing matrix: 
+
+W (h)
+
+ij = K(h)
+
+ij 
+
+P
+
+j′ K(h)
+
+ij ′ + ε , Y (h)
+
+i =
+
+NX
+
+j=1 
+
+W (h)
+
+ij ˜x(h)
+
+j . (4) Each head thus applies Gaussian kernel smoothing—equivalently, one step of feature-space diffusion on a fully connected similarity graph. No WQ, W K , W V
+
+are learned; only {ℓh}Hh=1 and WO remain. 
+
+Output projection .
+
+GKA( ˜X) = Concat Hh=1 (Y (h)) WO . (5) Gaussian Kernel Attention 7
+
+Efficient distance computation. Squared distances use 
+
+∥a − b∥22 = ∥a∥22 + ∥b∥22 − 2a⊤b,  (6) so the dominant cost reduces to batched matrix multiplications followed by ex-ponentiation and normalization. 
+
+3.3 Masking 
+
+Masking is applied directly to affinities before normalization. Let I[allowed( i, j )] 
+
+be a binary mask: 
+
+¯K(h) 
+
+> ij
+
+= K(h) 
+
+> ij
+
+I[allowed( i, j )] , W (h) 
+
+> ij
+
+=¯K(h)
+
+> ij
+
+P 
+
+> j′
+
+¯K(h) 
+
+> ij ′
+
++ ε . (7) For language models, causal masking enforces j ≤ i. Optional sliding-window masking additionally restricts i − W < j ≤ i, reducing effective complexity to linear in N up to window size. 
+
+3.4 Integration into Transformer blocks 
+
+GKA replaces multi-head attention in a standard pre-norm block: 
+
+˜X = LN( X), (8) 
+
+X′ = X + DropPath(GKA( ˜X)) , (9) 
+
+Y = X′ + DropPath(MLP(LN( X′))) . (10) Vision models apply bidirectional mixing over [CLS] and patch tokens; lan-guage models apply causal (optionally windowed) masking. 
+
+3.5 Complexity 
+
+Unmasked GKA computes an N × N affinity per head, giving time O(BHN 2d)
+
+and memory O(BHN 2). With window size W , complexity becomes O(BHN W d )
+
+time and O(BHN W ) memory. As an exact quadratic operator under the chosen mask, GKA benefits from IO-aware attention implementations such as FlashAttention [7], since compu-tation reduces to matrix multiplications plus pointwise operations amenable to fused kernels. 
+
+## 4 Experiments in Vision Task 
+
+4.1 Experimental Setup 
+
+Dataset. We evaluate on ImageNet-1K [8] (1.28M training, 50k validation im-ages; 1,000 classes). All models are trained from scratch without external data or distillation. 8 D.Kundu et al.      
+
+> Table 2: Comparison of GKA and DeiT on ImageNet-1K. Attn counts param-eters within attention modules only; MLP parameters match by design. Top-1 uses EMA weights. ∆Params and ∆FLOPs are relative to the DeiT baseline at the same scale.
+
+Model Total Attn MLP FLOPs Size Top-1 ∆Params ∆FLOPs 
+
+(M) (M) (M) (G) (MB) (%) (%) (%) DeiT-Ti 5.72 1.78 3.55 2.51 21.9 72.2 — —
+
+GKA-Ti 4.38 0.44 3.55 1.98 16.8 71.54 −23.4 −21.1 
+
+DeiT-S 22.05 7.10 14.18 9.20 84.2 79.8 — —
+
+GKA-S 16.73 1.77 14.18 7.11 63.9 78.23 −24.1 −22.7 
+
+DeiT-B 86.57 28.35 56.67 35.13 330.3 81.8 — —
+
+GKA-B 65.31 7.09 56.67 26.76 249.2 80.3 −24.6 −23.8 
+
+Training protocol. For fair comparison, we follow the DeiT recipe [32] across all models. We train for 300 epochs with AdamW [20], base learning rate 10 −3
+
+scaled by effective batch size ( lr = lr base · batch eff /1024 ), weight decay 0.05 ,and (β1, β 2) = (0 .9, 0.999) . We use 5-epoch linear warmup and cosine decay to 10 −6. Weight decay is disabled for biases, LayerNorm parameters, positional embeddings, the [CLS] token, and the learnable log σ parameters. 
+
+Data augmentation and regularization. We use random resized crop to 
+
+224 ×224 (scale [0 .08 , 1.0] , bicubic), random horizontal flip, RandAugment [6] (n=2 , m=9 ), random erasing [41] ( p=0 .25 ), Mixup [40] ( α=0 .8), CutMix [38] (α=1 .0), label smoothing [30] ( ϵ=0 .1), and repeated augmentation [11] (3 re-peats). We apply stochastic depth [12] with drop rate 0.1 for Tiny/Small and 
+
+0.2 for Base. 
+
+Optimization details and reporting. We use EMA weights (decay 0.99996 )and report EMA Top-1 as the primary accuracy metric. Gradient clipping uses max norm 1.0.
+
+Infrastructure. Training uses 7 × NVIDIA RTX 5090 GPUs (32 GB) with Py-Torch DDP (NCCL), BF16 mixed precision, and torch.compile (max-autotune ). We use per-GPU batch size 256 (effective batch size 1,792). Throughput and memory are averaged over 100 forward passes after warmup. 
+
+4.2 Results on the Vision Task 
+
+Table 2 compares GKA against DeiT baselines across model scales. We report total parameters, attention-module parameters, FLOPs, checkpoint size, and ImageNet Top-1 accuracy. Gaussian Kernel Attention 9            
+
+> Table 3: Parameter and compute efficiency. GKA removes Wq, W k, W vand re-places them with Hlearnable σhscalars per block. Attention parameters include Wo
+> and, for GKA, the σscalars. FLOPs are analytical single-image forward-pass estimates.
+
+Model Total Attn MLP σ Params FLOPs Ckpt 
+
+(M) (M) (M) (G) (MB) DeiT-Ti 5.72 1.78 3.55 — 2.51 21.9 
+
+GKA-Ti 4.38 (−23% ) 0.44 (−75% ) 3.55 36 1.98 (−21% ) 16.7 
+
+DeiT-S 22.05 7.10 14.18 — 9.22 84.2 
+
+GKA-S 16.73 (−24% ) 1.77 (−75% ) 14.18 72 7.11 (−23% ) 63.9 
+
+DeiT-B 86.57 28.35 56.67 — 35.13 330.2 
+
+GKA-B 65.31 (−25% ) 7.09 (−75% ) 56.67 144 26.76 (−24% ) 249.1 
+
+Across scales, GKA reduces total parameters by 23–25% and FLOPs by 21– 24%, with proportional checkpoint (Ckpt) savings (e.g., 84.2 MB → 63.9 MB for Small). These gains come entirely from attention: removing WQ, W K , W V re-duces attention-module parameters by ≈75%, while MLP capacity is unchanged. Accuracy degrades modestly. GKA-Ti trails DeiT-Ti by 0.66 pp (71.54 vs. 72.2), and GKA-S trails DeiT-S by 1.57 pp (78.23 vs. 79.8). These results suggest that a large portion of projection-based attention capacity can be replaced by distance-based Gaussian diffusion on residual-stream features, while retaining competitive ImageNet performance at lower parameter and FLOP budgets. 
+
+4.3 Efficiency Analysis 
+
+The parameter/FLOP reductions above do not directly translate into wall-clock gains. We therefore measure runtime and memory explicitly. Inference is bench-marked on a single GPU over batch sizes {32 , 64 , 128 , 256 , 512 } and we report peak throughput. Training measurements use DDP across 7 GPUs in BF16 at per-GPU batch sizes 64 and 128. 
+
+Why smaller FLOPs can be slower and how to speed up GKA. Al-though GKA reduces parameters and analytical FLOPs (Table 3), in our cur-rent implementation, it is consistently slower and more memory-intensive (Ta-ble 4). The key reason is kernel fusion: dot-product attention can use fused SDPA/FlashAttention kernels [7] that avoid materializing the full N × N at-tention matrix, streaming tiles through on-chip memory. GKA requires forming pairwise squared distances and Gaussian affinities followed by separate expo-nentiation and row normalization, which (in our implementation) materializes 
+
+N × N intermediates and increases memory traffic. However, it is possible to significantly speed up Gaussian kernel computation using the fast Gauss trans-form [37], Nystrom approximation [10, 17], or GPU-based acceleration [29]. 10 D.Kundu et al.                                                                        
+
+> Table 4: Runtime efficiency on 7 ×RTX 5090. Inference throughput/memory are measured on a single GPU at the best batch size (in parentheses). Training uses DDP across 7 GPUs at the indicated per-GPU batch size (BF16). ∆is relative to DeiT at the same scale.
+> Inference Training (bs = 64/gpu) Training (bs = 128/gpu) Model Throughput Mem Throughput Mem Throughput Mem (img/s) (MB) (img/s) (MB) (img/s) (MB) DeiT-Ti 43,182 (128) 316 12,131 1,245 23,258 2,352
+> GKA-Ti 37,806 (128) 311 7,567 2,484 13,678 4,876
+> ∆%−12% −2% −38% +100% −41% +107% DeiT-S 16,199 (64) 378 10,010 2,569 20,100 4,710
+> GKA-S 15,649 (64) 358 6,519 5,028 7,394 9,755
+> ∆%−3% −5% −35% +96% −63% +107% DeiT-B 4,225 (64) 3,165 7,672 5,961 7,976 10,089
+> GKA-B 2,288 (32) 4,753 3,815 10,528 3,385 19,918
+> ∆%−46% +50% −50% +77% −58% +97%
+
+Scaling trends. Runtime penalties grow with model scale and batch size. From Tiny to Base, the inference throughput gap increases from −12% to −46% and GKA-B’s optimal inference batch size drops to 32 (vs. 64 for DeiT-B), consistent with larger activation footprints. In training, DeiT-S nearly doubles throughput when increasing per-GPU batch size from 64 to 128 (10,010 → 20,100 img/s), while GKA-S improves marginally (6,519 → 7,394 img/s), consistent with a memory-bandwidth bottleneck. At Base scale, GKA reaches 19.9 GB per GPU at batch size 128, limiting further scaling without accumulation/checkpointing. 
+
+Discussion and outlook. These results highlight a gap between parametric ef-ficiency and wall-clock efficiency: removing three projection GEMMs trades tensor-core-friendly matrix multiplications for bandwidth-dominated distance, exponentiation or normalization. A promising direction is fused Gaussian at-tention kernels (CUDA/Triton) that tile distance computation, exponentiation, masking, and normalization in a single IO-aware pass, analogous in spirit to FlashAttention [7]. This systems optimization is orthogonal to the modeling contribution of GKA. 
+
+4.4 Ablation Studies 
+
+Partial projection removal. To isolate which projections matter, we compare against Value-Less Transformers (VLT), which remove WV but retain WQ, W K
+
+with dot-product attention. GKA removes all three input projections. Table 5 reports results for these models. VLT-Ti improves over DeiT-Ti by 1.3 pp (73.5 vs. 72.2), suggesting that WV
+
+can be unnecessary or even harmful at this scale. Removing WQ and WK as well Gaussian Kernel Attention 11                         
+
+> Table 5: Ablation of projection matrices in ViT-Ti on ImageNet-1K. Standard: all projections. VLT: removes WV. GKA: removes WQ, W K, W Vand uses Gaussian similarity. All models are trained for 300 epochs with identical settings.
+> Variant Projections Params (M) FLOPs (G) Top-1 (%)
+> DeiT-Ti (Standard) WQ, W K, W V, W O5.72 2.51 72.2
+> VLT-Ti WQ, W K, W O5.28 2.33 73.5 GKA-Ti WOonly 4.38 1.98 71.54
+
+yields a modest accuracy drop (GKA-Ti at 71.54%) while providing the largest reductions in parameters and FLOPs. Taken together, these results indicate that (i) the value projection is the easiest to remove, and (ii) learned query/key projections provide a measurable but non-essential benefit via learned similarity geometry that a fixed Gaussian kernel only partially recovers at this scale. 
+
+## 5 Experiments with the NLP Task 
+
+Evaluation setting: nanochat . All language experiments use nanochat [13], which provides end-to-end training and evaluation for GPT-style models. nanochat reports language-model quality in bits-per-byte (BPB; lower is better) and down-stream capability using centered per-task scores and an aggregate CORE score aligned with DataComp-LM (DCLM) [16, 23]. We follow nanochat’s reference pipeline based on FineWeb-Edu [25] for tokenization and pretraining. All runs use vocabulary size 32,768 and sequence length 2,048. 
+
+5.1 Models 
+
+Baseline: standard causal self-attention. The baseline is the default depth-20 nanochat GPT-style Transformer [13] with learned WQ, W K , W V and output projection WO .
+
+Gaussian Kernel Attention (GKA, ours). We change only the attention op-erator: dot-product attention is replaced by a Gaussian RBF kernel operat-ing directly on per-head residual-stream features, while keeping the surround-ing block structure (norms, residuals, MLP) unchanged. Concretely, we (i) re-move WQ, W K , W V , (ii) apply RoPE and per-head normalization consistent with nanochat’s QK normalization [13], and (iii) compute masked, row-normalized Gaussian affinities: 
+
+K(h) 
+
+> ij
+
+= exp − ∥˜x(h) 
+
+> i
+
+− ˜x(h) 
+
+> j
+
+∥22
+
+2σ2
+
+> h
+
+!
+
+, W (h) 
+
+> ij
+
+= K(h) 
+
+> ij
+
+I[allowed( i, j )] 
+
+P 
+
+> j′
+
+K(h) 
+
+> ij ′
+
+I[allowed( i, j ′)] , (11) where σh = exp(log σh) is a learnable per-head bandwidth. The head output is 
+
+y(h) 
+
+> i
+
+= P 
+
+> j
+
+W (h) 
+
+> ij
+
+˜x(h) 
+
+> j
+
+, followed by the standard output projection. 12 D.Kundu et al. 
+
+5.2 Depth-20 configurations 
+
+We compare two depth-20 configurations using the same sequence length (2,048) and the same sliding-window pattern SSSL :
+
+– Baseline ( nanochat_base , depth 20): standard attention as implemented in nanochat [13]. 
+
+– GKA (depth 20): nlayer = 20 , nhead = 10 , dmodel = 1280 , vocab size 32,768, window pattern SSSL .
+
+5.3 Results on the NLP Task         
+
+> Table 6: Depth-20 language modeling results (BPB; lower is better).
+> Model Train BPB Val BPB (Val–Train)
+> nanochat_base (depth 20) 0.7800 0.7884 0.0084
+> GKA (depth 20) 0.818256 0.819080 0.000824
+
+Language modeling quality (BPB) From Table 6, we observe that at depth 20, GKA yields higher BPB than the baseline. Notably, the train–validation gap is much smaller for GKA at this training point, consistent with reduced overfitting and/or under-training relative to the baseline. 
+
+Downstream evaluation: CORE subset and task breakdown Nanochat reports centered per-task scores and a CORE aggregate over a fixed suite [13,16]. For the GKA run, long-context tasks were not executed; therefore its reported “CORE” is computed over a reduced subset and is not directly comparable to the baseline CORE. We instead compare the shared subset of tasks and report the mean-centered score over this shared subset in Table 7.                           
+
+> Table 7: Centered CORE subset at depth 20. GKA “CORE” is computed over this subset because long-context tasks were not run. Task Baseline (centered) GKA (centered) ∆(GKA–Base) hellaswag_zeroshot [39] 0.2650 0.2267 -0.0383 copa [27] 0.3000 0.3000 0openbook_qa [22] 0.1520 0.2000 0.0480 lambada_openai [24] 0.3627 0.2750 -0.0877 winograd [15] 0.3040 0.2800 -0.0240 winogrande [28] 0.0671 0.0900 0.0229 Mean over shared subset 0.2418 0.2286 -0.0132
+
+On the shared subset, GKA improves OpenBookQA and Winogrande, matches COPA, and lags on LAMBADA and HellaSwag, yielding a modestly lower mean centered score. Gaussian Kernel Attention 13          
+
+> Table 8: Depth-20 size and compute summary.
+> Model Params (in M) FLOPs/token Train tokens Total train FLOPs
+> nanochat_base 896 3.0042e9 4.5686e9 1.3725e19
+> GKA 378 2.4143e9 2.7787e9 6.7088e18
+
+Model size and training compute Relative to the baseline, we observe from Table 8 that the GKA depth-20 run uses 0.42 × parameters and 0.49 × total training FLOPs. Accordingly, the observed BPB and downstream differences reflect both the attention mechanism change and a substantial scale/compute reduction, motivating controlled scaling comparisons in future work. 
+
+## 6 Summary and Discussion 
+
+We introduced Gaussian Kernel Attention (GKA), a projection-free attention mechanism that replaces the learned WQ, WK , and WV matrices with Gaussian RBF affinities parameterized by a single learnable bandwidth per head. GKA remains a drop-in replacement for multi-head attention, preserving the Trans-former block interface and the output projection WO .Across vision and language, much of the performance of projection-based attention can be recovered with this simplified diffusion operator, at modest accuracy cost. In vision, GKA-Ti and GKA-S close to within 0.66 and 1.57 top-1 points of their DeiT counterparts on ImageNet-1K while reducing parameters by 23–25% and FLOPs by 21–24%. Projection ablations reveal a non-monotonic effect: removing WV can improve accuracy at small scale, while removing WQ
+
+and WK incurs only limited degradation for substantially larger efficiency gains. In language modeling, a depth-20 GKA configuration trained at 0.42 × pa-rameters and 0.49 × total training FLOPs relative to the baseline trains stably with a near-zero train–validation gap at the measured point. On the shared CORE subset, GKA improves OpenBookQA [22] and Winogrande [28], matches COPA, and trails on LAMBADA [24] and HellaSwag [39]. Although these com-parisons are not compute-matched, the pattern is consistent with projection-free diffusion preserving relational aggregation while offering less flexible learned sim-ilarity geometry. Conceptually, GKA makes explicit that self-attention is normalized kernel regression over tokens, linking Transformers to non-local filtering and kernel smoothing operators [2,35]. The learned bandwidths σh expose an interpretable, continuous locality scale per head—an explicit inductive bias not directly pa-rameterized in dot-product attention. 
+
+Limitations and future directions. GKA remains quadratic in sequence length (when unmasked) and cannot leverage fused SDPA/FlashAttention kernels [7], which explains the wall-clock gap despite fewer parameters and FLOPs. A clear systems direction is fused Gaussian attention kernels that tile distance compu-tation, exponentiation, masking, and normalization in a single IO-aware pass. 14 D.Kundu et al. 
+
+On the modeling side, compute-matched scaling studies are needed to isolate architectural effects, and hybrid designs that interleave GKA with projected at-tention may recover additional expressivity while retaining most parameter and interpretability benefits. Overall, GKA demonstrates that projection-based similarity is not a pre-requisite for effective token interaction. A minimal Gaussian diffusion operator, with one learned scalar per head, recovers most of the accuracy of standard at-tention while substantially reducing parameters and FLOPs. By isolating the role of learned projection geometry, GKA sharpens our understanding of what attention actually contributes and establishes a new, interpretable point in the Transformer accuracy–efficiency design space. 
+
+## References 
+
+1. Abnar, S., Zuidema, W.: Quantifying attention flow in transformers. In: Proceed-ings of the 58th Annual Meeting of the Association for Computational Linguistics (ACL). pp. 4190–4197 (2020) 2. Buades, A., Coll, B., Morel, J.M.: A non-local algorithm for image denoising. In: Proceedings of the IEEE Computer Society Conference on Computer Vision and Pattern Recognition (CVPR). pp. 60–65 (2005). https://doi.org/10.1109/CVPR. 2005.38 
+
+3. Caron, M., Touvron, H., Misra, I., Jégou, H., Mairal, J., Bojanowski, P., Joulin, A.: Emerging properties in self-supervised vision transformers. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV). pp. 9650–9660 (2021) 4. Chen, Y., Zeng, Q., Ji, H., Yang, Y.: Skyformer: Remodel self-attention with gaus-sian kernel and nyström method. In: Advances in Neural Information Processing Systems (NeurIPS). pp. 2122–2135 (2021), https://arxiv.org/abs/2111.00035 
+
+5. Choromanski, K.M., Likhosherstov, V., Dohan, D., Song, X., Gane, A., Sarlos, T., Hawkins, P., Davis, J.Q., Mohiuddin, A., Kaiser, L., Belanger, D., Colwell, L., Weller, A.: Rethinking attention with performers. In: International Conference on Learning Representations (ICLR) (2021), https://openreview.net/forum?id= Ua6zuk0WRH 
+
+6. Cubuk, E.D., Zoph, B., Shlens, J., Le, Q.V.: Randaugment: Practical automated data augmentation with a reduced search space. In: IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW). pp. 702–703 (2020) 7. Dao, T., Fu, D.Y., Ermon, S., Rudra, A., Ré, C.: Flashattention: Fast and memory-efficient exact attention with IO-awareness. In: Advances in Neural Information Processing Systems (NeurIPS). vol. 35, pp. 16344–16359 (2022), https://arxiv. org/abs/2205.14135 
+
+8. Deng, J., Dong, W., Socher, R., Li, L.J., Li, K., Fei-Fei, L.: Imagenet: A large-scale hierarchical image database. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR). pp. 248–255 (2009) 9. Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., Uszkoreit, J., Houlsby, N.: An image is worth 16x16 words: Transformers for image recognition at scale. In: International Conference on Learning Representations (ICLR) (2021), https: //openreview.net/forum?id=YicbFdNTTy , arXiv:2010.11929 Gaussian Kernel Attention 15 10. Drineas, P., Mahoney, M.W., Cristianini, N.: On the nyström method for approx-imating a gram matrix for improved kernel-based learning. journal of machine learning research 6(12) (2005) 11. Hoffer, E., Ben-Nun, T., Hubara, I., Giladi, N., Hoefler, T., Soudry, D.: Augment your batch: Improving generalization through instance repetition. In: IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR). pp. 8129–8138 (2020) 12. Huang, G., Sun, Y., Liu, Z., Sedra, D., Weinberger, K.Q.: Deep networks with stochastic depth. In: European Conference on Computer Vision (ECCV). pp. 646– 661. Springer (2016) 13. Karpathy, A.: nanochat. GitHub repository (2025), https : / / github . com / karpathy/nanochat , accessed 2026-02-28 14. Katharopoulos, A., Vyas, A., Pappas, N., Fleuret, F.: Transformers are RNNs: Fast autoregressive transformers with linear attention. In: Proceedings of the 37th International Conference on Machine Learning (ICML). Proceedings of Machine Learning Research, vol. 119, pp. 5156–5165. PMLR (2020), https://proceedings. mlr.press/v119/katharopoulos20a.html 
+
+15. Levesque, H.J., Davis, E., Morgenstern, L.: The winograd schema challenge. In: Proceedings of the Thirteenth International Conference on Principles of Knowledge Representation and Reasoning (KR) (2012), https://cdn.aaai.org/ocs/4492/ 4492-21843-1-PB.pdf 
+
+16. Li, J., Fang, A., Smyrnis, G., Ivgi, M., Jordan, M., Gadre, S., Bansal, H., Guha, E., Keh, S., Arora, K., et al.: Datacomp-lm: In search of the next generation of training sets for language models. arXiv preprint arXiv:2406.11794 (2024), https: //arxiv.org/abs/2406.11794 
+
+17. Li, M., Bi, W., Kwok, J.T., Lu, B.L.: Large-scale nyström kernel matrix approxi-mation using randomized svd. IEEE transactions on neural networks and learning systems 26 (1), 152–164 (2014) 18. Liu, J., Yue, Y., Welling, M., Song, Y.: Krause synchronization transformers. arXiv preprint arXiv:2602.11534 (2026), https://arxiv.org/abs/2602.11534 
+
+19. Liu, Z., Lin, Y., Cao, Y., Hu, H., Wei, Y., Zhang, Z., Lin, S., Guo, B.: Swin trans-former: Hierarchical vision transformer using shifted windows. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV). pp. 10012– 10022 (2021), https://openaccess.thecvf.com/content/ICCV2021/papers/ Liu _ Swin _ Transformer _ Hierarchical_Vision_ Transformer _Using_Shifted_ Windows_ICCV_2021_paper.pdf 
+
+20. Loshchilov, I., Hutter, F.: Decoupled weight decay regularization. In: International Conference on Learning Representations (ICLR) (2019) 21. Luo, S., Li, S., Cai, T., He, D., Peng, D., Zheng, S., Ke, G., Wang, L., Liu, T.Y.: Stable, fast and accurate: Kernelized attention with relative positional encoding. In: Advances in Neural Information Processing Systems (NeurIPS). pp. 22795– 22807 (2021), https://arxiv.org/abs/2106.12566 
+
+22. Mihaylov, T., Clark, P., Khot, T., Sabharwal, A.: Can a suit of armor conduct electricity? a new dataset for open book question answering. In: Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP) (2018). https://doi.org/10.18653/v1/D18-1260 , https://aclanthology.org/ D18-1260/ 
+
+23. ML Foundations: dclm: Datacomp for language models. GitHub repository (2024), 
+
+https://github.com/mlfoundations/dclm 16 D.Kundu et al. 24. Paperno, D., Kruszewski, G., Lazaridou, A., Pham, N.Q., Bernardi, R., Pezzelle, S., Baroni, M., Boleda, G., Fernández, R.: The LAMBADA dataset: Word prediction requiring a broad discourse context. In: Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (ACL). pp. 1525–1534 (2016). 
+
+https://doi.org/10.18653/v1/P16- 1144 , https://aclanthology.org/P16-1144/ 
+
+25. Penedo, G., Kydlíček, H., Ben Allal, L., Lozhkov, A., Mitchell, M., Raffel, C., von Werra, L., Wolf, T.: The fineweb datasets: Decanting the web for the finest text data at scale. arXiv preprint arXiv:2406.17557 (2024), https://arxiv.org/abs/ 2406.17557 
+
+26. Rahimi, A., Recht, B.: Random features for large-scale kernel machines. In: Advances in Neural Information Processing Systems (NeurIPS) (2007), https: //papers.nips.cc/paper/3182- random- features- for- large- scale- kernel-machines 
+
+27. Roemmele, M., Bejan, C.A., Gordon, A.S.: Choice of plausible alternatives: An evaluation of commonsense causal reasoning. In: AAAI Spring Symposium Series: Logical Formalizations of Commonsense Reasoning (2011), https://cdn.aaai. org/ocs/2418/2418-10878-1-PB.pdf 
+
+28. Sakaguchi, K., Le Bras, R., Bhagavatula, C., Choi, Y.: WinoGrande: An adversarial winograd schema challenge at scale. In: Proceedings of the AAAI Conference on Artificial Intelligence (AAAI) (2020), https://arxiv.org/abs/1907.10641 
+
+29. Srinivasan, B.V., Hu, Q., Duraiswami, R., et al.: Gpuml: Graphical processors for speeding up kernel machines. In: Workshop on High Performance Analytics-Algorithms, Implementations, and Applications, Siam Conference on Data Mining. vol. 31 (2010) 30. Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J., Wojna, Z.: Rethinking the incep-tion architecture for computer vision. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR). pp. 2818–2826 (2016) 31. Touvron, H., Cord, M., Douze, M., Massa, F., Sablayrolles, A., Jégou, H.: Training data-efficient image transformers & distillation through attention. In: Proceedings of the 38th International Conference on Machine Learning (ICML). Proceedings of Machine Learning Research, vol. 139, pp. 10347–10357. PMLR (2021), https: //proceedings.mlr.press/v139/touvron21a.html 
+
+32. Touvron, H., Cord, M., Douze, M., Massa, F., Sablayrolles, A., Jégou, H.: Training data-efficient image transformers & distillation through attention. In: International Conference on Machine Learning (ICML). pp. 10347–10357. PMLR (2021) 33. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A.N., Kaiser, L., Polosukhin, I.: Attention is all you need. In: Advances in Neural Information Processing Systems (NeurIPS). vol. 30 (2017), https://arxiv.org/abs/1706. 03762 
+
+34. Wang, S., Li, B.Z., Khabsa, M., Fang, H., Ma, H.: Linformer: Self-attention with linear complexity. arXiv preprint arXiv:2006.04768 (2020), https://arxiv.org/ abs/2006.04768 
+
+35. Wang, X., Girshick, R., Gupta, A., He, K.: Non-local neural networks. In: Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recog-nition (CVPR). pp. 7794–7803 (2018). https://doi.org/10.1109/CVPR.2018. 00813 , https://openaccess.thecvf.com/content_cvpr_2018/papers/Wang_ Non-Local_Neural_Networks_CVPR_2018_paper.pdf 
+
+36. Xiong, Y., Zeng, Z., Chakraborty, R., Tan, M., Fung, G., Li, Y., Singh, V.: Nys-trömformer: A nyström-based algorithm for approximating self-attention. In: Pro-Gaussian Kernel Attention 17 ceedings of the AAAI Conference on Artificial Intelligence (AAAI). pp. 14138– 14148 (2021). https://doi.org/10.1609/aaai.v35i16.17664 , https://arxiv. org/abs/2102.03902 
+
+37. Yang, C., Duraiswami, R., Davis, L.S.: Efficient kernel machines using the improved fast gauss transform. In: Saul, L., Weiss, Y., Bottou, L. (eds.) Advances in Neural Information Processing Systems. vol. 17. MIT Press (2004), https : / / proceedings. neurips.cc/ paper_files/ paper/2004/ file/ 85353d3b2f39b9c9b5ee3576578c04b7-Paper.pdf 
+
+38. Yun, S., Han, D., Oh, S.J., Chun, S., Choe, J., Yoo, Y.: Cutmix: Regularization strategy to train strong classifiers with localizable features. In: IEEE/CVF Inter-national Conference on Computer Vision (ICCV). pp. 6023–6032 (2019) 39. Zellers, R., Holtzman, A., Bisk, Y., Farhadi, A., Choi, Y.: HellaSwag: Can a ma-chine really finish your sentence? In: Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (ACL) (2019). https://doi.org/ 10.18653/v1/P19-1472 , https://aclanthology.org/P19-1472/ 
+
+40. Zhang, H., Cisse, M., Dauphin, Y.N., Lopez-Paz, D.: mixup: Beyond empirical risk minimization. In: International Conference on Learning Representations (ICLR) (2018) 41. Zhong, Z., Zheng, L., Kang, G., Li, S., Yang, Y.: Random erasing data augmenta-tion. Proceedings of the AAAI Conference on Artificial Intelligence 34 (07), 13001– 13008 (2020) 
+
+## 7 Attention Visualization Methodology 
+
+To provide interpretable insight into the behavior of Gaussian Kernel Attention (GKA), we construct an exhaustive visualization pipeline that probes attention patterns at multiple levels of granularity: per-head, per-layer, patch-to-patch, and network-wide. All visualizations are generated from a single forward pass through the trained GKA model. In this documents we show the results for GKA-Tiny model for a single image. For other models and images please refer the supplementary folder. 
+
+7.1 Gaussian Kernel Attention Recap 
+
+Recall that GKA replaces the standard dot-product attention mechanism with a Gaussian radial basis function (RBF) kernel operating directly on token features. Given input tokens X ∈ RN ×d reshaped into H heads of dimension dh = d/H ,the attention weights for head h are computed as: 
+
+A(h) 
+
+> ij
+
+= exp  −∥ x(h) 
+
+> i
+
+− x(h) 
+
+> j
+
+∥2 / 2σ(h)2PNk=1 exp  −∥ x(h) 
+
+> i
+
+− x(h) 
+
+> k
+
+∥2 / 2σ(h)2 , (12) where σ(h) is a learnable per-head bandwidth parameter, and the pairwise squared Euclidean distances are computed as ∥xi − xj ∥2 = ∥xi∥2 + ∥xj ∥2 − 2 x⊤ 
+
+> i
+
+xj . Un-like standard multi-head self-attention [33], GKA eliminates all learned WQ,
+
+WK , and WV projection matrices, retaining only the per-head scalar σ(h) and the output projection WO .18 D.Kundu et al. 
+
+7.2 Attention Rollout 
+
+Following [1], we compute attention rollout to approximate the total attention flow from the input to the [CLS] token across all layers. At each layer ℓ, we first compute the head-averaged attention matrix ¯A(ℓ) = 1
+
+> H
+
+P 
+
+> h
+
+A(ℓ,h ), then augment it with a residual connection identity term: 
+
+ˆA(ℓ) = 0 .5 · ¯A(ℓ) + 0 .5 · I,  (13) followed by row-normalization. The cumulative rollout is then R = QLℓ=1 ˆA(ℓ),and the CLS row R0,1: N is reshaped and overlaid on the input image. To ex-amine the effect of pruning low-confidence connections, we additionally apply discard-ratio thresholding [1] at ratios {0.0, 0.5, 0.9}: entries below the corre-sponding quantile are zeroed before re-normalization. This reveals whether the network concentrates attention on semantically meaningful regions when weak connections are removed. Network-Wide Attention Rollout 
+
+> Fig. 3
+
+7.3 Learned Bandwidth ( σ) Analysis 
+
+The per-head bandwidth parameters {σ(ℓ,h )} are the only learnable parameters within GKA’s attention computation (aside from WO ). We visualize these in two complementary formats: Gaussian Kernel Attention 19 
+
+Heatmap. A H × L matrix displaying the learned σ value for each head–layer pair, colored using the YlOrRd (yellow–orange–red) sequential colormap. This reveals whether the network has learned to differentiate bandwidth across heads and layers. 
+
+Line plot. Per-head σ trajectories plotted against layer depth, showing the evo-lution of bandwidth from early to late layers. In standard dot-product attention, analogous analysis would track the effective temperature of the softmax; here, 
+
+σ directly controls the spatial extent of the Gaussian kernel, with larger val-ues producing broader (more uniform) attention and smaller values producing sharper (more localized) attention. 1 2 3 4 5 6 7 8 9 10 11 12         
+
+> 1
+> 2
+> 3
+> Learned σper Head/Layer
+> 246810 12
+> Layer
+> 0.0
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> 12.5
+> 15.0
+> 17.5
+> σEvolution Across Layers
+> Head 1
+> Head 2
+> Head 3
+> 2
+> 4
+> 6
+> 8
+> 10
+> 12
+> 14
+> 16
+> σ
+
+Fig. 4 
+
+7.4 Per-Head CLS Attention Maps 
+
+For each layer ℓ ∈ { 1, . . . , L } and head h ∈ { 1, . . . , H }, we extract the attention distribution from the [CLS] token to all spatial patch tokens. Given an input image of size 224 × 224 with patch size 16 × 16 , this yields a 14 × 14 spatial attention map per head. Formally, for layer ℓ and head h, the CLS-to-patch attention is: 
+
+M(ℓ,h ) 
+
+> CLS
+
+= A(ℓ,h )0,1: N ∈ RP ×P , (14) where P = 14 is the spatial grid dimension and index 0 corresponds to the [CLS] 
+
+token. Each 14 × 14 map is bilinearly upscaled to the original image resolution and overlaid with partial transparency ( α=0 .6) using the inferno colormap, following the visualization conventions of [3,9]. We generate one composite figure per layer containing all H heads side-by-side, yielding L figures in total. 20 D.Kundu et al. Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 1 
+
+Fig. 5 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 2 
+
+Fig. 6 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 3 
+
+Fig. 7 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 4 
+
+Fig. 8 Gaussian Kernel Attention 21 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 5 
+
+Fig. 9 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 6 
+
+Fig. 10 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 7 
+
+Fig. 11 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 8 
+
+Fig. 12 22 D.Kundu et al. Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 9 
+
+Fig. 13 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 10 
+
+Fig. 14 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 11 
+
+Fig. 15 Input Head 1 Head 2 Head 3 
+
+Per-Head CLS Attention — Layer 12 
+
+Fig. 16 Gaussian Kernel Attention 23 
+
+7.5 Patch-to-Patch Attention 
+
+To examine how spatial tokens attend to one another (rather than how [CLS] 
+
+aggregates information), we select four query patches at canonical positions— specifically at grid coordinates (⌊P/ 4⌋, ⌊P/ 4⌋), (⌊P/ 2⌋, ⌊P/ 2⌋), (⌊3P/ 4⌋, ⌊3P/ 4⌋),and (⌊P/ 4⌋, ⌊3P/ 4⌋)—corresponding to the upper-left, center, lower-right, and upper-right quadrants. For each query patch q, we compute the head-averaged attention distribution over all spatial tokens: 
+
+M(ℓ,q ) 
+
+> patch
+
+= 1
+
+H
+
+> H
+
+X
+
+> h=1
+
+A(ℓ,h ) 
+
+> q, 1: N
+
+∈ RP ×P . (15) Each per-query map is displayed both as a raw 14 × 14 heatmap and as an upscaled overlay on the original image, with the query patch location indicated by a colored bounding box. This visualization reveals the effective receptive field of individual patches and illustrates how GKA’s distance-based kernel induces spatially localized or globally diffuse attention depending on the scene content. Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+> Patch-to-Patch Attention — Layer 1
+
+Fig. 17 24 D.Kundu et al. Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 2 
+
+Fig. 18 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 3 
+
+Fig. 19 Gaussian Kernel Attention 25 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 4 
+
+Fig. 20 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 5 
+
+Fig. 21 26 D.Kundu et al. Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 6 
+
+Fig. 22 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 7 
+
+Fig. 23 Gaussian Kernel Attention 27 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 8 
+
+Fig. 24 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 9 
+
+Fig. 25 28 D.Kundu et al. Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 10 
+
+Fig. 26 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 11 
+
+Fig. 27 Gaussian Kernel Attention 29 Input Patch (3,3) Patch (7,7) Patch (10,10) Patch (3,10) 
+
+Patch-to-Patch Attention — Layer 12 
+
+Fig. 28 30 D.Kundu et al. 
+
+7.6 Layer-wise Kernel Evolution 
+
+To provide a holistic view of how attention patterns develop across depth, we generate a single composite figure with L rows (one per layer) and three columns: (1) the head-averaged full attention matrix, (2) the head-averaged CLS-to-patch attention as a 14 × 14 heatmap, and (3) the same CLS attention overlaid on the input image. This three-column layout, spanning all L=12 layers, allows direct visual comparison of how the Gaussian kernel’s effective receptive field evolves from early layers (which tend toward near-identity attention when σ is small) to later layers. Layer 1   
+
+> Attention Matrix CLS Attention Overlay
+> Layer 2 Layer 3 Layer 4
+
+Gaussian Kernel Evolution — Layers 1–4 
+
+Fig. 29 Gaussian Kernel Attention 31 Layer 5   
+
+> Attention Matrix CLS Attention Overlay
+> Layer 6 Layer 7 Layer 8
+
+Gaussian Kernel Evolution — Layers 5–8 
+
+Fig. 30 32 D.Kundu et al. Layer 9 
+
+Attention Matrix CLS Attention Overlay 
+
+> Layer 10 Layer 11 Layer 12
+
+Gaussian Kernel Evolution — Layers 9–12 
+
+Fig. 31 Gaussian Kernel Attention 33 
+
+7.7 Raw Attention Matrices with Diagonal Masking 
+
+A distinctive property of GKA is that the self-attention weight A(h) 
+
+> ii
+
+(the di-agonal) tends to dominate when the learned bandwidth σ(h) remains close to its initialization value, since ∥xi − xi∥2 = 0 always yields the maximum kernel response. To reveal the structure of cross-token attention, we visualize the full 
+
+N × N attention matrix for each layer–head pair with the diagonal explicitly masked (set to zero) before applying the colormap. This rescales the color range to the off-diagonal entries, exposing fine-grained spatial relationships that would otherwise be invisible. For visualization clarity, matrices exceeding 50 tokens are uniformly subsampled. We produce one figure per layer–head combination, yield-ing L × H individual matrices. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 1, Head 1 
+
+> −0.100
+> −0.075
+> −0.050
+> −0.025
+> 0.000
+> 0.025
+> 0.050
+> 0.075
+> 0.100
+> Fig. 32
+
+34 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 1, Head 2 
+
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+
+1e−17 
+
+Fig. 33 Gaussian Kernel Attention 35 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 1, Head 3 
+
+−0.100 
+
+−0.075 
+
+−0.050 
+
+−0.025 
+
+0.000 
+
+0.025 
+
+0.050 
+
+0.075 
+
+0.100 
+
+Fig. 34 36 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 2, Head 1 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+> 0.030
+
+Fig. 35 Gaussian Kernel Attention 37 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 2, Head 2 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+0.035 
+
+Fig. 36 38 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 2, Head 3 
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+
+Fig. 37 Gaussian Kernel Attention 39 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 3, Head 1 
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+
+Fig. 38 40 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 3, Head 2 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+0.035 
+
+0.040 
+
+Fig. 39 Gaussian Kernel Attention 41 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 3, Head 3 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+0.035 
+
+Fig. 40 42 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 4, Head 1 
+
+> 0.00
+> 0.02
+> 0.04
+> 0.06
+> 0.08
+
+Fig. 41 Gaussian Kernel Attention 43 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 4, Head 2 
+
+> 0.000
+> 0.002
+> 0.004
+> 0.006
+> 0.008
+
+Fig. 42 44 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 4, Head 3 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+> 0.030
+
+Fig. 43 Gaussian Kernel Attention 45 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 5, Head 1 
+
+> 0.00
+> 0.02
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> 0.12
+
+Fig. 44 46 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 5, Head 2 
+
+0.0000 
+
+0.0025 
+
+0.0050 
+
+0.0075 
+
+0.0100 
+
+0.0125 
+
+0.0150 
+
+0.0175 
+
+0.0200 
+
+Fig. 45 Gaussian Kernel Attention 47 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 5, Head 3 
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+
+Fig. 46 48 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 6, Head 1 
+
+0.00 
+
+0.01 
+
+0.02 
+
+0.03 
+
+0.04 
+
+0.05 
+
+0.06 
+
+0.07 
+
+0.08 
+
+Fig. 47 Gaussian Kernel Attention 49 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 6, Head 2 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+0.035 
+
+Fig. 48 50 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 6, Head 3 
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+> 0.07
+
+Fig. 49 Gaussian Kernel Attention 51 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 7, Head 1 
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+
+Fig. 50 52 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 7, Head 2 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+
+Fig. 51 Gaussian Kernel Attention 53 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 7, Head 3 
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+
+Fig. 52 54 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+# GKA Matrix (Diag Masked) — Layer 8, Head 1 
+
+> 0.00
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+> 0.05
+> 0.06
+
+Fig. 53 Gaussian Kernel Attention 55 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 8, Head 2 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+
+Fig. 54 56 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 8, Head 3 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+> 0.030
+
+Fig. 55 Gaussian Kernel Attention 57 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 9, Head 1 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+
+Fig. 56 58 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 9, Head 2 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+0.035 
+
+0.040 
+
+Fig. 57 Gaussian Kernel Attention 59 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 9, Head 3 
+
+0.0000 
+
+0.0025 
+
+0.0050 
+
+0.0075 
+
+0.0100 
+
+0.0125 
+
+0.0150 
+
+0.0175 
+
+Fig. 58 60 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 10, Head 1 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+0.035 
+
+Fig. 59 Gaussian Kernel Attention 61 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 10, Head 2 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+Fig. 60 62 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 10, Head 3 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+
+Fig. 61 Gaussian Kernel Attention 63 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 11, Head 1 
+
+0.000 
+
+0.005 
+
+0.010 
+
+0.015 
+
+0.020 
+
+0.025 
+
+0.030 
+
+Fig. 62 64 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 11, Head 2 
+
+> 0.000
+> 0.005
+> 0.010
+> 0.015
+> 0.020
+> 0.025
+> 0.030
+
+Fig. 63 Gaussian Kernel Attention 65 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 11, Head 3 
+
+0.0000 
+
+0.0025 
+
+0.0050 
+
+0.0075 
+
+0.0100 
+
+0.0125 
+
+0.0150 
+
+0.0175 
+
+Fig. 64 66 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 12, Head 1 
+
+0.0000 
+
+0.0025 
+
+0.0050 
+
+0.0075 
+
+0.0100 
+
+0.0125 
+
+0.0150 
+
+0.0175 
+
+Fig. 65 Gaussian Kernel Attention 67 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 12, Head 2 
+
+0.000 
+
+0.002 
+
+0.004 
+
+0.006 
+
+0.008 
+
+0.010 
+
+0.012 
+
+0.014 
+
+0.016 
+
+Fig. 66 68 D.Kundu et al. 0 10 20 30 40 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+## GKA Matrix (Diag Masked) — Layer 12, Head 3 
+
+> 0.000
+> 0.002
+> 0.004
+> 0.006
+> 0.008
+> 0.010
+
+Fig. 67 Gaussian Kernel Attention 69 
+
+7.8 Implementation Details 
+
+All attention maps are extracted via forward hooks registered on each 
+
+GaussianKernelAttention module, recomputing the kernel from the interme-diate features to ensure exact correspondence with the trained model’s behavior. The extraction is performed in a single forward pass with no gradient compu-tation. Spatial upscaling from the 14 × 14 patch grid to the 224 × 224 image resolution uses bicubic interpolation.
